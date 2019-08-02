@@ -15,4 +15,4 @@ Currently it only stores the `Nodejs` project's source code.
 Links to runtime-specific _Readme.md_ files:
 ----------------
 
-[![Node.js](readme-assets/nodejs.png)](Ipc-Nodejs/README.md)
+[![Node.js](readme-assets/nodejs.png)](clients/nodejs/README.md)
