@@ -54,8 +54,8 @@ class CallInfo {
         public readonly message: string
     ) {
         promise.then(
-            (x) => this.result = x,
-            (x) => this.error = x as any);
+            x => this.result = x,
+            x => this.error = x as any);
     }
 }
 
@@ -79,6 +79,9 @@ describe('NamedPipeClient', () => {
     test('end-2-end with callbacks', async () => {
         const pipeName = generateGuid();
         const serverPath = '.\\IpcSampleServerForNodejs\\included-bin\\Debug\\net461\\IpcSampleServerForNodejs.exe';
+
+        console.log(`***** server path is ${serverPath}`);
+
         if (!fs.existsSync(serverPath)) {
             const errorMessage = `Could not find "${serverPath}". Make sure the IpcSampleServerForNodejs project is built.`;
             console.error(errorMessage);
@@ -99,9 +102,9 @@ describe('NamedPipeClient', () => {
             await client.proxy.HeaderAsync(`Batch ${new Date()}`);
 
             const infos = range(0, 500)
-                .map((index) => CallInfo.create(index, client.proxy));
+                .map(index => CallInfo.create(index, client.proxy));
 
-            await PromiseHelper.whenAll(...infos.map((info) => info.promise));
+            await PromiseHelper.whenAll(...infos.map(info => info.promise));
 
             for (const info of infos) {
                 const expected = info.index + info.message.length;
@@ -117,7 +120,7 @@ describe('NamedPipeClient', () => {
         } finally {
             child_process.exec(`taskkill /pid ${serverProcess.pid} /T /F`);
         }
-    }, 10 * 60 * 1000);
+    }, 6 * 10 * 1000);
 
     test('end-2-end without callbacks', async () => {
         const pipeName = generateGuid();
