@@ -1,0 +1,26 @@
+{
+    "name": "root",
+    "private": true,
+    "workspaces": [
+        "projects/*"
+    ],
+    "scripts": {
+        "coverage": "jest --coverage",
+        "unit": "jest",
+        "ipc": "jest -t 'NamedPipeClient'",
+        "refreshVSToken" : "vsts-npm-auth -config .npmrc"
+    },
+    "devDependencies": {
+        "@types/node": "^12.6.8",
+        "babel-jest": "^24.8.0",
+        "jest": "^24.8.0",
+        "jest-haste-map": "^24.8.1",
+        "jest-resolve": "^24.8.0",
+        "jest-styled-components": "^6.3.3",
+        "lerna": "^3.16.4",
+        "react-test-renderer": "^16.8.6",
+        "ts-jest": "^24.0.2",
+        "tslint": "^5.18.0",
+        "typescript": "^3.5.3"
+    }
+}

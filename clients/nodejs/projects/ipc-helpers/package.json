@@ -1,0 +1,24 @@
+{
+    "name": "@uipath/ipc-helpers",
+    "version": "0.0.21",
+    "description": "Foundation classes for @uipath/ipc",
+    "main": "dist/index.js",
+    "typings": "dist/index",
+    "scripts": {
+        "build": "tsc",
+        "build:watch": "tsc --watch",
+        "lint": "tslint --project \"./tsconfig.json\""
+    },
+    "author": "Eduard Dumitru",
+    "license": "MIT",
+    "files": [
+        "dist/**/*"
+    ],
+    "devDependencies": {
+        "@types/jest": "^22.1.4",
+        "@types/node": "^9.4.6",
+        "jest": "^22.4.2",
+        "ts-jest": "^22.4.1",
+        "typescript": "^2.7.2"
+    }
+}
