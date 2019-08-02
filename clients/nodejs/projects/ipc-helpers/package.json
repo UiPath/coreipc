@@ -1,6 +1,6 @@
 {
     "name": "@uipath/ipc-helpers",
-    "version": "0.0.23",
+    "version": "0.0.24",
     "description": "Foundation classes for @uipath/ipc",
     "main": "dist/index.js",
     "typings": "dist/index",
@@ -14,6 +14,10 @@
     "files": [
         "dist/**/*"
     ],
+    "publishConfig": {
+        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages@Local/npm/registry/",
+        "access": "public"
+    },
     "devDependencies": {
         "@types/jest": "^22.1.4",
         "@types/node": "^9.4.6",
