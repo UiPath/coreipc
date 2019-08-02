@@ -1,6 +1,6 @@
 {
     "name": "@uipath/ipc-helpers",
-    "version": "0.0.31",
+    "version": "0.0.32",
     "description": "Foundation classes for @uipath/ipc",
     "main": "dist/index.js",
     "typings": "dist/index",
@@ -25,5 +25,5 @@
         "ts-jest": "^22.4.1",
         "typescript": "^2.7.2"
     },
-    "gitHead": "a3004e8fdcc85b97908e90cc0f3f9e638b57aa3a"
+    "gitHead": "edef4e238fde99232400d5270c6f54c3f054cb10"
 }
