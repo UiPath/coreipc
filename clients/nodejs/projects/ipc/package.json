@@ -1,6 +1,6 @@
 {
     "name": "@uipath/ipc",
-    "version": "0.0.30",
+    "version": "0.0.31",
     "description": "Offers a service model API for communication over named pipes.",
     "main": "dist/index.js",
     "typings": "dist/index",
@@ -19,7 +19,7 @@
         "access": "public"
     },
     "dependencies": {
-        "@uipath/ipc-helpers": "^0.0.30",
+        "@uipath/ipc-helpers": "^0.0.31",
         "rxjs": "6.5.2"
     },
     "devDependencies": {
@@ -29,5 +29,5 @@
         "ts-jest": "^22.4.1",
         "typescript": "^2.7.2"
     },
-    "gitHead": "ae3ca47708d65beea656efe075097b7039ace8e6"
+    "gitHead": "a3004e8fdcc85b97908e90cc0f3f9e638b57aa3a"
 }
