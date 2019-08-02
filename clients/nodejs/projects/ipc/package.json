@@ -1,6 +1,6 @@
 {
     "name": "@uipath/ipc",
-    "version": "0.0.21",
+    "version": "0.0.22",
     "description": "Offers a service model API for communication over named pipes.",
     "main": "dist/index.js",
     "typings": "dist/index",
@@ -15,7 +15,7 @@
         "dist/**/*"
     ],
     "dependencies": {
-        "@uipath/ipc-helpers": "^0.0.21",
+        "@uipath/ipc-helpers": "^0.0.22",
         "rxjs": "6.5.2"
     },
     "devDependencies": {
