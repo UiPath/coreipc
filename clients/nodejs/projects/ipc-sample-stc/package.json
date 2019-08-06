@@ -1,7 +1,8 @@
 {
-    "name": "@uipath/ipc",
+    "name": "@uipath/ipc-sample-stc",
     "version": "0.0.32",
-    "description": "Offers a service model API for communication over named pipes.",
+    "description": "Sample Strongly-Typed-Client showcasing the `@uipath/ipc` library",
+    "private": false,
     "main": "dist/index.js",
     "typings": "dist/index",
     "scripts": {
@@ -19,6 +20,7 @@
         "access": "public"
     },
     "dependencies": {
+        "@uipath/ipc": "^0.0.32",
         "@uipath/ipc-helpers": "^0.0.32",
         "rxjs": "6.5.2"
     },

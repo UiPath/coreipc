@@ -147,7 +147,8 @@ export class Broker implements IBroker {
         }
 
         const promises = Object
-            .values(this._processes)
+            .keys(this._processes)
+            .map(key => this._processes[key])
             .map((process: IProcessInfo) => process.promise);
 
         await PromiseHelper.whenAll(...promises);
