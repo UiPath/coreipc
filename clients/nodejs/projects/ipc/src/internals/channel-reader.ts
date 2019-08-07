@@ -13,7 +13,7 @@ export class ChannelReader implements IChannelReader {
     private readonly _window = new BufferWindow();
 
     constructor(private readonly _pipe: IPipeWrapper) {
-        this._subscription = this._pipe.signals.subscribe((signal) => {
+        this._subscription = this._pipe.signals.subscribe(signal => {
             if (signal instanceof PipeDataSignal) {
                 this._window.enqueue(signal.data);
                 return;
@@ -22,7 +22,6 @@ export class ChannelReader implements IChannelReader {
             /* istanbul ignore else */
             if (signal instanceof PipeClosedSignal) {
                 this._window.markClosed(signal.maybeError);
-
             } else {
                 throw new Error(`Not supported PipeSignal type (${signal})`);
             }
@@ -39,13 +38,16 @@ export class ChannelReader implements IChannelReader {
             buffer = buffer.slice(cbRead);
         }
     }
-    public dispose(): void { this._subscription.unsubscribe(); }
+    public dispose(): void {
+        this._pipe.dispose();
+        this._subscription.unsubscribe();
+    }
 }
 
 // tslint:disable-next-line: max-classes-per-file
 class BufferWindow {
     private readonly _buffers = new Quack<Buffer | PoisonPill>();
-    private _reading = false;
+    private _isReading = false;
     private _pcsDataAvailable: PromiseCompletionSource<void> | null = null;
 
     private _maybeLastError: Error | null = null;
@@ -82,7 +84,7 @@ class BufferWindow {
     // (the method along with its declaring class are internal)
     // tslint:disable-next-line: member-ordering
     public async readAsync(destination: Buffer, cancellationToken: CancellationToken): Promise<number> {
-        if (this._reading) {
+        if (this._isReading) {
             throw new Error('The method BufferWindow.readAsync must not be called concurrently');
         }
 
@@ -90,7 +92,7 @@ class BufferWindow {
         if (destination.length === 0) { return 0; }
 
         try {
-            this._reading = true;
+            this._isReading = true;
 
             if (this._buffers.empty) { await this.waitForDataAsync(cancellationToken); }
 
@@ -123,7 +125,7 @@ class BufferWindow {
 
             return cbRead;
         } finally {
-            this._reading = false;
+            this._isReading = false;
         }
     }
 }

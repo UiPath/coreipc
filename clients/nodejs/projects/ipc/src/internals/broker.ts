@@ -19,6 +19,7 @@ import {
 
 /* @internal */
 export interface IBroker extends IAsyncDisposable {
+    readonly errors: Observable<Error>;
     sendReceiveAsync(request: InternalRequestMessage, cancellationToken: CancellationToken): Promise<InternalResponseMessage>;
 }
 
@@ -187,72 +188,3 @@ export class BrokerWithCallbacks extends Broker implements IBrokerWithCallbacks 
         this._callbacks.complete();
     }
 }
-
-/* @internal */
-// tslint:disable-next-line: max-classes-per-file
-// export class OldBroker implements IBroker {
-//     private readonly _cts = new CancellationTokenSource();
-//     private readonly _loop: Promise<void>;
-//     private readonly _callbacks = new ReplaySubject<CallbackContext>();
-//     private readonly _completionTable: ICompletionDictionary = {};
-//     private _sequence = 0;
-//     private get nextRequestId(): string { return `${this._sequence++}`; }
-
-//     public get callbacks(): Observable<CallbackContext> { return this._callbacks; }
-
-//     constructor(private readonly _channel: IChannel) {
-//         if (!_channel) {
-//             throw new ArgumentNullError('_channel');
-//         }
-//         this._loop = this.loopAsync();
-//     }
-
-//     public async sendReceiveAsync(request: InternalRequestMessage, cancellationToken: CancellationToken): Promise<InternalResponseMessage> {
-//         request.Id = this.nextRequestId;
-//         const pcs = new PromiseCompletionSource<InternalResponseMessage>();
-//         this._completionTable[request.Id] = pcs;
-
-//         await request.writeWithEnvelopeAsync(this._channel, cancellationToken);
-//         const response = await pcs.promise;
-
-//         return response;
-//     }
-
-//     public async disposeAsync(): Promise<void> {
-//         this._cts.cancel();
-//         await this._loop;
-//         for (const requestId in this._completionTable) {
-//             if (typeof requestId === 'string') {
-//                 this._completionTable[requestId].trySetCanceled();
-//             }
-//         }
-//     }
-
-//     private async loopAsync(): Promise<void> {
-//         const token = this._cts.token;
-
-//         while (!token.isCancellationRequested) {
-//             const message = await Broker.tryReadMessageAsync(this._channel, token);
-
-//             if (message instanceof InternalRequestMessage) {
-//                 this._callbacks.next(new CallbackContext(message, this._channel));
-
-//             } else if (message instanceof InternalResponseMessage) {
-//                 this._completionTable[message.RequestId].setResult(message);
-//                 delete this._completionTable[message.RequestId];
-
-//             } else {
-//                 return;
-//             }
-//         }
-//     }
-
-//     // tslint:disable-next-line: member-ordering
-//     private static async tryReadMessageAsync(channel: IChannel, token: CancellationToken): Promise<InternalMessage | null> {
-//         try {
-//             return await InternalMessage.readAsync(channel, token);
-//         } catch (ex) {
-//             return null;
-//         }
-//     }
-// }

@@ -8,7 +8,7 @@
         "coverage": "jest --coverage",
         "unit": "jest",
         "ipc": "jest -t 'NamedPipeClient'",
-        "refreshVSToken" : "vsts-npm-auth -config .npmrc"
+        "refreshVSToken": "vsts-npm-auth -config .npmrc"
     },
     "devDependencies": {
         "@types/node": "^12.6.8",

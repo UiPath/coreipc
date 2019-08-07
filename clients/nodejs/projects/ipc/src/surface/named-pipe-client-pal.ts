@@ -1,5 +1,5 @@
 import * as net from 'net';
-import { PromiseCompletionSource, CancellationToken } from '@uipath/ipc-helpers';
+import { PromiseCompletionSource, CancellationToken, RethrownError } from '@uipath/ipc-helpers';
 import { IBroker, Broker, IBrokerWithCallbacks, BrokerWithCallbacks } from '../internals/broker';
 import { PipeWrapper } from '../internals/pipe-wrapper';
 import { ChannelReader } from '../internals/channel-reader';
@@ -16,13 +16,20 @@ interface IMethodContainer {
 
 /* @internal */
 export class NamedPipeClientPal {
-    public static connectAsync(pipeName: string): Promise<net.Socket> {
+    public static async connectAsync(pipeName: string): Promise<net.Socket> {
+        try {
+            return await NamedPipeClientPal.connectInternalAsync(pipeName);
+        } catch (error) {
+            throw new RethrownError(error, `Failed to connect to pipe "${pipeName}"`);
+        }
+    }
+    public static connectInternalAsync(pipeName: string): Promise<net.Socket> {
         const pcsConnected = new PromiseCompletionSource<net.Socket>();
         const fullName = `\\\\.\\pipe\\${pipeName}`;
         const socket = net.connect(fullName);
         socket.once('connect', () => pcsConnected.trySetResult(socket));
         socket.once('timeout', () => pcsConnected.trySetException(new Error(`Connecting to "${fullName}" timed out.`)));
-        socket.once('error', (error) => pcsConnected.trySetException(error));
+        socket.once('error', error => pcsConnected.trySetException(error));
         return pcsConnected.promise;
     }
 
@@ -56,7 +63,7 @@ export class NamedPipeClientPal {
     }
     private static generateMethodProxy(methodName: string, executor: IExecutor): IMethod {
         // tslint:disable-next-line: only-arrow-functions
-        return function () {
+        return function() {
             const paramsBuilder = {
                 methodName,
                 jsonArgs: new Array<string>(),

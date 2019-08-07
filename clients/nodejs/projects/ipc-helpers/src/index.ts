@@ -11,6 +11,7 @@ import { InvalidOperationError } from './exceptions/invalid-operation-error';
 import { ArgumentNullError } from './exceptions/argument-null-error';
 import { Quack } from './collections/quack';
 import { EndOfStreamError } from './exceptions/end-of-stream-error';
+import { RethrownError } from './exceptions/rethrown-error';
 
 export {
     CancellationToken as CancellationToken, CancellationTokenSource,
@@ -20,7 +21,7 @@ export {
 
     IDisposable, IAsyncDisposable,
 
-    AggregateError, InvalidOperationError, ArgumentNullError, EndOfStreamError,
+    AggregateError, InvalidOperationError, ArgumentNullError, EndOfStreamError, RethrownError,
 
     PromiseCompletionSource, PromiseHelper,
     Lazy, Quack

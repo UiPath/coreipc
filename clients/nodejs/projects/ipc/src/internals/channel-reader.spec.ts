@@ -16,14 +16,16 @@ describe('ChannelReader', () => {
     test('ctor-doesnt-throw', () => {
         const mockPipe: IPipeWrapper = {
             signals: new ReplaySubject<PipeSignal>(),
-            write: jest.fn()
+            write: jest.fn(),
+            dispose: jest.fn()
         };
         const channelReader = new ChannelReader(mockPipe);
     });
     test('dispose-doesnt-throw', () => {
         const mockPipe: IPipeWrapper = {
             signals: new ReplaySubject<PipeSignal>(),
-            write: jest.fn()
+            write: jest.fn(),
+            dispose: jest.fn()
         };
         const channelReader = new ChannelReader(mockPipe);
         channelReader.dispose();
@@ -32,7 +34,8 @@ describe('ChannelReader', () => {
         const subject = new ReplaySubject<PipeSignal>();
         const mockPipe: IPipeWrapper = {
             signals: subject,
-            write: jest.fn()
+            write: jest.fn(),
+            dispose: jest.fn()
         };
         const channelReader = new ChannelReader(mockPipe);
 
@@ -81,7 +84,8 @@ describe('ChannelReader', () => {
         const subject = new ReplaySubject<PipeSignal>();
         const mockPipe: IPipeWrapper = {
             signals: subject,
-            write: jest.fn()
+            write: jest.fn(),
+            dispose: jest.fn()
         };
         const channelReader = new ChannelReader(mockPipe);
 
@@ -113,7 +117,8 @@ describe('ChannelReader', () => {
         const subject = new ReplaySubject<PipeSignal>();
         const mockPipe: IPipeWrapper = {
             signals: subject,
-            write: jest.fn()
+            write: jest.fn(),
+            dispose: jest.fn()
         };
         const channelReader = new ChannelReader(mockPipe);
 
@@ -161,7 +166,8 @@ describe('ChannelReader', () => {
         const subject = new ReplaySubject<PipeSignal>();
         const mockPipe: IPipeWrapper = {
             signals: subject,
-            write: jest.fn()
+            write: jest.fn(),
+            dispose: jest.fn()
         };
         const channelReader = new ChannelReader(mockPipe);
 
@@ -188,7 +194,8 @@ describe('ChannelReader', () => {
         const subject = new ReplaySubject<PipeSignal>();
         const mockPipe: IPipeWrapper = {
             signals: subject,
-            write: jest.fn()
+            write: jest.fn(),
+            dispose: jest.fn()
         };
         const channelReader = new ChannelReader(mockPipe);
 

@@ -48,6 +48,7 @@ export class InternalMessage {
         const json = payload.toString('utf8');
 
         const message = InternalMessage.createMessage(messageType, json);
+
         return message;
     }
 

@@ -1,4 +1,4 @@
-import { Subscription } from 'rxjs';
+import { Subscription, Observable } from 'rxjs';
 import { CancellationToken, IAsyncDisposable } from '@uipath/ipc-helpers';
 import { IBroker, IBrokerWithCallbacks } from '../internals/broker';
 import { InternalRequestMessage, InternalResponseMessage, IResponseError } from '../internals/internal-message';
@@ -12,6 +12,7 @@ interface IMethodContainer {
 }
 
 export interface INamedPipeClient<TService> extends IAsyncDisposable {
+    readonly errors$: Observable<Error>;
     readonly proxy: TService;
 }
 
@@ -38,6 +39,7 @@ export class NamedPipeClientBuilder {
 // tslint:disable-next-line: max-classes-per-file
 export class NamedPipeClientImpl<TService, TBroker extends IBroker> implements IAsyncDisposable, IExecutor, INamedPipeClient<TService> {
     public readonly proxy: TService;
+    public get errors$(): Observable<Error> { return this._broker.errors; }
 
     constructor(protected readonly _broker: TBroker, servicePrototype: TService) {
         this.proxy = NamedPipeClientPal.generateProxy<TService>(servicePrototype, this);
@@ -83,11 +85,11 @@ export class NamedPipeClientWithCallbacksImpl<TService, TCallback>
     constructor(broker: IBrokerWithCallbacks, servicePrototype: TService, callbackService: TCallback) {
         super(broker, servicePrototype);
         this._callbackService = callbackService as any;
-        this._callbacksSubscription = broker.callbacks.subscribe((context) => this.executeCallbackAsync(context));
+        this._callbacksSubscription = broker.callbacks.subscribe(context => this.executeCallbackAsync(context));
     }
 
     private async executeCallbackAsync(context: CallbackContext): Promise<void> {
-        const parameters = context.request.Parameters.map((json) => JSON.parse(json));
+        const parameters = context.request.Parameters.map(json => JSON.parse(json));
         const method = this._callbackService[context.request.MethodName] as IMethod;
 
         let response: InternalResponseMessage | null = null;
