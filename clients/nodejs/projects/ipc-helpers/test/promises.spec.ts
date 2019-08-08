@@ -1,7 +1,7 @@
-import { PromiseCompletionSource } from './promise-completion-source';
-import { PromiseHelper } from './promise-helper';
-import { CancellationToken } from '../cancellation-token/cancellation-token';
-import { CancellationTokenSource } from '../cancellation-token/cancellation-token-source';
+import { PromiseCompletionSource } from '../src/promises/promise-completion-source';
+import { PromiseHelper } from '../src/promises/promise-helper';
+import { CancellationToken } from '../src/cancellation-token/cancellation-token';
+import { CancellationTokenSource } from '../src/cancellation-token/cancellation-token-source';
 
 describe('PromiseCompletionSource<T>', () => {
 

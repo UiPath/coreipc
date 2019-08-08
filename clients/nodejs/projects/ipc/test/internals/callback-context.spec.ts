@@ -1,6 +1,6 @@
-import { CallbackContext } from './callback-context';
-import { InternalRequestMessage, InternalResponseMessage } from './internal-message';
-import { IChannelWriter } from './channel-writer';
+import { CallbackContext } from '../../src/internals/callback-context';
+import { InternalRequestMessage, InternalResponseMessage } from '../../src/internals/internal-message';
+import { IChannelWriter } from '../../src/internals/channel-writer';
 import { CancellationToken, PromiseHelper } from '@uipath/ipc-helpers';
 
 describe('CallbackContext', () => {

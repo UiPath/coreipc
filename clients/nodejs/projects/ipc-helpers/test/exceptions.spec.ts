@@ -1,6 +1,6 @@
-import { EndOfStreamError } from './end-of-stream-error';
-import { AggregateError } from './aggregate-error';
-import { ArgumentNullError } from './argument-null-error';
+import { EndOfStreamError } from '../src/exceptions/end-of-stream-error';
+import { AggregateError } from '../src/exceptions/aggregate-error';
+import { ArgumentNullError } from '../src/exceptions/argument-null-error';
 
 describe('EndOfStreamError', () => {
 

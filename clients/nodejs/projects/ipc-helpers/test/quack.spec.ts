@@ -1,4 +1,4 @@
-import { Quack } from './quack';
+import { Quack } from '../src/collections/quack';
 
 describe('Quack<T>', () => {
 

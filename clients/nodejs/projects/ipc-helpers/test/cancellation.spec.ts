@@ -1,6 +1,6 @@
-import { CancellationToken, SimpleCancellationToken } from './cancellation-token';
-import { CancellationTokenSource } from './cancellation-token-source';
-import { PromiseHelper } from '../promises/promise-helper';
+import { CancellationToken, SimpleCancellationToken } from '../src/cancellation-token/cancellation-token';
+import { CancellationTokenSource } from '../src/cancellation-token/cancellation-token-source';
+import { PromiseHelper } from '../src/promises/promise-helper';
 
 describe('CancellationToken and CancellationTokenSource', () => {
 

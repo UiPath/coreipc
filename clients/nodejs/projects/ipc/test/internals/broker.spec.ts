@@ -1,8 +1,8 @@
-import { Broker, BrokerWithCallbacks } from './broker';
-import { Channel } from './channel';
+import { Broker, BrokerWithCallbacks } from '../../src/internals/broker';
+import { Channel } from '../../src/internals/channel';
 import { CancellationToken, PromiseHelper, PromiseCompletionSource } from '@uipath/ipc-helpers';
-import { IChannelReader } from './channel-reader';
-import { MessageType, InternalRequestMessage } from './internal-message';
+import { IChannelReader } from '../../src/internals/channel-reader';
+import { MessageType, InternalRequestMessage } from '../../src/internals/internal-message';
 
 class MockReader implements IChannelReader {
     private _index = 0;

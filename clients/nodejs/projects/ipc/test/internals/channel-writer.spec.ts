@@ -1,6 +1,6 @@
-import { IPipeWrapper, PipeSignal } from './pipe-wrapper';
+import { IPipeWrapper, PipeSignal } from '../../src/internals/pipe-wrapper';
 import { Observable, Subject } from 'rxjs';
-import { ChannelWriter } from './channel-writer';
+import { ChannelWriter } from '../../src/internals/channel-writer';
 import { CancellationTokenSource, PromiseHelper } from '@uipath/ipc-helpers';
 
 class MockPipeWrapper implements IPipeWrapper {
@@ -20,6 +20,7 @@ class MockPipeWrapper implements IPipeWrapper {
             throw new Error('Callback was not set');
         }
     }
+    public dispose(): void { /* */ }
 }
 
 describe('ChannelWriter', () => {

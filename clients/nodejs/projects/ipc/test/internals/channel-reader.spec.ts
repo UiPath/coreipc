@@ -1,6 +1,6 @@
-import { IPipeWrapper, PipeSignal, PipeDataSignal, PipeClosedSignal } from './pipe-wrapper';
+import { IPipeWrapper, PipeSignal, PipeDataSignal, PipeClosedSignal } from '../../src/internals/pipe-wrapper';
 import { ReplaySubject } from 'rxjs';
-import { ChannelReader } from './channel-reader';
+import { ChannelReader } from '../../src/internals/channel-reader';
 import { CancellationToken, PromiseHelper, CancellationTokenSource, EndOfStreamError } from '@uipath/ipc-helpers';
 
 function range(start: number, length: number): number[] {

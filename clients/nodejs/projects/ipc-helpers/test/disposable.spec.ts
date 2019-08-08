@@ -1,4 +1,4 @@
-import { Disposable, IDisposable } from './disposable';
+import { Disposable, IDisposable } from '../src/disposable/disposable';
 
 describe('Disposable', () => {
 

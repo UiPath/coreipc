@@ -1,4 +1,4 @@
-import { Lazy } from './lazy';
+import { Lazy } from '../src/helpers/lazy';
 
 describe('Lazy<T>', () => {
 

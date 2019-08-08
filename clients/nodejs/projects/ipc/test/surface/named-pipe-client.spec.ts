@@ -1,5 +1,5 @@
-import { NamedPipeClientBuilder } from './named-pipe-client';
-import { Message } from './message';
+import { NamedPipeClientBuilder } from '../../src/surface/named-pipe-client';
+import { Message } from '../../src/surface/message';
 import { PromiseHelper } from '@uipath/ipc-helpers';
 import * as child_process from 'child_process';
 import * as fs from 'fs';
