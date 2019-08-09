@@ -3,13 +3,18 @@
 ## Table of contents
 
 1) [Audience](#audience)
-2) [Test Chat Application Suite](#test-chat-application-suite)
-3) [Getting started](#getting-started)
+2) [Walthrough](#walkthrough)
+3) [Test Chat Application Suite](#test-chat-application-suite)
+4) [Getting started](#getting-started)
 
 ## Audience
 
 This guide showcases the way you can use the `UiPath IPC client for Nodejs` library in order to write strongly typed clients.
 If you're a contributor looking for a guide on how to contribute to the library itself check [this document](./Readme-Contributors.md).
+
+## Walkthrough
+
+For a thorough walkthrough read this [doc](./walkthrough/Walkthrough.md)
 
 ## Test Chat Application Suite
 
