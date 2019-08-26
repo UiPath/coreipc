@@ -1,11 +1,4 @@
 {
-	"files.exclude": {
-		".vscode": true,
-		"**/dist": true,
-		"**/node_modules": true,
-		"coverage": true,
-		"IpcSampleServerForNodejs": true,
-		"readme": true
-	},
-	"god.tsconfig": "./tsconfig.json"
+    "javascript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
+    "typescript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false
 }

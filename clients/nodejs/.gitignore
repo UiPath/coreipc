@@ -2,4 +2,3 @@ node_modules
 coverage
 yarn.lock
 dist
-!IpcSampleServerForNodejs/included-bin/**/

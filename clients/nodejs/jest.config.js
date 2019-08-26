@@ -1,8 +1,15 @@
 module.exports = {
+    verbose: true,
+    globals: {
+        'ts-jest': {
+            tsConfig: {
+                'target': 'es6',
+                'experimentalDecorators': true,
+                'esModuleInterop': true
+            }
+        }
+    },
     coveragePathIgnorePatterns: ['<rootDir>/projects/(?:.+?)/dist/'],
-    // cacheDirectory: '.jest-cache',
-    // coverageDirectory: '.jest-coverage',
-    // coverageReporters: ['html'],
     coverageThreshold: {
         global: {
             branches: 30,
@@ -14,8 +21,8 @@ module.exports = {
     collectCoverage: true,
     testPathIgnorePatterns: ['<rootDir>/projects/(?:.+?)/dist/'],
     roots: [
-        '<rootDir>/projects/ipc-helpers',
-        '<rootDir>/projects/ipc'
+        '<rootDir>/projects/@uipath-ipc',
+        '<rootDir>/projects/@uipath-ipc-sample-app',
     ],
     transform: {
         '^.+\\.tsx?$': 'ts-jest',
