@@ -1,6 +1,7 @@
 {
     "name": "@uipath/ipc-sample-app",
     "version": "0.0.1",
+    "private": true,
     "description": "Sample App using the UiPath Ipc for Nodejs",    
     "main": "dist/program.js",
     "typings": "dist/program",
