@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 import { execFile, ExecFileOptions } from 'child_process';
 import * as fs from 'fs';
 import { randomBytes } from 'crypto';

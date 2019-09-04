@@ -2,57 +2,71 @@ import * as BrokerMessage from './broker-message';
 import * as WireMessage from './wire-message';
 import { PipeClientStream, CancellationToken } from '../../..';
 import { CallbackContext, CallContextTable } from './context';
-import { SerializationHelper } from './serialization-helper';
-import { PipeBrokenError } from '../../../foundation/errors/pipe/pipe-broken-error';
+import { SerializationPal } from './serialization-pal';
 import { CancellationTokenSource } from '../../../foundation/tasks/cancellation-token-source';
 import { IAsyncDisposable } from '../../../foundation/disposable/disposable';
 import { ArgumentError } from '../../../foundation/errors/argument-error';
 import { InvalidOperationError } from '../../../foundation/errors/invalid-operation-error';
-import { Emitter } from './emitter';
+import { StreamWrapper } from './stream-wrapper';
 import { MessageEvent } from './message-event';
-import { Succeeded } from '../../../foundation/result/result';
+import { Succeeded } from '../../../foundation/outcome';
+import { ILogicalSocketFactory } from '../../../foundation/pipes/logical-socket';
+import { TimeSpan } from '../../../foundation/tasks/timespan';
+import { ArgumentNullError } from '../../../foundation/errors/argument-null-error';
 
 type IMethod = (this: IMethodContainer, ...args: any[]) => any;
 interface IMethodContainer { readonly [methodName: string]: IMethod | undefined; }
 
 /* @internal */
-export class Broker implements IAsyncDisposable {
+export interface IBroker extends IAsyncDisposable {
+    sendReceiveAsync(brokerRequest: BrokerMessage.Request): Promise<BrokerMessage.Response>;
+}
+
+/* @internal */
+export class Broker implements IBroker, IAsyncDisposable {
     private readonly _inFlightCallbackPromises = new Array<Promise<void>>();
     private _isDisposed = false;
     private readonly _cts = new CancellationTokenSource();
 
-    private _maybeEmitter: Emitter | null = null;
+    private _maybeWrapper: StreamWrapper | null = null;
     private readonly _calls = new CallContextTable();
 
     constructor(
+        private readonly _factory: ILogicalSocketFactory,
         private readonly _pipeName: string,
-        private readonly _connectTimeoutMilliseconds: number,
-        private readonly _defaultCallTimeoutMilliseconds: number,
+        private readonly _connectTimeout: TimeSpan,
+        private readonly _defaultCallTimeout: TimeSpan,
         private readonly _callback: IMethodContainer | undefined
-    ) { }
+    ) {
+        if (!_factory) { throw new ArgumentNullError('_factory'); }
+        if (!_pipeName) { throw new ArgumentNullError('_pipeName'); }
+        if (!_connectTimeout) { throw new ArgumentNullError('_connectTimeout'); }
+        if (!_defaultCallTimeout) { throw new ArgumentNullError('_defaultCallTimeout'); }
+    }
 
-    private async getEmitterAsync(cancellationToken: CancellationToken): Promise<Emitter> {
-        if (!this._maybeEmitter) {
-            const emitter = new Emitter(await this.connectAsync(cancellationToken));
-            emitter.messages.subscribe(this.processInboundAsync.bind(this));
-            this._maybeEmitter = emitter;
+    private async getOrCreateWrapperAsync(cancellationToken: CancellationToken): Promise<StreamWrapper> {
+        if (!this._maybeWrapper) {
+            const wrapper = new StreamWrapper(await this.connectAsync(cancellationToken));
+            wrapper.messages.subscribe(this.processInboundAsync.bind(this));
+            this._maybeWrapper = wrapper;
         }
-        return this._maybeEmitter;
+        return this._maybeWrapper;
     }
     private async connectAsync(cancellationToken: CancellationToken): Promise<PipeClientStream> {
         return await await PipeClientStream.connectAsync(
+            this._factory,
             this._pipeName,
-            this._connectTimeoutMilliseconds,
+            this._connectTimeout,
             cancellationToken);
     }
 
     private processInboundAsync(event: MessageEvent): void {
         if (event.message instanceof WireMessage.Request) {
-            const tuple = SerializationHelper.deserializeRequest(event.message);
+            const tuple = SerializationPal.deserializeRequest(event.message);
             const callbackContext = new CallbackContext(
                 tuple.brokerRequest,
                 async brokerResponse => {
-                    const buffer = SerializationHelper.serializeResponse(brokerResponse, tuple.id);
+                    const buffer = SerializationPal.serializeResponse(brokerResponse, tuple.id);
                     try {
                         await event.sender.stream.writeAsync(buffer, this._cts.token);
                     } catch (error) {
@@ -75,7 +89,7 @@ export class Broker implements IAsyncDisposable {
                 ));
             }
         } else if (event.message instanceof WireMessage.Response) {
-            const tuple = SerializationHelper.deserializeResponse(event.message);
+            const tuple = SerializationPal.deserializeResponse(event.message);
             this._calls.signal(tuple.id, new Succeeded(tuple.brokerResponse));
         } else {
             throw new ArgumentError('Unexpected message type', 'message');
@@ -115,13 +129,15 @@ export class Broker implements IAsyncDisposable {
         }
     }
 
-    public async sendReceiveAsync(brokerRequest: BrokerMessage.Request): Promise<BrokerMessage.Response> {
+    public async sendReceiveAsync(brokerRequest: BrokerMessage.OutboundRequest): Promise<BrokerMessage.Response> {
+        if (!brokerRequest) { throw new ArgumentNullError('brokerRequest'); }
+
         const context = this._calls.createContext();
         await this.sendRequestAsync(brokerRequest, context.id);
         return await context.promise;
     }
-    private async sendRequestAsync(brokerRequest: BrokerMessage.Request, id: string): Promise<void> {
-        const obj = SerializationHelper.serializeRequest(brokerRequest, id, this._defaultCallTimeoutMilliseconds);
+    private async sendRequestAsync(brokerRequest: BrokerMessage.OutboundRequest, id: string): Promise<void> {
+        const obj = SerializationPal.serializeRequest(brokerRequest, id, this._defaultCallTimeout);
         await this.sendBufferAsync(obj.buffer, obj.cancellationToken);
     }
 
@@ -129,19 +145,19 @@ export class Broker implements IAsyncDisposable {
     private async sendBufferAsync(buffer: Buffer, cancellationToken: CancellationToken): Promise<void> {
         let fulfilled = false;
         while (!fulfilled) {
-            let emitter: Emitter = null as any;
+            let wrapper: StreamWrapper = null as any;
             try {
-                emitter = await this.getEmitterAsync(cancellationToken);
+                wrapper = await this.getOrCreateWrapperAsync(cancellationToken);
             } catch (error) {
                 throw error;
             }
 
             try {
-                await emitter.stream.writeAsync(buffer, cancellationToken);
+                await wrapper.stream.writeAsync(buffer, cancellationToken);
                 fulfilled = true;
             } catch (error) {
-                await emitter.disposeAsync();
-                this._maybeEmitter = null;
+                await wrapper.disposeAsync();
+                this._maybeWrapper = null;
             }
         }
     }
@@ -152,9 +168,8 @@ export class Broker implements IAsyncDisposable {
 
             this._cts.cancel();
 
-            if (this._maybeEmitter) {
-
-                await this._maybeEmitter.disposeAsync();
+            if (this._maybeWrapper) {
+                await this._maybeWrapper.disposeAsync();
             }
 
             for (const promise of this._inFlightCallbackPromises) {

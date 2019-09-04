@@ -1,25 +1,32 @@
-import { CancellationToken } from './cancellation-token';
+import { CancellationToken, ProperCancellationToken } from './cancellation-token';
 import { IDisposable } from '../disposable/disposable';
+import { TimeSpan } from './timespan';
+import { Timeout } from './timeout';
+import { ObjectDisposedError } from '../errors/object-disposed-error';
 
 export class CancellationTokenSource implements IDisposable {
-    public readonly token: CancellationToken = new CancellationToken();
-    private readonly _timeoutIds = new Array<NodeJS.Timeout>();
+    private readonly _token: ProperCancellationToken = new ProperCancellationToken();
+    public get token(): CancellationToken { return this._token; }
+    private _maybeTimeout: Timeout | null = null;
+    private _isDisposed = false;
 
     public cancel(throwOnFirstError: boolean = false): void {
-        this.token.cancel(throwOnFirstError);
+        if (this._isDisposed) { throw new ObjectDisposedError('CancellationTokenSource'); }
+        this._token.cancel(throwOnFirstError);
     }
-    public cancelAfter(milliseconds: number): void {
-        this._timeoutIds.push(
-            setTimeout(
-                this.cancel.bind(this),
-                milliseconds
-            )
-        );
+    public cancelAfter(timeSpan: TimeSpan): void {
+        if (this._isDisposed) { throw new ObjectDisposedError('CancellationTokenSource'); }
+        if (!this._token.isCancellationRequested && !this._maybeTimeout) {
+            this._maybeTimeout = new Timeout(timeSpan, this.cancel.bind(this));
+        }
     }
 
     public dispose(): void {
-        for (const timeoutId of this._timeoutIds) {
-            clearTimeout(timeoutId);
+        if (!this._isDisposed) {
+            this._isDisposed = true;
+            if (this._maybeTimeout) {
+                this._maybeTimeout.dispose();
+            }
         }
     }
 }

@@ -1,24 +1,23 @@
 import { IDisposable } from '../disposable/disposable';
-import { AbstractMemberError } from '../errors/abstract-member-error';
-import { CancellationToken } from './cancellation-token';
+import { ProperCancellationToken } from './cancellation-token';
 
-export class CancellationTokenRegistration implements IDisposable {
+export abstract class CancellationTokenRegistration implements IDisposable {
     /* @internal */
     public static get none(): CancellationTokenRegistration { return NoneCancellationTokenRegistration.instance; }
 
     /* @internal */
-    public static create(cancellationToken: CancellationToken, callback: () => void): CancellationTokenRegistration {
+    public static create(cancellationToken: ProperCancellationToken, callback: () => void): CancellationTokenRegistration {
         return new ProperCancellationTokenRegistration(cancellationToken, callback);
     }
 
     protected constructor() { /* */ }
-    public dispose(): void { throw new AbstractMemberError(); }
+    public abstract dispose(): void;
 }
 
 /* @internal */
 export class ProperCancellationTokenRegistration extends CancellationTokenRegistration {
     constructor(
-        private readonly _cancellationToken: CancellationToken,
+        private readonly _cancellationToken: ProperCancellationToken,
         private readonly _callback: () => void
     ) { super(); }
     public dispose(): void { this._cancellationToken.unregister(this._callback); }

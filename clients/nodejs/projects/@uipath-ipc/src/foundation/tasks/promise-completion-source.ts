@@ -1,6 +1,6 @@
-import { PromiseCanceledError } from '../errors/promise-canceled-error';
+import { OperationCanceledError } from '../errors/operation-canceled-error';
 import { InvalidOperationError } from '../errors/invalid-operation-error';
-import { Result, Succeeded, Faulted, Canceled } from '../result/result';
+import * as Outcome from '../outcome';
 
 export class PromiseCompletionSource<T> {
     public readonly promise: Promise<T>;
@@ -15,24 +15,11 @@ export class PromiseCompletionSource<T> {
             me._resolve = resolve;
             me._reject = reject;
         });
+        this.promise.then(_ => { }, _ => { });
     }
 
-    public trySet(result: Result<T>): boolean {
-        if (result instanceof Succeeded) {
-            return this.trySetResult(result.result);
-        } else if (result instanceof Faulted) {
-            return this.trySetError(result.error);
-        } else if (result instanceof Canceled) {
-            return this.trySetCanceled();
-        } else {
-            throw Error('Wtf?');
-        }
-    }
-    public set(result: Result<T>): void {
-        if (!this.trySet(result)) {
-            throw new InvalidOperationError(PromiseCompletionSource._errorMessage);
-        }
-    }
+    public trySet(outcome: Outcome.Any<T>): boolean { return outcome.tryApply(this); }
+    public set(outcome: Outcome.Any<T>): void { outcome.apply(this); }
 
     public trySetResult(result: T): boolean {
         if (this._isCompleted) { return false; }
@@ -49,11 +36,12 @@ export class PromiseCompletionSource<T> {
     public trySetCanceled(): boolean {
         if (this._isCompleted) { return false; }
         this._isCompleted = true;
-        this._reject(new PromiseCanceledError());
+        this._reject(new OperationCanceledError());
         return true;
     }
 
-    private static readonly _errorMessage = 'An attempt was made to transition a task to a final state when it had already completed.';
+    /* @internal */
+    public static readonly _errorMessage = 'An attempt was made to transition a task to a final state when it had already completed.';
     public setResult(result: T): void {
         if (!this.trySetResult(result)) {
             throw new InvalidOperationError(PromiseCompletionSource._errorMessage);

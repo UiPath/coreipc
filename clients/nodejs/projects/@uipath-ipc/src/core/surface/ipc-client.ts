@@ -1,20 +1,34 @@
 import { ProxyFactory } from '../internals/proxy-factory';
-import { Broker } from '../internals/broker/broker';
+import { Broker, IBroker } from '../internals/broker/broker';
+import { PhysicalSocket } from '../../foundation/pipes/physical-socket-adapter';
+import { TimeSpan } from '../../foundation/tasks/timespan';
+import { ILogicalSocketFactory } from '../../foundation/pipes/logical-socket';
+import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
+import { PublicConstructor } from '../../foundation/reflection/reflection';
 
 export class IpcClient<TService> {
-    private readonly _broker: Broker;
+    private readonly _broker: IBroker;
     public readonly proxy: TService;
 
     constructor(
         public readonly pipeName: string,
-        serviceSample: TService,
+        serviceCtor: PublicConstructor<TService>,
         configFunc?: (config: IpcClientConfig) => void
     ) {
-        const config = new IpcClientConfig();
+        if (!pipeName) { throw new ArgumentNullError('pipeName'); }
+        if (!serviceCtor) { throw new ArgumentNullError('serviceCtor'); }
+
+        const config = new InternalIpcClientConfig();
         if (configFunc) { configFunc(config); }
 
-        this._broker = new Broker(pipeName, config.connectTimeoutMilliseconds, config.defaultCallTimeoutSeconds, config.callbackService);
-        this.proxy = ProxyFactory.create(serviceSample, this._broker);
+        this._broker = config.maybeBroker || new Broker(
+            config.logicalSocketFactory,
+            pipeName,
+            TimeSpan.fromMilliseconds(config.connectTimeoutMilliseconds),
+            TimeSpan.fromSeconds(config.defaultCallTimeoutSeconds),
+            config.callbackService);
+
+        this.proxy = ProxyFactory.create(serviceCtor, this._broker);
     }
 
     public async closeAsync(): Promise<void> {
@@ -27,4 +41,10 @@ export class IpcClientConfig {
     public defaultCallTimeoutSeconds: number = 2;
 
     public callbackService?: any;
+}
+
+/* @internal */
+export class InternalIpcClientConfig extends IpcClientConfig {
+    public logicalSocketFactory: ILogicalSocketFactory = () => new PhysicalSocket();
+    public maybeBroker: IBroker | null = null;
 }

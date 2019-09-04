@@ -1,57 +1,60 @@
 import { CancellationTokenRegistration } from './cancellation-token-registration';
-import { PromiseCanceledError } from '../errors/promise-canceled-error';
+import { OperationCanceledError } from '../errors/operation-canceled-error';
 import { AggregateError } from '../errors/aggregate-error';
 
-export class CancellationToken {
+export abstract class CancellationToken {
     public static get none(): CancellationToken { return NoneCancellationToken.instance; }
 
+    public abstract get canBeCanceled(): boolean;
+    public abstract get isCancellationRequested(): boolean;
+
+    public abstract register(callback: () => void): CancellationTokenRegistration;
+    public abstract throwIfCancellationRequested(): void;
+}
+
+/* @internal */
+export class ProperCancellationToken extends CancellationToken {
     private readonly _callbacks = new Array<() => void>();
     private _isCancellationRequested = false;
 
     public get canBeCanceled(): boolean { return true; }
     public get isCancellationRequested(): boolean { return this._isCancellationRequested; }
 
-    /* @internal */
-    constructor() { /* */ }
-
-    /* @internal */
     public cancel(throwOnFirstError: boolean): void {
-        this._isCancellationRequested = true;
-        try {
-            if (throwOnFirstError) {
-                for (const callback of this._callbacks) {
-                    callback();
-                }
-            } else {
-                const errors = new Array<Error>();
-                for (const callback of this._callbacks) {
-                    try {
+        if (!this._isCancellationRequested) {
+            this._isCancellationRequested = true;
+            try {
+                if (throwOnFirstError) {
+                    for (const callback of this._callbacks) {
                         callback();
-                    } catch (error) {
-                        errors.push(error);
+                    }
+                } else {
+                    const errors = new Array<Error>();
+                    for (const callback of this._callbacks) {
+                        try {
+                            callback();
+                        } catch (error) {
+                            errors.push(error);
+                        }
+                    }
+                    if (errors.length > 0) {
+                        throw new AggregateError(...errors);
                     }
                 }
-                if (errors.length > 0) {
-                    throw new AggregateError(...errors);
-                }
+            } finally {
+                this._callbacks.splice(0);
             }
-        } finally {
-            this._callbacks.splice(0);
         }
     }
-
     public register(callback: () => void): CancellationTokenRegistration {
-        this._callbacks.push(callback);
-        return CancellationTokenRegistration.create(this, callback);
-    }
-    public registerIfCanBeCanceled(callback: () => void): CancellationTokenRegistration {
-        if (this.canBeCanceled) {
-            return this.register(callback);
-        } else {
+        if (this.isCancellationRequested) {
+            callback();
             return CancellationTokenRegistration.none;
+        } else {
+            this._callbacks.push(callback);
+            return CancellationTokenRegistration.create(this, callback);
         }
     }
-    /* @internal */
     public unregister(callback: () => void): void {
         const index = this._callbacks.indexOf(callback);
         if (index >= 0) {
@@ -60,7 +63,7 @@ export class CancellationToken {
     }
     public throwIfCancellationRequested(): void {
         if (this._isCancellationRequested) {
-            throw new PromiseCanceledError();
+            throw new OperationCanceledError();
         }
     }
 }
@@ -74,5 +77,5 @@ class NoneCancellationToken extends CancellationToken {
     private constructor() { super(); }
 
     public register(callback: () => void): CancellationTokenRegistration { return CancellationTokenRegistration.none; }
-    public throwIfCancellationRequested(): void { /* */ }
+    public throwIfCancellationRequested(): void { }
 }

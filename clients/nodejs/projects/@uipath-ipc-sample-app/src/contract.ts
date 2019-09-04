@@ -8,7 +8,7 @@ export class SystemMessage extends Message<void> {
     }
 }
 export class ComplexNumber {
-    constructor(public a: number, public b: number) {  }
+    constructor(public a: number, public b: number) { }
 }
 
 export class IComputingService {

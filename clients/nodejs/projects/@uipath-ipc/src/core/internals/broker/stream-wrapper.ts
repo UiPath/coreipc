@@ -1,13 +1,13 @@
 import * as WireMessage from './wire-message';
 import { Observable, ReplaySubject } from 'rxjs';
 import { PipeClientStream, CancellationToken } from '../../..';
-import { SerializationHelper } from './serialization-helper';
+import { SerializationPal } from './serialization-pal';
 import { CancellationTokenSource } from '../../../foundation/tasks/cancellation-token-source';
 import { IAsyncDisposable } from '../../../foundation/disposable/disposable';
 import { MessageEvent } from './message-event';
 
 /* @internal */
-export class Emitter implements IAsyncDisposable {
+export class StreamWrapper implements IAsyncDisposable {
     private readonly _messages = new ReplaySubject<MessageEvent>();
     public get messages(): Observable<MessageEvent> { return this._messages; }
     private readonly _readIndefinitelyCts = new CancellationTokenSource();
@@ -32,11 +32,10 @@ export class Emitter implements IAsyncDisposable {
         await this.stream.readAsync(bytes, token);
 
         const json = bytes.toString('utf8');
-        const message = SerializationHelper.fromJson(json, type);
+        const message = SerializationPal.fromJson(json, type);
         return message;
     }
     public async disposeAsync(): Promise<void> {
-
         await this.stream.disposeAsync();
 
         this._messages.complete();

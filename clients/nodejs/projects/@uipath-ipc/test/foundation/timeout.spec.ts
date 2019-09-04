@@ -1,0 +1,72 @@
+import '../jest-extensions';
+import { Timeout } from '../../src/foundation/tasks/timeout';
+import { TimeSpan } from '../../src/foundation/tasks/timespan';
+import { ArgumentNullError } from '../../src/foundation/errors/argument-null-error';
+import { PromisePal } from '../../src';
+import { ArgumentError } from '../../src/foundation/errors/argument-error';
+
+describe('Foundation-Timeout', () => {
+    test(`ctor doesn't throw when it shouldn't`, () => {
+        let timeout: Timeout | null = null;
+        try {
+            expect(() => timeout = new Timeout(TimeSpan.zero, () => { })).not.toThrow();
+        } finally {
+            if (timeout) {
+                try {
+                    timeout.dispose();
+                } catch (error) { }
+            }
+        }
+    });
+    test(`ctor throws when it should`, () => {
+        const timeouts = new Array<Timeout>();
+        try {
+            expect(() => timeouts.push(new Timeout(null as any, () => { }))).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'timespan');
+            expect(() => timeouts.push(new Timeout(null as any, null as any))).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'timespan');
+            expect(() => timeouts.push(new Timeout(TimeSpan.zero, null as any))).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === '_callback');
+            expect(() => timeouts.push(new Timeout(TimeSpan.fromSeconds(-100), () => { }))).toThrowInstanceOf(ArgumentError, error => error.maybeParamName === 'timespan');
+        } finally {
+            for (const timeout of timeouts) {
+                try {
+                    timeout.dispose();
+                } catch (error) { }
+            }
+        }
+    });
+    test(`dispose doesn't throw`, () => {
+        const timeout = new Timeout(TimeSpan.zero, () => { });
+        expect(() => timeout.dispose()).not.toThrow();
+    });
+    test(`Timeout works for 0 milliseconds`, async () => {
+        const callback = jest.fn();
+        const timeout = new Timeout(TimeSpan.zero, callback);
+        try {
+            expect(callback).not.toHaveBeenCalled();
+            await PromisePal.yield();
+            expect(callback).toHaveBeenCalledTimes(1);
+        } finally {
+            timeout.dispose();
+        }
+    });
+    test(`Timeout works for 1 second`, async () => {
+        const callback = jest.fn();
+        const timeout = new Timeout(TimeSpan.fromSeconds(1), callback);
+        try {
+            expect(callback).not.toHaveBeenCalled();
+            await PromisePal.delay(TimeSpan.fromMilliseconds(300));
+            expect(callback).not.toHaveBeenCalled();
+            await PromisePal.delay(TimeSpan.fromMilliseconds(700));
+            expect(callback).toHaveBeenCalledTimes(1);
+        } finally {
+            timeout.dispose();
+        }
+    });
+    test(`maybeCreate doesn't throw when it shouldn't`, () => {
+        expect(() => Timeout.maybeCreate(TimeSpan.zero, () => { }).dispose()).not.toThrow();
+        expect(() => Timeout.maybeCreate(null, () => { }).dispose()).not.toThrow();
+    });
+    test(`maybeCreate throws when it should`, () => {
+        expect(() => Timeout.maybeCreate(TimeSpan.zero, null)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'callback');
+        expect(() => Timeout.maybeCreate(null, null)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'callback');
+    });
+});

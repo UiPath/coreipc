@@ -2,39 +2,31 @@
 // tslint:disable: only-arrow-functions
 
 import * as BrokerMessage from './broker/broker-message';
-import { Broker } from './broker/broker';
+import { Broker, IBroker } from './broker/broker';
 import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
-import { rtti } from '../surface/attributes';
+import { rtti } from '../surface/rtti';
 import { CancellationToken } from '../../foundation/tasks/cancellation-token';
 import { RemoteError } from '../surface/remote-error';
+import { PublicConstructor } from '../../foundation/reflection/reflection';
 
 const symbolofMaybeProxyCtor = Symbol('maybe:ProxyFactory');
 const symbolofBroker = Symbol('broker');
 
 interface IProxyCtor<TService> {
-    new(broker: Broker): TService;
+    new(broker: IBroker): TService;
     prototype: IProxyPrototype<TService>;
 }
 interface IProxyPrototype<TService> {
     [methodName: string]: IMethod;
 }
 interface IProxy<TService> {
-    [symbolofBroker]: Broker;
+    [symbolofBroker]: IBroker;
 }
 type IMethod = (...args: any[]) => any;
-interface IConstructedSample<TService> {
-    readonly constructor: ISampleConstructor<TService>;
-}
-interface ISampleConstructor<TService> {
-    readonly prototype: ISamplePrototype<TService>;
-}
-interface ISamplePrototype<TService> {
-    [symbolofMaybeProxyCtor]: IProxyCtor<TService> | undefined;
-    readonly [methodName: string]: IMethod;
-}
 
-class Generator<TService> {
-    public static generate<TService>(sampleCtor: ISampleConstructor<TService>): IProxyCtor<TService> {
+/* @internal */
+export class Generator<TService> {
+    public static generate<TService>(sampleCtor: PublicConstructor<TService>): IProxyCtor<TService> {
         const instance = new Generator<TService>(sampleCtor);
         instance.run();
         return instance._generatedCtor;
@@ -42,23 +34,24 @@ class Generator<TService> {
 
     private readonly _generatedCtor: IProxyCtor<TService>;
 
-    private constructor(private readonly _sampleCtor: ISampleConstructor<TService>) {
+    constructor(private readonly _sampleCtor: PublicConstructor<TService>) {
         this._generatedCtor = Generator.createCtor<TService>();
     }
 
     private run(): void {
-        for (const methodName of this.enumerateSampleMethodNames()) {
+        const methodNames = this.enumerateSampleMethodNames();
+        for (const methodName of methodNames) {
             const generatedMethod = this.generateMethod(methodName);
             this._generatedCtor.prototype[methodName] = generatedMethod;
         }
     }
 
     private generateMethod(methodName: string): IMethod {
-        const maybeMethodInfo = rtti.ClassInfo.get(this._sampleCtor.prototype).tryGetMethod(methodName);
+        const maybeMethodInfo = rtti.ClassInfo.get(this._sampleCtor as any).tryGetMethod(methodName);
         const hasCancellationToken = maybeMethodInfo ? maybeMethodInfo.hasCancellationToken : false;
 
         const normalizeArgs = Normalizers.getArgListNormalizer(hasCancellationToken);
-        const maybeReturnCtor = maybeMethodInfo ? maybeMethodInfo.maybeCtor : null;
+        const maybeReturnCtor = maybeMethodInfo ? maybeMethodInfo.maybeReturnValueCtor : null;
         const normalizeResult = Normalizers.getResultNormalizer(maybeReturnCtor);
 
         return async function(this: IProxy<TService>) {
@@ -75,11 +68,11 @@ class Generator<TService> {
         };
     }
 
-    private enumerateSampleMethodNames(): string[] {
+    public enumerateSampleMethodNames(): string[] {
         return Reflect.ownKeys(this._sampleCtor.prototype).filter(this.refersToAMethod.bind(this));
     }
-    private refersToAMethod(key: string | number | symbol): key is string {
-        return typeof key === 'string' && typeof this._sampleCtor.prototype[key] === 'function';
+    public refersToAMethod(key: string | number | symbol): key is string {
+        return typeof key === 'string' && typeof this._sampleCtor.prototype[key] === 'function' && this._sampleCtor !== this._sampleCtor.prototype[key];
     }
 
     private static createCtor<TService>(): IProxyCtor<TService> {
@@ -127,16 +120,26 @@ class Normalizers {
 /* @internal */
 export class ProxyFactory {
     public static create<TService>(
-        sample: TService & IConstructedSample<TService>,
-        broker: Broker
+        sampleCtor: PublicConstructor<TService>,
+        broker: IBroker
     ): TService {
-        if (!sample) {
+        if (!sampleCtor) {
             throw new ArgumentNullError('sampleInstance');
         }
-
-        const sampleCtor = sample.constructor;
         const sampleProto = sampleCtor.prototype;
-        const ctor = sampleProto[symbolofMaybeProxyCtor] || (sampleProto[symbolofMaybeProxyCtor] = Generator.generate(sampleCtor));
+
+        const ownKeys = Reflect.ownKeys(sampleProto);
+        let mustCreate = true;
+        for (const key of ownKeys) {
+            if (key === symbolofMaybeProxyCtor) {
+                mustCreate = false;
+                break;
+            }
+        }
+        const ctor: IProxyCtor<TService> = mustCreate
+            ? sampleProto[symbolofMaybeProxyCtor] = Generator.generate(sampleCtor)
+            : sampleProto[symbolofMaybeProxyCtor];
+
         const result = new ctor(broker);
         return result;
     }

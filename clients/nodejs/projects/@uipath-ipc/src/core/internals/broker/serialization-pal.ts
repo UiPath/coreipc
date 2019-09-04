@@ -3,9 +3,11 @@ import * as WireMessage from './wire-message';
 import { Message } from '../../surface/message';
 import { CancellationToken } from '../../..';
 import { ArgumentError } from '../../../foundation/errors/argument-error';
+import { TimeSpan } from '../../../foundation/tasks/timespan';
+import { ArgumentNullError } from '../../../foundation/errors/argument-null-error';
 
 /* @internal */
-export class SerializationHelper {
+export class SerializationPal {
     private static serializeObject(argument: any): string {
         return JSON.stringify(argument);
     }
@@ -34,26 +36,29 @@ export class SerializationHelper {
         return result;
     }
 
+    public static fromJson(json: string, type: WireMessage.Type.Request): WireMessage.Request;
+    public static fromJson(json: string, type: WireMessage.Type.Response): WireMessage.Response;
+    public static fromJson(json: string, type: WireMessage.Type): WireMessage.Request | WireMessage.Response;
     public static fromJson(json: string, type: WireMessage.Type): WireMessage.Request | WireMessage.Response {
+        if (!json) { throw new ArgumentNullError('json'); }
+        if (type === null || type === undefined) { throw new ArgumentNullError('type'); }
+
         switch (type) {
             default:
                 throw new ArgumentError('Unexpected WireMessage.Type', 'type');
 
             case WireMessage.Type.Request: {
                 const result = JSON.parse(json) as WireMessage.Request;
-                (result as any).constructor = WireMessage.Request;
                 (result as any).__proto__ = WireMessage.Request.prototype;
                 return result;
             }
 
             case WireMessage.Type.Response: {
                 const result = JSON.parse(json) as WireMessage.Response;
-                (result as any).constructor = WireMessage.Response;
                 (result as any).__proto__ = WireMessage.Response.prototype;
 
                 let error = result.Error;
                 while (error) {
-                    (error as any).constructor = WireMessage.Error;
                     (error as any).__proto__ = WireMessage.Error.prototype;
 
                     error = error.InnerError;
@@ -68,6 +73,7 @@ export class SerializationHelper {
         brokerRequest: BrokerMessage.Request,
         id: string
     } {
+        if (!wireRequest) { throw new ArgumentNullError('wireRequest'); }
         const id = wireRequest.Id;
 
         const args = wireRequest.Parameters.map(this.deserializeObject.bind(this));
@@ -79,6 +85,9 @@ export class SerializationHelper {
         return { brokerRequest, id };
     }
     public static serializeResponse(brokerResponse: BrokerMessage.Response, id: string): Buffer {
+        if (!brokerResponse) { throw new ArgumentNullError('brokerResponse'); }
+        if (!id) { throw new ArgumentNullError('id'); }
+
         const wireResponse = new WireMessage.Response(
             id,
             brokerResponse.maybeError ? null : this.serializeObject(brokerResponse.maybeResult),
@@ -95,12 +104,16 @@ export class SerializationHelper {
         return buffer;
     }
 
-    public static serializeRequest(request: BrokerMessage.Request, id: string, defaultTimeoutSeconds: number): {
+    public static serializeRequest(request: BrokerMessage.Request, id: string, defaultTimeout: TimeSpan): {
         buffer: Buffer,
         timeoutSeconds: number,
         cancellationToken: CancellationToken
     } {
-        let timeoutSeconds = defaultTimeoutSeconds;
+        if (!request) { throw new ArgumentNullError('request'); }
+        if (!id) { throw new ArgumentNullError('id'); }
+        if (!defaultTimeout) { throw new ArgumentNullError('defaultTimeout'); }
+
+        let timeoutSeconds = defaultTimeout.totalSeconds;
         let cancellationToken = CancellationToken.none;
         const serializedArgs = new Array<string>();
 
@@ -136,6 +149,8 @@ export class SerializationHelper {
         brokerResponse: BrokerMessage.Response,
         id: string
     } {
+        if (!wireResponse) { throw new ArgumentNullError('wireResponse'); }
+
         const id = wireResponse.RequestId;
 
         const maybeError = this.deserializeError(wireResponse.Error);

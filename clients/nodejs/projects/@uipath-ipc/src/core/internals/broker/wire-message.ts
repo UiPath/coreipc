@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 /* @internal */
 export enum Type {
     Request,

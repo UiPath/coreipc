@@ -16,7 +16,7 @@ describe('Foo', () => {
 
     test('Bar2', async () => {
         await runCsx(getBar2Csx(), async () => {
-            const client = new IpcClient('computingPipe', new Types.IComputingService());
+            const client = new IpcClient('computingPipe', Types.IComputingService);
             try {
                 const actual = await client.proxy.AddComplexNumber(
                     new Types.ComplexNumber(10, 20),
@@ -34,52 +34,53 @@ describe('Foo', () => {
     function getBar2Csx(): string {
         const csx = // javascript
             `#! "netcoreapp2.0"
-        #r ".\\Nito.AsyncEx.Context.dll"
-        #r ".\\Nito.AsyncEx.Coordination.dll"
-        #r ".\\Nito.AsyncEx.Interop.WaitHandles.dll"
-        #r ".\\Nito.AsyncEx.Oop.dll"
-        #r ".\\Nito.AsyncEx.Tasks.dll"
-        #r ".\\Nito.Cancellation.dll"
-        #r ".\\Nito.Collections.Deque.dll"
-        #r ".\\Nito.Disposables.dll"
-        #r ".\\Microsoft.Extensions.DependencyInjection.dll"
-        #r ".\\UiPath.Ipc.dll"
-        #r ".\\UiPath.Ipc.Tests.dll"
+#r ".\\Nito.AsyncEx.Context.dll"
+#r ".\\Nito.AsyncEx.Coordination.dll"
+#r ".\\Nito.AsyncEx.Interop.WaitHandles.dll"
+#r ".\\Nito.AsyncEx.Oop.dll"
+#r ".\\Nito.AsyncEx.Tasks.dll"
+#r ".\\Nito.Cancellation.dll"
+#r ".\\Nito.Collections.Deque.dll"
+#r ".\\Nito.Disposables.dll"
+#r ".\\Microsoft.Extensions.DependencyInjection.dll"
+#r ".\\UiPath.Ipc.dll"
+#r ".\\UiPath.Ipc.Tests.dll"
 
-        using Microsoft.Extensions.DependencyInjection;
-        using System;
-        using System.Reflection;
-        using System.IO;
-        using System.Diagnostics;
-        using System.Threading;
-        using System.Threading.Tasks;
-        using UiPath.Ipc;
-        using UiPath.Ipc.NamedPipe;
-        using UiPath.Ipc.Tests;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Reflection;
+using System.IO;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+using UiPath.Ipc;
+using UiPath.Ipc.NamedPipe;
+using UiPath.Ipc.Tests;
 
-        var serviceProvider = new ServiceCollection()
-            .AddLogging()
-            .AddIpc()
-            .AddSingleton<IComputingService, ComputingService>()
-            .BuildServiceProvider();
+// Debugger.Launch();
 
-        var host = new ServiceHostBuilder(serviceProvider)
-            .AddEndpoint(new NamedPipeEndpointSettings<IComputingService, IComputingCallback>("computingPipe") {
-                RequestTimeout = TimeSpan.FromSeconds(2),
-                AccessControl = security=> security.AllowCurrentUser()
-            })
-            .Build();
+var serviceProvider = new ServiceCollection()
+    .AddLogging()
+    .AddIpc()
+    .AddSingleton<IComputingService, ComputingService>()
+    .BuildServiceProvider();
 
-        await await Task.WhenAny(host.RunAsync(), Task.Run(async () =>
-            {
-                Console.WriteLine(typeof(int).Assembly);
-                await Task.Delay(500);
-                Console.WriteLine("#!READY");
-                Console.ReadLine();
-                host.Dispose();
-            }));
+var host = new ServiceHostBuilder(serviceProvider)
+    .AddEndpoint(new NamedPipeEndpointSettings<IComputingService, IComputingCallback>("computingPipe") {
+        RequestTimeout = TimeSpan.FromSeconds(2)
+    })
+    .Build();
 
-        Console.WriteLine("Server stopped.");
+await await Task.WhenAny(host.RunAsync(), Task.Run(async () =>
+    {
+        Console.WriteLine(typeof(int).Assembly);
+        await Task.Delay(500);
+        Console.WriteLine("#!READY");
+        Console.ReadLine();
+        host.Dispose();
+    }));
+
+Console.WriteLine("Server stopped.");
         `;
         return csx;
     }

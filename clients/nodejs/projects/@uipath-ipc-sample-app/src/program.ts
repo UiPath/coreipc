@@ -1,11 +1,12 @@
 import { CancellationToken, IpcClient, PromisePal } from '@uipath/ipc';
 import { IComputingCallback, IComputingService, ComplexNumber, SystemMessage } from './contract';
+import { TimeSpan } from '@uipath/ipc/dist/foundation/tasks/timespan';
 
 class Program {
     public static async main(args: string[]): Promise<void> {
         const callback = new ComputingCallback('[>---Responded from Nodejs---<]');
 
-        const client = new IpcClient('computingPipe', new IComputingService(), config => {
+        const client = new IpcClient('computingPipe', IComputingService, config => {
             config.callbackService = callback;
         });
 
@@ -19,9 +20,9 @@ class Program {
             console.log('y == ', y);
             console.log('z == ', z);
 
-            console.log('Urmeaza sa dorm 10 secunde');
-            await PromisePal.delay(10 * 1000);
-            console.log('acum invocam mai departe');
+            console.log('waiting 10 seconds....');
+            await PromisePal.delay(TimeSpan.fromSeconds(10));
+            console.log('continuing...');
         } finally {
             await client.closeAsync();
         }

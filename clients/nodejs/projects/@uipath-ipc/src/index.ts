@@ -5,7 +5,7 @@ import { IpcClient } from './core/surface/ipc-client';
 import { Message } from './core/surface/message';
 import { CancellationTokenSource } from './foundation/tasks/cancellation-token-source';
 import { PromiseCompletionSource } from './foundation/tasks/promise-completion-source';
-import { __hasCancellationToken__, __returns__ } from './core/surface/attributes';
+import { __hasCancellationToken__, __returns__ } from './core/surface/rtti';
 
 export {
     CancellationToken,

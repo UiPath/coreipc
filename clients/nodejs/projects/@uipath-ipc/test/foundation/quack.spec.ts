@@ -1,8 +1,9 @@
 // tslint:disable: align
 // tslint:disable: ban-types
+
 import { Quack } from '../../src/foundation/data-structures/quack';
 import { InvalidOperationError } from '../../src/foundation/errors/invalid-operation-error';
-import '../custom-matchers';
+import '../jest-extensions';
 
 describe('Foundation-Quack', () => {
 
@@ -35,7 +36,7 @@ describe('Foundation-Quack', () => {
         /*               */ expect(quack.any).toBe(false);
         /*               */ expect(quack.empty).toBe(true);
         /*               */ expect(quack.length).toBe(0);
-        expect(() => quack.pop()).toThrowPrecisely(InvalidOperationError);
+        expect(() => quack.pop()).toThrowInstanceOf(InvalidOperationError);
 
         quack.push(0);
         /*               */ expect(quack.any).toBe(true);
@@ -67,7 +68,7 @@ describe('Foundation-Quack', () => {
         /*               */ expect(quack.empty).toBe(true);
         /*               */ expect(quack.length).toBe(0);
 
-        expect(() => quack.pop()).toThrowPrecisely(InvalidOperationError);
+        expect(() => quack.pop()).toThrowInstanceOf(InvalidOperationError);
 
         quack.enqueue(0);
         /*               */ expect(quack.any).toBe(true);
@@ -99,7 +100,7 @@ describe('Foundation-Quack', () => {
         /*               */ expect(quack.empty).toBe(true);
         /*               */ expect(quack.length).toBe(0);
 
-        expect(() => quack.pop()).toThrowPrecisely(InvalidOperationError);
+        expect(() => quack.pop()).toThrowInstanceOf(InvalidOperationError);
     });
 
 });

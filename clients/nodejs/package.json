@@ -7,6 +7,7 @@
     "scripts": {
         "coverage": "jest --coverage",
         "unit": "jest",
+        "clear_jest": "jest --clearCache",
         "ipc": "jest -t 'NamedPipeClient'",
         "refreshVSToken": "vsts-npm-auth -config .npmrc"
     },
