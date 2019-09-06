@@ -10,6 +10,7 @@ import { TimeSpan } from './foundation/tasks/timespan';
 import { Timeout } from './foundation/tasks/timeout';
 import { RemoteError } from './core/surface/remote-error';
 import { OperationCanceledError } from './foundation/errors/operation-canceled-error';
+import { Error as IpcError} from './core/internals/broker/wire-message';
 
 export {
     CancellationToken,
@@ -22,6 +23,7 @@ export {
     TimeSpan,
     Timeout,
     RemoteError,
+    IpcError,
     OperationCanceledError,
     __hasCancellationToken__,
     __returns__

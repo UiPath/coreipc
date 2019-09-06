@@ -61,6 +61,9 @@ export class Broker implements IBroker, IAsyncDisposable {
     }
 
     private processInboundAsync(event: MessageEvent): void {
+
+        // console.debug(`Got Inbound >> `, event);
+
         if (event.message instanceof WireMessage.Request) {
             const tuple = SerializationPal.deserializeRequest(event.message);
             const callbackContext = new CallbackContext(

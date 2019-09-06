@@ -137,18 +137,19 @@ export class Program {
     }
 
     private static createIpcClient(pipeName: string): IpcClient<Contract.IService> {
-        return new IpcClient(pipeName, Contract.IService, config => {
+        const x = new IpcClient(pipeName, Contract.IService, config => {
             config.callbackService = Program.callback;
+
             config.setBeforeConnect(async cancellationToken => {
                 console.log(`BeforeConnect. Sleeping 2 seconds...`);
                 await PromisePal.delay(TimeSpan.fromSeconds(2), cancellationToken);
                 console.log(`Done`);
             }).setBeforeCall(async (callInfo, cancellationToken) => {
                 console.log(`BeforeCall. callInfo.newConnection === ${callInfo.newConnection}`);
-
                 await callInfo.proxy.StartTimerAsync(new Message<void>());
             });
         });
+        return x;
     }
 
     public static async connect(): Promise<void> {

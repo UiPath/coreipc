@@ -40,7 +40,6 @@ export class Response extends Base {
     }
 }
 
-/* @internal */
 export class Error {
     constructor(
         // tslint:disable-next-line: variable-name
