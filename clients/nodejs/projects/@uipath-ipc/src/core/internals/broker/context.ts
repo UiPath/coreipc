@@ -4,6 +4,8 @@ import { ArgumentNullError } from '../../../foundation/errors/argument-null-erro
 import * as Outcome from '../../../foundation/outcome';
 import { IDisposable } from '../../../foundation/disposable/disposable';
 import { ObjectDisposedError } from '../../../foundation/errors/object-disposed-error';
+import { CancellationToken } from '../../..';
+import { CancellationTokenRegistration } from '../../../foundation/tasks/cancellation-token-registration';
 
 /* @internal */
 export interface ICallContext {
@@ -14,11 +16,22 @@ export interface ICallContext {
 /* @internal */
 export class CallContext implements ICallContext {
     private readonly _pcs = new PromiseCompletionSource<BrokerMessage.Response>();
+    private readonly _ctreg: CancellationTokenRegistration;
+
     public get promise(): Promise<BrokerMessage.Response> { return this._pcs.promise; }
-    constructor(public readonly id: string) {
+
+    constructor(public readonly id: string, cancellationToken: CancellationToken) {
         if (!id) { throw new ArgumentNullError('id'); }
+        if (!cancellationToken) { throw new ArgumentNullError('cancellationToken'); }
+
+        this._ctreg = cancellationToken.register(() => {
+            this.set(new Outcome.Canceled());
+        });
     }
-    public set(outcome: Outcome.Any<BrokerMessage.Response>) { this._pcs.set(outcome); }
+    public set(outcome: Outcome.Any<BrokerMessage.Response>) {
+        this._ctreg.dispose();
+        this._pcs.trySet(outcome);
+    }
 }
 
 /* @internal */
@@ -41,9 +54,9 @@ export class CallContextTable implements IDisposable {
     private _isDisposed = false;
     private readonly _contexts: { [id: string]: CallContext | undefined; } = {};
 
-    public createContext(): ICallContext {
+    public createContext(cancellationToken: CancellationToken): ICallContext {
         if (this._isDisposed) { throw new ObjectDisposedError('CallContextTable'); }
-        const context = new CallContext(`${this._nextId++}`);
+        const context = new CallContext(`${this._nextId++}`, cancellationToken);
         this._contexts[context.id] = context;
         return context;
     }

@@ -104,15 +104,22 @@ export class SerializationPal {
         return buffer;
     }
 
-    public static serializeRequest(request: BrokerMessage.Request, id: string, defaultTimeout: TimeSpan): {
-        buffer: Buffer,
+    public static extract(request: BrokerMessage.Request, defaultTimeout: TimeSpan): {
+        serializedArgs: string[],
         timeoutSeconds: number,
         cancellationToken: CancellationToken
     } {
         if (!request) { throw new ArgumentNullError('request'); }
-        if (!id) { throw new ArgumentNullError('id'); }
         if (!defaultTimeout) { throw new ArgumentNullError('defaultTimeout'); }
 
+        return SerializationPal.extractUnchecked(request, defaultTimeout);
+    }
+
+    private static extractUnchecked(request: BrokerMessage.Request, defaultTimeout: TimeSpan): {
+        serializedArgs: string[],
+        timeoutSeconds: number,
+        cancellationToken: CancellationToken
+    } {
         let timeoutSeconds = defaultTimeout.totalSeconds;
         let cancellationToken = CancellationToken.none;
         const serializedArgs = new Array<string>();
@@ -120,7 +127,9 @@ export class SerializationPal {
         for (const arg of request.args) {
             let wireArg: any = arg;
             if (arg instanceof Message) {
-                timeoutSeconds = arg.TimeoutSeconds;
+                if (arg.RequestTimeout) {
+                    timeoutSeconds = arg.RequestTimeout.totalSeconds;
+                }
             } else if (arg instanceof CancellationToken) {
                 cancellationToken = arg;
                 wireArg = null;
@@ -130,10 +139,20 @@ export class SerializationPal {
             serializedArgs.push(jsonArg);
         }
 
+        return { serializedArgs, timeoutSeconds, cancellationToken };
+    }
+
+    public static serializeRequest(id: string, methodName: string, serializedArgs: string[], timeoutSeconds: number, cancellationToken: CancellationToken): Buffer {
+        if (!id) { throw new ArgumentNullError('id'); }
+        if (!methodName) { throw new ArgumentNullError('methodName'); }
+        if (!serializedArgs) { throw new ArgumentNullError('serializedArgs'); }
+        if (!timeoutSeconds) { throw new ArgumentNullError('timeoutSeconds'); }
+        if (!cancellationToken) { throw new ArgumentNullError('cancellationToken'); }
+
         const wireRequest = new WireMessage.Request(
             timeoutSeconds,
             id,
-            request.methodName,
+            methodName,
             serializedArgs
         );
         const jsonRequest = JSON.stringify(wireRequest);
@@ -143,7 +162,7 @@ export class SerializationPal {
         buffer.writeInt32LE(cbPayload, 1);
         buffer.write(jsonRequest, 5, 'utf8');
 
-        return { buffer, timeoutSeconds, cancellationToken };
+        return buffer;
     }
     public static deserializeResponse(wireResponse: WireMessage.Response): {
         brokerResponse: BrokerMessage.Response,

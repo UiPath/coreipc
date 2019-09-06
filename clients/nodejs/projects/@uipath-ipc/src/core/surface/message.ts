@@ -1,25 +1,30 @@
+import { TimeSpan } from '../../foundation/tasks/timespan';
+
 // tslint:disable: variable-name
 export class Message<T> {
+    public Payload: T | undefined;
+    public RequestTimeout: TimeSpan | null;
 
-    public readonly Payload: T;
-    public readonly TimeoutSeconds: number;
-
-    constructor(Payload: T, TimeoutSeconds: number);
-    constructor(TimeoutSeconds: number);
-    constructor(arg0: T | number, maybeTimeoutSeconds?: number) {
-        if (typeof arg0 === 'number' && maybeTimeoutSeconds === undefined) {
-            this.Payload = undefined as any;
-            this.TimeoutSeconds = arg0;
+    constructor();
+    constructor(payload: T);
+    constructor(requestTimeout: TimeSpan);
+    constructor(payload: T, requestTimeout: TimeSpan);
+    constructor(maybePayloadOrRequestTimeout?: T | TimeSpan, maybeRequestTimeout?: TimeSpan) {
+        if (maybePayloadOrRequestTimeout === undefined && maybeRequestTimeout === undefined) {
+            this.Payload = undefined;
+            this.RequestTimeout = null;
+        } else if (maybePayloadOrRequestTimeout instanceof TimeSpan && maybeRequestTimeout === undefined) {
+            this.Payload = undefined;
+            this.RequestTimeout = maybePayloadOrRequestTimeout;
         } else {
             /* istanbul ignore else */
-            if (typeof maybeTimeoutSeconds === 'number') {
-                this.Payload = arg0 as any;
-                this.TimeoutSeconds = maybeTimeoutSeconds;
+            if (maybeRequestTimeout instanceof TimeSpan) {
+                this.Payload = maybePayloadOrRequestTimeout as T;
+                this.RequestTimeout = maybeRequestTimeout || null;
             } else {
-                this.Payload = undefined as any;
-                this.TimeoutSeconds = undefined as any;
+                this.Payload = undefined;
+                this.RequestTimeout = null;
             }
         }
     }
-
 }

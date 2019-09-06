@@ -1,22 +1,73 @@
 import '../csx-helpers';
 import '../jest-extensions';
 import { runCsx } from '../csx-helpers';
-import { __returns__, CancellationToken, __hasCancellationToken__, Message, IpcClient } from '../../src';
+import {
+    IpcClient,
+    Message,
+    CancellationToken,
+    CancellationTokenSource,
+    __returns__,
+    __hasCancellationToken__,
+    Timeout,
+    TimeSpan,
+    PromisePal,
+    RemoteError,
+    OperationCanceledError
+} from '../../src';
 
 describe('Client-Server-1', () => {
 
-    test(`Main`, async () => {
+    // test(`Main`, async () => {
+
+    //     await runCsx(csx(), async () => {
+    //         const client = new IpcClient('test-pipe', Contract.ITestService, config => {
+    //             config.callbackService = new TestCallback();
+    //         });
+    //         try {
+    //             const a = new Contract.Complex(1, 2);
+    //             const b = new Contract.Complex(3, 4);
+    //             const expected = new Contract.Complex(4, 6);
+
+    //             await expect(client.proxy.AddAsync(a, new Message<Contract.Complex>(b, TimeSpan.fromSeconds(5)))).resolves.toEqual(expected);
+    //         } finally {
+    //             await client.closeAsync();
+    //         }
+    //     });
+
+    // }, 1000 * 30);
+
+    test(`Infinite`, async () => {
 
         await runCsx(csx(), async () => {
             const client = new IpcClient('test-pipe', Contract.ITestService, config => {
                 config.callbackService = new TestCallback();
             });
             try {
-                const a = new Contract.Complex(1, 2);
-                const b = new Contract.Complex(3, 4);
-                const expected = new Contract.Complex(4, 6);
+                // const actual = await client.proxy.AddAsync(
+                //     new Contract.Complex(10, 20),
+                //     new Message(new Contract.Complex(30, 40))
+                // );
 
-                await expect(client.proxy.AddAsync(a, new Message<Contract.Complex>(b, 5))).resolves.toEqual(expected);
+                // expect(actual).toEqual(new Contract.Complex(40, 60));
+
+                await expect(client.proxy.InfiniteAsync(new Message<void>(TimeSpan.fromMilliseconds(10)))).rejects.toBeInstanceOf(RemoteError);
+
+                const cts = new CancellationTokenSource();
+                const promise = client.proxy.InfiniteAsync(new Message<void>(Timeout.infiniteTimeSpan), cts.token);
+                const _then = jest.fn();
+                const _catch = jest.fn(x => {
+                    expect(x).toBeInstanceOf(OperationCanceledError);
+                });
+                promise.then(_then, _catch);
+
+                await PromisePal.delay(TimeSpan.fromSeconds(5));
+                expect(_then).not.toHaveBeenCalled();
+                expect(_catch).not.toHaveBeenCalled();
+
+                cts.cancel();
+                await PromisePal.yield();
+                expect(_then).not.toHaveBeenCalled();
+                expect(_catch).toHaveBeenCalledTimes(1);
             } finally {
                 await client.closeAsync();
             }
@@ -59,6 +110,7 @@ public static class Contract {
     }
     public interface ITestService {
         Task<Complex> AddAsync(Complex a, Message<Complex> b, CancellationToken ct = default);
+        Task<bool> InfiniteAsync(Message message, CancellationToken ct = default);
     }
     public interface ITestCallback {
         Task<double> AddAsync(double a, double b);
@@ -70,6 +122,10 @@ public class TestService : Contract.ITestService {
         var x = await callback.AddAsync(a.X, b.Payload.X);
         var y = await callback.AddAsync(a.Y, b.Payload.Y);
         return new Contract.Complex { X = x, Y = y };
+    }
+    public async Task<bool> InfiniteAsync(Message message, CancellationToken ct = default) {
+        await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, ct);
+        return true;
     }
 }
 
@@ -107,6 +163,10 @@ namespace Contract {
         @__returns__(Complex)
         // @ts-ignore
         public AddAsync(a: Complex, b: Message<Complex>, ct?: CancellationToken): Promise<Complex> { throw null; }
+
+        @__hasCancellationToken__
+        // @ts-ignore
+        public InfiniteAsync(message: Message<void>, ct?: CancellationToken): Promise<boolean> { throw null; }
     }
     export interface ITestCallback {
         AddAsync(a: number, b: number): Promise<number>;

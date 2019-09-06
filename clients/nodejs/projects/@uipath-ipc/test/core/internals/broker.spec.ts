@@ -175,7 +175,9 @@ describe('Core-Internals-Broker', () => {
         expect(logicalSocket.addDataListener).toHaveBeenCalledTimes(1);
         expect(listener).toBeTruthy();
 
-        const callbackRequestBuffer = SerializationPal.serializeRequest(new BrokerMessage.InboundRequest('bar', ['frob', 123], 1), 'some-id', TimeSpan.fromHours(1)).buffer;
+        const brokerRequest = new BrokerMessage.InboundRequest('bar', ['frob', 123], 1);
+        const tuple = SerializationPal.extract(brokerRequest, TimeSpan.fromHours(1));
+        const callbackRequestBuffer = SerializationPal.serializeRequest('some-id', brokerRequest.methodName, tuple.serializedArgs, tuple.timeoutSeconds, tuple.cancellationToken);
         expect(callbacks.bar).not.toHaveBeenCalled();
         listener(callbackRequestBuffer);
         await PromisePal.yield();

@@ -3,7 +3,7 @@ import { InvalidOperationError } from '../errors/invalid-operation-error';
 import { ObjectDisposedError } from '../errors/object-disposed-error';
 import { CancellationToken } from '../tasks/cancellation-token';
 import { PromiseCompletionSource } from '../tasks/promise-completion-source';
-import { Timeout } from '../tasks/timeout';
+import { EcmaTimeout } from '../tasks/ecma-timeout';
 import { TimeSpan } from '../tasks/timespan';
 import { TimeoutError } from '../errors/timeout-error';
 import { PipeBrokenError } from '../errors/pipe/pipe-broken-error';
@@ -36,7 +36,7 @@ export class SocketAdapter implements ILogicalSocket {
         const ctreg = cancellationToken.register(() => {
             pcs.trySetCanceled();
         });
-        const timeout = Timeout.maybeCreate(maybeTimeout, () => {
+        const timeout = EcmaTimeout.maybeCreate(maybeTimeout, () => {
             pcs.trySetError(new TimeoutError());
         });
         this._socketLike.connect(path, () => pcs.trySetResult(undefined));

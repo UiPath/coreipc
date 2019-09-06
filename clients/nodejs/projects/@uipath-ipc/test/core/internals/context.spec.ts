@@ -6,30 +6,33 @@ import * as BrokerMessage from '../../../src/core/internals/broker/broker-messag
 import { CallContext, CallbackContext, CallContextTable, ICallContext } from '../../../src/core/internals/broker/context';
 import { OperationCanceledError } from '../../../src/foundation/errors/operation-canceled-error';
 import { ArgumentNullError } from '../../../src/foundation/errors/argument-null-error';
-import { PromisePal } from '../../../src';
+import { PromisePal, CancellationToken } from '../../../src';
 import { ObjectDisposedError } from '../../../src/foundation/errors/object-disposed-error';
 
 describe('Core-Internals-Context', () => {
 
     test(`CallContext works`, async () => {
-        expect(() => new CallContext(undefined)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'id');
-        expect(() => new CallContext(null)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'id');
-        expect(() => new CallContext('')).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'id');
+        expect(() => new CallContext(undefined, CancellationToken.none)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'id');
+        expect(() => new CallContext(null, CancellationToken.none)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'id');
+        expect(() => new CallContext('', CancellationToken.none)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'id');
+
+        expect(() => new CallContext('foo', undefined)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'cancellationToken');
+        expect(() => new CallContext('foo', null)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'cancellationToken');
 
         {
             const brokerResponse = new BrokerMessage.Response(null, null);
-            const callContext = new CallContext('id-foo');
+            const callContext = new CallContext('id-foo', CancellationToken.none);
             callContext.set(new Outcome.Succeeded(brokerResponse));
             await expect(callContext.promise).resolves.toBe(brokerResponse);
         }
         {
             const error = new MockError();
-            const callContext = new CallContext('id-foo');
+            const callContext = new CallContext('id-foo', CancellationToken.none);
             callContext.set(new Outcome.Faulted(error));
             await expect(callContext.promise).rejects.toBe(error);
         }
         {
-            const callContext = new CallContext('id-foo');
+            const callContext = new CallContext('id-foo', CancellationToken.none);
             callContext.set(new Outcome.Canceled());
             await expect(callContext.promise).rejects.toBeInstanceOf(OperationCanceledError);
         }
@@ -63,7 +66,7 @@ describe('Core-Internals-Context', () => {
         const table = new CallContextTable();
 
         let createdContext: ICallContext;
-        expect(() => createdContext = table.createContext()).not.toThrow();
+        expect(() => createdContext = table.createContext(CancellationToken.none)).not.toThrow();
         expect(createdContext).toBeTruthy();
         expect(createdContext.id).toBeTruthy();
         expect(createdContext.promise).toBeTruthy();
@@ -88,7 +91,7 @@ describe('Core-Internals-Context', () => {
         const table = new CallContextTable();
         expect(() => table.signal('inexistent-id', someOutcome)).not.toThrow();
 
-        const context = table.createContext();
+        const context = table.createContext(CancellationToken.none);
 
         expect(() => table.signal(context.id, someOutcome)).not.toThrow();
         await expect(context.promise).resolves.toBe(someBrokerResponse);
@@ -97,9 +100,9 @@ describe('Core-Internals-Context', () => {
     test(`CallContextTable.dispose works, is idempotent and cancels all contexts`, async () => {
         const table = new CallContextTable();
 
-        const context1 = table.createContext();
-        const context2 = table.createContext();
-        const context3 = table.createContext();
+        const context1 = table.createContext(CancellationToken.none);
+        const context2 = table.createContext(CancellationToken.none);
+        const context3 = table.createContext(CancellationToken.none);
 
         expect(() => table.dispose()).not.toThrow();
         expect(() => table.dispose()).not.toThrow();
@@ -114,7 +117,7 @@ describe('Core-Internals-Context', () => {
         const table = new CallContextTable();
         table.dispose();
 
-        expect(() => table.createContext()).toThrowInstanceOf(ObjectDisposedError);
+        expect(() => table.createContext(CancellationToken.none)).toThrowInstanceOf(ObjectDisposedError);
         expect(() => table.signal('foo', new Outcome.Canceled())).toThrowInstanceOf(ObjectDisposedError);
     });
 

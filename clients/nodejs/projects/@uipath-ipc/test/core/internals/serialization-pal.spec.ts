@@ -33,67 +33,57 @@ describe('Core-Internals-SerializationPal', () => {
         expect(() => SerializationPal.serializeResponse(error, 'foo')).not.toThrow();
     });
 
-    test(`serializeRequest throws for falsy args`, () => {
-        expect(() => SerializationPal.serializeRequest(
+    test(`extract throws for falsy args`, () => {
+        expect(() => SerializationPal.extract(
             new BrokerMessage.InboundRequest('foo', [], 10),
-            'bar',
             null)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'defaultTimeout');
 
-        expect(() => SerializationPal.serializeRequest(
-            new BrokerMessage.InboundRequest('foo', [], 10),
-            null,
-            null)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'id');
-
-        expect(() => SerializationPal.serializeRequest(
-            null,
+        expect(() => SerializationPal.extract(
             null,
             null)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === 'request');
     });
 
-    test(`serializeRequest produces a non-empty buffer`, () => {
+    test(`extract and serializeRequest produce a non-empty buffer`, () => {
         expect(SerializationPal.serializeRequest(
-            new BrokerMessage.InboundRequest('foo', [], 10),
-            'bar',
-            TimeSpan.fromHours(10)
-        ).buffer).toBeMatchedBy<Buffer>(x => x && x.length > 0);
+            'foo-id',
+            'foo-method',
+            [],
+            100,
+            CancellationToken.none
+        )).toBeMatchedBy<Buffer>(x => x && x.length > 0);
     });
 
-    test(`serializeRequest detects cancellation tokens`, () => {
-        expect(SerializationPal.serializeRequest(
+    test(`extract detects cancellation tokens`, () => {
+        expect(SerializationPal.extract(
             new BrokerMessage.InboundRequest('foo', [], 10),
-            'bar',
             TimeSpan.fromHours(10)
         ).cancellationToken).toBe(CancellationToken.none);
 
         const specific = new CancellationTokenSource().token;
 
-        expect(SerializationPal.serializeRequest(
+        expect(SerializationPal.extract(
             new BrokerMessage.InboundRequest('foo', [specific], 10),
-            'bar',
             TimeSpan.fromHours(10)
         ).cancellationToken).toBe(specific);
 
-        expect(SerializationPal.serializeRequest(
+        expect(SerializationPal.extract(
             new BrokerMessage.InboundRequest('foo', ['foo2', specific], 10),
-            'bar',
             TimeSpan.fromHours(10)
         ).cancellationToken).toBe(specific);
     });
 
-    test(`serializeRequest extracts timeouts from messages while serializing Outbound requests`, () => {
+    test(`extract extracts timeouts from messages while serializing Outbound requests`, () => {
         const defaultTimeout = TimeSpan.fromHours(10);
 
-        expect(SerializationPal.serializeRequest(
+        expect(SerializationPal.extract(
             new BrokerMessage.OutboundRequest('foo', []),
-            'bar',
             defaultTimeout
         ).timeoutSeconds).toBe(defaultTimeout.totalSeconds);
 
-        expect(SerializationPal.serializeRequest(
-            new BrokerMessage.OutboundRequest('foo', [new Message(undefined, 30)]),
-            'bar',
+        expect(SerializationPal.extract(
+            new BrokerMessage.OutboundRequest('foo', [new Message(undefined, TimeSpan.fromHours(1))]),
             defaultTimeout
-        ).timeoutSeconds).toBe(30);
+        ).timeoutSeconds).toBe(3600);
     });
 
     test(`deserializeResponse throws for falsy args`, () => {

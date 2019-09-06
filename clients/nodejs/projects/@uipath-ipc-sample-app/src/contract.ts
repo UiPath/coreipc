@@ -1,10 +1,11 @@
 // tslint:disable: variable-name
 // tslint:disable: max-line-length
 import { CancellationToken, Message, __hasCancellationToken__, __returns__ } from '@uipath/ipc';
+import { TimeSpan } from '@uipath/ipc/dist/foundation/tasks/timespan';
 
 export class SystemMessage extends Message<void> {
-    constructor(public Text: string, public Delay: number, TimeoutSeconds: number) {
-        super(TimeoutSeconds);
+    constructor(public Text: string, public Delay: number, requestTimeout: TimeSpan) {
+        super(requestTimeout);
     }
 }
 export class ComplexNumber {

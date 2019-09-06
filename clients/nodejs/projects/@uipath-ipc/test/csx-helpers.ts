@@ -90,13 +90,16 @@ export async function runCsxFrom<T>(relativePath: string, func: () => Promise<T>
 
 export async function runCsx<T>(csx: string, func: () => Promise<T>): Promise<T> {
     const cts = new CancellationTokenSource();
+    let dotNetScript: Promise<void>;
     try {
         const pcsReady = new PromiseCompletionSource<void>();
-        executeCSharp(csx, cts.token, false, '#!READY', pcsReady);
+        dotNetScript = executeCSharp(csx, cts.token, false, '#!READY', pcsReady);
         await pcsReady.promise;
 
-        return await func();
+        const result = await func();
+        return result;
     } finally {
         cts.cancel();
+        await dotNetScript;
     }
 }

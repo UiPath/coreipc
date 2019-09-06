@@ -132,13 +132,13 @@ export class Broker implements IBroker, IAsyncDisposable {
     public async sendReceiveAsync(brokerRequest: BrokerMessage.OutboundRequest): Promise<BrokerMessage.Response> {
         if (!brokerRequest) { throw new ArgumentNullError('brokerRequest'); }
 
-        const context = this._calls.createContext();
-        await this.sendRequestAsync(brokerRequest, context.id);
+        const tuple1 = SerializationPal.extract(brokerRequest, this._defaultCallTimeout);
+        const context = this._calls.createContext(tuple1.cancellationToken);
+
+        const buffer = SerializationPal.serializeRequest(context.id, brokerRequest.methodName, tuple1.serializedArgs, tuple1.timeoutSeconds, tuple1.cancellationToken);
+        await this.sendBufferAsync(buffer, tuple1.cancellationToken);
+
         return await context.promise;
-    }
-    private async sendRequestAsync(brokerRequest: BrokerMessage.OutboundRequest, id: string): Promise<void> {
-        const obj = SerializationPal.serializeRequest(brokerRequest, id, this._defaultCallTimeout);
-        await this.sendBufferAsync(obj.buffer, obj.cancellationToken);
     }
 
     // TODO: Add timeout logic here

@@ -90,7 +90,7 @@ describe('Core-Surface-IpcClient', () => {
         const client = new IpcClient(
             'foo',
             IService,
-            (config: InternalIpcClientConfig) => {
+            (config: InternalIpcClientConfig<IService>) => {
                 config.logicalSocketFactory = () => new MockLogicalSocket();
                 config.connectTimeoutMilliseconds = 60 * 1000;
                 config.defaultCallTimeoutSeconds = 60 * 1000;

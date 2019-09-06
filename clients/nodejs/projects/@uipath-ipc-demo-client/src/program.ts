@@ -2,8 +2,7 @@ import * as Contract from './contract';
 import * as Registry from 'winreg';
 
 import { Bootstrapper } from './bootstrapper';
-import { IpcClient, Message, PromisePal, PromiseCompletionSource } from '@uipath/ipc';
-import { TimeSpan } from '@uipath/ipc/dist/foundation/tasks/timespan';
+import { IpcClient, Message, PromisePal, PromiseCompletionSource, CancellationToken, TimeSpan, Timeout } from '@uipath/ipc';
 import { TerminalBase } from './terminal-base';
 
 class Callback implements Contract.ICallback {
@@ -136,15 +135,32 @@ export class Program {
             Program.terminal.writeLine('callback.fail = {yellow-fg}false{/yellow-fg}');
         }
     }
+
+    private static createIpcClient(pipeName: string): IpcClient<Contract.IService> {
+        return new IpcClient(pipeName, Contract.IService, config => {
+            config.callbackService = Program.callback;
+            config.setBeforeConnect(async cancellationToken => {
+                console.log(`BeforeConnect. Sleeping 2 seconds...`);
+                await PromisePal.delay(TimeSpan.fromSeconds(2), cancellationToken);
+                console.log(`Done`);
+            }).setBeforeCall(async (callInfo, cancellationToken) => {
+                console.log(`BeforeCall. callInfo.newConnection === ${callInfo.newConnection}`);
+
+                await callInfo.proxy.StartTimerAsync(new Message<void>());
+            });
+        });
+    }
+
     public static async connect(): Promise<void> {
         if (Program.getStatus(Program.maybeClient)) {
             Program.terminal.writeLine(`{red-fg}You're already connected. You need to "disconnect" first.{/red-fg}`);
         } else {
             Program.terminal.writeLine('  pipe name (leave blank for "foo-pipe"): ');
             const pipeName = await Program.terminal.readLine(x => x || 'foo-pipe');
-            Program.maybeClient = new IpcClient(pipeName, Contract.IService, config => {
-                config.callbackService = Program.callback;
-            });
+            Program.maybeClient = Program.createIpcClient(pipeName);
+            //  new IpcClient(pipeName, Contract.IService, config => {
+            //     config.callbackService = Program.callback;
+            // });
             Program.terminal.writeLine(`You are now logically connected to "${pipeName}"`);
         }
     }
@@ -167,7 +183,7 @@ export class Program {
 
             Program.terminal.writeLine(`Calling AddAsync(a: ${JSON.stringify(a)}, b: ${JSON.stringify(b)})`);
             try {
-                const c = await Program.maybeClient.proxy.AddAsync(a, new Message(b, 5));
+                const c = await Program.maybeClient.proxy.AddAsync(a, new Message(b, TimeSpan.fromSeconds(5)));
                 Program.terminal.writeLine(`Result is ${JSON.stringify(c)}`);
             } catch (error) {
                 Program.terminal.writeLine(`{red-fg}Caught error: ${error}{/red-fg}`);
@@ -178,7 +194,7 @@ export class Program {
         if (!Program.getStatus(Program.maybeClient)) {
             Program.terminal.writeLine(`{red-fg}You're not connected. You need to "connect" first.{/red-fg}`);
         } else {
-            const message = new Message<void>(10);
+            const message = new Message<void>(TimeSpan.fromSeconds(10));
 
             Program.terminal.writeLine(`Calling StartTimerAsync(message: ${JSON.stringify(message)})`);
             try {

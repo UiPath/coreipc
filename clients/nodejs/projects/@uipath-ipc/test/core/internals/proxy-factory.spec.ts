@@ -87,7 +87,7 @@ describe('Core-Internals-ProxyFactory', () => {
         mockBroker.sendReceiveAsync = jest.fn(() => PromisePal.fromResult(new BrokerMessage.Response(new Integer(30), null)));
 
         const client = new IpcClient('foo', IMockService, config => {
-            const asInternal = config as InternalIpcClientConfig;
+            const asInternal = config as InternalIpcClientConfig<IMockService>;
             asInternal.maybeBroker = mockBroker;
         });
         const proxy = client.proxy;
