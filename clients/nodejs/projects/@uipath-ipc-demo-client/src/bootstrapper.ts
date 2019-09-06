@@ -1,7 +1,7 @@
 import * as readline from 'readline';
 export { };
 
-const readlineIface = readline.createInterface(process.stdin, process.stdout);
+// const readlineIface = readline.createInterface(process.stdin, process.stdout);
 
 export class Bootstrapper {
     public static start(main: (args: string[]) => Promise<void>): void {
@@ -10,7 +10,7 @@ export class Bootstrapper {
                 try {
                     await main(process.argv);
                 } finally {
-                    readlineIface.close();
+                    // readlineIface.close();
                 }
                 console.debug(`main ended successfully`);
             } catch (error) {
@@ -20,14 +20,14 @@ export class Bootstrapper {
     }
 }
 
-declare global {
-    interface Console {
-        readlineAsync(question?: string): Promise<string>;
-    }
-}
+// declare global {
+//     interface Console {
+//         readlineAsync(question?: string): Promise<string>;
+//     }
+// }
 
-console.readlineAsync = async function(question?: string): Promise<string> {
-    return new Promise<string>(resolve => {
-        readlineIface.question(question || '', resolve);
-    });
-};
+// console.readlineAsync = async function(question?: string): Promise<string> {
+//     return new Promise<string>(resolve => {
+//         readlineIface.question(question || '', resolve);
+//     });
+// };

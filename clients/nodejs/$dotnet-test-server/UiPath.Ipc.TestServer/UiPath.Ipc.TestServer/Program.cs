@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
 using System.IO.Pipes;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UiPath.Ipc.NamedPipe;
@@ -27,8 +28,15 @@ namespace UiPath.Ipc.TestServer
             using (GuiLikeSyncContext.Install())
             {
                 _host.RunAsync(TaskScheduler.FromCurrentSynchronizationContext());
-                Console.WriteLine($"Server is running (pipeName == \"{pipeName}\"). Press any key to terminate...");
-                Console.ReadKey(true);
+                Console.WriteLine($"Service is exposed over pipe \"{pipeName}\"");
+                Console.WriteLine("Press CTRL_Q to terminate...");
+
+                // Press any key to terminate...");
+                ConsoleKeyInfo keyInfo;
+                do
+                {
+                    keyInfo = Console.ReadKey(true);
+                } while ((keyInfo.Modifiers & ConsoleModifiers.Control) == 0 || keyInfo.Key != ConsoleKey.Q);
             }
         }
 
@@ -37,6 +45,17 @@ namespace UiPath.Ipc.TestServer
             public async Task<Contract.Complex> AddAsync(Contract.Complex a, Message<Contract.Complex> b, CancellationToken ct = default)
             {
                 var callback = b.Client.GetCallback<Contract.ICallback>();
+
+                //var stopwatch = new Stopwatch();
+                //stopwatch.Start();
+
+                //int i = 0;
+                //while (stopwatch.Elapsed < TimeSpan.FromMinutes(0.5))
+                //{
+                //    await callback.AddAsync(10, i++);
+                //    await Task.Delay(300);
+                //}
+
                 var x = await callback.AddAsync(a.X, b.Payload.X);
                 ct.ThrowIfCancellationRequested();
 
@@ -44,6 +63,24 @@ namespace UiPath.Ipc.TestServer
                 ct.ThrowIfCancellationRequested();
 
                 return new Contract.Complex { X = x, Y = y };
+            }
+
+            public async Task StartTimerAsync(Message message)
+            {
+                var callback = message.Client.GetCallback<Contract.ICallback>();
+
+                while (true)
+                {
+                    try
+                    {
+                        await callback.TimeAsync(DateTime.Now.ToLongTimeString());
+                    }
+                    catch
+                    {
+                        return;
+                    }
+                    await Task.Delay(1000);
+                }
             }
         }
 

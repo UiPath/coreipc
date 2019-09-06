@@ -14,10 +14,12 @@ namespace UiPath.Ipc.TestServer
         public interface IService
         {
             Task<Complex> AddAsync(Complex a, Message<Complex> b, CancellationToken ct = default);
+            Task StartTimerAsync(Message message);
         }
         public interface ICallback
         {
             Task<double> AddAsync(double a, double b);
+            Task<string> TimeAsync(string info);
         }
     }
 }
