@@ -27,8 +27,8 @@ class MockSocketLikeBase implements ISocketLike {
     public connect: (path: string, connectionListener?: () => void) => this = jest.fn();
     public once: (path: string, listener: (err: Error) => void) => this = jest.fn();
     public write: (buffer: string | Uint8Array, cb?: (err?: Error) => void) => boolean = jest.fn();
-    public addListener: (event: 'data', listener: (data: Buffer) => void) => this = jest.fn();
-    public removeListener: (event: 'data', listener: (chunk: any) => void) => this = jest.fn();
+    public addListener: (event: 'data' | 'end', listener: (data?: Buffer) => void) => this = jest.fn();
+    public removeListener: (event: 'data' | 'end', listener: (data?: Buffer) => void) => this = jest.fn();
     public removeAllListeners: (event?: string | symbol) => this = jest.fn();
     public unref: () => void = jest.fn();
     public destroy: (error?: Error) => void = jest.fn();

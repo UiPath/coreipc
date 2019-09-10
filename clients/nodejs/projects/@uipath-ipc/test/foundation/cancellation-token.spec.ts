@@ -3,8 +3,8 @@ import { MockError } from '../jest-extensions';
 import { CancellationToken } from '../../src/foundation/tasks/cancellation-token';
 import { CancellationTokenRegistration } from '../../src/foundation/tasks/cancellation-token-registration';
 import { CancellationTokenSource } from '../../src/foundation/tasks/cancellation-token-source';
-import { AggregateError } from '../../src/foundation/errors/aggregate-error';
 import { OperationCanceledError } from '../../src/foundation/errors/operation-canceled-error';
+import { ArgumentError } from '../../src/foundation/errors/argument-error';
 
 describe('Foundation-CancellationToken', () => {
 
@@ -60,4 +60,37 @@ describe('Foundation-CancellationToken', () => {
         expect(() => token.throwIfCancellationRequested()).toThrowInstanceOf(OperationCanceledError);
     });
 
+    test(`CancellationToken.merge throws for empty array`, () => {
+        expect(() => CancellationToken.merge())
+            .toThrowInstanceOf(ArgumentError, x => x.message === ArgumentError.computeMessage('No tokens were supplied.', 'tokens') && x.maybeParamName === 'tokens');
+    });
+
+    test(`CancellationToken.merge returns same token from singleton array`, () => {
+        const token = new CancellationTokenSource().token;
+        expect(CancellationToken.merge(token)).toBe(token);
+    });
+
+    test(`CancellationToken.merge works`, () => {
+        const cts1 = new CancellationTokenSource();
+        const cts2 = new CancellationTokenSource();
+        const cts3 = new CancellationTokenSource();
+
+        const mergedToken = CancellationToken.merge(cts1.token, cts2.token, cts2.token);
+
+        expect(mergedToken.canBeCanceled).toBe(true);
+        expect(mergedToken.isCancellationRequested).toBe(false);
+
+        const mock1 = jest.fn();
+        mergedToken.register(mock1);
+
+        expect(mock1).not.toHaveBeenCalled();
+        cts1.cancel();
+        expect(mergedToken.isCancellationRequested).toBe(true);
+        expect(mock1).toHaveBeenCalledTimes(1);
+
+        cts2.cancel();
+        expect(mock1).toHaveBeenCalledTimes(1);
+        cts3.cancel();
+        expect(mock1).toHaveBeenCalledTimes(1);
+    });
 });

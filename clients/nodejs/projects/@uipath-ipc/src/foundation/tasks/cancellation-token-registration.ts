@@ -1,12 +1,12 @@
 import { IDisposable } from '../disposable/disposable';
-import { ProperCancellationToken } from './cancellation-token';
+import { RegistrarCancellationToken } from './cancellation-token';
 
 export abstract class CancellationTokenRegistration implements IDisposable {
     /* @internal */
     public static get none(): CancellationTokenRegistration { return NoneCancellationTokenRegistration.instance; }
 
     /* @internal */
-    public static create(cancellationToken: ProperCancellationToken, callback: () => void): CancellationTokenRegistration {
+    public static create(cancellationToken: RegistrarCancellationToken, callback: () => void): CancellationTokenRegistration {
         return new ProperCancellationTokenRegistration(cancellationToken, callback);
     }
 
@@ -17,7 +17,7 @@ export abstract class CancellationTokenRegistration implements IDisposable {
 /* @internal */
 export class ProperCancellationTokenRegistration extends CancellationTokenRegistration {
     constructor(
-        private readonly _cancellationToken: ProperCancellationToken,
+        private readonly _cancellationToken: RegistrarCancellationToken,
         private readonly _callback: () => void
     ) { super(); }
     public dispose(): void { this._cancellationToken.unregister(this._callback); }

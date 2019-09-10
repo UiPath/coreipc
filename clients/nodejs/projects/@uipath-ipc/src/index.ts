@@ -10,7 +10,8 @@ import { TimeSpan } from './foundation/tasks/timespan';
 import { Timeout } from './foundation/tasks/timeout';
 import { RemoteError } from './core/surface/remote-error';
 import { OperationCanceledError } from './foundation/errors/operation-canceled-error';
-import { Error as IpcError} from './core/internals/broker/wire-message';
+import { Error as IpcError } from './core/internals/broker/wire-message';
+import { Trace } from './foundation/trace/trace';
 
 export {
     CancellationToken,
@@ -26,5 +27,6 @@ export {
     IpcError,
     OperationCanceledError,
     __hasCancellationToken__,
-    __returns__
+    __returns__,
+    Trace
 };

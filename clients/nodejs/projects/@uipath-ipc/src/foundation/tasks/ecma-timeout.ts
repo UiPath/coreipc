@@ -6,7 +6,7 @@ import { ArgumentError } from '../errors/argument-error';
 export class EcmaTimeout implements IDisposable {
     public static maybeCreate(maybeTimeSpan: TimeSpan | null, callback: () => void): IDisposable {
         if (!callback) { throw new ArgumentNullError('callback'); }
-        if (maybeTimeSpan) {
+        if (maybeTimeSpan && !maybeTimeSpan.isNegative) {
             return new EcmaTimeout(maybeTimeSpan, callback);
         } else {
             return { dispose: () => { /* */ } };
@@ -19,7 +19,7 @@ export class EcmaTimeout implements IDisposable {
     constructor(timespan: TimeSpan, private readonly _callback: () => void) {
         if (!timespan) { throw new ArgumentNullError('timespan'); }
         if (!_callback) { throw new ArgumentNullError('_callback'); }
-        if (timespan.isNegative) { throw new ArgumentError('The specified TimeSpan cannot be negative.', 'timespan'); }
+        if (timespan.isNegative) { throw new ArgumentError('The TimeSpan cannot be negative.', 'timespan'); }
         this._id = setTimeout(this.callback.bind(this), timespan.totalMilliseconds);
     }
     private callback(): void {

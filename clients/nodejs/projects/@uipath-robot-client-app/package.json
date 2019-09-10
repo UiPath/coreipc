@@ -1,13 +1,19 @@
 {
-    "name": "@uipath/robot-client",
+    "name": "@uipath/robot-client-app",
     "version": "0.0.1",
-    "description": "UiPath Robot Client for Nodejs",
-    "main": "dist/index.js",
-    "typings": "dist/index",
+    "private": true,
+    "description": "UiPath Robot Client Test App",
+    "main": "dist/program.js",
+    "bin": "dist/program.js",
+    "typings": "dist/program",
     "scripts": {
         "build": "tsc",
         "build:watch": "tsc --watch",
-        "lint": "tslint --project \"./tsconfig.json\""
+        "package": "pkg . --out-path ./bin",
+        "lint": "tslint --project \"./tsconfig.json\"",
+        "start": "node ./dist/program.js",
+        "start2": "node ./dist/program2.js",
+        "restart": "tsc & node ./dist/program.js"
     },
     "author": "Eduard Dumitru",
     "license": "MIT",
@@ -17,19 +23,17 @@
     "publishConfig": {
         "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages@Local/npm/registry/",
         "access": "public"
-    
-    },
-    "dependencies": {
-        "@uipath/ipc": "^0.0.1",
-        "blessed": "0.1.81",
-        "winreg": "1.2.3",
-        "rxjs": "6.5.2"
     },
     "pkg": {
         "assets": [
             "../../node_modules/blessed/usr/xterm",
             "../../node_modules/blessed/usr/xterm-256color"
-        ]        
+        ]
+    },
+    "dependencies": {
+        "@uipath/robot-client": "^0.0.1",
+        "blessed": "0.1.81",
+        "winreg": "1.2.3"
     },
     "devDependencies": {
         "@types/jest": "^22.1.4",

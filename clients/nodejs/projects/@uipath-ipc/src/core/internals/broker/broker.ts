@@ -13,6 +13,8 @@ import { Succeeded } from '../../../foundation/outcome';
 import { ILogicalSocketFactory } from '../../../foundation/pipes/logical-socket';
 import { TimeSpan } from '../../../foundation/tasks/timespan';
 import { ArgumentNullError } from '../../../foundation/errors/argument-null-error';
+import { Maybe } from '../../../foundation/data-structures/maybe';
+import { ConnectionFactoryDelegate, BeforeCallDelegate } from '../../surface/ipc-client';
 
 type IMethod = (this: IMethodContainer, ...args: any[]) => any;
 interface IMethodContainer { readonly [methodName: string]: IMethod | undefined; }
@@ -31,12 +33,20 @@ export class Broker implements IBroker, IAsyncDisposable {
     private _maybeWrapper: StreamWrapper | null = null;
     private readonly _calls = new CallContextTable();
 
+    private _newConnection = true;
+    private _insideConnectionFactory = false;
+    private _insideBeforeCall = false;
+    private _generation = 0;
+
     constructor(
         private readonly _factory: ILogicalSocketFactory,
         private readonly _pipeName: string,
         private readonly _connectTimeout: TimeSpan,
         private readonly _defaultCallTimeout: TimeSpan,
-        private readonly _callback: IMethodContainer | undefined
+        private readonly _callback: IMethodContainer | undefined,
+
+        private readonly _maybeConnectionFactory: Maybe<ConnectionFactoryDelegate>,
+        private readonly _maybeBeforeCall: Maybe<BeforeCallDelegate>
     ) {
         if (!_factory) { throw new ArgumentNullError('_factory'); }
         if (!_pipeName) { throw new ArgumentNullError('_pipeName'); }
@@ -53,17 +63,34 @@ export class Broker implements IBroker, IAsyncDisposable {
         return this._maybeWrapper;
     }
     private async connectAsync(cancellationToken: CancellationToken): Promise<PipeClientStream> {
-        return await await PipeClientStream.connectAsync(
+        const connect = async () => await PipeClientStream.connectAsync(
+            this._factory,
+            this._pipeName,
+            this._connectTimeout,
+            cancellationToken
+        );
+
+        let result: PipeClientStream | void | null = null;
+        if (this._maybeConnectionFactory && !this._insideConnectionFactory) {
+            this._insideConnectionFactory = true;
+            try {
+                result = await this._maybeConnectionFactory(connect, cancellationToken);
+            } catch (error) { }
+            this._insideConnectionFactory = false;
+        }
+        result = result || await PipeClientStream.connectAsync(
             this._factory,
             this._pipeName,
             this._connectTimeout,
             cancellationToken);
+
+        this._newConnection = true;
+        this._generation++;
+
+        return result;
     }
 
     private processInboundAsync(event: MessageEvent): void {
-
-        // console.debug(`Got Inbound >> `, event);
-
         if (event.message instanceof WireMessage.Request) {
             const tuple = SerializationPal.deserializeRequest(event.message);
             const callbackContext = new CallbackContext(
@@ -132,20 +159,37 @@ export class Broker implements IBroker, IAsyncDisposable {
         }
     }
 
+    private async ensureConnectedAsync(cancellationToken: CancellationToken): Promise<void> {
+        if (!this._maybeWrapper || !this._maybeWrapper.isConnected) {
+            if (this._maybeWrapper) {
+                await this._maybeWrapper.disposeAsync();
+                this._maybeWrapper = null;
+            }
+            await this.getOrCreateWrapperAsync(cancellationToken);
+        }
+    }
+
     public async sendReceiveAsync(brokerRequest: BrokerMessage.OutboundRequest): Promise<BrokerMessage.Response> {
         if (!brokerRequest) { throw new ArgumentNullError('brokerRequest'); }
 
         const tuple1 = SerializationPal.extract(brokerRequest, this._defaultCallTimeout);
         const context = this._calls.createContext(tuple1.cancellationToken);
 
-        const buffer = SerializationPal.serializeRequest(context.id, brokerRequest.methodName, tuple1.serializedArgs, tuple1.timeoutSeconds, tuple1.cancellationToken);
-        await this.sendBufferAsync(buffer, tuple1.cancellationToken);
+        await this.ensureConnectedAsync(tuple1.cancellationToken);
+
+        const buffer = SerializationPal.serializeRequest(
+            context.id,
+            brokerRequest.methodName,
+            tuple1.serializedArgs,
+            tuple1.timeoutSeconds,
+            tuple1.cancellationToken
+        );
+        await this.sendBufferAsync(brokerRequest.methodName, buffer, tuple1.cancellationToken);
 
         return await context.promise;
     }
 
-    // TODO: Add timeout logic here
-    private async sendBufferAsync(buffer: Buffer, cancellationToken: CancellationToken): Promise<void> {
+    private async sendBufferAsync(methodName: string, buffer: Buffer, cancellationToken: CancellationToken): Promise<void> {
         let fulfilled = false;
         while (!fulfilled) {
             let wrapper: StreamWrapper = null as any;
@@ -156,6 +200,15 @@ export class Broker implements IBroker, IAsyncDisposable {
             }
 
             try {
+                if (this._maybeBeforeCall && !this._insideBeforeCall) {
+                    this._insideBeforeCall = true;
+                    try {
+                        await this._maybeBeforeCall(methodName, this._newConnection, cancellationToken);
+                    } catch (error) {
+                    }
+                    this._newConnection = false;
+                    this._insideBeforeCall = false;
+                }
                 await wrapper.stream.writeAsync(buffer, cancellationToken);
                 fulfilled = true;
             } catch (error) {

@@ -5,7 +5,7 @@ import { TimeSpan } from '../../foundation/tasks/timespan';
 import { ILogicalSocketFactory } from '../../foundation/pipes/logical-socket';
 import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
 import { PublicConstructor } from '../../foundation/reflection/reflection';
-import { CancellationToken } from '../..';
+import { CancellationToken, PipeClientStream } from '../..';
 import { Maybe } from '../../foundation/data-structures/maybe';
 
 export class IpcClient<TService> {
@@ -28,7 +28,10 @@ export class IpcClient<TService> {
             pipeName,
             TimeSpan.fromMilliseconds(config.connectTimeoutMilliseconds),
             TimeSpan.fromSeconds(config.defaultCallTimeoutSeconds),
-            config.callbackService);
+            config.callbackService,
+            config.maybeConnectionFactory,
+            config.maybeBeforeCall
+        );
 
         this.proxy = ProxyFactory.create(serviceCtor, this._broker);
     }
@@ -38,27 +41,26 @@ export class IpcClient<TService> {
     }
 }
 
-export interface CallInfo<TService> {
-    readonly newConnection: boolean;
-    readonly proxy: TService;
-}
-export type BeforeConnectDelegate = (cancellationToken: CancellationToken) => Promise<void>;
-export type BeforeCallDelegate<TService> = (callInfo: CallInfo<TService>, cancellationToken: CancellationToken) => Promise<void>;
+/* @internal */
+export type ConnectionFactoryDelegate = (connect: () => Promise<PipeClientStream>, cancellationToken: CancellationToken) => Promise<PipeClientStream | void>;
+
+/* @internal */
+export type BeforeCallDelegate = (methodName: string, newConnection: boolean, cancellationToken: CancellationToken) => Promise<void>;
 
 export class IpcClientConfig<TService> {
-    public connectTimeoutMilliseconds: number = 2000;
-    public defaultCallTimeoutSeconds: number = 2;
+    public connectTimeoutMilliseconds: number = 3000;
+    public defaultCallTimeoutSeconds: number = 40;
 
     public callbackService?: any;
 
-    protected _maybeBeforeConnect: Maybe<BeforeConnectDelegate> = null;
-    protected _maybeBeforeCall: Maybe<BeforeCallDelegate<TService>> = null;
+    protected _maybeConnectionFactory: Maybe<ConnectionFactoryDelegate> = null;
+    protected _maybeBeforeCall: Maybe<BeforeCallDelegate> = null;
 
-    public setBeforeConnect(delegate: BeforeConnectDelegate): this {
-        this._maybeBeforeConnect = delegate;
+    public setConnectionFactory(delegate: (connect: () => Promise<PipeClientStream>, cancellationToken: CancellationToken) => Promise<PipeClientStream | void>): this {
+        this._maybeConnectionFactory = delegate;
         return this;
     }
-    public setBeforeCall(delegate: BeforeCallDelegate<TService>): this {
+    public setBeforeCall(delegate: (methodName: string, newConnection: boolean, cancellationToken: CancellationToken) => Promise<void>): this {
         this._maybeBeforeCall = delegate;
         return this;
     }
@@ -69,6 +71,6 @@ export class InternalIpcClientConfig<TService> extends IpcClientConfig<TService>
     public logicalSocketFactory: ILogicalSocketFactory = () => new PhysicalSocket();
     public maybeBroker: IBroker | null = null;
 
-    public get maybeBeforeConnect(): Maybe<BeforeConnectDelegate> { return this._maybeBeforeConnect; }
-    public get maybeBeforeCall(): Maybe<Maybe<BeforeCallDelegate<TService>>> { return this._maybeBeforeCall; }
+    public get maybeConnectionFactory(): Maybe<ConnectionFactoryDelegate> { return this._maybeConnectionFactory; }
+    public get maybeBeforeCall(): Maybe<BeforeCallDelegate> { return this._maybeBeforeCall; }
 }

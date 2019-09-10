@@ -10,6 +10,7 @@ import { PipeBrokenError } from '../errors/pipe/pipe-broken-error';
 import { ISocketLike } from './socket-like';
 import { ILogicalSocket } from './logical-socket';
 import { ArgumentNullError } from '../errors/argument-null-error';
+import * as net from 'net';
 
 /* @internal */
 export class SocketAdapter implements ILogicalSocket {
@@ -93,6 +94,20 @@ export class SocketAdapter implements ILogicalSocket {
         this._socketLike.addListener('data', listener);
         return {
             dispose: () => this._socketLike.removeListener('data', listener)
+        };
+    }
+    public addEndListener(listener: () => void): IDisposable {
+        if (!listener) { throw new ArgumentNullError('listener'); }
+
+        if (this._isDisposed) {
+            throw new ObjectDisposedError('PhysicalSocket');
+        }
+        if (!this._isConnected) {
+            throw new InvalidOperationError();
+        }
+        this._socketLike.addListener('end', listener);
+        return {
+            dispose: () => this._socketLike.removeListener('end', listener)
         };
     }
     public dispose(): void {

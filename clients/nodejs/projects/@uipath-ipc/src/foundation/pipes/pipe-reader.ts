@@ -10,22 +10,27 @@ import { ArgumentNullError } from '../errors/argument-null-error';
 
 /* @internal */
 export class PipeReader implements IAsyncDisposable {
-    private readonly _buffers = new Quack<Buffer>();
+    private readonly _buffers = new Quack<Buffer | null>();
 
-    private readonly _boundHandler: (data: Buffer) => void;
     private _isDisposed = false;
     private _currentRead: Promise<number> | null = null;
     private _cts = new CancellationTokenSource();
     private _maybeDataAvailableSignal: PromiseCompletionSource<void> | null = null;
     private _dataListenerSubscription: IDisposable;
+    private _endListenerSubscription: IDisposable;
 
     constructor(private readonly _socket: ILogicalSocket) {
         if (!_socket) { throw new ArgumentNullError('_socket'); }
-        this._dataListenerSubscription = _socket.addDataListener(this._boundHandler = this.onData.bind(this));
+        this._dataListenerSubscription = _socket.addDataListener(this.onData.bind(this));
+        this._endListenerSubscription = _socket.addEndListener(this.onEnd.bind(this));
     }
 
     private onData(data: Buffer): void {
         this._buffers.enqueue(data);
+        if (this._maybeDataAvailableSignal) { this._maybeDataAvailableSignal.setResult(undefined); }
+    }
+    private onEnd(): void {
+        this._buffers.enqueue(null);
         if (this._maybeDataAvailableSignal) { this._maybeDataAvailableSignal.setResult(undefined); }
     }
     public async readPartiallyAsync(destination: Buffer, cancellationToken: CancellationToken): Promise<number> {
@@ -56,15 +61,18 @@ export class PipeReader implements IAsyncDisposable {
         let result = 0;
         while (this._buffers.any && destination.length > 0) {
             const source = this._buffers.pop();
-            const progress = Math.min(source.length, destination.length);
-            source.copy(destination, 0, 0, progress);
-            result += progress;
-            destination = destination.subarray(progress);
-            if (progress < source.length) {
-                const remainder = source.subarray(progress);
-                this._buffers.push(remainder);
+            if (source) {
+                const progress = Math.min(source.length, destination.length);
+                source.copy(destination, 0, 0, progress);
+                result += progress;
+                destination = destination.subarray(progress);
+                if (progress < source.length) {
+                    const remainder = source.subarray(progress);
+                    this._buffers.push(remainder);
+                }
             }
         }
+
         return result;
     }
 
@@ -72,6 +80,7 @@ export class PipeReader implements IAsyncDisposable {
         if (!this._isDisposed) {
             this._isDisposed = true;
             this._dataListenerSubscription.dispose();
+            this._endListenerSubscription.dispose();
             this._cts.cancel();
         }
     }

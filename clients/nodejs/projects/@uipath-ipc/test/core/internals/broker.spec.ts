@@ -15,15 +15,15 @@ import { PromisePal, PromiseCompletionSource } from '../../../src';
 
 describe('Core-Internals-Broker', () => {
     test(`Broker.ctor throws for falsy args`, () => {
-        expect(() => new Broker(null, null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_factory');
-        expect(() => new Broker(jest.fn(), null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_pipeName');
-        expect(() => new Broker(jest.fn(), 'foo', null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_connectTimeout');
-        expect(() => new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_defaultCallTimeout');
-        expect(() => new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), TimeSpan.fromDays(1), null)).not.toThrow();
+        expect(() => new Broker(null, null, null, null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_factory');
+        expect(() => new Broker(jest.fn(), null, null, null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_pipeName');
+        expect(() => new Broker(jest.fn(), 'foo', null, null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_connectTimeout');
+        expect(() => new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_defaultCallTimeout');
+        expect(() => new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), TimeSpan.fromDays(1), null, null, null)).not.toThrow();
     });
 
     test(`Broker.sendReceiveAsync throws for falsy args`, async () => {
-        const broker = new Broker(jest.fn(), 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null);
+        const broker = new Broker(jest.fn(), 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
         await expect(broker.sendReceiveAsync(null)).rejects.toBeInstanceOf(ArgumentNullError, x => x.maybeParamName === 'brokerRequest');
     });
 
@@ -31,12 +31,13 @@ describe('Core-Internals-Broker', () => {
         const logicalSocket = _mock_<ILogicalSocket>({
             connectAsync: jest.fn(),
             addDataListener: jest.fn(),
+            addEndListener: jest.fn(),
             writeAsync: jest.fn(() => PromisePal.completedPromise),
             dispose: () => { }
         });
         const logicalSocketFactory = jest.fn(() => logicalSocket);
 
-        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null);
+        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
 
         broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('bar', []));
         await PromisePal.yield();
@@ -63,12 +64,13 @@ describe('Core-Internals-Broker', () => {
         const logicalSockets = writePromises.map(writePromise => _mock_<ILogicalSocket>({
             connectAsync: jest.fn(() => PromisePal.completedPromise),
             addDataListener: jest.fn(() => ({ dispose: () => { } })),
+            addEndListener: jest.fn(() => ({ dispose: () => { } })),
             writeAsync: jest.fn(() => writePromise),
             dispose: () => { }
         }));
         const logicalSocketFactory = jest.fn(() => logicalSockets[++currentSocketIndex]);
 
-        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null);
+        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
 
         broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('bar', []));
         await PromisePal.yield();
@@ -96,12 +98,13 @@ describe('Core-Internals-Broker', () => {
         const logicalSockets = promisePairs.map(pair => _mock_<ILogicalSocket>({
             connectAsync: jest.fn(() => pair.connect),
             addDataListener: jest.fn(() => ({ dispose: () => { } })),
+            addEndListener: jest.fn(() => ({ dispose: () => { } })),
             writeAsync: jest.fn(() => pair.write),
             dispose: () => { }
         }));
         const logicalSocketFactory = jest.fn(() => logicalSockets[++currentSocketIndex]);
 
-        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null);
+        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
 
         await expect(broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('bar', []))).rejects.toBe(connectError);
     });
@@ -136,11 +139,15 @@ describe('Core-Internals-Broker', () => {
                     }
                 };
             }
+            public addEndListener(listener: () => void): IDisposable {
+                return { dispose: () => { } };
+            }
+
             public dispose(): void { }
         }
 
         const expectedResponse = new BrokerMessage.Response(123, null);
-        const broker = new Broker(() => new MockLogicalSocket(expectedResponse), 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null);
+        const broker = new Broker(() => new MockLogicalSocket(expectedResponse), 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
         const request = new BrokerMessage.OutboundRequest('bar', []);
         await expect(broker.sendReceiveAsync(request)).resolves.toEqual(expectedResponse);
         await expect(broker.sendReceiveAsync(request)).resolves.toEqual(expectedResponse);
@@ -154,6 +161,7 @@ describe('Core-Internals-Broker', () => {
                 listener = x;
                 return { dispose: () => { } };
             }),
+            addEndListener: jest.fn(() => ({ dispose: () => { } })),
             writeAsync: jest.fn(() => PromisePal.completedPromise),
             dispose: () => { }
         });
@@ -167,7 +175,10 @@ describe('Core-Internals-Broker', () => {
             'foo',
             TimeSpan.fromSeconds(1),
             TimeSpan.fromSeconds(1),
-            callbacks);
+            callbacks,
+            null,
+            null
+        );
 
         broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('remote-method', []));
         await PromisePal.yield();
@@ -187,7 +198,7 @@ describe('Core-Internals-Broker', () => {
     });
 
     test(`Broker.disposeAsync works and is idempotent`, async () => {
-        const broker = new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), TimeSpan.fromDays(1), null);
+        const broker = new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), TimeSpan.fromDays(1), null, null, null);
 
         await expect(broker.disposeAsync()).resolves.toBeUndefined();
         await expect(broker.disposeAsync()).resolves.toBeUndefined();

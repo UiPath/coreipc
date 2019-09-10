@@ -12,6 +12,7 @@ describe('Foundation-PipeClientStream', () => {
         public connectAsync: (path: string, maybeTimeout: TimeSpan | null, cancellationToken: CancellationToken) => Promise<void> = jest.fn();
         public writeAsync: (buffer: Buffer, cancellationToken: CancellationToken) => Promise<void> = jest.fn();
         public addDataListener: (listener: (data: Buffer) => void) => IDisposable = jest.fn();
+        public addEndListener: (listener: () => void) => IDisposable = jest.fn();
         public dispose: () => void = jest.fn();
     }
 
@@ -44,6 +45,7 @@ describe('Foundation-PipeClientStream', () => {
             return pcs.promise;
         });
         socket.addDataListener = jest.fn(() => ({ dispose: () => { } }));
+        socket.addEndListener = jest.fn(() => ({ dispose: () => { } }));
 
         const methods = [socket.connectAsync, socket.addDataListener, socket.dispose, socket.writeAsync];
         for (const method of methods) {
@@ -91,6 +93,7 @@ describe('Foundation-PipeClientStream', () => {
             return PromisePal.completedPromise;
         });
         socket.addDataListener = jest.fn(() => ({ dispose: () => { } }));
+        socket.addEndListener = jest.fn(() => ({ dispose: () => { } }));
         socket.writeAsync = jest.fn((buffer: Buffer, cancellationToken: CancellationToken) => {
             return PromisePal.completedPromise;
         });

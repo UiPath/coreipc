@@ -1,51 +1,57 @@
-import { CancellationTokenRegistration } from './cancellation-token-registration';
+import { CancellationTokenRegistration, ProperCancellationTokenRegistration } from './cancellation-token-registration';
 import { OperationCanceledError } from '../errors/operation-canceled-error';
 import { AggregateError } from '../errors/aggregate-error';
+import { ArgumentError } from '../errors/argument-error';
 
 export abstract class CancellationToken {
+    public static merge(...tokens: CancellationToken[]): CancellationToken {
+        switch (tokens.length) {
+            case 0:
+                throw new ArgumentError('No tokens were supplied.', 'tokens');
+            case 1:
+                return tokens[0];
+            default:
+                return new LinkedCancellationToken(tokens);
+        }
+    }
+
     public static get none(): CancellationToken { return NoneCancellationToken.instance; }
 
     public abstract get canBeCanceled(): boolean;
     public abstract get isCancellationRequested(): boolean;
 
     public abstract register(callback: () => void): CancellationTokenRegistration;
-    public abstract throwIfCancellationRequested(): void;
+    public throwIfCancellationRequested(): void {
+        if (this.isCancellationRequested) {
+            throw new OperationCanceledError();
+        }
+    }
 }
 
 /* @internal */
-export class ProperCancellationToken extends CancellationToken {
+export abstract class RegistrarCancellationToken extends CancellationToken {
     private readonly _callbacks = new Array<() => void>();
-    private _isCancellationRequested = false;
 
-    public get canBeCanceled(): boolean { return true; }
-    public get isCancellationRequested(): boolean { return this._isCancellationRequested; }
-
-    public cancel(throwOnFirstError: boolean): void {
-        if (!this._isCancellationRequested) {
-            this._isCancellationRequested = true;
-            try {
-                if (throwOnFirstError) {
-                    for (const callback of this._callbacks) {
-                        callback();
-                    }
-                } else {
-                    const errors = new Array<Error>();
-                    for (const callback of this._callbacks) {
-                        try {
-                            callback();
-                        } catch (error) {
-                            errors.push(error);
-                        }
-                    }
-                    if (errors.length > 0) {
-                        throw new AggregateError(...errors);
-                    }
+    protected invokeCallbacks(throwOnFirstError: boolean): void {
+        if (throwOnFirstError) {
+            for (const callback of this._callbacks.splice(0)) {
+                callback();
+            }
+        } else {
+            const errors = new Array<Error>();
+            for (const callback of this._callbacks.splice(0)) {
+                try {
+                    callback();
+                } catch (error) {
+                    errors.push(error);
                 }
-            } finally {
-                this._callbacks.splice(0);
+            }
+            if (errors.length > 0) {
+                throw new AggregateError(...errors);
             }
         }
     }
+
     public register(callback: () => void): CancellationTokenRegistration {
         if (this.isCancellationRequested) {
             callback();
@@ -61,10 +67,44 @@ export class ProperCancellationToken extends CancellationToken {
             this._callbacks.splice(index, 1);
         }
     }
-    public throwIfCancellationRequested(): void {
-        if (this._isCancellationRequested) {
-            throw new OperationCanceledError();
+}
+
+/* @internal */
+export class ProperCancellationToken extends RegistrarCancellationToken {
+    private _isCancellationRequested = false;
+
+    public get canBeCanceled(): boolean { return true; }
+    public get isCancellationRequested(): boolean { return this._isCancellationRequested; }
+
+    public cancel(throwOnFirstError: boolean): void {
+        if (!this._isCancellationRequested) {
+            this._isCancellationRequested = true;
+            this.invokeCallbacks(throwOnFirstError);
         }
+    }
+}
+
+/* @internal */
+export class LinkedCancellationToken extends RegistrarCancellationToken {
+    private readonly _registrations: CancellationTokenRegistration[];
+    private _isCancellationRequested = false;
+
+    public get canBeCanceled(): boolean { return true; }
+    public get isCancellationRequested(): boolean { return this._isCancellationRequested; }
+
+    constructor(tokens: CancellationToken[]) {
+        super();
+        const boundHandler = this.onCancellationRequested.bind(this);
+        this._registrations = tokens.map(token => token.register(boundHandler));
+    }
+
+    private onCancellationRequested(): void {
+        for (const registration of this._registrations.splice(0)) {
+            registration.dispose();
+        }
+
+        this._isCancellationRequested = true;
+        this.invokeCallbacks(false);
     }
 }
 

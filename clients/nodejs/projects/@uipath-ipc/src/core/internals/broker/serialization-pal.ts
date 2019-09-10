@@ -1,7 +1,7 @@
 import * as BrokerMessage from './broker-message';
 import * as WireMessage from './wire-message';
 import { Message } from '../../surface/message';
-import { CancellationToken } from '../../..';
+import { CancellationToken, CancellationTokenSource } from '../../..';
 import { ArgumentError } from '../../../foundation/errors/argument-error';
 import { TimeSpan } from '../../../foundation/tasks/timespan';
 import { ArgumentNullError } from '../../../foundation/errors/argument-null-error';
@@ -9,7 +9,11 @@ import { ArgumentNullError } from '../../../foundation/errors/argument-null-erro
 /* @internal */
 export class SerializationPal {
     private static serializeObject(argument: any): string {
-        return JSON.stringify(argument);
+        if (argument === undefined) {
+            return '';
+        } else {
+            return JSON.stringify(argument);
+        }
     }
     private static deserializeObject(json: string): any {
         return JSON.parse(json);
@@ -139,7 +143,13 @@ export class SerializationPal {
             serializedArgs.push(jsonArg);
         }
 
-        return { serializedArgs, timeoutSeconds, cancellationToken };
+        const ctsTimeout = new CancellationTokenSource();
+        ctsTimeout.cancelAfter(TimeSpan.fromSeconds(timeoutSeconds));
+
+        const linkedToken = CancellationToken.merge(ctsTimeout.token, cancellationToken);
+        cancellationToken.register(ctsTimeout.dispose.bind(ctsTimeout));
+
+        return { serializedArgs, timeoutSeconds, cancellationToken: linkedToken };
     }
 
     public static serializeRequest(id: string, methodName: string, serializedArgs: string[], timeoutSeconds: number, cancellationToken: CancellationToken): Buffer {

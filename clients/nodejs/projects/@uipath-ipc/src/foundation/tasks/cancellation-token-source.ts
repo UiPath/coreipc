@@ -7,7 +7,7 @@ import { ObjectDisposedError } from '../errors/object-disposed-error';
 export class CancellationTokenSource implements IDisposable {
     private readonly _token: ProperCancellationToken = new ProperCancellationToken();
     public get token(): CancellationToken { return this._token; }
-    private _maybeTimeout: EcmaTimeout | null = null;
+    private _maybeTimeout: IDisposable | null = null;
     private _isDisposed = false;
 
     public cancel(throwOnFirstError: boolean = false): void {
@@ -17,7 +17,7 @@ export class CancellationTokenSource implements IDisposable {
     public cancelAfter(timeSpan: TimeSpan): void {
         if (this._isDisposed) { throw new ObjectDisposedError('CancellationTokenSource'); }
         if (!this._token.isCancellationRequested && !this._maybeTimeout) {
-            this._maybeTimeout = new EcmaTimeout(timeSpan, this.cancel.bind(this));
+            this._maybeTimeout = EcmaTimeout.maybeCreate(timeSpan, this.cancel.bind(this));
         }
     }
 

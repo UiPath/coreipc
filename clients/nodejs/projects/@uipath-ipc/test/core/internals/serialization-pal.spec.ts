@@ -5,7 +5,7 @@ import { SerializationPal } from '../../../src/core/internals/broker/serializati
 import { ArgumentNullError } from '../../../src/foundation/errors/argument-null-error';
 import { MockError } from '../../jest-extensions';
 import { TimeSpan } from '../../../src/foundation/tasks/timespan';
-import { CancellationToken, CancellationTokenSource, Message } from '../../../src';
+import { CancellationToken, CancellationTokenSource, Message, PromisePal } from '../../../src';
 import { ArgumentError } from '../../../src/foundation/errors/argument-error';
 
 describe('Core-Internals-SerializationPal', () => {
@@ -53,23 +53,29 @@ describe('Core-Internals-SerializationPal', () => {
         )).toBeMatchedBy<Buffer>(x => x && x.length > 0);
     });
 
-    test(`extract detects cancellation tokens`, () => {
-        expect(SerializationPal.extract(
-            new BrokerMessage.InboundRequest('foo', [], 10),
-            TimeSpan.fromHours(10)
-        ).cancellationToken).toBe(CancellationToken.none);
+    test(`extract detects cancellation tokens`, async () => {
+        const token1 = SerializationPal.extract(new BrokerMessage.OutboundRequest('foo', []), TimeSpan.fromMilliseconds(1)).cancellationToken;
+        expect(token1).toBeTruthy();
 
-        const specific = new CancellationTokenSource().token;
+        expect(token1.isCancellationRequested).toBe(false);
+        await PromisePal.delay(TimeSpan.fromMilliseconds(10));
+        expect(token1.isCancellationRequested).toBe(true);
 
-        expect(SerializationPal.extract(
-            new BrokerMessage.InboundRequest('foo', [specific], 10),
-            TimeSpan.fromHours(10)
-        ).cancellationToken).toBe(specific);
+        const cts2 = new CancellationTokenSource();
+        const token2 = SerializationPal.extract(new BrokerMessage.OutboundRequest('foo', [cts2.token]), TimeSpan.fromHours(10)).cancellationToken;
+        expect(token2).toBeTruthy();
 
-        expect(SerializationPal.extract(
-            new BrokerMessage.InboundRequest('foo', ['foo2', specific], 10),
-            TimeSpan.fromHours(10)
-        ).cancellationToken).toBe(specific);
+        expect(token2.isCancellationRequested).toBe(false);
+        cts2.cancel();
+        expect(token2.isCancellationRequested).toBe(true);
+
+        const cts3 = new CancellationTokenSource();
+        const token3 = SerializationPal.extract(new BrokerMessage.OutboundRequest('foo', ['foo2', cts3.token]), TimeSpan.fromHours(10)).cancellationToken;
+        expect(token3).toBeTruthy();
+
+        expect(token3.isCancellationRequested).toBe(false);
+        cts3.cancel();
+        expect(token3.isCancellationRequested).toBe(true);
     });
 
     test(`extract extracts timeouts from messages while serializing Outbound requests`, () => {

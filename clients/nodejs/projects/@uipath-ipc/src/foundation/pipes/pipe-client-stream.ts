@@ -5,6 +5,7 @@ import { PipeReader } from './pipe-reader';
 import { ILogicalSocketFactory, ILogicalSocket } from './logical-socket';
 import { TimeSpan } from '../tasks/timespan';
 import { PromisePal } from '../..';
+import { PipeBrokenError } from '../errors/pipe/pipe-broken-error';
 
 export class PipeClientStream implements IAsyncDisposable {
     public static async connectAsync(
@@ -23,6 +24,7 @@ export class PipeClientStream implements IAsyncDisposable {
     ): Promise<PipeClientStream> {
         const path = `\\\\.\\pipe\\${name}`;
         const socket = factory();
+
         await socket.connectAsync(path, maybeTimeout, cancellationToken);
 
         return new PipeClientStream(socket);
@@ -51,6 +53,9 @@ export class PipeClientStream implements IAsyncDisposable {
     public async readPartiallyAsync(destination: Buffer, cancellationToken: CancellationToken = CancellationToken.none): Promise<number> {
         if (this._isDisposed) { throw new ObjectDisposedError('PipeClientStream'); }
         const cbRead = await this._pipeReader.readPartiallyAsync(destination, cancellationToken);
+        if (0 === cbRead) {
+            throw new PipeBrokenError();
+        }
         return cbRead;
     }
 

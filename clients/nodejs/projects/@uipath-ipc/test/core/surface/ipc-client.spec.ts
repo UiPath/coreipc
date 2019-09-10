@@ -23,6 +23,7 @@ describe('Core-Surface-IpcClient', () => {
         public static _connectAsync: (path: string, maybeTimeout: TimeSpan, cancellationToken: CancellationToken) => Promise<void>;
         public static _writeAsync: (buffer: Buffer, cancellationToken: CancellationToken) => Promise<void>;
         public static _addDataListener: (listener: (data: Buffer) => void) => IDisposable;
+        public static _addEndListener: (listener: () => void) => IDisposable;
         public static _dispose: () => void;
 
         public connectAsync(path: string, maybeTimeout: TimeSpan, cancellationToken: CancellationToken): Promise<void> {
@@ -33,6 +34,9 @@ describe('Core-Surface-IpcClient', () => {
         }
         public addDataListener(listener: (data: Buffer) => void): IDisposable {
             return MockLogicalSocket._addDataListener(listener);
+        }
+        public addEndListener(listener: () => void): IDisposable {
+            return MockLogicalSocket._addEndListener(listener);
         }
         public dispose(): void {
             MockLogicalSocket._dispose();

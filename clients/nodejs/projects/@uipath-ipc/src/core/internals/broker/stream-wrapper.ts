@@ -14,13 +14,20 @@ export class StreamWrapper implements IAsyncDisposable {
     private readonly _readIndefinitelyPromise: Promise<void>;
     private readonly _headerBuffer = Buffer.alloc(5);
 
+    private _isConnected = true;
+    public get isConnected(): boolean { return this._isConnected; }
+
     constructor(public readonly stream: PipeClientStream) {
         this._readIndefinitelyPromise = this.readIndefinitelyAsync(this._readIndefinitelyCts.token);
     }
     private async readIndefinitelyAsync(token: CancellationToken): Promise<void> {
-        while (!token.isCancellationRequested) {
-            const message = await this.readMessageAsync(token);
-            this._messages.next(new MessageEvent(this, message));
+        try {
+            while (!token.isCancellationRequested) {
+                const message = await this.readMessageAsync(token);
+                this._messages.next(new MessageEvent(this, message));
+            }
+        } catch (error) {
+            this._isConnected = false;
         }
     }
     private async readMessageAsync(token: CancellationToken): Promise<WireMessage.Request | WireMessage.Response> {

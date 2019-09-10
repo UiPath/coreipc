@@ -17,25 +17,6 @@ import {
 
 describe('Client-Server-1', () => {
 
-    // test(`Main`, async () => {
-
-    //     await runCsx(csx(), async () => {
-    //         const client = new IpcClient('test-pipe', Contract.ITestService, config => {
-    //             config.callbackService = new TestCallback();
-    //         });
-    //         try {
-    //             const a = new Contract.Complex(1, 2);
-    //             const b = new Contract.Complex(3, 4);
-    //             const expected = new Contract.Complex(4, 6);
-
-    //             await expect(client.proxy.AddAsync(a, new Message<Contract.Complex>(b, TimeSpan.fromSeconds(5)))).resolves.toEqual(expected);
-    //         } finally {
-    //             await client.closeAsync();
-    //         }
-    //     });
-
-    // }, 1000 * 30);
-
     test(`Infinite`, async () => {
 
         await runCsx(csx(), async () => {
@@ -43,14 +24,7 @@ describe('Client-Server-1', () => {
                 config.callbackService = new TestCallback();
             });
             try {
-                // const actual = await client.proxy.AddAsync(
-                //     new Contract.Complex(10, 20),
-                //     new Message(new Contract.Complex(30, 40))
-                // );
-
-                // expect(actual).toEqual(new Contract.Complex(40, 60));
-
-                await expect(client.proxy.InfiniteAsync(new Message<void>(TimeSpan.fromMilliseconds(10)))).rejects.toBeInstanceOf(RemoteError);
+                await expect(client.proxy.InfiniteAsync(new Message<void>(TimeSpan.fromMilliseconds(10)))).rejects.toBeInstanceOf(OperationCanceledError);
 
                 const cts = new CancellationTokenSource();
                 const promise = client.proxy.InfiniteAsync(new Message<void>(Timeout.infiniteTimeSpan), cts.token);

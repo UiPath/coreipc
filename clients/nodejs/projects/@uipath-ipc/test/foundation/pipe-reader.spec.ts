@@ -15,7 +15,8 @@ describe('Foundation-PipeReader', () => {
         expect(() => new PipeReader(null as any)).toThrowInstanceOf(ArgumentNullError, error => error.maybeParamName === '_socket');
 
         const mock = _mock_<ILogicalSocket>({
-            addDataListener: jest.fn()
+            addDataListener: jest.fn(),
+            addEndListener: jest.fn()
         });
         expect(() => new PipeReader(mock)).not.toThrow();
 
@@ -23,29 +24,35 @@ describe('Foundation-PipeReader', () => {
     });
 
     test(`disposeAsync works`, async () => {
-        const _disposable = _mock_<IDisposable>({ dispose: jest.fn() });
-        const _logicalSocket = _mock_<ILogicalSocket>({ addDataListener: jest.fn(() => _disposable) });
+        const _disposable1 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable2 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _logicalSocket = _mock_<ILogicalSocket>({
+            addDataListener: jest.fn(() => _disposable1),
+            addEndListener: jest.fn(() => _disposable2)
+        });
 
         const reader = new PipeReader(_logicalSocket);
         expect(_logicalSocket.addDataListener).toHaveBeenCalledTimes(1);
-        expect(_disposable.dispose).not.toHaveBeenCalled();
+        expect(_disposable1.dispose).not.toHaveBeenCalled();
 
         await expect(reader.disposeAsync()).resolves.toBeUndefined();
-        expect(_disposable.dispose).toHaveBeenCalledTimes(1);
+        expect(_disposable1.dispose).toHaveBeenCalledTimes(1);
 
         await expect(reader.disposeAsync()).resolves.toBeUndefined();
-        expect(_disposable.dispose).toHaveBeenCalledTimes(1);
+        expect(_disposable1.dispose).toHaveBeenCalledTimes(1);
     });
 
     test(`readPartiallyAsync succeeds even with immediate cancellation when data is already available`, async () => {
         const alreadyAvailable = Buffer.from('test-message');
 
-        const _disposable = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable1 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable2 = _mock_<IDisposable>({ dispose: jest.fn() });
         const _logicalSocket = _mock_<ILogicalSocket>({
             addDataListener: jest.fn((listener: (data: Buffer) => void) => {
                 listener(alreadyAvailable);
-                return _disposable;
-            })
+                return _disposable1;
+            }),
+            addEndListener: jest.fn(() => _disposable2)
         });
 
         const actual = Buffer.alloc(alreadyAvailable.length);
@@ -58,12 +65,14 @@ describe('Foundation-PipeReader', () => {
     test(`readPartiallyAsync succeeds even with immediate cancellation even when data is only partially available`, async () => {
         const alreadyAvailable = Buffer.from('test');
 
-        const _disposable = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable1 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable2 = _mock_<IDisposable>({ dispose: jest.fn() });
         const _logicalSocket = _mock_<ILogicalSocket>({
             addDataListener: jest.fn((listener: (data: Buffer) => void) => {
                 listener(alreadyAvailable);
-                return _disposable;
-            })
+                return _disposable1;
+            }),
+            addEndListener: jest.fn(() => _disposable2)
         });
 
         const actual = Buffer.alloc(alreadyAvailable.length * 2);
@@ -74,11 +83,13 @@ describe('Foundation-PipeReader', () => {
     });
 
     test(`readPartiallyAsync succeeds even with immediate cancellation even when no data is available if the destination is zero length`, async () => {
-        const _disposable = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable1 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable2 = _mock_<IDisposable>({ dispose: jest.fn() });
         const _logicalSocket = _mock_<ILogicalSocket>({
             addDataListener: jest.fn((listener: (data: Buffer) => void) => {
-                return _disposable;
-            })
+                return _disposable1;
+            }),
+            addEndListener: jest.fn(() => _disposable2)
         });
 
         const actual = Buffer.alloc(0);
@@ -88,8 +99,12 @@ describe('Foundation-PipeReader', () => {
     });
 
     test(`readPartiallyAsync fails as canceled with immediate cancellation when no data is available and destination is not zero length`, async () => {
-        const _disposable = _mock_<IDisposable>({ dispose: jest.fn() });
-        const _logicalSocket = _mock_<ILogicalSocket>({ addDataListener: jest.fn((listener: (data: Buffer) => void) => _disposable) });
+        const _disposable1 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable2 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _logicalSocket = _mock_<ILogicalSocket>({
+            addDataListener: jest.fn((listener: (data: Buffer) => void) => _disposable1),
+            addEndListener: jest.fn(() => _disposable2)
+        });
 
         const actual = Buffer.alloc(10);
         const reader = new PipeReader(_logicalSocket);
@@ -98,8 +113,12 @@ describe('Foundation-PipeReader', () => {
     });
 
     test(`readPartiallyAsync fails for falsy args`, async () => {
-        const _disposable = _mock_<IDisposable>({ dispose: jest.fn() });
-        const _logicalSocket = _mock_<ILogicalSocket>({ addDataListener: jest.fn((listener: (data: Buffer) => void) => _disposable) });
+        const _disposable1 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable2 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _logicalSocket = _mock_<ILogicalSocket>({
+            addDataListener: jest.fn((listener: (data: Buffer) => void) => _disposable1),
+            addEndListener: jest.fn(() => _disposable2)
+        });
 
         const reader = new PipeReader(_logicalSocket);
         expect(reader.readPartiallyAsync(null as any, CancellationToken.none)).rejects.toBeInstanceOf(ArgumentNullError, error => error.maybeParamName === 'destination');
@@ -108,8 +127,12 @@ describe('Foundation-PipeReader', () => {
     });
 
     test(`readPartiallyAsync fails when reader is disposed`, async () => {
-        const _disposable = _mock_<IDisposable>({ dispose: jest.fn() });
-        const _logicalSocket = _mock_<ILogicalSocket>({ addDataListener: jest.fn((listener: (data: Buffer) => void) => _disposable) });
+        const _disposable1 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable2 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _logicalSocket = _mock_<ILogicalSocket>({
+            addDataListener: jest.fn((listener: (data: Buffer) => void) => _disposable1),
+            addEndListener: jest.fn(() => _disposable2)
+        });
 
         const reader = new PipeReader(_logicalSocket);
         await reader.disposeAsync();
@@ -118,8 +141,12 @@ describe('Foundation-PipeReader', () => {
     });
 
     test(`readPartiallyAsync fails when called twice concurrently`, async () => {
-        const _disposable = _mock_<IDisposable>({ dispose: jest.fn() });
-        const _logicalSocket = _mock_<ILogicalSocket>({ addDataListener: jest.fn((listener: (data: Buffer) => void) => _disposable) });
+        const _disposable1 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable2 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _logicalSocket = _mock_<ILogicalSocket>({
+            addDataListener: jest.fn((listener: (data: Buffer) => void) => _disposable1),
+            addEndListener: jest.fn(() => _disposable2)
+        });
 
         const reader = new PipeReader(_logicalSocket);
         const promise1 = reader.readPartiallyAsync(Buffer.alloc(10), CancellationToken.none);
@@ -131,14 +158,16 @@ describe('Foundation-PipeReader', () => {
             'strawberry', 'cherry', 'raspberry'
         ].map(str => Buffer.from(str));
 
-        const _disposable = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable1 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable2 = _mock_<IDisposable>({ dispose: jest.fn() });
         const _logicalSocket = _mock_<ILogicalSocket>({
             addDataListener: jest.fn((listener: (data: Buffer) => void) => {
                 listener(Buffer.from('straw'));
                 listener(Buffer.from('berrycherryrasp'));
                 listener(Buffer.from('berryblack'));
-                return _disposable;
-            })
+                return _disposable1;
+            }),
+            addEndListener: jest.fn(() => _disposable2)
         });
 
         const reader = new PipeReader(_logicalSocket);
@@ -166,7 +195,8 @@ describe('Foundation-PipeReader', () => {
             trigger: new PromiseCompletionSource<void>()
         }));
 
-        const _disposable = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable1 = _mock_<IDisposable>({ dispose: jest.fn() });
+        const _disposable2 = _mock_<IDisposable>({ dispose: jest.fn() });
         const _logicalSocket = _mock_<ILogicalSocket>({
             addDataListener: jest.fn((listener: (data: Buffer) => void) => {
                 (async () => {
@@ -175,8 +205,9 @@ describe('Foundation-PipeReader', () => {
                         listener(Buffer.from(component.str));
                     }
                 })();
-                return _disposable;
-            })
+                return _disposable1;
+            }),
+            addEndListener: jest.fn(() => _disposable2)
         });
 
         const reader = new PipeReader(_logicalSocket);
