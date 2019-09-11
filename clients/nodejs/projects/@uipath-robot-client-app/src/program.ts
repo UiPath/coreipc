@@ -1,4 +1,4 @@
-import { TerminalBase } from './terminal-base';
+import { Terminal } from './terminal';
 import { Bootstrapper } from './bootstrapper';
 
 import { Trace } from '@uipath/ipc';
@@ -7,19 +7,24 @@ import {
     RobotStatus,
     LocalProcessInformation,
     StartJobParameters,
-    StopJobParameters
+    StopJobParameters,
+    IRobotAgentProxy,
+    RobotEnvironmentStore
 } from '@uipath/robot-client';
+import { InstallProcessParameters, PauseJobParameters, ResumeJobParameters } from '@uipath/robot-client/dist/upstream-contract';
 
 export class Program {
-    private static readonly terminal = new TerminalBase(settings => {
+    private static readonly terminal = new Terminal(settings => {
         settings.title = '@uipath/robot-client Tester App';
     });
+
     private static exitRequested = false;
     private static command: string | null = null;
 
-    public static async main(args: string[]): Promise<void> {
-        Program.terminal.initialize('');
+    private static proxy: IRobotAgentProxy = null as any;
 
+    public static async main(args: string[]): Promise<void> {
+        Program.terminal.initialize('Hello World!');
         Trace.addListener(errorOrText => {
             if (errorOrText instanceof Error) {
                 Program.terminal.writeLine(`{red-fg}--! ${errorOrText}{/red-fg}`);
@@ -27,18 +32,51 @@ export class Program {
                 Program.terminal.writeLine(`{green-fg}--> ${errorOrText}{/green-fg}`);
             }
         });
+        Trace.log('Hello World again!');
 
-        const proxy = new RobotProxyConstructor();
+        RobotEnvironmentStore.initialize();
+        Program.proxy = new RobotProxyConstructor();
 
-        proxy.JobCompleted.subscribe(_args => {
+        // console.debug(`data === ${JSON.stringify(RobotEnvironmentStore.data)}`);
+        // return;
+        // (this as any).terminal = new Terminal(settings => {
+        //     settings.title = '@uipath/robot-client Tester App';
+        // });
+
+
+        Program.terminal.writeLine(`>>>> ${JSON.stringify(RobotEnvironmentStore.data)}`);
+
+        function hookStderr(callback: (x: string) => void) {
+            const oldWrite = process.stderr.write;
+
+            // tslint:disable-next-line: ban-types
+            process.stderr.write = (function(write: Function) {
+                return function(a: string) {
+                    write.apply(process.stderr, arguments);
+                    callback(a);
+                };
+            })(process.stderr.write) as any;
+
+            return function() {
+                process.stderr.write = oldWrite;
+            };
+        }
+        hookStderr(x => Trace.log(new Error(`${x}`)));
+
+        // process.stderr.on('data', buffer => {
+        //     Trace.log(new Error(`${buffer}`));
+        // });
+        Trace.log(`I'm here`);
+
+        Program.proxy.JobCompleted.subscribe(_args => {
             Program.terminal.writeLine(`$$ JobCompleted (DisplayName === ${_args.Job.DisplayName})`);
         });
 
-        proxy.JobStatusChanged.subscribe(_args => {
+        Program.proxy.JobStatusChanged.subscribe(_args => {
             Program.terminal.writeLine(`$$ JobStatusChanged (DisplayName === ${_args.Job.DisplayName}, StatusText === ${_args.StatusText})`);
         });
 
-        proxy.RobotStatusChanged.subscribe(_args => {
+        Program.proxy.RobotStatusChanged.subscribe(_args => {
             function robotStatusToString(status: RobotStatus): string {
                 switch (status) {
                     case RobotStatus.Connected: return 'Connected';
@@ -54,7 +92,7 @@ export class Program {
             Program.terminal.writeLine(`$$ RobotStatusChanged (RobotStatus === ${robotStatusToString(_args.Status)}, LogInError === ${_args.LogInError})`);
         });
 
-        proxy.ProcessListUpdated.subscribe(_args => {
+        Program.proxy.ProcessListUpdated.subscribe(_args => {
             Program.terminal.writeLine(`$$ ProcessListUpdated (args.Processes.length === ${_args.Processes.length})`);
 
             function processToString(process: LocalProcessInformation): string {
@@ -78,12 +116,12 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
         });
 
         Trace.log(`Calling RefreshStatus.....`);
-        await proxy.RefreshStatus({
+        await Program.proxy.RefreshStatus({
             ForceProcessListUpdate: true
         });
         Trace.log(`                     .....DONE!`);
 
-        // Program.help();
+        Program.help();
         while (!Program.exitRequested) {
             Program.command = await Program.terminal.readLine();
             const parts = [Program.command];
@@ -99,13 +137,13 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
                         case 'help':
                             Program.help();
                             break;
-                        case 'start job':
+                        case 'start':
                             {
                                 Program.terminal.writeLine(`  ProcessKey (empty string to cancel):`);
                                 const processKey = await Program.terminal.readLine();
                                 if (processKey) {
                                     try {
-                                        const jobData = await proxy.StartJob(new StartJobParameters(processKey));
+                                        const jobData = await Program.proxy.StartJob(new StartJobParameters(processKey));
                                         Program.terminal.writeLine(`   DisplayName: {yellow-fg}"${jobData.DisplayName}"{/yellow-fg}`);
                                         Program.terminal.writeLine(`   Identifier: {yellow-fg}"${jobData.Identifier}"{/yellow-fg}`);
                                         Program.terminal.writeLine(`   ProcessData: {yellow-fg}"${JSON.stringify(jobData.ProcessData)}"{/yellow-fg}`);
@@ -115,13 +153,55 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
                                 }
                             }
                             break;
-                        case 'stop job':
+                        case 'stop':
                             {
                                 Program.terminal.writeLine(`  JobIdentifier (empty string to cancel):`);
                                 const jobIdentifier = await Program.terminal.readLine();
                                 if (jobIdentifier) {
                                     try {
-                                        await proxy.StopJob(new StopJobParameters(jobIdentifier));
+                                        await Program.proxy.StopJob(new StopJobParameters(jobIdentifier));
+                                        Program.terminal.writeLine('Finished without error.');
+                                    } catch (error) {
+                                        Trace.log(error);
+                                    }
+                                }
+                            }
+                            break;
+                        case 'install':
+                            {
+                                Program.terminal.writeLine(`  ProcessKey (empty string to cancel):`);
+                                const processKey = await Program.terminal.readLine();
+                                if (processKey) {
+                                    try {
+                                        await Program.proxy.InstallProcess(new InstallProcessParameters(processKey));
+                                        Program.terminal.writeLine('Finished without error.');
+                                    } catch (error) {
+                                        Trace.log(error);
+                                    }
+                                }
+                            }
+                            break;
+                        case 'pause':
+                            {
+                                Program.terminal.writeLine(`  JobIdentifier (empty string to cancel):`);
+                                const jobIdentifier = await Program.terminal.readLine();
+                                if (jobIdentifier) {
+                                    try {
+                                        await Program.proxy.PauseJob(new PauseJobParameters(jobIdentifier));
+                                        Program.terminal.writeLine('Finished without error.');
+                                    } catch (error) {
+                                        Trace.log(error);
+                                    }
+                                }
+                            }
+                            break;
+                        case 'resume':
+                            {
+                                Program.terminal.writeLine(`  JobIdentifier (empty string to cancel):`);
+                                const jobIdentifier = await Program.terminal.readLine();
+                                if (jobIdentifier) {
+                                    try {
+                                        await Program.proxy.ResumeJob(new ResumeJobParameters(jobIdentifier));
                                         Program.terminal.writeLine('Finished without error.');
                                     } catch (error) {
                                         Trace.log(error);
@@ -139,11 +219,14 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
         Program.terminal.writeLine();
         Program.terminal.writeLine('{yellow-fg}Commands:{/yellow-fg}');
         Program.terminal.writeLine('---------------------------');
-        Program.terminal.writeLine('  {yellow-fg}help{/yellow-fg}                              Displays this manual.');
-        Program.terminal.writeLine(`  {yellow-fg}start job{/yellow-fg}                         Start a job.`);
+        Program.terminal.writeLine('  {yellow-fg}help{/yellow-fg}       Displays this manual.');
+        Program.terminal.writeLine(`  {yellow-fg}start{/yellow-fg}      Starts a job.`);
         // tslint:disable-next-line: max-line-length
-        Program.terminal.writeLine('  {yellow-fg}stop job{/yellow-fg}                          Stop a job.');
-        Program.terminal.writeLine('  {yellow-fg}exit{/yellow-fg}                              Gracefully closes the client app (disconnecting if needed).');
+        Program.terminal.writeLine('  {yellow-fg}stop{/yellow-fg}       Stops a job.');
+        Program.terminal.writeLine('  {yellow-fg}install{/yellow-fg}    Installs a process.');
+        Program.terminal.writeLine('  {yellow-fg}pause{/yellow-fg}      Pauses a job.');
+        Program.terminal.writeLine('  {yellow-fg}resume{/yellow-fg}     Resumes a job.');
+        Program.terminal.writeLine('  {yellow-fg}exit{/yellow-fg}       Gracefully closes the client app (disconnecting if needed).');
         Program.terminal.writeLine('---------------------------');
         Program.terminal.writeLine();
         Program.terminal.writeLine();

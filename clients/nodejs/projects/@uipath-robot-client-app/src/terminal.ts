@@ -12,7 +12,7 @@ export interface ITerminalSettings {
     colors: ITerminalColorSettings;
 }
 
-export class TerminalBase implements IDisposable {
+export class Terminal implements IDisposable {
     private static createDefaultSettings(): ITerminalSettings {
         return {
             title: 'My Terminal',
@@ -34,7 +34,7 @@ export class TerminalBase implements IDisposable {
     private _maybeReadLinePcs: PromiseCompletionSource<void> | null = null;
 
     constructor(config?: (settings: ITerminalSettings) => void) {
-        this._settings = TerminalBase.createDefaultSettings();
+        this._settings = Terminal.createDefaultSettings();
         if (config) { config(this._settings); }
 
         this._screen = this.createScreen();

@@ -16,6 +16,7 @@ import {
     StartJobParameters,
     StopJobParameters
 } from './upstream-contract';
+import { RobotEnvironmentStore } from './robot-environment';
 
 const RobotProxyConstructor: new () => IRobotAgentProxy = RobotAgentProxy;
 
@@ -33,4 +34,8 @@ export {
     LocalProcessInformation,
     StartJobParameters,
     StopJobParameters
+
+    // Temp
+    ,
+    RobotEnvironmentStore
 };

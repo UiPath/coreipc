@@ -23,6 +23,7 @@ module.exports = {
     roots: [
         '<rootDir>/projects/@uipath-ipc',
         '<rootDir>/projects/@uipath-ipc-sample-app',
+        '<rootDir>/projects/@uipath-robot-client',
     ],
     transform: {
         '^.+\\.tsx?$': 'ts-jest',

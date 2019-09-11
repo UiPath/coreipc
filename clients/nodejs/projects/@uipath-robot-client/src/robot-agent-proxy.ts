@@ -18,6 +18,7 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     private readonly _jobCompleted = RobotAgentProxy.createSubject<UpstreamContract.JobCompletedEventArgs>();
 
     constructor() {
+        Trace.log(`Calling new RobotProxy()`);
         this._proxy = new RobotProxy();
 
         this._proxy.ServiceUnavailable.subscribe(_ => this.raiseRobotStatusChanged(DownstreamContract.RobotStatus.ServiceUnavailable));

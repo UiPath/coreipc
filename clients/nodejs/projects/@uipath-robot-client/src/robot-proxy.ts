@@ -5,6 +5,7 @@ import { Subject, Observable, Observer } from 'rxjs';
 import * as UpstreamContract from './upstream-contract';
 import { Utils } from './utils';
 import { RobotClientSettings } from './robot-client-settings';
+import { RobotEnvironmentStore } from './robot-environment';
 
 export interface IRobotProxy {
     readonly JobCompleted: Observable<UpstreamContract.JobCompletedEventArgs>;
@@ -29,6 +30,16 @@ export interface IRobotProxy {
 
 /* @internal */
 export class RobotProxy extends UpstreamContract.IAgentOperations {
+    private static readonly _data = (() => {
+        try {
+            Trace.log(`Calling RobotEnvironmentStore.initialize()...`);
+            RobotEnvironmentStore.initialize();
+            return RobotEnvironmentStore.data;
+        } finally {
+            Trace.log(`...DONE!`);
+        }
+    })();
+
     private static createSubject<T>(): Observer<T> & Observable<T> {
         return new Subject<T>();
     }
@@ -44,6 +55,10 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
 
     constructor() {
         super();
+
+        Trace.log(`Calling Utils.getPipeName(serviceInstalled: ${RobotProxy._data.serviceInstalled})...`);
+        const pipeName = Utils.getPipeName(RobotProxy._data.serviceInstalled);
+        Trace.log(`===> ${pipeName}`);
 
         class AgentEvents implements UpstreamContract.IAgentEvents {
             constructor(private readonly _owner: RobotProxy) { }
@@ -62,7 +77,7 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
         }
 
         this._ipcClient = new IpcClient(
-            Utils.pipeName,
+            pipeName,
             UpstreamContract.IAgentOperations,
             config => {
                 config.callbackService = new AgentEvents(this);
@@ -74,7 +89,13 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
 
                 config.setBeforeCall(async (methodName, newConnection, ct) => {
                     if (newConnection) {
-                        await this._ipcClient.proxy.SubscribeToEvents(new Message<void>());
+                        try {
+                            Trace.log('calling SubscribeToEvents');
+                            await this._ipcClient.proxy.SubscribeToEvents(new Message<void>());
+                            Trace.log('DONE (SubscribeToEvents)!');
+                        } catch (error) {
+                            Trace.log(error);
+                        }
                     }
                 });
             }
@@ -113,7 +134,9 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
     public StartEvents(): void {
         (async () => {
             try {
+                Trace.log('calling GetUserStatus...');
                 await this.channel.GetUserStatus(new Message<void>());
+                Trace.log('....DONE!');
             } catch (error) {
                 Trace.log(error);
             }
