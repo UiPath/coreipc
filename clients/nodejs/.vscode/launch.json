@@ -4,14 +4,16 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        {
-            "type": "node",
-            "request": "launch",
-            "name": "Launch Program",
-            "program": "${workspaceFolder}\\projects\\@uipath-ipc-sample-app\\src\\program.ts",
-            "outFiles": [
-                "${workspaceFolder}\\projects\\@uipath-ipc-sample-app\\dist\\*.js"
-            ]
-        }
+       {
+           "type": "node",
+           "request": "launch",
+           "name": "Launch via NPM",
+           "runtimeExecutable": "npm",
+           "runtimeArgs": [
+               "run-script",
+               "debug"
+           ],
+           "port": 9229
+       }
     ]
 }

@@ -21,21 +21,6 @@ export interface IRobotAgentProxy {
     ResumeJob(parameters: ResumeJobParameters): Promise<void>;
 }
 
-
-// export interface IRobotAgentProxy {
-//     readonly RobotStatusChanged: Observable<DownstreamContract.RobotStatusChangedEventArgs>;
-//     readonly ProcessListUpdated: Observable<DownstreamContract.ProcessListUpdatedArgs>;
-//     readonly JobStatusChanged: Observable<UpstreamContract.JobStatusChangedEventArgs>;
-//     readonly JobCompleted: Observable<UpstreamContract.JobCompletedEventArgs>;
-
-//     RefreshStatus(parameters: DownstreamContract.RefreshStatusParameters): Promise<void>;
-//     InstallProcess(parameters: UpstreamContract.InstallProcessParameters): Promise<void>;
-//     StartJob(parameters: UpstreamContract.StartJobParameters): Promise<UpstreamContract.JobData>;
-//     StopJob(parameters: UpstreamContract.StopJobParameters): Promise<void>;
-//     PauseJob(parameters: UpstreamContract.PauseJobParameters): Promise<void>;
-//     ResumeJob(parameters: UpstreamContract.ResumeJobParameters): Promise<void>;
-// }
-
 export interface RobotStatusChangedEventArgs {
     readonly Status: RobotStatus;
     readonly LogInError: string | null;

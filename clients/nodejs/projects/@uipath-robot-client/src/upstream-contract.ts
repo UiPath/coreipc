@@ -13,7 +13,6 @@ export class JobCompletedEventArgs extends Message<void> {
     }
 }
 
-/* @internal */
 export class JobStatusChangedEventArgs extends Message<void> {
     constructor(
         public readonly Job: JobData,
@@ -167,6 +166,10 @@ export class IAgentOperations {
     // Orchestrator
     @__hasCancellationToken__
     public LogInUser(parameters: LogInParameters, ct?: CancellationToken): Promise<UserStatus> { throw null; }
+
+    // IClientOperations
+    @__hasCancellationToken__
+    public GetUserStatus(message: Message<void>, ct?: CancellationToken): Promise<UserStatus> { throw null; }
 }
 
 export interface IAgentEvents {

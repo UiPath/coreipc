@@ -10,6 +10,7 @@
         "build": "tsc",
         "build:watch": "tsc --watch",
         "package": "pkg . --out-path ./bin",
+        "debug": "node --nolazy --inspect-brk=9229 ./dist/program.js",
         "lint": "tslint --project \"./tsconfig.json\"",
         "start": "node ./dist/program.js",
         "start2": "node ./dist/program2.js",

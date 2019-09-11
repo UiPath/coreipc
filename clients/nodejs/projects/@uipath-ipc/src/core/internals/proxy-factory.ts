@@ -8,6 +8,7 @@ import { rtti } from '../surface/rtti';
 import { CancellationToken } from '../../foundation/tasks/cancellation-token';
 import { RemoteError } from '../surface/remote-error';
 import { PublicConstructor } from '../../foundation/reflection/reflection';
+import { Trace } from '../..';
 
 const symbolofMaybeProxyCtor = Symbol('maybe:ProxyFactory');
 const symbolofBroker = Symbol('broker');
@@ -90,6 +91,10 @@ class Normalizers {
     }
 
     private static normalizeArgList__hasCancellationToken__(args: any[]): any[] {
+        if (args.length > 0 && args[args.length - 1] === undefined) {
+            args.splice(args.length - 1);
+        }
+
         if (args.length === 0 || (!(args[args.length - 1] instanceof CancellationToken))) {
             return [...args, CancellationToken.none];
         } else {
@@ -97,6 +102,10 @@ class Normalizers {
         }
     }
     private static normalizeArgList__doesNotHaveCancellationToken__(args: any[]): any[] {
+        if (args.length > 0 && args[args.length - 1] === undefined) {
+            args.splice(args.length - 1);
+        }
+
         return args;
     }
 

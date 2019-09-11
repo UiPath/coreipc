@@ -1,5 +1,5 @@
 // tslint:disable: max-line-length
-import { IpcClient, Message, PipeClientStream, CancellationToken, TimeSpan, PromisePal } from '@uipath/ipc';
+import { IpcClient, Message, PipeClientStream, CancellationToken, TimeSpan, PromisePal, Trace } from '@uipath/ipc';
 import { Subject, Observable, Observer } from 'rxjs';
 
 import * as UpstreamContract from './upstream-contract';
@@ -12,6 +12,8 @@ export interface IRobotProxy {
     readonly OrchestratorStatusChanged: Observable<UpstreamContract.OrchestratorStatusChangedEventArgs>;
     readonly ServiceUnavailable: Observable<void>;
     readonly LogInSessionExpired: Observable<void>;
+
+    StartEvents(): void;
 
     StartAgentJob(parameters: UpstreamContract.StartJobParameters, ct?: CancellationToken): Promise<UpstreamContract.JobData>;
     StopJob(parameters: UpstreamContract.StopJobParameters, ct?: CancellationToken): Promise<void>;
@@ -26,7 +28,7 @@ export interface IRobotProxy {
 }
 
 /* @internal */
-export class RobotProxy implements UpstreamContract.IAgentOperations {
+export class RobotProxy extends UpstreamContract.IAgentOperations {
     private static createSubject<T>(): Observer<T> & Observable<T> {
         return new Subject<T>();
     }
@@ -41,6 +43,8 @@ export class RobotProxy implements UpstreamContract.IAgentOperations {
     private get channel(): UpstreamContract.IAgentOperations { return this._ipcClient.proxy; }
 
     constructor() {
+        super();
+
         class AgentEvents implements UpstreamContract.IAgentEvents {
             constructor(private readonly _owner: RobotProxy) { }
             public async OnJobCompleted(args: UpstreamContract.JobCompletedEventArgs): Promise<void> {
@@ -105,6 +109,16 @@ export class RobotProxy implements UpstreamContract.IAgentOperations {
     public get OrchestratorStatusChanged(): Observable<UpstreamContract.OrchestratorStatusChangedEventArgs> { return this._orchestratorStatusChanged; }
     public get ServiceUnavailable(): Observable<void> { return this._serviceUnavailable; }
     public get LogInSessionExpired(): Observable<void> { return this._logInSessionExpired; }
+
+    public StartEvents(): void {
+        (async () => {
+            try {
+                await this.channel.GetUserStatus(new Message<void>());
+            } catch (error) {
+                Trace.log(error);
+            }
+        })();
+    }
 
     public StartAgentJob(parameters: UpstreamContract.StartJobParameters, ct?: CancellationToken): Promise<UpstreamContract.JobData> {
         return this.channel.StartAgentJob(parameters, ct);

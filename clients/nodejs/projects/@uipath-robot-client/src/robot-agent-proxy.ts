@@ -36,6 +36,7 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
 
     public async RefreshStatus(parameters: DownstreamContract.RefreshStatusParameters): Promise<void> {
         if (!this._initialized) {
+            this._proxy.StartEvents();
             this._initialized = true;
             return;
         }
@@ -49,10 +50,12 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
 
     // #endregion
 
+    // #region " Internals "
+
     private async refreshStatusCore(force: boolean = false) {
         try {
             await this.ensureLogin();
-            this.updateProcesses();
+            this.updateProcesses(force);
         } catch (error) {
             Trace.log(error);
         }
@@ -70,8 +73,11 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     }
     private async updateProcesses(force: boolean = false): Promise<void> {
         try {
+            const parameters = new UpstreamContract.GetProcessesParameters({ ForceRefresh: force });
+            Trace.log(`> RobotAgentProxy.updateProcesses: Calling GetAvailableProcesses(${parameters})`);
+
             // tslint:disable-next-line: variable-name
-            const Processes = await this._proxy.GetAvailableProcesses(new UpstreamContract.GetProcessesParameters({ ForceRefresh: force }));
+            const Processes = await this._proxy.GetAvailableProcesses(parameters);
             this._processListUpdated.next({ Processes });
         } catch (error) {
             Trace.log(error);
@@ -114,4 +120,6 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         this.raiseRobotStatusChanged(DownstreamContract.RobotStatus.LoggingIn);
         this.updateProcesses();
     }
+
+    // #endregion
 }

@@ -1,7 +1,7 @@
 import * as BrokerMessage from './broker-message';
 import * as WireMessage from './wire-message';
 import { Message } from '../../surface/message';
-import { CancellationToken, CancellationTokenSource } from '../../..';
+import { CancellationToken, CancellationTokenSource, Trace } from '../../..';
 import { ArgumentError } from '../../../foundation/errors/argument-error';
 import { TimeSpan } from '../../../foundation/tasks/timespan';
 import { ArgumentNullError } from '../../../foundation/errors/argument-null-error';

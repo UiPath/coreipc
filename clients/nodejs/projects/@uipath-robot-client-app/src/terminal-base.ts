@@ -27,7 +27,8 @@ export class TerminalBase implements IDisposable {
     private readonly _settings: ITerminalSettings;
     private readonly _screen: blessed.Widgets.Screen;
     private readonly _form: blessed.Widgets.FormElement<void>;
-    private readonly _log: blessed.Widgets.BoxElement;
+    private readonly _log1: blessed.Widgets.BoxElement;
+    private readonly _log2: blessed.Widgets.BoxElement;
     private readonly _command: blessed.Widgets.TextboxElement;
 
     private _maybeReadLinePcs: PromiseCompletionSource<void> | null = null;
@@ -38,11 +39,12 @@ export class TerminalBase implements IDisposable {
 
         this._screen = this.createScreen();
         this._form = this.createForm();
-        this._log = this.createLog();
+        this._log1 = this.createLog1();
+        this._log2 = this.createLog2();
         this._command = this.createCommand();
 
         this._screen.on('resize', () => {
-            this._log.setScrollPerc(100);
+            this._log1.setScrollPerc(100);
             this._screen.render();
         });
 
@@ -68,12 +70,11 @@ export class TerminalBase implements IDisposable {
             parent: this._screen,
             top: 'center',
             left: 'center',
-            width: '80%',
-            height: '80%',
+            width: '100%',
+            height: '100%',
             content: ` ${this._settings.title}`,
             tags: true,
             border: 'line',
-            shadow: true,
             style: {
                 fg: 'white',
                 bg: 'black',
@@ -93,15 +94,48 @@ export class TerminalBase implements IDisposable {
             bg: 'black'
         });
 
+        blessed.line({
+            parent: form,
+            top: 2,
+            right: 71,
+            bottom: 1,
+            orientation: 'vertical',
+            fg: this._settings.colors.border,
+            bg: 'black'
+        });
+
+        blessed.line({
+            parent: form,
+            left: 0,
+            right: 0,
+            bottom: 1,
+            orientation: 'horizontal',
+            fg: this._settings.colors.border,
+            bg: 'black'
+        });
+
         return form as any;
     }
-    private createLog(): blessed.Widgets.BoxElement {
+    private createLog1(): blessed.Widgets.BoxElement {
         return blessed.scrollabletext({
             parent: this._form,
             left: 1,
             top: 2,
+            right: 72,
+            bottom: 2,
+            tags: true,
+            bg: 'black',
+            fg: 'white',
+            focusable: false
+        });
+    }
+    private createLog2(): blessed.Widgets.BoxElement {
+        return blessed.scrollabletext({
+            parent: this._form,
+            width: 70,
+            top: 2,
             right: 1,
-            bottom: 0,
+            bottom: 2,
             tags: true,
             bg: 'black',
             fg: 'white',
@@ -142,15 +176,21 @@ export class TerminalBase implements IDisposable {
         return command;
     }
 
+    public get annex(): string { return this._log2.getContent(); }
+    public set annex(value: string) {
+        this._log2.setContent(value);
+        this._screen.render();
+    }
+
     public write(text: string): void {
-        this._log.setContent(`${this._log.getContent()}${text}`);
-        this._log.setScrollPerc(100);
+        this._log1.setContent(`${this._log1.getContent()}${text}`);
+        this._log1.setScrollPerc(100);
         this._screen.render();
     }
     public writeLine(text?: string): void {
         text = text || '';
-        this._log.setContent(`${this._log.getContent()}${text}\r\n`);
-        this._log.setScrollPerc(100);
+        this._log1.setContent(`${this._log1.getContent()}${text}\r\n`);
+        this._log1.setScrollPerc(100);
         this._screen.render();
     }
     public initialize(text: string): void { this.writeLine(`${'\r\n'.repeat(80)}${text}`); }
