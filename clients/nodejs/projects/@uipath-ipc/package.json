@@ -14,10 +14,6 @@
     "files": [
         "dist/**/*"
     ],
-    "publishConfig": {
-        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages/npm/registry/",
-        "access": "public"
-    },
     "dependencies": {
         "rxjs": "6.5.2"
     },
