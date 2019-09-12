@@ -1,6 +1,6 @@
 {
     "name": "@uipath/robot-client",
-    "version": "0.0.1",
+    "version": "0.0.7",
     "description": "UiPath Robot Client for Nodejs",
     "main": "dist/index.js",
     "typings": "dist/index",
@@ -15,31 +15,30 @@
         "dist/**/*"
     ],
     "publishConfig": {
-        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages@Local/npm/registry/",
+        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages/npm/registry/",
         "access": "public"
-    
     },
     "dependencies": {
-        "@uipath/ipc": "^0.0.1",
+        "@uipath/ipc": "^0.0.7",
         "blessed": "0.1.81",
-        "winreg": "1.2.3",
-        "rxjs": "6.5.2"
+        "rxjs": "6.5.2",
+        "winreg": "1.2.3"
     },
     "pkg": {
         "assets": [
             "../../node_modules/blessed/usr/xterm",
             "../../node_modules/blessed/usr/xterm-256color"
-        ]        
+        ]
     },
     "devDependencies": {
+        "@types/blessed": "0.1.10",
         "@types/jest": "^22.1.4",
         "@types/node": "^12.6.8",
-        "@types/blessed": "0.1.10",
         "@types/winreg": "1.2.30",
         "jest": "^24.8.0",
+        "pkg": "4.4.0",
         "ts-jest": "^24.0.2",
-        "typescript": "^3.5.3",
-        "pkg": "4.4.0"
+        "typescript": "^3.5.3"
     },
     "gitHead": "edef4e238fde99232400d5270c6f54c3f054cb10"
 }

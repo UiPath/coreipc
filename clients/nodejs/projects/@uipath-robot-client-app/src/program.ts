@@ -4,14 +4,19 @@ import { Bootstrapper } from './bootstrapper';
 import { Trace } from '@uipath/ipc';
 import {
     RobotProxyConstructor,
+    IRobotAgentProxy,
+
+    RobotConfig,
+    IRobotEnvironment,
+
     RobotStatus,
     LocalProcessInformation,
     StartJobParameters,
     StopJobParameters,
-    IRobotAgentProxy,
-    RobotEnvironmentStore
+    InstallProcessParameters,
+    PauseJobParameters,
+    ResumeJobParameters
 } from '@uipath/robot-client';
-import { InstallProcessParameters, PauseJobParameters, ResumeJobParameters } from '@uipath/robot-client/dist/upstream-contract';
 
 export class Program {
     private static readonly terminal = new Terminal(settings => {
@@ -24,7 +29,7 @@ export class Program {
     private static proxy: IRobotAgentProxy = null as any;
 
     public static async main(args: string[]): Promise<void> {
-        Program.terminal.initialize('Hello World!');
+        Program.terminal.initialize('');
         Trace.addListener(errorOrText => {
             if (errorOrText instanceof Error) {
                 Program.terminal.writeLine(`{red-fg}--! ${errorOrText}{/red-fg}`);
@@ -32,48 +37,15 @@ export class Program {
                 Program.terminal.writeLine(`{green-fg}--> ${errorOrText}{/green-fg}`);
             }
         });
-        Trace.log('Hello World again!');
 
-        RobotEnvironmentStore.initialize();
         Program.proxy = new RobotProxyConstructor();
 
-        // console.debug(`data === ${JSON.stringify(RobotEnvironmentStore.data)}`);
-        // return;
-        // (this as any).terminal = new Terminal(settings => {
-        //     settings.title = '@uipath/robot-client Tester App';
-        // });
-
-
-        Program.terminal.writeLine(`>>>> ${JSON.stringify(RobotEnvironmentStore.data)}`);
-
-        function hookStderr(callback: (x: string) => void) {
-            const oldWrite = process.stderr.write;
-
-            // tslint:disable-next-line: ban-types
-            process.stderr.write = (function(write: Function) {
-                return function(a: string) {
-                    write.apply(process.stderr, arguments);
-                    callback(a);
-                };
-            })(process.stderr.write) as any;
-
-            return function() {
-                process.stderr.write = oldWrite;
-            };
-        }
-        hookStderr(x => Trace.log(new Error(`${x}`)));
-
-        // process.stderr.on('data', buffer => {
-        //     Trace.log(new Error(`${buffer}`));
-        // });
-        Trace.log(`I'm here`);
-
         Program.proxy.JobCompleted.subscribe(_args => {
-            Program.terminal.writeLine(`$$ JobCompleted (DisplayName === ${_args.Job.DisplayName})`);
+            Program.terminal.writeLine(`      [{green-fg}event{/green-fg} JobCompleted] (DisplayName === ${_args.Job.DisplayName})`);
         });
 
         Program.proxy.JobStatusChanged.subscribe(_args => {
-            Program.terminal.writeLine(`$$ JobStatusChanged (DisplayName === ${_args.Job.DisplayName}, StatusText === ${_args.StatusText})`);
+            Program.terminal.writeLine(`      [{green-fg}event{/green-fg} JobStatusChanged] (DisplayName === ${_args.Job.DisplayName}, StatusText === ${_args.StatusText})`);
         });
 
         Program.proxy.RobotStatusChanged.subscribe(_args => {
@@ -89,11 +61,11 @@ export class Program {
                     default: return `Unexpected RobotStatus value (${status})`;
                 }
             }
-            Program.terminal.writeLine(`$$ RobotStatusChanged (RobotStatus === ${robotStatusToString(_args.Status)}, LogInError === ${_args.LogInError})`);
+            Program.terminal.writeLine(`      [{green-fg}event{/green-fg} RobotStatusChanged] (RobotStatus === ${robotStatusToString(_args.Status)}, LogInError === ${_args.LogInError})`);
         });
 
         Program.proxy.ProcessListUpdated.subscribe(_args => {
-            Program.terminal.writeLine(`$$ ProcessListUpdated (args.Processes.length === ${_args.Processes.length})`);
+            Program.terminal.writeLine(`      [{green-fg}event{/green-fg} ProcessListUpdated] (args.Processes.length === ${_args.Processes.length})`);
 
             function processToString(process: LocalProcessInformation): string {
                 return `name: {yellow-fg}${process.Process.Name}{/yellow-fg}
@@ -115,11 +87,9 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
             Program.terminal.annex = annex;
         });
 
-        Trace.log(`Calling RefreshStatus.....`);
         await Program.proxy.RefreshStatus({
             ForceProcessListUpdate: true
         });
-        Trace.log(`                     .....DONE!`);
 
         Program.help();
         while (!Program.exitRequested) {
@@ -136,6 +106,28 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
                             break;
                         case 'help':
                             Program.help();
+                            break;
+                        case 'env':
+                            {
+                                for (const key in RobotConfig.data) {
+                                    if (typeof key === 'string') {
+                                        // tslint:disable-next-line: max-line-length
+                                        Program.terminal.writeLine(`     env.{green-fg}${key}{/green-fg} === {yellow-fg}${JSON.stringify((RobotConfig.data as any)[key])}{/yellow-fg}`);
+                                    }
+                                }
+                                Program.terminal.writeLine();
+                            }
+                            break;
+                        case 'refresh':
+                            {
+                                Program.terminal.write('Refreshing......');
+                                try {
+                                    await Program.proxy.RefreshStatus({ ForceProcessListUpdate: true });
+                                    Program.terminal.writeLine('DONE!');
+                                } catch (error) {
+                                    Trace.log(error);
+                                }
+                            }
                             break;
                         case 'start':
                             {
@@ -220,8 +212,9 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
         Program.terminal.writeLine('{yellow-fg}Commands:{/yellow-fg}');
         Program.terminal.writeLine('---------------------------');
         Program.terminal.writeLine('  {yellow-fg}help{/yellow-fg}       Displays this manual.');
+        Program.terminal.writeLine('  {yellow-fg}env{/yellow-fg}        Displays the current config.');
+        Program.terminal.writeLine(`  {yellow-fg}refresh{/yellow-fg}    Refreshes the status with force === true.`);
         Program.terminal.writeLine(`  {yellow-fg}start{/yellow-fg}      Starts a job.`);
-        // tslint:disable-next-line: max-line-length
         Program.terminal.writeLine('  {yellow-fg}stop{/yellow-fg}       Stops a job.');
         Program.terminal.writeLine('  {yellow-fg}install{/yellow-fg}    Installs a process.');
         Program.terminal.writeLine('  {yellow-fg}pause{/yellow-fg}      Pauses a job.');

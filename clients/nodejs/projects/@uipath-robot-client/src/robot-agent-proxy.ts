@@ -17,9 +17,10 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     private readonly _jobStatusChanged = RobotAgentProxy.createSubject<UpstreamContract.JobStatusChangedEventArgs>();
     private readonly _jobCompleted = RobotAgentProxy.createSubject<UpstreamContract.JobCompletedEventArgs>();
 
-    constructor() {
-        Trace.log(`Calling new RobotProxy()`);
-        this._proxy = new RobotProxy();
+    constructor();
+    constructor(proxy: IRobotProxy);
+    constructor(proxy?: IRobotProxy) {
+        this._proxy = proxy || new RobotProxy();
 
         this._proxy.ServiceUnavailable.subscribe(_ => this.raiseRobotStatusChanged(DownstreamContract.RobotStatus.ServiceUnavailable));
         this._proxy.OrchestratorStatusChanged.subscribe(this.onOrchestratorStatusChanged.bind(this));
@@ -75,8 +76,6 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     private async updateProcesses(force: boolean = false): Promise<void> {
         try {
             const parameters = new UpstreamContract.GetProcessesParameters({ ForceRefresh: force });
-            Trace.log(`> RobotAgentProxy.updateProcesses: Calling GetAvailableProcesses(${parameters})`);
-
             // tslint:disable-next-line: variable-name
             const Processes = await this._proxy.GetAvailableProcesses(parameters);
             this._processListUpdated.next({ Processes });

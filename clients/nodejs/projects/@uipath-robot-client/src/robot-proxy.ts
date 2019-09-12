@@ -1,11 +1,10 @@
 // tslint:disable: max-line-length
 import { IpcClient, Message, PipeClientStream, CancellationToken, TimeSpan, PromisePal, Trace } from '@uipath/ipc';
 import { Subject, Observable, Observer } from 'rxjs';
+import { spawn } from 'child_process';
 
 import * as UpstreamContract from './upstream-contract';
-import { Utils } from './utils';
-import { RobotClientSettings } from './robot-client-settings';
-import { RobotEnvironmentStore } from './robot-environment';
+import { RobotConfig } from './robot-config';
 
 export interface IRobotProxy {
     readonly JobCompleted: Observable<UpstreamContract.JobCompletedEventArgs>;
@@ -30,16 +29,6 @@ export interface IRobotProxy {
 
 /* @internal */
 export class RobotProxy extends UpstreamContract.IAgentOperations {
-    private static readonly _data = (() => {
-        try {
-            Trace.log(`Calling RobotEnvironmentStore.initialize()...`);
-            RobotEnvironmentStore.initialize();
-            return RobotEnvironmentStore.data;
-        } finally {
-            Trace.log(`...DONE!`);
-        }
-    })();
-
     private static createSubject<T>(): Observer<T> & Observable<T> {
         return new Subject<T>();
     }
@@ -55,10 +44,6 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
 
     constructor() {
         super();
-
-        Trace.log(`Calling Utils.getPipeName(serviceInstalled: ${RobotProxy._data.serviceInstalled})...`);
-        const pipeName = Utils.getPipeName(RobotProxy._data.serviceInstalled);
-        Trace.log(`===> ${pipeName}`);
 
         class AgentEvents implements UpstreamContract.IAgentEvents {
             constructor(private readonly _owner: RobotProxy) { }
@@ -77,22 +62,27 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
         }
 
         this._ipcClient = new IpcClient(
-            pipeName,
+            RobotConfig.data.pipeName,
             UpstreamContract.IAgentOperations,
             config => {
                 config.callbackService = new AgentEvents(this);
 
+                config.connectTimeoutMilliseconds = RobotConfig.data.connectTimeout.totalMilliseconds;
+                config.defaultCallTimeoutSeconds = RobotConfig.data.defaultCallTimeout.totalSeconds;
+
                 config.setConnectionFactory(async (connect, ct) => {
-                    Utils.spawnService();
-                    return await this.spinWaitForNamedPipeAsync(connect, ct);
+                    try {
+                        return await this.ensureService(connect, ct);
+                    } catch (error) {
+                        Trace.log(error);
+                        this._serviceUnavailable.next(undefined);
+                    }
                 });
 
                 config.setBeforeCall(async (methodName, newConnection, ct) => {
                     if (newConnection) {
                         try {
-                            Trace.log('calling SubscribeToEvents');
                             await this._ipcClient.proxy.SubscribeToEvents(new Message<void>());
-                            Trace.log('DONE (SubscribeToEvents)!');
                         } catch (error) {
                             Trace.log(error);
                         }
@@ -102,8 +92,31 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
         );
     }
 
+    private async ensureService(connect: () => Promise<PipeClientStream>, ct: CancellationToken): Promise<PipeClientStream> {
+        if (!RobotConfig.data.serviceInstalled && RobotConfig.data.maybeUserHostServiceFilePath) {
+            spawn(
+                RobotConfig.data.maybeUserHostServiceFilePath,
+                {
+                    cwd: RobotConfig.data.serviceHome,
+                    detached: true,
+                    shell: false
+                }
+            ).unref();
+        }
+
+        return await this.spinWaitForNamedPipeAsync(connect, ct);
+    }
+
     private async spinWaitForNamedPipeAsync(connect: () => Promise<PipeClientStream>, ct: CancellationToken): Promise<PipeClientStream> {
         while (true) {
+            try {
+                const result = await connect();
+                return result;
+            } catch (error) {
+                const errorText = error instanceof Error ? error.message : `${error}`;
+                Trace.log(error || new Error(errorText));
+            }
+
             try {
                 ct.throwIfCancellationRequested();
             } catch (error) {
@@ -111,15 +124,7 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
                 throw error;
             }
 
-            try {
-                const result = await connect();
-                return result;
-            } catch (error) {
-                const errorText = error instanceof Error ? error.message : `${error}`;
-            }
-
-            const pause = TimeSpan.fromMilliseconds(300);
-            await PromisePal.delay(pause);
+            await PromisePal.delay(TimeSpan.fromMilliseconds(300));
         }
     }
 
@@ -134,9 +139,7 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
     public StartEvents(): void {
         (async () => {
             try {
-                Trace.log('calling GetUserStatus...');
                 await this.channel.GetUserStatus(new Message<void>());
-                Trace.log('....DONE!');
             } catch (error) {
                 Trace.log(error);
             }
@@ -162,7 +165,7 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
         return this.channel.GetAvailableProcesses(parameters, ct);
     }
     public InstallProcess(parameters: UpstreamContract.InstallProcessParameters, ct?: CancellationToken | undefined): Promise<boolean> {
-        parameters.RequestTimeout = RobotClientSettings.installPackageRequestTimeout;
+        parameters.RequestTimeout = RobotConfig.data.installPackageRequestTimeout;
         return this.channel.InstallProcess(parameters, ct);
     }
 

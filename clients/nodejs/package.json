@@ -11,6 +11,10 @@
         "ipc": "jest -t 'NamedPipeClient'",
         "refreshVSToken": "vsts-npm-auth -config .npmrc"
     },
+    "publishConfig": {
+        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages@Local/npm/registry/",
+        "access": "public"
+    },
     "devDependencies": {
         "@types/node": "^12.6.8",
         "babel-jest": "^24.8.0",

@@ -68,4 +68,5 @@ export class TimeSpan {
         return result;
     }
     public toString(): string { return this._maybeToString || (this._maybeToString = this.computeToString()); }
+    public toJSON(): any { return this.toString(); }
 }

@@ -1,8 +1,8 @@
 {
     "name": "@uipath/ipc-sample-app",
-    "version": "0.0.1",
+    "version": "0.0.7",
     "private": true,
-    "description": "Sample App using the UiPath Ipc for Nodejs",    
+    "description": "Sample App using the UiPath Ipc for Nodejs",
     "main": "dist/program.js",
     "typings": "dist/program",
     "scripts": {
@@ -23,7 +23,7 @@
         "access": "public"
     },
     "dependencies": {
-        "@uipath/ipc": "^0.0.1"
+        "@uipath/ipc": "^0.0.7"
     },
     "devDependencies": {
         "@types/jest": "^22.1.4",

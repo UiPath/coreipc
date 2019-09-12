@@ -14,15 +14,21 @@ import {
 import {
     LocalProcessInformation,
     StartJobParameters,
-    StopJobParameters
+    StopJobParameters,
+    InstallProcessParameters,
+    PauseJobParameters,
+    ResumeJobParameters
 } from './upstream-contract';
-import { RobotEnvironmentStore } from './robot-environment';
+import { RobotConfig, IRobotEnvironment } from './robot-config';
 
 const RobotProxyConstructor: new () => IRobotAgentProxy = RobotAgentProxy;
 
 export {
     RobotProxyConstructor,
     IRobotAgentProxy,
+
+    RobotConfig,
+    IRobotEnvironment,
 
     // Downstream contract DTOs
     RobotStatusChangedEventArgs,
@@ -33,9 +39,8 @@ export {
     // Common contract DTOs
     LocalProcessInformation,
     StartJobParameters,
-    StopJobParameters
-
-    // Temp
-    ,
-    RobotEnvironmentStore
+    StopJobParameters,
+    InstallProcessParameters,
+    PauseJobParameters,
+    ResumeJobParameters
 };

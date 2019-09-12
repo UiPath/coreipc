@@ -1,6 +1,6 @@
 {
     "name": "@uipath/ipc",
-    "version": "0.0.1",
+    "version": "0.0.7",
     "description": "UiPath Ipc for Nodejs",
     "main": "dist/index.js",
     "typings": "dist/index",
@@ -15,7 +15,7 @@
         "dist/**/*"
     ],
     "publishConfig": {
-        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages@Local/npm/registry/",
+        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages/npm/registry/",
         "access": "public"
     },
     "dependencies": {
