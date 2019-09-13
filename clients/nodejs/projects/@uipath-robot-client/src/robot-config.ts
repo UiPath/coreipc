@@ -56,7 +56,6 @@ class RobotConfigPal {
         return {
             serviceHome,
             serviceInstalled,
-            connectTimeout: this._context.connectTimeout,
             defaultCallTimeout: this._context.defaultCallTimeout,
             maybeUserHostServiceFilePath,
             installPackageRequestTimeout: this._context.installPackageRequestTimeout,
@@ -187,7 +186,6 @@ export interface IRobotEnvironmentData {
     readonly serviceHome: string;
     readonly serviceInstalled: boolean;
 
-    readonly connectTimeout: TimeSpan;
     readonly defaultCallTimeout: TimeSpan;
 
     readonly maybeUserHostServiceFilePath: string | undefined;

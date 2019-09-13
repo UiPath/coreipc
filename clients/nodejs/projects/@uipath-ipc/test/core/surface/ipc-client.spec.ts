@@ -96,7 +96,6 @@ describe('Core-Surface-IpcClient', () => {
             IService,
             (config: InternalIpcClientConfig<IService>) => {
                 config.logicalSocketFactory = () => new MockLogicalSocket();
-                config.connectTimeoutMilliseconds = 60 * 1000;
                 config.defaultCallTimeoutSeconds = 60 * 1000;
             }
         );

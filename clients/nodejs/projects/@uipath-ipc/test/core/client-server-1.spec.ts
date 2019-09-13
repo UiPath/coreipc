@@ -11,7 +11,6 @@ import {
     Timeout,
     TimeSpan,
     PromisePal,
-    RemoteError,
     OperationCanceledError
 } from '../../src';
 

@@ -26,7 +26,7 @@ export class IpcClient<TService> {
         this._broker = config.maybeBroker || new Broker(
             config.logicalSocketFactory,
             pipeName,
-            TimeSpan.fromMilliseconds(config.connectTimeoutMilliseconds),
+            TimeSpan.fromSeconds(config.defaultCallTimeoutSeconds),
             TimeSpan.fromSeconds(config.defaultCallTimeoutSeconds),
             config.callbackService,
             config.maybeConnectionFactory,
@@ -46,7 +46,6 @@ export type ConnectionFactoryDelegate = (connect: () => Promise<PipeClientStream
 export type BeforeCallDelegate = (methodName: string, newConnection: boolean, cancellationToken: CancellationToken) => Promise<void>;
 
 export class IpcClientConfig<TService> {
-    public connectTimeoutMilliseconds: number = 3000;
     public defaultCallTimeoutSeconds: number = 40;
 
     public callbackService?: any;

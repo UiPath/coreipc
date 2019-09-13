@@ -22,7 +22,6 @@ module.exports = {
     testPathIgnorePatterns: ['<rootDir>/projects/(?:.+?)/dist/'],
     roots: [
         '<rootDir>/projects/@uipath-ipc',
-        '<rootDir>/projects/@uipath-ipc-sample-app',
         '<rootDir>/projects/@uipath-robot-client',
     ],
     transform: {

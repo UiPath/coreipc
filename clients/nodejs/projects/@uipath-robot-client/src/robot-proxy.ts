@@ -67,7 +67,6 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
             config => {
                 config.callbackService = new AgentEvents(this);
 
-                config.connectTimeoutMilliseconds = RobotConfig.data.connectTimeout.totalMilliseconds;
                 config.defaultCallTimeoutSeconds = RobotConfig.data.defaultCallTimeout.totalSeconds;
 
                 config.setConnectionFactory(async (connect, ct) => {
@@ -113,6 +112,9 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
                 const result = await connect();
                 return result;
             } catch (error) {
+                if (RobotConfig.data.serviceInstalled) {
+                    throw error;
+                }
                 const errorText = error instanceof Error ? error.message : `${error}`;
                 Trace.log(error || new Error(errorText));
             }
