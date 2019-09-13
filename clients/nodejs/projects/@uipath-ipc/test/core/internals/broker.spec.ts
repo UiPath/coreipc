@@ -150,6 +150,11 @@ describe('Core-Internals-Broker', () => {
         const broker = new Broker(() => new MockLogicalSocket(expectedResponse), 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
         const request = new BrokerMessage.OutboundRequest('bar', []);
         await expect(broker.sendReceiveAsync(request)).resolves.toEqual(expectedResponse);
+        try {
+            await broker.sendReceiveAsync(request);
+        } catch (error) {
+            console.error(error);
+        }
         await expect(broker.sendReceiveAsync(request)).resolves.toEqual(expectedResponse);
     });
 

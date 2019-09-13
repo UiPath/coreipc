@@ -64,6 +64,7 @@ export class Program {
         });
 
         Program.proxy.ProcessListUpdated.subscribe(_args => {
+            Program.terminal.writeLine(`*********  ProcessListUpdated: ${JSON.stringify(_args)}`);
             Program.terminal.writeLine(`      [{green-fg}event{/green-fg} ProcessListUpdated] (args.Processes.length === ${_args.Processes.length})`);
 
             function processToString(process: LocalProcessInformation): string {
@@ -86,7 +87,7 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
             Program.terminal.annex = annex;
         });
 
-        await Program.proxy.RefreshStatus({
+        Program.proxy.RefreshStatus({
             ForceProcessListUpdate: true
         });
 
@@ -121,7 +122,7 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
                             {
                                 Program.terminal.write('Refreshing......');
                                 try {
-                                    await Program.proxy.RefreshStatus({ ForceProcessListUpdate: true });
+                                    Program.proxy.RefreshStatus({ ForceProcessListUpdate: true });
                                     Program.terminal.writeLine('DONE!');
                                 } catch (error) {
                                     Trace.log(error);
