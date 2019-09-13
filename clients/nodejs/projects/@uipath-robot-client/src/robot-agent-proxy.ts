@@ -36,7 +36,7 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     public get JobStatusChanged(): Observable<UpstreamContract.JobStatusChangedEventArgs> { return this._jobStatusChanged; }
     public get JobCompleted(): Observable<UpstreamContract.JobCompletedEventArgs> { return this._jobCompleted; }
 
-    public async RefreshStatus(parameters: DownstreamContract.RefreshStatusParameters): Promise<void> {
+    public RefreshStatus(parameters: DownstreamContract.RefreshStatusParameters): void {
         if (!this._initialized) {
             this._proxy.StartEvents();
             this._initialized = true;
@@ -54,7 +54,7 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
 
     // #region " Internals "
 
-    private async refreshStatusCore(force: boolean = false) {
+    private async refreshStatusCore(force: boolean = false): Promise<void> {
         try {
             await this.ensureLogin();
             this.updateProcesses(force);

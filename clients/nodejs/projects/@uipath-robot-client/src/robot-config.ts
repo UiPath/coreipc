@@ -99,7 +99,6 @@ export class RobotConfig {
             envvarnameServiceInstalled: 'UIPATH_SERVICE_INSTALLED',
             relpathFailoverServiceHome: '..',
 
-            connectTimeout: TimeSpan.fromSeconds(40),
             defaultCallTimeout: TimeSpan.fromSeconds(40),
 
             installPackageRequestTimeout: TimeSpan.fromMinutes(20),
@@ -142,12 +141,6 @@ export class RobotConfig {
         RobotConfig.reinitialize();
     }
 
-    public static get connectTimeout(): TimeSpan { return RobotConfig._context.connectTimeout; }
-    public static set connectTimeout(value: TimeSpan) {
-        RobotConfig._context.connectTimeout = value;
-        RobotConfig.reinitialize();
-    }
-
     public static get defaultCallTimeout(): TimeSpan { return RobotConfig._context.defaultCallTimeout; }
     public static set defaultCallTimeout(value: TimeSpan) {
         RobotConfig._context.defaultCallTimeout = value;
@@ -176,7 +169,6 @@ export interface IRobotEnvironmentSettings {
     envvarnameServiceInstalled: string;
 
     installPackageRequestTimeout: TimeSpan;
-    connectTimeout: TimeSpan;
     defaultCallTimeout: TimeSpan;
 }
 export interface IRobotEnvironmentContext extends IRobotEnvironmentSettings {

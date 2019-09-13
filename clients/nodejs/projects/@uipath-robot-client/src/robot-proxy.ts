@@ -75,6 +75,8 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
                     } catch (error) {
                         Trace.log(error);
                         this._serviceUnavailable.next(undefined);
+                        Trace.log(`throwing error ${JSON.stringify(error)}`);
+                        throw error;
                     }
                 });
 
@@ -196,5 +198,5 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
         return this.channel.LogInUser(parameters, ct);
     }
 
-    // #endregion }
+    // #endregion
 }

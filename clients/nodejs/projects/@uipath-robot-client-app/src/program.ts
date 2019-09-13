@@ -7,7 +7,6 @@ import {
     IRobotAgentProxy,
 
     RobotConfig,
-    IRobotEnvironment,
 
     RobotStatus,
     LocalProcessInformation,

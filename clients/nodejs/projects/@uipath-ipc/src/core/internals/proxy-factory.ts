@@ -59,12 +59,19 @@ export class Generator<TService> {
             const args = normalizeArgs([...arguments]);
 
             const brokerOutboundRequest = new BrokerMessage.OutboundRequest(methodName, args);
-            const brokerResponse = await this[symbolofBroker].sendReceiveAsync(brokerOutboundRequest);
 
-            if (brokerResponse.maybeError) {
-                throw new RemoteError(brokerResponse.maybeError, methodName);
-            } else {
-                return normalizeResult(brokerResponse.maybeResult);
+            Trace.log(`GeneratedProxy: Sending brokerRequest === ${JSON.stringify(brokerOutboundRequest)}`);
+            try {
+                const brokerResponse = await this[symbolofBroker].sendReceiveAsync(brokerOutboundRequest);
+                Trace.log(`GeneratedProxy: brokerResponse === ${JSON.stringify(brokerOutboundRequest)}`);
+
+                if (brokerResponse.maybeError) {
+                    throw new RemoteError(brokerResponse.maybeError, methodName);
+                } else {
+                    return normalizeResult(brokerResponse.maybeResult);
+                }
+            } catch (error) {
+                Trace.log(`GeneratedProxy: error === ${JSON.stringify(error)}`);
             }
         };
     }

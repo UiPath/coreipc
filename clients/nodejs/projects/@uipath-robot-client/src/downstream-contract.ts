@@ -13,7 +13,7 @@ export interface IRobotAgentProxy {
     readonly JobStatusChanged: Observable<JobStatusChangedEventArgs>;
     readonly JobCompleted: Observable<JobCompletedEventArgs>;
 
-    RefreshStatus(parameters: RefreshStatusParameters): Promise<void>;
+    RefreshStatus(parameters: RefreshStatusParameters): void;
     InstallProcess(parameters: InstallProcessParameters): Promise<void>;
     StartJob(parameters: StartJobParameters): Promise<JobData>;
     StopJob(parameters: StopJobParameters): Promise<void>;
