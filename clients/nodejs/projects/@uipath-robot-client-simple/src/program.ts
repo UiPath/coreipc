@@ -29,7 +29,7 @@ async function main() {
     console.log(`program.ts: env is: `, RobotConfig.data);
 
     console.log('program.ts: Starting...');
-    await proxy.RefreshStatus({ ForceProcessListUpdate: true });
+    proxy.RefreshStatus({ ForceProcessListUpdate: true });
 
     // program will not close gracefully (intended)
     // await some time or some event and call process.exit()

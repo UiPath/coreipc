@@ -23,7 +23,8 @@ describe('Client-Server-1', () => {
                 config.callbackService = new TestCallback();
             });
             try {
-                await expect(client.proxy.InfiniteAsync(new Message<void>(TimeSpan.fromMilliseconds(10)))).rejects.toBeInstanceOf(OperationCanceledError);
+                const promise1 = client.proxy.InfiniteAsync(new Message<void>(TimeSpan.fromMilliseconds(10)));
+                await expect(promise1).rejects.toBeInstanceOf(OperationCanceledError);
 
                 const cts = new CancellationTokenSource();
                 const promise = client.proxy.InfiniteAsync(new Message<void>(Timeout.infiniteTimeSpan), cts.token);

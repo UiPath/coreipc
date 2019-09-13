@@ -12,6 +12,10 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     private _orchestratorStatus: UpstreamContract.OrchestratorStatus = UpstreamContract.OrchestratorStatus.Offline;
     private _initialized = false;
 
+    private static readonly _finished = {};
+    // tslint:disable-next-line: ban-types
+    private readonly _finishedJobs: { [identifier: string]: {} } & Object = {};
+
     private readonly _robotStatusChanged = RobotAgentProxy.createSubject<DownstreamContract.RobotStatusChangedEventArgs>();
     private readonly _processListUpdated = RobotAgentProxy.createSubject<DownstreamContract.ProcessListUpdatedArgs>();
     private readonly _jobStatusChanged = RobotAgentProxy.createSubject<UpstreamContract.JobStatusChangedEventArgs>();
@@ -25,8 +29,19 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         this._proxy.ServiceUnavailable.subscribe(_ => this.raiseRobotStatusChanged(DownstreamContract.RobotStatus.ServiceUnavailable));
         this._proxy.OrchestratorStatusChanged.subscribe(this.onOrchestratorStatusChanged.bind(this));
         this._proxy.LogInSessionExpired.subscribe(this.onLogInSessionExpired.bind(this));
-        this._proxy.JobStatusChanged.subscribe(this._jobStatusChanged);
-        this._proxy.JobCompleted.subscribe(this._jobCompleted);
+
+        this._proxy.JobCompleted.subscribe(args => {
+            this._finishedJobs[args.Job.Identifier] = RobotAgentProxy._finished;
+            this._jobCompleted.next(args);
+        });
+
+        this._proxy.JobStatusChanged.subscribe(args => {
+            if (this._finishedJobs.hasOwnProperty(args.Job.Identifier)) {
+                Trace.log(`Would have seen "${args.StatusText}" `);
+                return;
+            }
+            this._jobStatusChanged.next(args);
+        });
     }
 
     // #region " Implementation of IRobotAgentProxy "
@@ -63,7 +78,7 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         }
     }
     private async ensureLogin(): Promise<void> {
-        if (this._orchestratorStatus === UpstreamContract.OrchestratorStatus.Connected) {
+        if (this._orchestratorStatus === UpstreamContract.OrchestratorStatus.Connected) {   
             try {
                 await this._proxy.LogInUser();
                 this.raiseLicenseStatus(DownstreamContract.RobotStatus.Connected);
