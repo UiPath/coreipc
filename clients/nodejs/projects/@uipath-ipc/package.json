@@ -1,6 +1,6 @@
 {
     "name": "@uipath/ipc",
-    "version": "0.0.9",
+    "version": "0.0.10",
     "description": "UiPath Ipc for Nodejs",
     "main": "dist/index.js",
     "typings": "dist/index",
@@ -15,7 +15,8 @@
         "dist/**/*"
     ],
     "dependencies": {
-        "rxjs": "6.5.2"
+        "rxjs": "6.5.2",
+        "@types/node": "^12.6.8"        
     },
     "devDependencies": {
         "@types/jest": "^22.1.4",

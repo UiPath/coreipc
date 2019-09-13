@@ -34,7 +34,6 @@ export enum CompletedStatus {
     Stopped,
     Failed,
 }
-/* @internal */
 export enum JobStatus {
     Running,
     Stopping,
@@ -69,7 +68,6 @@ export interface LocalProcessInformation {
     readonly Settings: ProcessSettings;
     readonly Installed: boolean;
 }
-/* @internal */
 export class ProjectSettings {
     constructor(
         public readonly Pausable: boolean,

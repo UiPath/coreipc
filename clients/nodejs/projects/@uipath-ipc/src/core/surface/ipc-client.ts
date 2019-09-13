@@ -41,10 +41,8 @@ export class IpcClient<TService> {
     }
 }
 
-/* @internal */
 export type ConnectionFactoryDelegate = (connect: () => Promise<PipeClientStream>, cancellationToken: CancellationToken) => Promise<PipeClientStream | void>;
 
-/* @internal */
 export type BeforeCallDelegate = (methodName: string, newConnection: boolean, cancellationToken: CancellationToken) => Promise<void>;
 
 export class IpcClientConfig<TService> {

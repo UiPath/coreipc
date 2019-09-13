@@ -32,7 +32,7 @@
         ]
     },
     "dependencies": {
-        "@uipath/robot-client": "^0.0.7",
+        "@uipath/robot-client": "^0.0.8",
         "blessed": "0.1.81",
         "winreg": "1.2.3"
     },

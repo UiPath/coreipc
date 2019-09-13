@@ -27,6 +27,7 @@ describe(`RobotAgentProxy`, () => {
             public OrchestratorStatusChanged: Observable<OrchestratorStatusChangedEventArgs>;
             public ServiceUnavailable: Observable<void>;
             public LogInSessionExpired: Observable<void>;
+
             public StartEvents(): void {
                 throw new Error('Method not implemented.');
             }
