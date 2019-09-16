@@ -2,7 +2,9 @@ import * as DownstreamContract from './downstream-contract';
 import * as UpstreamContract from './upstream-contract';
 import { Observable, Subject, Observer } from 'rxjs';
 import { IRobotProxy, RobotProxy } from './robot-proxy';
-import { Trace } from '@uipath/ipc';
+import { Trace, PromisePal } from '@uipath/ipc';
+import { RobotConfig } from '.';
+import { spawn } from 'child_process';
 
 /* @internal */
 export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
@@ -64,6 +66,16 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     public StopJob(parameters: UpstreamContract.StopJobParameters): Promise<void> { return this._proxy.StopJob(parameters); }
     public PauseJob(parameters: UpstreamContract.PauseJobParameters): Promise<void> { return this._proxy.PauseJob(parameters); }
     public ResumeJob(parameters: UpstreamContract.ResumeJobParameters): Promise<void> { return this._proxy.ResumeJob(parameters); }
+    public async OpenOrchestratorSettings(): Promise<void> {
+        spawn(
+            RobotConfig.data.oldAgentFilePath,
+            ['settings'],
+            {
+                detached: true,
+                shell: false
+            }
+        ).unref();
+    }
 
     // #endregion
 
@@ -78,7 +90,7 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         }
     }
     private async ensureLogin(): Promise<void> {
-        if (this._orchestratorStatus === UpstreamContract.OrchestratorStatus.Connected) {   
+        if (this._orchestratorStatus === UpstreamContract.OrchestratorStatus.Connected) {
             try {
                 await this._proxy.LogInUser();
                 this.raiseLicenseStatus(DownstreamContract.RobotStatus.Connected);

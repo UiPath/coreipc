@@ -25,7 +25,7 @@ export class JobStatusChangedEventArgs extends Message<void> {
 }
 
 export interface JobData {
-    readonly ProcessData: ProcessData | null;
+    readonly Process: ProcessData | null;
     readonly DisplayName: string;
     readonly Identifier: string;
 }

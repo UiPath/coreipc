@@ -19,6 +19,7 @@ export interface IRobotAgentProxy {
     StopJob(parameters: StopJobParameters): Promise<void>;
     PauseJob(parameters: PauseJobParameters): Promise<void>;
     ResumeJob(parameters: ResumeJobParameters): Promise<void>;
+    OpenOrchestratorSettings(): Promise<void>;
 }
 
 export interface RobotStatusChangedEventArgs {

@@ -134,6 +134,11 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
                                 }
                             }
                             break;
+                        case 'settings':
+                            {
+                                await Program.proxy.OpenOrchestratorSettings();
+                            }
+                            break;
                         case 'start':
                             {
                                 Program.terminal.writeLine(`  ProcessKey (empty string to cancel):`);
@@ -143,7 +148,7 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
                                         const jobData = await Program.proxy.StartJob(new StartJobParameters(processKey));
                                         Program.terminal.writeLine(`   DisplayName: {yellow-fg}"${jobData.DisplayName}"{/yellow-fg}`);
                                         Program.terminal.writeLine(`   Identifier: {yellow-fg}"${jobData.Identifier}"{/yellow-fg}`);
-                                        Program.terminal.writeLine(`   ProcessData: {yellow-fg}"${JSON.stringify(jobData.ProcessData)}"{/yellow-fg}`);
+                                        Program.terminal.writeLine(`   ProcessData: {yellow-fg}"${JSON.stringify(jobData.Process)}"{/yellow-fg}`);
                                     } catch (error) {
                                         Trace.log(error);
                                     }
@@ -219,6 +224,7 @@ autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
         Program.terminal.writeLine('  {yellow-fg}help{/yellow-fg}       Displays this manual.');
         Program.terminal.writeLine('  {yellow-fg}env{/yellow-fg}        Displays the current config.');
         Program.terminal.writeLine(`  {yellow-fg}refresh{/yellow-fg}    Refreshes the status with force === true.`);
+        Program.terminal.writeLine(`  {yellow-fg}settings{/yellow-fg}   Opens Orchestrator Settings in the old tray app.`);
         Program.terminal.writeLine(`  {yellow-fg}start{/yellow-fg}      Starts a job.`);
         Program.terminal.writeLine('  {yellow-fg}stop{/yellow-fg}       Stops a job.');
         Program.terminal.writeLine('  {yellow-fg}install{/yellow-fg}    Installs a process.');

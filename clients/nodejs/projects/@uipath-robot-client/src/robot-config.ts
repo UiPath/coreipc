@@ -52,12 +52,14 @@ class RobotConfigPal {
         const pipeName = serviceInstalled ? 'RobotEndpoint' : `RobotEndpoint_${userDomain}\\${userName}`;
 
         const maybeUserHostServiceFilePath = serviceInstalled ? undefined : NodePath.join(serviceHome, this._context.filenameUserHostService);
+        const oldAgentFilePath = NodePath.join(serviceHome, myself._context.filenameOldAgent);
 
         return {
             serviceHome,
             serviceInstalled,
             defaultCallTimeout: this._context.defaultCallTimeout,
             maybeUserHostServiceFilePath,
+            oldAgentFilePath,
             installPackageRequestTimeout: this._context.installPackageRequestTimeout,
             userName,
             userDomain,
@@ -95,6 +97,8 @@ export class RobotConfig {
     private static readonly _context: IRobotEnvironmentContext = (() => {
         const result: IRobotEnvironmentContext = {
             filenameUserHostService: 'UiPath.Service.UserHost.exe',
+            filenameOldAgent: 'UiPath.Agent.exe',
+
             envvarnameServiceHome: 'UIPATH_SERVICE_HOME',
             envvarnameServiceInstalled: 'UIPATH_SERVICE_INSTALLED',
             relpathFailoverServiceHome: '..',
@@ -164,6 +168,8 @@ export class RobotConfig {
 
 export interface IRobotEnvironmentSettings {
     filenameUserHostService: string;
+    filenameOldAgent: string;
+
     relpathFailoverServiceHome: string;
     envvarnameServiceHome: string;
     envvarnameServiceInstalled: string;
@@ -181,6 +187,8 @@ export interface IRobotEnvironmentData {
     readonly defaultCallTimeout: TimeSpan;
 
     readonly maybeUserHostServiceFilePath: string | undefined;
+    readonly oldAgentFilePath: string;
+
     readonly installPackageRequestTimeout: TimeSpan;
 
     readonly userName: string;
