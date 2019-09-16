@@ -1,5 +1,6 @@
 import { Terminal } from './terminal';
 import { Bootstrapper } from './bootstrapper';
+import * as fs from 'fs';
 
 import { Trace } from '@uipath/ipc';
 import {
@@ -16,6 +17,7 @@ import {
     PauseJobParameters,
     ResumeJobParameters
 } from '@uipath/robot-client';
+import { fstat } from 'fs';
 
 export class Program {
     private static readonly terminal = new Terminal(settings => {
@@ -64,8 +66,11 @@ export class Program {
         });
 
         Program.proxy.ProcessListUpdated.subscribe(_args => {
-            Program.terminal.writeLine(`*********  ProcessListUpdated: ${JSON.stringify(_args)}`);
-            Program.terminal.writeLine(`      [{green-fg}event{/green-fg} ProcessListUpdated] (args.Processes.length === ${_args.Processes.length})`);
+            const text = `*********  ProcessListUpdated: ${JSON.stringify(_args)}`;
+            Program.terminal.writeLine(text);
+
+            Program.terminal.writeLine(`      [{green-fg}event{/green-fg} ProcessListUpdated] (args.Processes === ${_args.Processes})`);
+            // Program.terminal.writeLine(`      [{green-fg}event{/green-fg} ProcessListUpdated] (args.Processes.length === ${_args.Processes.length})`);
 
             function processToString(process: LocalProcessInformation): string {
                 return `name: {yellow-fg}${process.Process.Name}{/yellow-fg}

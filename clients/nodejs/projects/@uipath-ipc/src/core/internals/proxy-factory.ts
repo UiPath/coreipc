@@ -8,7 +8,7 @@ import { rtti } from '../surface/rtti';
 import { CancellationToken } from '../../foundation/tasks/cancellation-token';
 import { RemoteError } from '../surface/remote-error';
 import { PublicConstructor } from '../../foundation/reflection/reflection';
-import { Trace } from '../..';
+import { Trace, OperationCanceledError } from '../..';
 
 const symbolofMaybeProxyCtor = Symbol('maybe:ProxyFactory');
 const symbolofBroker = Symbol('broker');
@@ -72,6 +72,11 @@ export class Generator<TService> {
                 }
             } catch (error) {
                 Trace.log(`GeneratedProxy: error === ${JSON.stringify(error)}`);
+                if (error instanceof OperationCanceledError) {
+                    throw error;
+                } else {
+                    throw new RemoteError(error, methodName);
+                }
             }
         };
     }

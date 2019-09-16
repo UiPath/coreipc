@@ -208,6 +208,7 @@ export class Broker implements IBroker, IAsyncDisposable {
                 wrapper = await this.getOrCreateWrapperAsync(cancellationToken);
             } catch (error) {
                 Trace.log(`Broker.sendBufferAsync: Failed to obtain a StreamWrapper`);
+                Trace.log(error);
                 throw error;
             }
 

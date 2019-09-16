@@ -11,13 +11,17 @@ import {
     Timeout,
     TimeSpan,
     PromisePal,
-    OperationCanceledError
+    OperationCanceledError,
+    Trace
 } from '../../src';
 
 describe('Client-Server-1', () => {
 
     test(`Infinite`, async () => {
 
+        Trace.addListener(x => {
+            console.log('Trace: ', x);
+        });
         await runCsx(csx(), async () => {
             const client = new IpcClient('test-pipe', Contract.ITestService, config => {
                 config.callbackService = new TestCallback();
