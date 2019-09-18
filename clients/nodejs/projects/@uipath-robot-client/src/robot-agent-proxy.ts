@@ -108,6 +108,7 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
             this._processListUpdated.next({ Processes });
         } catch (error) {
             Trace.log(error);
+            this._processListUpdated.next({ Processes: [] });
         }
     }
 

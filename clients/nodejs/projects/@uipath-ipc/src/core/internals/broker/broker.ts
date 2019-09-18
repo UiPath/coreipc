@@ -111,7 +111,7 @@ export class Broker implements IBroker, IAsyncDisposable {
                     try {
                         await event.sender.stream.writeAsync(buffer, this._cts.token);
                     } catch (error) {
-                        console.error(error);
+                        Trace.log(error);
                     }
                 }
             );

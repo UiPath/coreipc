@@ -1,8 +1,7 @@
-/* istanbul ignore file */
-import { TimeSpan } from '../src/foundation/tasks/timespan';
-
 // tslint:disable: no-namespace
 // tslint:disable: ban-types
+/* istanbul ignore file */
+import { TimeSpan } from '../src/foundation/tasks/timespan';
 
 type ErrorCtor<TError extends Error> = new (...args: any[]) => TError;
 type Ctor<T> = new (...args: any[]) => T;
