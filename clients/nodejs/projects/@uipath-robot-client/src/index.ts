@@ -17,9 +17,18 @@ import {
     StopJobParameters,
     InstallProcessParameters,
     PauseJobParameters,
-    ResumeJobParameters
+    ResumeJobParameters,
+    ProcessData,
+    ProcessSettings,
+    JobStatusChangedEventArgs,
+    JobCompletedEventArgs,
+    JobData,
+    JobStatus,
+    ProjectSettings,
+    CompletedStatus
 } from './upstream-contract';
 import { RobotConfig, IRobotEnvironment } from './robot-config';
+import { Message, IpcError } from '@uipath/ipc';
 
 const RobotProxyConstructor: new () => IRobotAgentProxy = RobotAgentProxy;
 
@@ -30,6 +39,10 @@ export {
     RobotConfig,
     IRobotEnvironment,
 
+    // Ipc DTOs
+    Message,
+    IpcError,
+
     // Downstream contract DTOs
     RobotStatusChangedEventArgs,
     ProcessListUpdatedArgs,
@@ -38,9 +51,18 @@ export {
 
     // Common contract DTOs
     LocalProcessInformation,
+    ProcessData,
+    ProcessSettings,
     StartJobParameters,
     StopJobParameters,
     InstallProcessParameters,
     PauseJobParameters,
-    ResumeJobParameters
+    ResumeJobParameters,
+
+    JobStatusChangedEventArgs,
+    JobCompletedEventArgs,
+    JobData,
+    JobStatus,
+    ProjectSettings,
+    CompletedStatus
 };

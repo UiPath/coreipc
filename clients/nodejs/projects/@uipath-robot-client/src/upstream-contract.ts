@@ -58,6 +58,7 @@ export interface ProcessData {
     readonly Name: string;
     readonly Version: string;
     readonly FolderName: string;
+    readonly FolderPath: string;
 }
 export interface ProcessSettings {
     readonly AutoStart: boolean;

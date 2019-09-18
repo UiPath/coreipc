@@ -74,12 +74,13 @@ export class Program {
 
             function processToString(process: LocalProcessInformation): string {
                 return `name: {yellow-fg}${process.Process.Name}{/yellow-fg}
-version: {yellow-fg}${process.Process.Version}{/yellow-fg}
-key: {yellow-fg}${process.Process.Key}{/yellow-fg}
-folder: {yellow-fg}${process.Process.FolderName}{/yellow-fg}
-installed: {yellow-fg}${process.Installed}{/yellow-fg}
-autoInstall: {yellow-fg}${process.Settings.AutoInstall}{/yellow-fg}
-autoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
+Version: {yellow-fg}${process.Process.Version}{/yellow-fg}
+Key: {yellow-fg}${process.Process.Key}{/yellow-fg}
+FolderName: {yellow-fg}${process.Process.FolderName}{/yellow-fg}
+FolderPath: {yellow-fg}${process.Process.FolderPath}{/yellow-fg}
+Installed: {yellow-fg}${process.Installed}{/yellow-fg}
+AutoInstall: {yellow-fg}${process.Settings.AutoInstall}{/yellow-fg}
+AutoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
 `;
             }
 
