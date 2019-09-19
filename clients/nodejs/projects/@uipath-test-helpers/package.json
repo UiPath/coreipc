@@ -1,12 +1,13 @@
 {
-    "name": "@uipath/ipc",
+    "name": "@uipath/test-helpers",
     "version": "0.0.18",
-    "description": "UiPath Ipc for Nodejs",
+    "description": "UiPath Helper library for launching CSX scripts with dotnet-script",
     "main": "dist/index.js",
     "typings": "dist/index",
     "scripts": {
         "build": "tsc",
         "build:watch": "tsc --watch",
+        "start": "node ./dist/program.js",
         "lint": "tslint --project \"./tsconfig.json\""
     },
     "author": "Eduard Dumitru",
@@ -16,12 +17,13 @@
     ],
     "dependencies": {
         "rxjs": "6.5.2",
-        "@types/node": "^12.6.8"
+        "@types/node": "^12.6.8",
+        "uuid": "3.3.2"
     },
     "devDependencies": {
-        "@uipath/test-helpers": "^0.0.18",
         "@types/jest": "^22.1.4",
         "@types/node": "^12.6.8",
+        "@types/uuid": "3.4.3",
         "jest": "^24.8.0",
         "ts-jest": "^24.0.2",
         "typescript": "^3.5.3"

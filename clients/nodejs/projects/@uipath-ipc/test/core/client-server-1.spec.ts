@@ -1,5 +1,6 @@
 import '../csx-helpers';
 import '../jest-extensions';
+import * as path from 'path';
 import { runCsx } from '../csx-helpers';
 import {
     IpcClient,
@@ -14,6 +15,11 @@ import {
     OperationCanceledError,
     Trace
 } from '../../src';
+
+import {
+    DotNetScript
+} from '@uipath/test-helpers';
+import { TimeoutError } from '../../src/foundation/errors/timeout-error';
 
 describe('Client-Server-1', () => {
 
@@ -53,11 +59,97 @@ describe('Client-Server-1', () => {
 
     }, 1000 * 30);
 
+    test(`timeout`, async () => {
+
+        class ITestService {
+            public InfiniteAsync(message: Message<void>, ct: CancellationToken): Promise<boolean> { throw null; }
+        }
+
+        function getCSharpContract(): string {
+            const result = // javascript
+                `
+public static class Contract {
+    public interface ITestService {
+        Task<bool> InfiniteAsync(Message message, CancellationToken ct = default);
+    }
+}
+            `;
+            return result;
+        }
+
+        function getCSharpImplementation(): string {
+            const result = // javascript
+                `
+            public sealed class TestService : Contract.ITestService {
+                public async Task<bool> InfiniteAsync(Message message, CancellationToken ct = default) {
+                    await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, ct);
+                    return true;
+                }
+            }
+            `;
+            return result;
+        }
+
+        function getCSharpScript(): string {
+            const result = // javascript
+                `
+                ${getCSharpContract()}
+                ${getCSharpImplementation()}
+
+            var serviceProvider = new ServiceCollection()
+                .AddLogging()
+                .AddIpc()
+                .AddSingleton<Contract.ITestService, TestService>()
+                .BuildServiceProvider();
+
+            var host = new ServiceHostBuilder(serviceProvider)
+                .AddEndpoint(new NamedPipeEndpointSettings<Contract.ITestService>("test-pipe") {
+                    RequestTimeout = TimeSpan.FromSeconds(10)
+                })
+                .Build();
+
+            await await Task.WhenAny(host.RunAsync(), Task.Run(async () => {
+                Console.WriteLine(typeof (int).Assembly);
+                await Task.Delay(500);
+                Console.WriteLine("#!READY");
+                Console.ReadLine();
+                host.Dispose();
+            }));
+            `;
+            return result;
+        }
+
+        let dns: DotNetScript | null = null;
+        let client: IpcClient<ITestService> | null = null;
+
+        try {
+            dns = await DotNetScript.startAsync(
+                formatCsx(getCSharpScript()),
+                path.join(process.cwd(), '$tools\\dotnet-script\\dotnet-script.cmd'),
+                path.join(process.cwd(), '$uipath-ipc-dotnet')
+            );
+            client = new IpcClient('test-pipe', ITestService);
+
+            await dns.waitAsync(x => x.type === 'line' && x.line === '#!READY');
+            const cts = new CancellationTokenSource();
+            cts.cancelAfter(TimeSpan.fromMilliseconds(500));
+
+            await expect(client
+                .proxy
+                .InfiniteAsync(new Message<void>(), cts.token)
+            ).rejects.toBeInstanceOf(OperationCanceledError);
+        } finally {
+            if (dns) {
+                await dns.disposeAsync();
+            }
+        }
+    }, 10 * 1000);
+
 });
 
-function csx(): string {
-    const result = // javascript
-        `#! "netcoreapp2.0"
+function formatCsx(code: string): string {
+    // javascript
+    return `#! "netcoreapp2.0"
 #r ".\\Nito.AsyncEx.Context.dll"
 #r ".\\Nito.AsyncEx.Coordination.dll"
 #r ".\\Nito.AsyncEx.Interop.WaitHandles.dll"
@@ -81,6 +173,36 @@ using UiPath.Ipc;
 using UiPath.Ipc.NamedPipe;
 using UiPath.Ipc.Tests;
 
+${code.replace('\\', '\\\\')}
+`;
+}
+
+function csx(): string {
+    const result = // javascript
+        `#! "netcoreapp2.0"
+    #r ".\\Nito.AsyncEx.Context.dll"
+    #r ".\\Nito.AsyncEx.Coordination.dll"
+    #r ".\\Nito.AsyncEx.Interop.WaitHandles.dll"
+    #r ".\\Nito.AsyncEx.Oop.dll"
+    #r ".\\Nito.AsyncEx.Tasks.dll"
+    #r ".\\Nito.Cancellation.dll"
+    #r ".\\Nito.Collections.Deque.dll"
+    #r ".\\Nito.Disposables.dll"
+    #r ".\\Microsoft.Extensions.DependencyInjection.dll"
+    #r ".\\UiPath.Ipc.dll"
+    #r ".\\UiPath.Ipc.Tests.dll"
+
+    using Microsoft.Extensions.DependencyInjection;
+    using System;
+    using System.Reflection;
+    using System.IO;
+    using System.Diagnostics;
+    using System.Threading;
+    using System.Threading.Tasks;
+    using UiPath.Ipc;
+    using UiPath.Ipc.NamedPipe;
+    using UiPath.Ipc.Tests;
+
 public static class Contract {
     public sealed class Complex {
         public double X { get; set; }
@@ -89,19 +211,19 @@ public static class Contract {
     public interface ITestService {
         Task<Complex> AddAsync(Complex a, Message<Complex> b, CancellationToken ct = default);
         Task<bool> InfiniteAsync(Message message, CancellationToken ct = default);
-    }
+        }
     public interface ITestCallback {
         Task<double> AddAsync(double a, double b);
     }
 }
 public class TestService : Contract.ITestService {
-    public async Task<Contract.Complex> AddAsync(Contract.Complex a, Message<Contract.Complex> b, CancellationToken ct) {
+    public async Task < Contract.Complex > AddAsync(Contract.Complex a, Message < Contract.Complex > b, CancellationToken ct) {
         var callback = b.Client.GetCallback<Contract.ITestCallback>();
         var x = await callback.AddAsync(a.X, b.Payload.X);
         var y = await callback.AddAsync(a.Y, b.Payload.Y);
         return new Contract.Complex { X = x, Y = y };
     }
-    public async Task<bool> InfiniteAsync(Message message, CancellationToken ct = default) {
+    public async Task < bool > InfiniteAsync(Message message, CancellationToken ct = default ) {
         await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, ct);
         return true;
     }
@@ -119,14 +241,13 @@ var host = new ServiceHostBuilder(serviceProvider)
     })
     .Build();
 
-await await Task.WhenAny(host.RunAsync(), Task.Run(async () =>
-    {
-        Console.WriteLine(typeof(int).Assembly);
-        await Task.Delay(500);
-        Console.WriteLine("#!READY");
-        Console.ReadLine();
-        host.Dispose();
-    }));
+await await Task.WhenAny(host.RunAsync(), Task.Run(async () => {
+    Console.WriteLine(typeof (int).Assembly);
+    await Task.Delay(500);
+    Console.WriteLine("#!READY");
+    Console.ReadLine();
+    host.Dispose();
+}));
 `;
     return result;
 }
