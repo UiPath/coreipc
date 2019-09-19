@@ -2,8 +2,8 @@ import '../jest-extensions';
 import { EcmaTimeout } from '../../src/foundation/tasks/ecma-timeout';
 import { TimeSpan } from '../../src/foundation/tasks/timespan';
 import { ArgumentNullError } from '../../src/foundation/errors/argument-null-error';
-import { PromisePal } from '../../src';
 import { ArgumentError } from '../../src/foundation/errors/argument-error';
+import '../../src/foundation/tasks/promise-pal';
 
 describe('Foundation-Timeout', () => {
     test(`ctor doesn't throw when it shouldn't`, () => {
@@ -42,7 +42,7 @@ describe('Foundation-Timeout', () => {
         const timeout = new EcmaTimeout(TimeSpan.zero, callback);
         try {
             expect(callback).not.toHaveBeenCalled();
-            await PromisePal.yield();
+            await Promise.yield();
             expect(callback).toHaveBeenCalledTimes(1);
         } finally {
             timeout.dispose();
@@ -53,9 +53,9 @@ describe('Foundation-Timeout', () => {
         const timeout = new EcmaTimeout(TimeSpan.fromSeconds(1), callback);
         try {
             expect(callback).not.toHaveBeenCalled();
-            await PromisePal.delay(TimeSpan.fromMilliseconds(300));
+            await Promise.delay(TimeSpan.fromMilliseconds(300));
             expect(callback).not.toHaveBeenCalled();
-            await PromisePal.delay(TimeSpan.fromMilliseconds(700));
+            await Promise.delay(TimeSpan.fromMilliseconds(700));
             expect(callback).toHaveBeenCalledTimes(1);
         } finally {
             timeout.dispose();

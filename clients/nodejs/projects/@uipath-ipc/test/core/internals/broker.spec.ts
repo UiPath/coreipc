@@ -11,7 +11,7 @@ import { ILogicalSocket } from '../../../src/foundation/pipes/logical-socket';
 import { CancellationToken } from '../../../src/foundation/tasks/cancellation-token';
 import { IDisposable } from '../../../src/foundation/disposable/disposable';
 import { SerializationPal } from '../../../src/core/internals/broker/serialization-pal';
-import { PromisePal, PromiseCompletionSource } from '../../../src';
+import '../../../src/foundation/tasks/promise-pal';
 
 describe('Core-Internals-Broker', () => {
     test(`Broker.ctor throws for falsy args`, () => {
@@ -32,7 +32,7 @@ describe('Core-Internals-Broker', () => {
             connectAsync: jest.fn(),
             addDataListener: jest.fn(),
             addEndListener: jest.fn(),
-            writeAsync: jest.fn(() => PromisePal.completedPromise),
+            writeAsync: jest.fn(() => Promise.completedPromise),
             dispose: () => { }
         });
         const logicalSocketFactory = jest.fn(() => logicalSocket);
@@ -40,14 +40,14 @@ describe('Core-Internals-Broker', () => {
         const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
 
         broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('bar', []));
-        await PromisePal.yield();
+        await Promise.yield();
 
         expect(logicalSocketFactory).toHaveBeenCalledTimes(1);
         expect(logicalSocket.addDataListener).toHaveBeenCalledTimes(1);
         expect(logicalSocket.connectAsync).toHaveBeenCalledTimes(1);
 
         broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('bar', []));
-        await PromisePal.yield();
+        await Promise.yield();
 
         expect(logicalSocketFactory).toHaveBeenCalledTimes(1);
         expect(logicalSocket.addDataListener).toHaveBeenCalledTimes(1);
@@ -57,12 +57,12 @@ describe('Core-Internals-Broker', () => {
     test(`Broker reconnects internally`, async () => {
         let currentSocketIndex = -1;
         const writePromises = [
-            PromisePal.fromError<void>(new MockError()),
-            PromisePal.fromError<void>(new MockError()),
-            PromisePal.completedPromise
+            Promise.fromError<void>(new MockError()),
+            Promise.fromError<void>(new MockError()),
+            Promise.completedPromise
         ];
         const logicalSockets = writePromises.map(writePromise => _mock_<ILogicalSocket>({
-            connectAsync: jest.fn(() => PromisePal.completedPromise),
+            connectAsync: jest.fn(() => Promise.completedPromise),
             addDataListener: jest.fn(() => ({ dispose: () => { } })),
             addEndListener: jest.fn(() => ({ dispose: () => { } })),
             writeAsync: jest.fn(() => writePromise),
@@ -73,7 +73,7 @@ describe('Core-Internals-Broker', () => {
         const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
 
         broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('bar', []));
-        await PromisePal.yield();
+        await Promise.yield();
 
         expect(logicalSocketFactory).toHaveBeenCalledTimes(3);
     });
@@ -83,16 +83,16 @@ describe('Core-Internals-Broker', () => {
         const connectError = new MockError();
         const promisePairs = [
             {
-                connect: PromisePal.completedPromise,
-                write: PromisePal.fromError<void>(new MockError())
+                connect: Promise.completedPromise,
+                write: Promise.fromError<void>(new MockError())
             },
             {
-                connect: PromisePal.completedPromise,
-                write: PromisePal.fromError<void>(new MockError())
+                connect: Promise.completedPromise,
+                write: Promise.fromError<void>(new MockError())
             },
             {
-                connect: PromisePal.fromError(connectError),
-                write: PromisePal.completedPromise
+                connect: Promise.fromError(connectError),
+                write: Promise.completedPromise
             },
         ];
         const logicalSockets = promisePairs.map(pair => _mock_<ILogicalSocket>({
@@ -119,7 +119,7 @@ describe('Core-Internals-Broker', () => {
             public async writeAsync(buffer: Buffer, cancellationToken: CancellationToken): Promise<void> {
                 expect(this._listeners.length).toBe(1);
 
-                await PromisePal.yield();
+                await Promise.yield();
 
                 const requestJson = buffer.toString('utf8', 5);
                 const wireRequest = SerializationPal.fromJson(requestJson, WireMesssage.Type.Request);
@@ -161,18 +161,18 @@ describe('Core-Internals-Broker', () => {
     test(`Broker issues callback`, async () => {
         let listener: (data: Buffer) => void | null = null;
         const logicalSocket = _mock_<ILogicalSocket>({
-            connectAsync: jest.fn(() => PromisePal.completedPromise),
+            connectAsync: jest.fn(() => Promise.completedPromise),
             addDataListener: jest.fn((x: (data: Buffer) => void) => {
                 listener = x;
                 return { dispose: () => { } };
             }),
             addEndListener: jest.fn(() => ({ dispose: () => { } })),
-            writeAsync: jest.fn(() => PromisePal.completedPromise),
+            writeAsync: jest.fn(() => Promise.completedPromise),
             dispose: () => { }
         });
 
         const callbacks = {
-            bar: jest.fn(() => PromisePal.fromResult(200))
+            bar: jest.fn(() => Promise.fromResult(200))
         };
 
         const broker = new Broker(
@@ -186,7 +186,7 @@ describe('Core-Internals-Broker', () => {
         );
 
         broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('remote-method', []));
-        await PromisePal.yield();
+        await Promise.yield();
 
         expect(logicalSocket.addDataListener).toHaveBeenCalledTimes(1);
         expect(listener).toBeTruthy();
@@ -196,7 +196,7 @@ describe('Core-Internals-Broker', () => {
         const callbackRequestBuffer = SerializationPal.serializeRequest('some-id', brokerRequest.methodName, tuple.serializedArgs, tuple.timeoutSeconds, tuple.cancellationToken);
         expect(callbacks.bar).not.toHaveBeenCalled();
         listener(callbackRequestBuffer);
-        await PromisePal.yield();
+        await Promise.yield();
         expect(callbacks.bar).toHaveBeenCalledTimes(1);
         expect(callbacks.bar).toHaveBeenCalledWith('frob', 123);
         expect(logicalSocket.writeAsync).toHaveBeenCalledTimes(2);

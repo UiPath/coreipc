@@ -5,8 +5,9 @@ import { SerializationPal } from '../../../src/core/internals/broker/serializati
 import { ArgumentNullError } from '../../../src/foundation/errors/argument-null-error';
 import { MockError } from '../../jest-extensions';
 import { TimeSpan } from '../../../src/foundation/tasks/timespan';
-import { CancellationToken, CancellationTokenSource, Message, PromisePal } from '../../../src';
+import { CancellationToken, CancellationTokenSource, Message } from '../../../src';
 import { ArgumentError } from '../../../src/foundation/errors/argument-error';
+import '../../../src/foundation/tasks/promise-pal';
 
 describe('Core-Internals-SerializationPal', () => {
     test(`serializeResponse throws for falsy args`, () => {
@@ -58,7 +59,7 @@ describe('Core-Internals-SerializationPal', () => {
         expect(token1).toBeTruthy();
 
         expect(token1.isCancellationRequested).toBe(false);
-        await PromisePal.delay(TimeSpan.fromMilliseconds(10));
+        await Promise.delay(TimeSpan.fromMilliseconds(10));
         expect(token1.isCancellationRequested).toBe(true);
 
         const cts2 = new CancellationTokenSource();

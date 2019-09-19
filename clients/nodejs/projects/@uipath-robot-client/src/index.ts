@@ -32,6 +32,7 @@ import { Message, IpcError } from '@uipath/ipc';
 
 const RobotProxyConstructor: new () => IRobotAgentProxy = RobotAgentProxy;
 
+export { default } from '@uipath/ipc';
 export {
     RobotProxyConstructor,
     IRobotAgentProxy,

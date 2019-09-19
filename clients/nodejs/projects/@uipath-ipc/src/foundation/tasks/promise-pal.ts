@@ -1,3 +1,5 @@
+// tslint:disable: only-arrow-functions
+
 import { CancellationToken } from './cancellation-token';
 import { CancellationTokenRegistration } from './cancellation-token-registration';
 import { PromiseCompletionSource } from './promise-completion-source';
@@ -5,7 +7,7 @@ import { TimeSpan } from './timespan';
 import { ArgumentError } from '../errors/argument-error';
 import { OperationCanceledError } from '../errors/operation-canceled-error';
 
-export class PromisePal {
+class PromisePal {
     public static readonly completedPromise = new Promise<void>(resolve => resolve(undefined));
 
     public static fromResult<T>(result: T): Promise<T> {
@@ -43,3 +45,34 @@ export class PromisePal {
         return pcs.promise;
     }
 }
+
+export { };
+
+declare global {
+    interface PromiseConstructor {
+        delay(delay: TimeSpan, cancellationToken?: CancellationToken): Promise<void>;
+        delay(millisecondsDelay: number, cancellationToken?: CancellationToken): Promise<void>;
+
+        readonly completedPromise: Promise<void>;
+        fromResult<T>(result: T): Promise<T>;
+        fromError<T>(error: Error): Promise<T>;
+        fromCanceled<T>(): Promise<T>;
+
+        yield(): Promise<void>;
+    }
+}
+
+// @ts-ignore
+Promise.delay = function(delayOrMillisecondsDelay: TimeSpan | number, cancellationToken?: CancellationToken): Promise<void> {
+    const delay = delayOrMillisecondsDelay instanceof TimeSpan
+        ? delayOrMillisecondsDelay
+        : TimeSpan.fromMilliseconds(delayOrMillisecondsDelay);
+
+    return PromisePal.delay(delay, cancellationToken);
+};
+
+(Promise as any).completedPromise = PromisePal.completedPromise;
+Promise.fromResult = PromisePal.fromResult;
+Promise.fromError = PromisePal.fromError;
+Promise.fromCanceled = PromisePal.fromCanceled;
+Promise.yield = PromisePal.yield;

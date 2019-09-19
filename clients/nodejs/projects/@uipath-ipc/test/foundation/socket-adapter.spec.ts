@@ -2,7 +2,7 @@ import '../jest-extensions';
 import { ISocketLike } from '../../src/foundation/pipes/socket-like';
 import { SocketAdapter } from '../../src/foundation/pipes/socket-adapter';
 import { ArgumentNullError } from '../../src/foundation/errors/argument-null-error';
-import { CancellationToken, CancellationTokenSource, PromisePal, PromiseCompletionSource } from '../../src';
+import { CancellationToken, CancellationTokenSource, PromiseCompletionSource } from '../../src';
 import { ObjectDisposedError } from '../../src/foundation/errors/object-disposed-error';
 import { InvalidOperationError } from '../../src/foundation/errors/invalid-operation-error';
 import { OperationCanceledError } from '../../src/foundation/errors/operation-canceled-error';
@@ -10,6 +10,7 @@ import { TimeSpan } from '../../src/foundation/tasks/timespan';
 import { TimeoutError } from '../../src/foundation/errors/timeout-error';
 import { _mock_, MockError } from '../jest-extensions';
 import { PipeBrokenError } from '../../src/foundation/errors/pipe/pipe-broken-error';
+import '../../src/foundation/tasks/promise-pal';
 
 class MockSocketLikeBase implements ISocketLike {
     constructor(callback?: (instance: MockSocketLikeBase) => void) {
@@ -151,7 +152,7 @@ describe('Foundation-SocketAdapter', () => {
         promise.then(_then, _catch);
 
         trigger.setResult(undefined);
-        await PromisePal.yield();
+        await Promise.yield();
 
         expect(_then).not.toHaveBeenCalled();
         expect(_catch).toHaveBeenCalledTimes(1);
@@ -219,7 +220,7 @@ describe('Foundation-SocketAdapter', () => {
         const promiseConnect = adapter.connectAsync('foo', null, CancellationToken.none);
 
         trigger1.setResult(undefined);
-        await PromisePal.yield();
+        await Promise.yield();
 
         await expect(promiseConnect).resolves.toBeUndefined();
 
@@ -229,7 +230,7 @@ describe('Foundation-SocketAdapter', () => {
         promiseWrite.then(_then, _catch);
 
         trigger2.setResult(undefined);
-        await PromisePal.yield();
+        await Promise.yield();
 
         expect(_then).toHaveBeenCalledTimes(1);
         await expect(promiseWrite).resolves.toBeUndefined();
@@ -260,7 +261,7 @@ describe('Foundation-SocketAdapter', () => {
         const promiseConnect = adapter.connectAsync('foo', null, CancellationToken.none);
 
         trigger1.setResult(undefined);
-        await PromisePal.yield();
+        await Promise.yield();
 
         await expect(promiseConnect).resolves.toBeUndefined();
 
@@ -270,7 +271,7 @@ describe('Foundation-SocketAdapter', () => {
         promiseWrite.then(_then, _catch);
 
         trigger2.setResult(undefined);
-        await PromisePal.yield();
+        await Promise.yield();
 
         expect(_catch).toHaveBeenCalledTimes(1);
         await expect(promiseWrite).rejects.toBe(mockError);
@@ -317,7 +318,7 @@ describe('Foundation-SocketAdapter', () => {
         function getUnconnected() {
             const socketLike = new MockSocketLikeBase();
             return {
-                adapter$: PromisePal.fromResult(new SocketAdapter(socketLike)),
+                adapter$: Promise.fromResult(new SocketAdapter(socketLike)),
                 socketLike,
                 isConnected: false
             };

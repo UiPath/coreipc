@@ -1,10 +1,10 @@
 import '../jest-extensions';
 import { CancellationTokenSource } from '../../src/foundation/tasks/cancellation-token-source';
-import { PromisePal } from '../../src/foundation/tasks/promise-pal';
 import { AggregateError } from '../../src/foundation/errors/aggregate-error';
 import { TimeSpan } from '../../src/foundation/tasks/timespan';
 import { ObjectDisposedError } from '../../src/foundation/errors/object-disposed-error';
 import { MockError } from '../jest-extensions';
+import '../../src/foundation/tasks/promise-pal';
 
 describe('Foundation-CancellationTokenSource', () => {
     test(`ctor doesn't throw`, () => {
@@ -106,7 +106,7 @@ describe('Foundation-CancellationTokenSource', () => {
         cts.token.register(mock);
 
         expect(mock).not.toHaveBeenCalled();
-        await PromisePal.delay(TimeSpan.fromMilliseconds(15));
+        await Promise.delay(TimeSpan.fromMilliseconds(15));
 
         expect(mock).toHaveBeenCalledTimes(1);
 
@@ -119,9 +119,9 @@ describe('Foundation-CancellationTokenSource', () => {
         cts.cancelAfter(TimeSpan.fromMilliseconds(10));
         cts.cancelAfter(TimeSpan.fromMilliseconds(50));
         expect(mock).not.toHaveBeenCalled();
-        await PromisePal.delay(TimeSpan.fromMilliseconds(30));
+        await Promise.delay(TimeSpan.fromMilliseconds(30));
         expect(mock).toHaveBeenCalledTimes(1);
-        await PromisePal.delay(TimeSpan.fromMilliseconds(200));
+        await Promise.delay(TimeSpan.fromMilliseconds(200));
         expect(mock).toHaveBeenCalledTimes(1);
     });
 

@@ -1,5 +1,6 @@
 // tslint:disable: max-line-length
-import { IpcClient, Message, PipeClientStream, CancellationToken, TimeSpan, PromisePal, Trace } from '@uipath/ipc';
+// import '@uipath/ipc';
+import { IpcClient, Message, PipeClientStream, CancellationToken, TimeSpan, Trace } from '@uipath/ipc';
 import { Subject, Observable, Observer } from 'rxjs';
 import { spawn } from 'child_process';
 
@@ -128,7 +129,7 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
                 throw error;
             }
 
-            await PromisePal.delay(TimeSpan.fromMilliseconds(300));
+            await Promise.delay(TimeSpan.fromMilliseconds(300));
         }
     }
 

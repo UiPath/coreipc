@@ -1,6 +1,6 @@
 import * as BrokerMessage from './broker-message';
 import * as WireMessage from './wire-message';
-import { PipeClientStream, CancellationToken, Trace, PromisePal } from '../../..';
+import { PipeClientStream, CancellationToken, Trace } from '../../..';
 import { CallbackContext, CallContextTable } from './context';
 import { SerializationPal } from './serialization-pal';
 import { CancellationTokenSource } from '../../../foundation/tasks/cancellation-token-source';
@@ -79,7 +79,7 @@ export class Broker implements IBroker, IAsyncDisposable {
                 try {
                     promise = this._maybeConnectionFactory(connect, cancellationToken);
                 } catch (error) {
-                    return PromisePal.fromError(error);
+                    return Promise.fromError(error);
                 }
                 try {
                     result = await promise;

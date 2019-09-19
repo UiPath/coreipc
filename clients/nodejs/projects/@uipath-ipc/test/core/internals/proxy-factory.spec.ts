@@ -2,8 +2,9 @@ import '../../jest-extensions';
 import * as BrokerMessage from '../../../src/core/internals/broker/broker-message'
 import { Generator, ProxyFactory } from '../../../src/core/internals/proxy-factory';
 import { IBroker } from '../../../src/core/internals/broker/broker';
-import { PromisePal, IpcClient, __returns__ } from '../../../src';
+import { IpcClient, __returns__ } from '../../../src';
 import { InternalIpcClientConfig } from '../../../src/core/surface/ipc-client';
+import '../../../src/foundation/tasks/promise-pal';
 
 describe('Core-Internals-ProxyFactory', () => {
     class Integer {
@@ -19,7 +20,7 @@ describe('Core-Internals-ProxyFactory', () => {
         // tslint:disable-next-line: max-line-length
         public sendReceiveAsync: (brokerRequest: BrokerMessage.Request) => Promise<BrokerMessage.Response> = brokerRequest => new Promise<BrokerMessage.Response>((resolve, reject) => { });
 
-        public disposeAsync(): Promise<void> { return PromisePal.completedPromise; }
+        public disposeAsync(): Promise<void> { return Promise.completedPromise; }
     }
 
     test(`Generator.refersToAMethod works`, () => {
@@ -44,7 +45,7 @@ describe('Core-Internals-ProxyFactory', () => {
 
     test(`Generator.generate works`, async () => {
         const mockBroker = new MockBroker();
-        mockBroker.sendReceiveAsync = jest.fn(() => PromisePal.fromResult(new BrokerMessage.Response(new Integer(30), null)));
+        mockBroker.sendReceiveAsync = jest.fn(() => Promise.fromResult(new BrokerMessage.Response(new Integer(30), null)));
 
         const proxyCtor = Generator.generate(IMockService);
         const proxy = new proxyCtor(mockBroker);
@@ -57,7 +58,7 @@ describe('Core-Internals-ProxyFactory', () => {
 
     test(`ProxyFactory.create works`, async () => {
         const mockBroker = new MockBroker();
-        mockBroker.sendReceiveAsync = jest.fn(() => PromisePal.fromResult(new BrokerMessage.Response(new Integer(30), null)));
+        mockBroker.sendReceiveAsync = jest.fn(() => Promise.fromResult(new BrokerMessage.Response(new Integer(30), null)));
 
         const proxy = ProxyFactory.create(IMockService, mockBroker);
 
@@ -74,7 +75,7 @@ describe('Core-Internals-ProxyFactory', () => {
 
     test(`ProxyFactory.create works 2`, async () => {
         const mockBroker = new MockBroker();
-        mockBroker.sendReceiveAsync = jest.fn(() => PromisePal.fromResult(new BrokerMessage.Response(new Integer(30), null)));
+        mockBroker.sendReceiveAsync = jest.fn(() => Promise.fromResult(new BrokerMessage.Response(new Integer(30), null)));
 
         const proxy1 = ProxyFactory.create(Object, mockBroker);
 
@@ -84,7 +85,7 @@ describe('Core-Internals-ProxyFactory', () => {
 
     test(`IpcClient.ctor works`, async () => {
         const mockBroker = new MockBroker();
-        mockBroker.sendReceiveAsync = jest.fn(() => PromisePal.fromResult(new BrokerMessage.Response(new Integer(30), null)));
+        mockBroker.sendReceiveAsync = jest.fn(() => Promise.fromResult(new BrokerMessage.Response(new Integer(30), null)));
 
         const client = new IpcClient('foo', IMockService, config => {
             const asInternal = config as InternalIpcClientConfig<IMockService>;

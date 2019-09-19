@@ -5,6 +5,7 @@ import { CancellationTokenRegistration } from '../../src/foundation/tasks/cancel
 import { CancellationTokenSource } from '../../src/foundation/tasks/cancellation-token-source';
 import { OperationCanceledError } from '../../src/foundation/errors/operation-canceled-error';
 import { ArgumentError } from '../../src/foundation/errors/argument-error';
+import '../../src/foundation/tasks/promise-pal';
 
 describe('Foundation-CancellationToken', () => {
 

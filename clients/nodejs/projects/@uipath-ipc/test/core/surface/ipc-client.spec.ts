@@ -7,7 +7,7 @@ import { ILogicalSocket } from '../../../src/foundation/pipes/logical-socket';
 import { IDisposable } from '../../../src/foundation/disposable/disposable';
 import { TimeSpan } from '../../../src/foundation/tasks/timespan';
 import { __returns__ } from '../../../src/core/surface/rtti';
-import { PromisePal } from '../../../src';
+import '../../../src/foundation/tasks/promise-pal';
 
 describe('Core-Surface-IpcClient', () => {
 
@@ -86,7 +86,7 @@ describe('Core-Surface-IpcClient', () => {
     });
 
     test('IpcClient works 1', async () => {
-        MockLogicalSocket._connectAsync = jest.fn(() => PromisePal.completedPromise);
+        MockLogicalSocket._connectAsync = jest.fn(() => Promise.completedPromise);
         MockLogicalSocket._addDataListener = jest.fn();
         MockLogicalSocket._writeAsync = jest.fn();
         MockLogicalSocket._dispose = jest.fn();

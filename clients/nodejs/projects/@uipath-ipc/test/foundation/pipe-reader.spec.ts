@@ -4,10 +4,11 @@ import { PipeReader } from '../../src/foundation/pipes/pipe-reader';
 import { ArgumentNullError } from '../../src/foundation/errors/argument-null-error';
 import { ILogicalSocket } from '../../src/foundation/pipes/logical-socket';
 import { IDisposable } from '../../src/foundation/disposable/disposable';
-import { CancellationToken, CancellationTokenSource, PromiseCompletionSource, PromisePal } from '../../src';
+import { CancellationToken, CancellationTokenSource, PromiseCompletionSource } from '../../src';
 import { OperationCanceledError } from '../../src/foundation/errors/operation-canceled-error';
 import { ObjectDisposedError } from '../../src/foundation/errors/object-disposed-error';
 import { InvalidOperationError } from '../../src/foundation/errors/invalid-operation-error';
+import '../../src/foundation/tasks/promise-pal';
 
 describe('Foundation-PipeReader', () => {
 
@@ -218,12 +219,12 @@ describe('Foundation-PipeReader', () => {
             const _then = jest.fn(); const _catch = jest.fn();
             promise.then(_then, _catch);
 
-            await PromisePal.yield();
+            await Promise.yield();
             expect(_then).not.toHaveBeenCalled();
             expect(_catch).not.toHaveBeenCalled();
 
             component.trigger.setResult(undefined);
-            await PromisePal.yield();
+            await Promise.yield();
 
             expect(_then).toHaveBeenCalledTimes(1);
             expect(_then).toHaveBeenCalledWith(Buffer.byteLength(component.str));

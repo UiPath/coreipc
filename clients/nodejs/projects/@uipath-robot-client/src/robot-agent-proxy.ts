@@ -2,7 +2,7 @@ import * as DownstreamContract from './downstream-contract';
 import * as UpstreamContract from './upstream-contract';
 import { Observable, Subject, Observer } from 'rxjs';
 import { IRobotProxy, RobotProxy } from './robot-proxy';
-import { Trace, PromisePal } from '@uipath/ipc';
+import { Trace } from '@uipath/ipc';
 import { RobotConfig } from '.';
 import { spawn } from 'child_process';
 

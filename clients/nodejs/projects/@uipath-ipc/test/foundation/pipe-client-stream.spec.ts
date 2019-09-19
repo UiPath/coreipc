@@ -4,8 +4,9 @@ import { ILogicalSocket } from '../../src/foundation/pipes/logical-socket';
 import { TimeSpan } from '../../src/foundation/tasks/timespan';
 import { CancellationToken } from '../../src/foundation/tasks/cancellation-token';
 import { IDisposable } from '../../src/foundation/disposable/disposable';
-import { PromiseCompletionSource, PromisePal } from '../../src';
+import { PromiseCompletionSource } from '../../src';
 import { ObjectDisposedError } from '../../src/foundation/errors/object-disposed-error';
+import '../../src/foundation/tasks/promise-pal';
 
 describe('Foundation-PipeClientStream', () => {
     class MockLogicalSocket implements ILogicalSocket {
@@ -72,7 +73,7 @@ describe('Foundation-PipeClientStream', () => {
         expect(_then).not.toHaveBeenCalled();
         pcs.setResult(undefined);
         expect(_then).not.toHaveBeenCalled();
-        await PromisePal.yield();
+        await Promise.yield();
         expect(_then).toHaveBeenCalled();
 
         let stream: PipeClientStream | null = null;
@@ -90,12 +91,12 @@ describe('Foundation-PipeClientStream', () => {
     test(`PipeClientStream.writeAsync works`, async () => {
         const socket = new MockLogicalSocket();
         socket.connectAsync = jest.fn((path: string, maybeTimeout: TimeSpan, cancellationToken: CancellationToken): Promise<void> => {
-            return PromisePal.completedPromise;
+            return Promise.completedPromise;
         });
         socket.addDataListener = jest.fn(() => ({ dispose: () => { } }));
         socket.addEndListener = jest.fn(() => ({ dispose: () => { } }));
         socket.writeAsync = jest.fn((buffer: Buffer, cancellationToken: CancellationToken) => {
-            return PromisePal.completedPromise;
+            return Promise.completedPromise;
         });
 
         const mockBuffer0 = Buffer.alloc(0);

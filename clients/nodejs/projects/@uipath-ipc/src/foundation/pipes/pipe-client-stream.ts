@@ -4,7 +4,6 @@ import { ObjectDisposedError } from '../errors/object-disposed-error';
 import { PipeReader } from './pipe-reader';
 import { ILogicalSocketFactory, ILogicalSocket } from './logical-socket';
 import { TimeSpan } from '../tasks/timespan';
-import { PromisePal } from '../..';
 import { PipeBrokenError } from '../errors/pipe/pipe-broken-error';
 
 export class PipeClientStream implements IAsyncDisposable {
@@ -38,8 +37,8 @@ export class PipeClientStream implements IAsyncDisposable {
     }
 
     public writeAsync(buffer: Buffer, cancellationToken: CancellationToken = CancellationToken.none): Promise<void> {
-        if (this._isDisposed) { return PromisePal.fromError(new ObjectDisposedError('PipeClientStream')); }
-        if (buffer.length === 0) { return PromisePal.completedPromise; }
+        if (this._isDisposed) { return Promise.fromError(new ObjectDisposedError('PipeClientStream')); }
+        if (buffer.length === 0) { return Promise.completedPromise; }
 
         return this._socket.writeAsync(buffer, cancellationToken);
     }

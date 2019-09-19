@@ -1,6 +1,6 @@
 import { CancellationToken } from './foundation/tasks/cancellation-token';
 import { PipeClientStream } from './foundation/pipes/pipe-client-stream';
-import { PromisePal } from './foundation/tasks/promise-pal';
+import './foundation/tasks/promise-pal';
 import { IpcClient } from './core/surface/ipc-client';
 import { Message } from './core/surface/message';
 import { CancellationTokenSource } from './foundation/tasks/cancellation-token-source';
@@ -13,11 +13,11 @@ import { OperationCanceledError } from './foundation/errors/operation-canceled-e
 import { Error as IpcError } from './core/internals/broker/wire-message';
 import { Trace } from './foundation/trace/trace';
 
+export { default } from './foundation/tasks/promise-pal';
 export {
     CancellationToken,
     CancellationTokenSource,
     PromiseCompletionSource,
-    PromisePal,
     PipeClientStream,
     IpcClient,
     Message,

@@ -6,8 +6,9 @@ import * as BrokerMessage from '../../../src/core/internals/broker/broker-messag
 import { CallContext, CallbackContext, CallContextTable, ICallContext } from '../../../src/core/internals/broker/context';
 import { OperationCanceledError } from '../../../src/foundation/errors/operation-canceled-error';
 import { ArgumentNullError } from '../../../src/foundation/errors/argument-null-error';
-import { PromisePal, CancellationToken } from '../../../src';
+import { CancellationToken } from '../../../src';
 import { ObjectDisposedError } from '../../../src/foundation/errors/object-disposed-error';
+import '../../../src/foundation/tasks/promise-pal';
 
 describe('Core-Internals-Context', () => {
 
@@ -49,7 +50,7 @@ describe('Core-Internals-Context', () => {
 
         expect(() => new CallbackContext(request, async _ => { })).not.toThrow();
 
-        const mockAction = jest.fn(() => PromisePal.completedPromise);
+        const mockAction = jest.fn(() => Promise.completedPromise);
         const callbackContext = new CallbackContext(request, mockAction);
         const response = new BrokerMessage.Response(null, null);
 
