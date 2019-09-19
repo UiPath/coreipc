@@ -18,7 +18,7 @@ export class Message<T> {
             this.RequestTimeout = maybePayloadOrRequestTimeout;
         } else {
             /* istanbul ignore else */
-            if (maybeRequestTimeout instanceof TimeSpan) {
+            if (!(maybePayloadOrRequestTimeout instanceof TimeSpan)) {
                 this.Payload = maybePayloadOrRequestTimeout as T;
                 this.RequestTimeout = maybeRequestTimeout || null;
             } else {

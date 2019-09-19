@@ -9,21 +9,26 @@ describe('Core-Surface-Message', () => {
         expect(() => new Message<string>(TimeSpan.fromSeconds(100))).not.toThrow();
         expect(() => new Message<string>('test', TimeSpan.fromSeconds(100))).not.toThrow();
 
-        const cases: Array<() => Message<unknown>> = [
-            () => new Message<void>(null as any),
-            () => new Message<void>(null as any, null as any),
-            () => new Message<void>(undefined as any),
-            () => new Message<void>(undefined as any, undefined as any),
-            () => new Message<void>(true as any),
-            () => new Message<void>(true as any, true as any)
-        ];
+        const cases: Array<{
+            factory: () => Message<unknown>,
+            expectedPayload: any,
+            expectedTimeout: any
+        }> = [
+                { factory: () => new Message<void>(), expectedPayload: undefined, expectedTimeout: null },
+                { factory: () => new Message<void>(null as any), expectedPayload: null, expectedTimeout: null },
+                { factory: () => new Message<void>(null as any, null as any), expectedPayload: null, expectedTimeout: null },
+                { factory: () => new Message<void>(undefined as any), expectedPayload: undefined, expectedTimeout: null },
+                { factory: () => new Message<void>(undefined as any, undefined as any), expectedPayload: undefined, expectedTimeout: null },
+                { factory: () => new Message<boolean>(true as any), expectedPayload: true, expectedTimeout: null },
+                { factory: () => new Message<boolean>(true as any, TimeSpan.fromSeconds(10)), expectedPayload: true, expectedTimeout: TimeSpan.fromSeconds(10) }
+            ];
 
         for (const _case of cases) {
             let message: Message<unknown> | null = null;
-            expect(() => message = _case()).not.toThrow();
+            expect(() => message = _case.factory()).not.toThrow();
             expect(message).not.toBeFalsy();
-            expect(message.Payload).toBeUndefined();
-            expect(message.RequestTimeout).toBeNull();
+            expect(message.Payload).toBe(_case.expectedPayload);
+            expect(message.RequestTimeout).toEqual(_case.expectedTimeout);
         }
     });
 
