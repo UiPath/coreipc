@@ -1,4 +1,4 @@
-import { IDisposable } from '../disposable/disposable';
+import { IDisposable } from '../disposable';
 import { RegistrarCancellationToken } from './cancellation-token';
 
 export abstract class CancellationTokenRegistration implements IDisposable {

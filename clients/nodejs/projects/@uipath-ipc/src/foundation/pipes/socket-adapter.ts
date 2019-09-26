@@ -1,4 +1,4 @@
-import { IDisposable } from '../disposable/disposable';
+import { IDisposable } from '../disposable';
 import { InvalidOperationError } from '../errors/invalid-operation-error';
 import { ObjectDisposedError } from '../errors/object-disposed-error';
 import { CancellationToken } from '../tasks/cancellation-token';

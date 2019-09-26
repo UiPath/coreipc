@@ -1,5 +1,5 @@
 import { CancellationToken, ProperCancellationToken } from './cancellation-token';
-import { IDisposable } from '../disposable/disposable';
+import { IDisposable } from '../disposable';
 import { TimeSpan } from './timespan';
 import { EcmaTimeout } from './ecma-timeout';
 import { ObjectDisposedError } from '../errors/object-disposed-error';

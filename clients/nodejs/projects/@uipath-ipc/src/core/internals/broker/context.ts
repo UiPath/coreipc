@@ -2,7 +2,7 @@ import * as BrokerMessage from './broker-message';
 import { PromiseCompletionSource } from '../../../foundation/tasks/promise-completion-source';
 import { ArgumentNullError } from '../../../foundation/errors/argument-null-error';
 import * as Outcome from '../../../foundation/outcome';
-import { IDisposable } from '../../../foundation/disposable/disposable';
+import { IDisposable } from '../../../foundation/disposable';
 import { ObjectDisposedError } from '../../../foundation/errors/object-disposed-error';
 import { CancellationToken } from '../../..';
 import { CancellationTokenRegistration } from '../../../foundation/tasks/cancellation-token-registration';

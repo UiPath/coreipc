@@ -17,7 +17,7 @@ import {
     PauseJobParameters,
     ResumeJobParameters
 } from '@uipath/robot-client';
-import { fstat } from 'fs';
+import { ProcessInstallationState } from '@uipath/robot-client/dist/upstream-contract';
 
 export class Program {
     private static readonly terminal = new Terminal(settings => {
@@ -29,14 +29,24 @@ export class Program {
 
     private static proxy: IRobotAgentProxy = null as any;
 
+    private static readonly _trace = Trace.category('app');
+
     public static async main(args: string[]): Promise<void> {
+        const colorReset = '\x1b[0m';
+        const colorRedFg = '\x1b[31m';
+        const colorGreenFg = '\x1b[32m';
+        const colorYellowFg = '\x1b[33m';
+        const colorWhiteFg = '\x1b[37m';
+
         Program.terminal.initialize('');
-        Trace.addListener(errorOrText => {
-            if (errorOrText instanceof Error) {
-                Program.terminal.writeLine(`{red-fg}--! ${errorOrText}{/red-fg}`);
-            } else {
-                Program.terminal.writeLine(`{green-fg}--> ${errorOrText}{/green-fg}`);
-            }
+        Trace.addListener((errorOrText, category) => {
+            const prefix = `${colorYellowFg}[${(category || 'uncategorized').padStart(20)}]${colorReset}`;
+            const message: string = (errorOrText instanceof Error)
+                ? `${prefix}: ${colorRedFg}--! ${errorOrText}${colorReset}`
+                : `${prefix}: ${colorGreenFg}--> ${errorOrText}${colorReset}`;
+
+            Program.terminal.writeLine(message);
+            // console.log(message);
         });
 
         Program.proxy = new RobotProxyConstructor();
@@ -67,20 +77,23 @@ export class Program {
 
         Program.proxy.ProcessListUpdated.subscribe(_args => {
             const text = `*********  ProcessListUpdated: ${JSON.stringify(_args)}`;
-            Program.terminal.writeLine(text);
+            // console.log(text);
+            Program._trace.log(text);
+
+            // Program.terminal.writeLine(text);
 
             Program.terminal.writeLine(`      [{green-fg}event{/green-fg} ProcessListUpdated] (args.Processes === ${_args.Processes})`);
             // Program.terminal.writeLine(`      [{green-fg}event{/green-fg} ProcessListUpdated] (args.Processes.length === ${_args.Processes.length})`);
 
             function processToString(process: LocalProcessInformation): string {
+                Program._trace.log(`LocalProcessInformation === ${JSON.stringify(process)}`);
+
                 return `name: {yellow-fg}${process.Process.Name}{/yellow-fg}
 Version: {yellow-fg}${process.Process.Version}{/yellow-fg}
 Key: {yellow-fg}${process.Process.Key}{/yellow-fg}
 FolderName: {yellow-fg}${process.Process.FolderName}{/yellow-fg}
 FolderPath: {yellow-fg}${process.Process.FolderPath}{/yellow-fg}
-Installed: {yellow-fg}${process.Installed}{/yellow-fg}
-AutoInstall: {yellow-fg}${process.Settings.AutoInstall}{/yellow-fg}
-AutoStart: {yellow-fg}${process.Settings.AutoStart}{/yellow-fg}
+InstallationState: {yellow-fg}${ProcessInstallationState[process.InstallationState]}{/yellow-fg}
 `;
             }
 

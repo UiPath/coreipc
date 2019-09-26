@@ -1,6 +1,6 @@
 import { Quack } from '../data-structures/quack';
 import { InvalidOperationError } from '../errors/invalid-operation-error';
-import { IAsyncDisposable, IDisposable } from '../disposable/disposable';
+import { IAsyncDisposable, IDisposable } from '../disposable';
 import { ObjectDisposedError } from '../errors/object-disposed-error';
 import { PromiseCompletionSource } from '../tasks/promise-completion-source';
 import { CancellationTokenSource } from '../tasks/cancellation-token-source';

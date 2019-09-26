@@ -4,7 +4,7 @@ import { PipeClientStream, CancellationToken, Trace } from '../../..';
 import { CallbackContext, CallContextTable } from './context';
 import { SerializationPal } from './serialization-pal';
 import { CancellationTokenSource } from '../../../foundation/tasks/cancellation-token-source';
-import { IAsyncDisposable } from '../../../foundation/disposable/disposable';
+import { IAsyncDisposable } from '../../../foundation/disposable';
 import { ArgumentError } from '../../../foundation/errors/argument-error';
 import { InvalidOperationError } from '../../../foundation/errors/invalid-operation-error';
 import { StreamWrapper } from './stream-wrapper';
@@ -45,7 +45,9 @@ export class Broker implements IBroker, IAsyncDisposable {
         private readonly _callback: IMethodContainer | undefined,
 
         private readonly _maybeConnectionFactory: Maybe<ConnectionFactoryDelegate>,
-        private readonly _maybeBeforeCall: Maybe<BeforeCallDelegate>
+        private readonly _maybeBeforeCall: Maybe<BeforeCallDelegate>,
+
+        private readonly _traceNetwork: boolean
     ) {
         if (!_factory) { throw new ArgumentNullError('_factory'); }
         if (!_pipeName) { throw new ArgumentNullError('_pipeName'); }
@@ -68,6 +70,7 @@ export class Broker implements IBroker, IAsyncDisposable {
             this._factory,
             this._pipeName,
             this._connectTimeout,
+            this._traceNetwork,
             cancellationToken
         );
 
@@ -94,6 +97,7 @@ export class Broker implements IBroker, IAsyncDisposable {
             this._factory,
             this._pipeName,
             this._connectTimeout,
+            this._traceNetwork,
             cancellationToken);
 
         this._newConnection = true;

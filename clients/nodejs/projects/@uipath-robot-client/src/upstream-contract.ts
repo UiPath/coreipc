@@ -60,14 +60,14 @@ export interface ProcessData {
     readonly FolderName: string;
     readonly FolderPath: string;
 }
-export interface ProcessSettings {
-    readonly AutoStart: boolean;
-    readonly AutoInstall: boolean;
-}
 export interface LocalProcessInformation {
     readonly Process: ProcessData;
-    readonly Settings: ProcessSettings;
-    readonly Installed: boolean;
+    readonly InstallationState: ProcessInstallationState;
+}
+export enum ProcessInstallationState {
+    NotInstalled,
+    Installing,
+    Installed
 }
 export class ProjectSettings {
     constructor(

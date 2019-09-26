@@ -3,7 +3,7 @@ import { Observable, ReplaySubject } from 'rxjs';
 import { PipeClientStream, CancellationToken } from '../../..';
 import { SerializationPal } from './serialization-pal';
 import { CancellationTokenSource } from '../../../foundation/tasks/cancellation-token-source';
-import { IAsyncDisposable } from '../../../foundation/disposable/disposable';
+import { IAsyncDisposable } from '../../../foundation/disposable';
 import { MessageEvent } from './message-event';
 
 /* @internal */

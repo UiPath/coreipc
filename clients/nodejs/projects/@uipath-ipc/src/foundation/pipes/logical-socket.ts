@@ -1,4 +1,4 @@
-import { IDisposable } from '../disposable/disposable';
+import { IDisposable } from '../disposable';
 import { CancellationToken } from '../tasks/cancellation-token';
 import { TimeSpan } from '../tasks/timespan';
 

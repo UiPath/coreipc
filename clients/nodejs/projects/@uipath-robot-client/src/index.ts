@@ -13,13 +13,13 @@ import {
 
 import {
     LocalProcessInformation,
+    ProcessInstallationState,
     StartJobParameters,
     StopJobParameters,
     InstallProcessParameters,
     PauseJobParameters,
     ResumeJobParameters,
     ProcessData,
-    ProcessSettings,
     JobStatusChangedEventArgs,
     JobCompletedEventArgs,
     JobData,
@@ -53,7 +53,6 @@ export {
     // Common contract DTOs
     LocalProcessInformation,
     ProcessData,
-    ProcessSettings,
     StartJobParameters,
     StopJobParameters,
     InstallProcessParameters,

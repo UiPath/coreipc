@@ -26,6 +26,8 @@ export interface IRobotProxy {
 
     LogInUser(ct?: CancellationToken | undefined): Promise<UpstreamContract.UserStatus>;
     LogInUser(parameters: UpstreamContract.LogInParameters, ct?: CancellationToken | undefined): Promise<UpstreamContract.UserStatus>;
+
+    CloseAsync(): Promise<void>;
 }
 
 /* @internal */
@@ -69,6 +71,7 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
                 config.callbackService = new AgentEvents(this);
 
                 config.defaultCallTimeoutSeconds = RobotConfig.data.defaultCallTimeout.totalSeconds;
+                config.traceNetwork = true;
 
                 config.setConnectionFactory(async (connect, ct) => {
                     try {
@@ -197,6 +200,10 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
         }
 
         return this.channel.LogInUser(parameters, ct);
+    }
+
+    public async CloseAsync(): Promise<void> {
+        await this._ipcClient.closeAsync();
     }
 
     // #endregion

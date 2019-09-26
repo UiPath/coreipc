@@ -1,7 +1,6 @@
 import '../../jest-extensions';
 import { MockError, _mock_ } from '../../jest-extensions';
 
-import * as Outcome from '../../../src/foundation/outcome';
 import * as BrokerMessage from '../../../src/core/internals/broker/broker-message';
 import * as WireMesssage from '../../../src/core/internals/broker/wire-message';
 import { Broker } from '../../../src/core/internals/broker/broker';
@@ -9,21 +8,21 @@ import { ArgumentNullError } from '../../../src/foundation/errors/argument-null-
 import { TimeSpan } from '../../../src/foundation/tasks/timespan';
 import { ILogicalSocket } from '../../../src/foundation/pipes/logical-socket';
 import { CancellationToken } from '../../../src/foundation/tasks/cancellation-token';
-import { IDisposable } from '../../../src/foundation/disposable/disposable';
+import { IDisposable } from '../../../src/foundation/disposable';
 import { SerializationPal } from '../../../src/core/internals/broker/serialization-pal';
 import '../../../src/foundation/tasks/promise-pal';
 
 describe('Core-Internals-Broker', () => {
     test(`Broker.ctor throws for falsy args`, () => {
-        expect(() => new Broker(null, null, null, null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_factory');
-        expect(() => new Broker(jest.fn(), null, null, null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_pipeName');
-        expect(() => new Broker(jest.fn(), 'foo', null, null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_connectTimeout');
-        expect(() => new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_defaultCallTimeout');
-        expect(() => new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), TimeSpan.fromDays(1), null, null, null)).not.toThrow();
+        expect(() => new Broker(null, null, null, null, null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_factory');
+        expect(() => new Broker(jest.fn(), null, null, null, null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_pipeName');
+        expect(() => new Broker(jest.fn(), 'foo', null, null, null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_connectTimeout');
+        expect(() => new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), null, null, null, null, null)).toThrowInstanceOf(ArgumentNullError, x => x.maybeParamName === '_defaultCallTimeout');
+        expect(() => new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), TimeSpan.fromDays(1), null, null, null, null)).not.toThrow();
     });
 
     test(`Broker.sendReceiveAsync throws for falsy args`, async () => {
-        const broker = new Broker(jest.fn(), 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
+        const broker = new Broker(jest.fn(), 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null, null);
         await expect(broker.sendReceiveAsync(null)).rejects.toBeInstanceOf(ArgumentNullError, x => x.maybeParamName === 'brokerRequest');
     });
 
@@ -37,7 +36,7 @@ describe('Core-Internals-Broker', () => {
         });
         const logicalSocketFactory = jest.fn(() => logicalSocket);
 
-        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
+        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null, null);
 
         broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('bar', []));
         await Promise.yield();
@@ -70,7 +69,7 @@ describe('Core-Internals-Broker', () => {
         }));
         const logicalSocketFactory = jest.fn(() => logicalSockets[++currentSocketIndex]);
 
-        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
+        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null, null);
 
         broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('bar', []));
         await Promise.yield();
@@ -104,7 +103,7 @@ describe('Core-Internals-Broker', () => {
         }));
         const logicalSocketFactory = jest.fn(() => logicalSockets[++currentSocketIndex]);
 
-        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
+        const broker = new Broker(logicalSocketFactory, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null, null);
 
         await expect(broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('bar', []))).rejects.toBe(connectError);
     });
@@ -147,7 +146,7 @@ describe('Core-Internals-Broker', () => {
         }
 
         const expectedResponse = new BrokerMessage.Response(123, null);
-        const broker = new Broker(() => new MockLogicalSocket(expectedResponse), 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null);
+        const broker = new Broker(() => new MockLogicalSocket(expectedResponse), 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), null, null, null, null);
         const request = new BrokerMessage.OutboundRequest('bar', []);
         await expect(broker.sendReceiveAsync(request)).resolves.toEqual(expectedResponse);
         try {
@@ -175,15 +174,7 @@ describe('Core-Internals-Broker', () => {
             bar: jest.fn(() => Promise.fromResult(200))
         };
 
-        const broker = new Broker(
-            () => logicalSocket,
-            'foo',
-            TimeSpan.fromSeconds(1),
-            TimeSpan.fromSeconds(1),
-            callbacks,
-            null,
-            null
-        );
+        const broker = new Broker(() => logicalSocket, 'foo', TimeSpan.fromSeconds(1), TimeSpan.fromSeconds(1), callbacks, null, null, null);
 
         broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('remote-method', []));
         await Promise.yield();
@@ -203,7 +194,7 @@ describe('Core-Internals-Broker', () => {
     });
 
     test(`Broker.disposeAsync works and is idempotent`, async () => {
-        const broker = new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), TimeSpan.fromDays(1), null, null, null);
+        const broker = new Broker(jest.fn(), 'foo', TimeSpan.fromDays(1), TimeSpan.fromDays(1), null, null, null, null);
 
         await expect(broker.disposeAsync()).resolves.toBeUndefined();
         await expect(broker.disposeAsync()).resolves.toBeUndefined();

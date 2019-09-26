@@ -13,6 +13,7 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     private readonly _proxy: IRobotProxy;
     private _orchestratorStatus: UpstreamContract.OrchestratorStatus = UpstreamContract.OrchestratorStatus.Offline;
     private _initialized = false;
+    private _disposed = false;
 
     private static readonly _finished = {};
     // tslint:disable-next-line: ban-types
@@ -54,6 +55,7 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     public get JobCompleted(): Observable<UpstreamContract.JobCompletedEventArgs> { return this._jobCompleted; }
 
     public RefreshStatus(parameters: DownstreamContract.RefreshStatusParameters): void {
+        this.assertNotClosed();
         if (!this._initialized) {
             this._proxy.StartEvents();
             this._initialized = true;
@@ -61,12 +63,28 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         }
         this.refreshStatusCore(parameters.ForceProcessListUpdate);
     }
-    public async InstallProcess(parameters: UpstreamContract.InstallProcessParameters): Promise<void> { await this._proxy.InstallProcess(parameters); }
-    public StartJob(parameters: UpstreamContract.StartJobParameters): Promise<UpstreamContract.JobData> { return this._proxy.StartAgentJob(parameters); }
-    public StopJob(parameters: UpstreamContract.StopJobParameters): Promise<void> { return this._proxy.StopJob(parameters); }
-    public PauseJob(parameters: UpstreamContract.PauseJobParameters): Promise<void> { return this._proxy.PauseJob(parameters); }
-    public ResumeJob(parameters: UpstreamContract.ResumeJobParameters): Promise<void> { return this._proxy.ResumeJob(parameters); }
+    public async InstallProcess(parameters: UpstreamContract.InstallProcessParameters): Promise<void> {
+        this.assertNotClosed();
+        await this._proxy.InstallProcess(parameters);
+    }
+    public async StartJob(parameters: UpstreamContract.StartJobParameters): Promise<UpstreamContract.JobData> {
+        this.assertNotClosed();
+        return await this._proxy.StartAgentJob(parameters);
+    }
+    public async StopJob(parameters: UpstreamContract.StopJobParameters): Promise<void> {
+        this.assertNotClosed();
+        await this._proxy.StopJob(parameters);
+    }
+    public async PauseJob(parameters: UpstreamContract.PauseJobParameters): Promise<void> {
+        this.assertNotClosed();
+        await this._proxy.PauseJob(parameters);
+    }
+    public async ResumeJob(parameters: UpstreamContract.ResumeJobParameters): Promise<void> {
+        this.assertNotClosed();
+        this._proxy.ResumeJob(parameters);
+    }
     public async OpenOrchestratorSettings(): Promise<void> {
+        this.assertNotClosed();
         spawn(
             RobotConfig.data.oldAgentFilePath,
             ['settings'],
@@ -77,9 +95,20 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         ).unref();
     }
 
+    public async CloseAsync(): Promise<void> {
+        this._disposed = true;
+        await this._proxy.CloseAsync();
+    }
+
     // #endregion
 
     // #region " Internals "
+
+    private assertNotClosed(): void {
+        if (this._disposed) {
+            throw new Error('Cannot access a closed RobotAgentProxy.');
+        }
+    }
 
     private async refreshStatusCore(force: boolean = false): Promise<void> {
         try {

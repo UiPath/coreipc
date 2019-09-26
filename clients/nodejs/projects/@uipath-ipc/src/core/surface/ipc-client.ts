@@ -30,7 +30,8 @@ export class IpcClient<TService> {
             TimeSpan.fromSeconds(config.defaultCallTimeoutSeconds),
             config.callbackService,
             config.maybeConnectionFactory,
-            config.maybeBeforeCall
+            config.maybeBeforeCall,
+            config.traceNetwork
         );
 
         this.proxy = ProxyFactory.create(serviceCtor, this._broker);
@@ -49,6 +50,7 @@ export class IpcClientConfig<TService> {
     public defaultCallTimeoutSeconds: number = 40;
 
     public callbackService?: any;
+    public traceNetwork = false;
 
     protected _maybeConnectionFactory: Maybe<ConnectionFactoryDelegate> = null;
     protected _maybeBeforeCall: Maybe<BeforeCallDelegate> = null;

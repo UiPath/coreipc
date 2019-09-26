@@ -1,4 +1,4 @@
-import { IDisposable } from '../disposable/disposable';
+import { IDisposable } from '../disposable';
 import { TimeSpan } from './timespan';
 import { ArgumentNullError } from '../errors/argument-null-error';
 import { ArgumentError } from '../errors/argument-error';

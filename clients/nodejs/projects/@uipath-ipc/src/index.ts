@@ -11,7 +11,7 @@ import { Timeout } from './foundation/tasks/timeout';
 import { RemoteError } from './core/surface/remote-error';
 import { OperationCanceledError } from './foundation/errors/operation-canceled-error';
 import { Error as IpcError } from './core/internals/broker/wire-message';
-import { Trace } from './foundation/trace/trace';
+import { Trace } from './foundation/trace';
 
 export { default } from './foundation/tasks/promise-pal';
 export {

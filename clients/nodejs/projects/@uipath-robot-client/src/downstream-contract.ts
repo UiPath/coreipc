@@ -20,6 +20,8 @@ export interface IRobotAgentProxy {
     PauseJob(parameters: PauseJobParameters): Promise<void>;
     ResumeJob(parameters: ResumeJobParameters): Promise<void>;
     OpenOrchestratorSettings(): Promise<void>;
+
+    CloseAsync(): Promise<void>;
 }
 
 export interface RobotStatusChangedEventArgs {

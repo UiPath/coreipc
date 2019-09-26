@@ -1,6 +1,6 @@
 import * as blessed from 'blessed';
 import { PromiseCompletionSource } from '@uipath/ipc';
-import { IDisposable } from '@uipath/ipc/dist/foundation/disposable/disposable';
+import { IDisposable } from '../../@uipath-ipc/dist/foundation/disposable';
 
 export interface ITerminalColorSettings {
     cursor: string;
