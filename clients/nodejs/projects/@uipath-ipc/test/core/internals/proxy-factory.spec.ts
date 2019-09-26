@@ -1,10 +1,10 @@
-import '../../jest-extensions';
-import * as BrokerMessage from '../../../src/core/internals/broker/broker-message'
-import { Generator, ProxyFactory } from '../../../src/core/internals/proxy-factory';
-import { IBroker } from '../../../src/core/internals/broker/broker';
 import { IpcClient, __returns__ } from '../../../src';
+import { IBroker } from '../../../src/core/internals/broker/broker';
+import * as BrokerMessage from '../../../src/core/internals/broker/broker-message';
+import { Generator, ProxyFactory } from '../../../src/core/internals/proxy-factory';
 import { InternalIpcClientConfig } from '../../../src/core/surface/ipc-client';
 import '../../../src/foundation/tasks/promise-pal';
+import '../../jest-extensions';
 
 describe('Core-Internals-ProxyFactory', () => {
     class Integer {
