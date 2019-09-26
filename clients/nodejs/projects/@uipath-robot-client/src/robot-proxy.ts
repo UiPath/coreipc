@@ -17,7 +17,7 @@ export interface IRobotProxy {
     StartEvents(): void;
 
     StartAgentJob(parameters: UpstreamContract.StartJobParameters, ct?: CancellationToken): Promise<UpstreamContract.JobData>;
-    StopJob(parameters: UpstreamContract.StopJobParameters, ct?: CancellationToken): Promise<void>;
+    StopJob(parameters: UpstreamContract.StopJobParameters, ct?: CancellationToken): Promise<boolean>;
     PauseJob(parameters: UpstreamContract.PauseJobParameters, ct?: CancellationToken): Promise<void>;
     SubscribeToEvents(message: Message<void>): Promise<boolean>;
     ResumeJob(parameters: UpstreamContract.ResumeJobParameters, ct?: CancellationToken | undefined): Promise<void>;
@@ -31,7 +31,7 @@ export interface IRobotProxy {
 }
 
 /* @internal */
-export class RobotProxy extends UpstreamContract.IAgentOperations {
+export class RobotProxy extends UpstreamContract.IAgentOperations implements IRobotProxy {
     private static createSubject<T>(): Observer<T> & Observable<T> {
         return new Subject<T>();
     }
@@ -157,7 +157,7 @@ export class RobotProxy extends UpstreamContract.IAgentOperations {
     public StartAgentJob(parameters: UpstreamContract.StartJobParameters, ct?: CancellationToken): Promise<UpstreamContract.JobData> {
         return this.channel.StartAgentJob(parameters, ct);
     }
-    public StopJob(parameters: UpstreamContract.StopJobParameters, ct?: CancellationToken): Promise<void> {
+    public StopJob(parameters: UpstreamContract.StopJobParameters, ct?: CancellationToken): Promise<boolean> {
         return this.channel.StopJob(parameters, ct);
     }
     public PauseJob(parameters: UpstreamContract.PauseJobParameters, ct?: CancellationToken): Promise<void> {

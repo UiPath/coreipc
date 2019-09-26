@@ -147,7 +147,7 @@ export class IAgentOperations {
     public StartAgentJob(parameters: StartJobParameters, ct?: CancellationToken): Promise<JobData> { throw null; }
 
     @__hasCancellationToken__
-    public StopJob(parameters: StopJobParameters, ct?: CancellationToken): Promise<void> { throw null; }
+    public StopJob(parameters: StopJobParameters, ct?: CancellationToken): Promise<boolean> { throw null; }
 
     @__hasCancellationToken__
     public PauseJob(parameters: PauseJobParameters, ct?: CancellationToken): Promise<void> { throw null; }

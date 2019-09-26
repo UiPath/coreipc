@@ -50,184 +50,189 @@ export class Program {
         });
 
         Program.proxy = new RobotProxyConstructor();
+        try {
 
-        Program.proxy.JobCompleted.subscribe(_args => {
-            Program.terminal.writeLine(`      [{green-fg}event{/green-fg} JobCompleted] (DisplayName === ${_args.Job.DisplayName})`);
-        });
+            Program.proxy.JobCompleted.subscribe(_args => {
+                Program.terminal.writeLine(`      [{green-fg}event{/green-fg} JobCompleted] (DisplayName === ${_args.Job.DisplayName})`);
+            });
 
-        Program.proxy.JobStatusChanged.subscribe(_args => {
-            Program.terminal.writeLine(`      [{green-fg}event{/green-fg} JobStatusChanged] (DisplayName === ${_args.Job.DisplayName}, StatusText === ${_args.StatusText})`);
-        });
+            Program.proxy.JobStatusChanged.subscribe(_args => {
+                Program.terminal.writeLine(`      [{green-fg}event{/green-fg} JobStatusChanged] (DisplayName === ${_args.Job.DisplayName}, StatusText === ${_args.StatusText})`);
+            });
 
-        Program.proxy.RobotStatusChanged.subscribe(_args => {
-            function robotStatusToString(status: RobotStatus): string {
-                switch (status) {
-                    case RobotStatus.Connected: return 'Connected';
-                    case RobotStatus.Connecting: return 'Connecting';
-                    case RobotStatus.ConnectionFailed: return 'ConnectionFailed';
-                    case RobotStatus.LogInFailed: return 'LogInFailed';
-                    case RobotStatus.LoggingIn: return 'LoggingIn';
-                    case RobotStatus.Offline: return 'Offline';
-                    case RobotStatus.ServiceUnavailable: return 'ServiceUnavailable';
-                    default: return `Unexpected RobotStatus value (${status})`;
+            Program.proxy.RobotStatusChanged.subscribe(_args => {
+                function robotStatusToString(status: RobotStatus): string {
+                    switch (status) {
+                        case RobotStatus.Connected: return 'Connected';
+                        case RobotStatus.Connecting: return 'Connecting';
+                        case RobotStatus.ConnectionFailed: return 'ConnectionFailed';
+                        case RobotStatus.LogInFailed: return 'LogInFailed';
+                        case RobotStatus.LoggingIn: return 'LoggingIn';
+                        case RobotStatus.Offline: return 'Offline';
+                        case RobotStatus.ServiceUnavailable: return 'ServiceUnavailable';
+                        default: return `Unexpected RobotStatus value (${status})`;
+                    }
                 }
-            }
-            Program.terminal.writeLine(`      [{green-fg}event{/green-fg} RobotStatusChanged] (RobotStatus === ${robotStatusToString(_args.Status)}, LogInError === ${_args.LogInError})`);
-        });
+                Program.terminal.writeLine(`      [{green-fg}event{/green-fg} RobotStatusChanged] (RobotStatus === ${robotStatusToString(_args.Status)}, LogInError === ${_args.LogInError})`);
+            });
 
-        Program.proxy.ProcessListUpdated.subscribe(_args => {
-            const text = `*********  ProcessListUpdated: ${JSON.stringify(_args)}`;
-            // console.log(text);
-            Program._trace.log(text);
+            Program.proxy.ProcessListUpdated.subscribe(_args => {
+                const text = `*********  ProcessListUpdated: ${JSON.stringify(_args)}`;
+                // console.log(text);
+                Program._trace.log(text);
 
-            // Program.terminal.writeLine(text);
+                // Program.terminal.writeLine(text);
 
-            Program.terminal.writeLine(`      [{green-fg}event{/green-fg} ProcessListUpdated] (args.Processes === ${_args.Processes})`);
-            // Program.terminal.writeLine(`      [{green-fg}event{/green-fg} ProcessListUpdated] (args.Processes.length === ${_args.Processes.length})`);
+                Program.terminal.writeLine(`      [{green-fg}event{/green-fg} ProcessListUpdated] (args.Processes === ${_args.Processes})`);
+                // Program.terminal.writeLine(`      [{green-fg}event{/green-fg} ProcessListUpdated] (args.Processes.length === ${_args.Processes.length})`);
 
-            function processToString(process: LocalProcessInformation): string {
-                Program._trace.log(`LocalProcessInformation === ${JSON.stringify(process)}`);
+                function processToString(process: LocalProcessInformation): string {
+                    Program._trace.log(`LocalProcessInformation === ${JSON.stringify(process)}`);
 
-                return `name: {yellow-fg}${process.Process.Name}{/yellow-fg}
+                    return `name: {yellow-fg}${process.Process.Name}{/yellow-fg}
 Version: {yellow-fg}${process.Process.Version}{/yellow-fg}
 Key: {yellow-fg}${process.Process.Key}{/yellow-fg}
 FolderName: {yellow-fg}${process.Process.FolderName}{/yellow-fg}
 FolderPath: {yellow-fg}${process.Process.FolderPath}{/yellow-fg}
 InstallationState: {yellow-fg}${ProcessInstallationState[process.InstallationState]}{/yellow-fg}
 `;
+                }
+
+                let annex = '{green-fg}Processes:{/green-fg}\r\n=====================\r\n\r\n';
+                for (const process of _args.Processes) {
+                    annex += processToString(process);
+                    annex += '\r\n\r\n';
+                }
+
+                Program.terminal.annex = annex;
+            });
+
+            Program.proxy.RefreshStatus({
+                ForceProcessListUpdate: true
+            });
+
+            Program.help();
+            while (!Program.exitRequested) {
+                Program.command = await Program.terminal.readLine();
+                const parts = [Program.command];
+
+                switch (parts.length) {
+                    case 1:
+                        switch (parts[0].toLowerCase()) {
+                            case 'exit':
+                                Program.terminal.dispose();
+                                Program.exitRequested = true;
+                                process.exit();
+                                break;
+                            case 'help':
+                                Program.help();
+                                break;
+                            case 'env':
+                                {
+                                    for (const key in RobotConfig.data) {
+                                        if (typeof key === 'string') {
+                                            // tslint:disable-next-line: max-line-length
+                                            Program.terminal.writeLine(`     env.{green-fg}${key}{/green-fg} === {yellow-fg}${JSON.stringify((RobotConfig.data as any)[key])}{/yellow-fg}`);
+                                        }
+                                    }
+                                    Program.terminal.writeLine();
+                                }
+                                break;
+                            case 'refresh':
+                                {
+                                    Program.terminal.write('Refreshing......');
+                                    try {
+                                        Program.proxy.RefreshStatus({ ForceProcessListUpdate: true });
+                                        Program.terminal.writeLine('DONE!');
+                                    } catch (error) {
+                                        Trace.log(error);
+                                    }
+                                }
+                                break;
+                            case 'settings':
+                                {
+                                    await Program.proxy.OpenOrchestratorSettings();
+                                }
+                                break;
+                            case 'start':
+                                {
+                                    Program.terminal.writeLine(`  ProcessKey (empty string to cancel):`);
+                                    const processKey = await Program.terminal.readLine();
+                                    if (processKey) {
+                                        try {
+                                            const jobData = await Program.proxy.StartJob(new StartJobParameters(processKey));
+                                            Program.terminal.writeLine(`   DisplayName: {yellow-fg}"${jobData.DisplayName}"{/yellow-fg}`);
+                                            Program.terminal.writeLine(`   Identifier: {yellow-fg}"${jobData.Identifier}"{/yellow-fg}`);
+                                            Program.terminal.writeLine(`   ProcessData: {yellow-fg}"${JSON.stringify(jobData.Process)}"{/yellow-fg}`);
+                                        } catch (error) {
+                                            Trace.log(error);
+                                        }
+                                    }
+                                }
+                                break;
+                            case 'stop':
+                                {
+                                    Program.terminal.writeLine(`  JobIdentifier (empty string to cancel):`);
+                                    const jobIdentifier = await Program.terminal.readLine();
+                                    if (jobIdentifier) {
+                                        try {
+                                            await Program.proxy.StopJob(new StopJobParameters(jobIdentifier));
+                                            Program.terminal.writeLine('Finished without error.');
+                                        } catch (error) {
+                                            Trace.log(error);
+                                        }
+                                    }
+                                }
+                                break;
+                            case 'install':
+                                {
+                                    Program.terminal.writeLine(`  ProcessKey (empty string to cancel):`);
+                                    const processKey = await Program.terminal.readLine();
+                                    if (processKey) {
+                                        try {
+                                            await Program.proxy.InstallProcess(new InstallProcessParameters(processKey));
+                                            Program.terminal.writeLine('Finished without error.');
+                                        } catch (error) {
+                                            Trace.log(error);
+                                        }
+                                    }
+                                }
+                                break;
+                            case 'pause':
+                                {
+                                    Program.terminal.writeLine(`  JobIdentifier (empty string to cancel):`);
+                                    const jobIdentifier = await Program.terminal.readLine();
+                                    if (jobIdentifier) {
+                                        try {
+                                            await Program.proxy.PauseJob(new PauseJobParameters(jobIdentifier));
+                                            Program.terminal.writeLine('Finished without error.');
+                                        } catch (error) {
+                                            Trace.log(error);
+                                        }
+                                    }
+                                }
+                                break;
+                            case 'resume':
+                                {
+                                    Program.terminal.writeLine(`  JobIdentifier (empty string to cancel):`);
+                                    const jobIdentifier = await Program.terminal.readLine();
+                                    if (jobIdentifier) {
+                                        try {
+                                            await Program.proxy.ResumeJob(new ResumeJobParameters(jobIdentifier));
+                                            Program.terminal.writeLine('Finished without error.');
+                                        } catch (error) {
+                                            Trace.log(error);
+                                        }
+                                    }
+                                }
+                                break;
+                        }
+                        break;
+                }
             }
 
-            let annex = '{green-fg}Processes:{/green-fg}\r\n=====================\r\n\r\n';
-            for (const process of _args.Processes) {
-                annex += processToString(process);
-                annex += '\r\n\r\n';
-            }
-
-            Program.terminal.annex = annex;
-        });
-
-        Program.proxy.RefreshStatus({
-            ForceProcessListUpdate: true
-        });
-
-        Program.help();
-        while (!Program.exitRequested) {
-            Program.command = await Program.terminal.readLine();
-            const parts = [Program.command];
-
-            switch (parts.length) {
-                case 1:
-                    switch (parts[0].toLowerCase()) {
-                        case 'exit':
-                            Program.terminal.dispose();
-                            Program.exitRequested = true;
-                            process.exit();
-                            break;
-                        case 'help':
-                            Program.help();
-                            break;
-                        case 'env':
-                            {
-                                for (const key in RobotConfig.data) {
-                                    if (typeof key === 'string') {
-                                        // tslint:disable-next-line: max-line-length
-                                        Program.terminal.writeLine(`     env.{green-fg}${key}{/green-fg} === {yellow-fg}${JSON.stringify((RobotConfig.data as any)[key])}{/yellow-fg}`);
-                                    }
-                                }
-                                Program.terminal.writeLine();
-                            }
-                            break;
-                        case 'refresh':
-                            {
-                                Program.terminal.write('Refreshing......');
-                                try {
-                                    Program.proxy.RefreshStatus({ ForceProcessListUpdate: true });
-                                    Program.terminal.writeLine('DONE!');
-                                } catch (error) {
-                                    Trace.log(error);
-                                }
-                            }
-                            break;
-                        case 'settings':
-                            {
-                                await Program.proxy.OpenOrchestratorSettings();
-                            }
-                            break;
-                        case 'start':
-                            {
-                                Program.terminal.writeLine(`  ProcessKey (empty string to cancel):`);
-                                const processKey = await Program.terminal.readLine();
-                                if (processKey) {
-                                    try {
-                                        const jobData = await Program.proxy.StartJob(new StartJobParameters(processKey));
-                                        Program.terminal.writeLine(`   DisplayName: {yellow-fg}"${jobData.DisplayName}"{/yellow-fg}`);
-                                        Program.terminal.writeLine(`   Identifier: {yellow-fg}"${jobData.Identifier}"{/yellow-fg}`);
-                                        Program.terminal.writeLine(`   ProcessData: {yellow-fg}"${JSON.stringify(jobData.Process)}"{/yellow-fg}`);
-                                    } catch (error) {
-                                        Trace.log(error);
-                                    }
-                                }
-                            }
-                            break;
-                        case 'stop':
-                            {
-                                Program.terminal.writeLine(`  JobIdentifier (empty string to cancel):`);
-                                const jobIdentifier = await Program.terminal.readLine();
-                                if (jobIdentifier) {
-                                    try {
-                                        await Program.proxy.StopJob(new StopJobParameters(jobIdentifier));
-                                        Program.terminal.writeLine('Finished without error.');
-                                    } catch (error) {
-                                        Trace.log(error);
-                                    }
-                                }
-                            }
-                            break;
-                        case 'install':
-                            {
-                                Program.terminal.writeLine(`  ProcessKey (empty string to cancel):`);
-                                const processKey = await Program.terminal.readLine();
-                                if (processKey) {
-                                    try {
-                                        await Program.proxy.InstallProcess(new InstallProcessParameters(processKey));
-                                        Program.terminal.writeLine('Finished without error.');
-                                    } catch (error) {
-                                        Trace.log(error);
-                                    }
-                                }
-                            }
-                            break;
-                        case 'pause':
-                            {
-                                Program.terminal.writeLine(`  JobIdentifier (empty string to cancel):`);
-                                const jobIdentifier = await Program.terminal.readLine();
-                                if (jobIdentifier) {
-                                    try {
-                                        await Program.proxy.PauseJob(new PauseJobParameters(jobIdentifier));
-                                        Program.terminal.writeLine('Finished without error.');
-                                    } catch (error) {
-                                        Trace.log(error);
-                                    }
-                                }
-                            }
-                            break;
-                        case 'resume':
-                            {
-                                Program.terminal.writeLine(`  JobIdentifier (empty string to cancel):`);
-                                const jobIdentifier = await Program.terminal.readLine();
-                                if (jobIdentifier) {
-                                    try {
-                                        await Program.proxy.ResumeJob(new ResumeJobParameters(jobIdentifier));
-                                        Program.terminal.writeLine('Finished without error.');
-                                    } catch (error) {
-                                        Trace.log(error);
-                                    }
-                                }
-                            }
-                            break;
-                    }
-                    break;
-            }
+        } finally {
+            await Program.proxy.CloseAsync();
         }
     }
 
