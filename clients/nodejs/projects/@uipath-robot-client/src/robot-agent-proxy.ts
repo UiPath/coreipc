@@ -15,10 +15,6 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     private _initialized = false;
     private _disposed = false;
 
-    private static readonly _finished = {};
-    // tslint:disable-next-line: ban-types
-    private readonly _finishedJobs: { [identifier: string]: {} } & Object = {};
-
     private readonly _robotStatusChanged = RobotAgentProxy.createSubject<DownstreamContract.RobotStatusChangedEventArgs>();
     private readonly _processListUpdated = RobotAgentProxy.createSubject<DownstreamContract.ProcessListUpdatedArgs>();
     private readonly _jobStatusChanged = RobotAgentProxy.createSubject<UpstreamContract.JobStatusChangedEventArgs>();
@@ -33,15 +29,10 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         this._proxy.OrchestratorStatusChanged.subscribe(this.onOrchestratorStatusChanged.bind(this));
 
         this._proxy.JobCompleted.subscribe(args => {
-            this._finishedJobs[args.Job.Identifier] = RobotAgentProxy._finished;
             this._jobCompleted.next(args);
         });
 
         this._proxy.JobStatusChanged.subscribe(args => {
-            if (this._finishedJobs.hasOwnProperty(args.Job.Identifier)) {
-                Trace.log(`Would have seen "${args.StatusText}" `);
-                return;
-            }
             this._jobStatusChanged.next(args);
         });
 
