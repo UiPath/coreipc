@@ -45,6 +45,14 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
             }
             this._jobStatusChanged.next(args);
         });
+
+        this._proxy.ProcessListChanged.subscribe(async _ => {
+            try {
+                await this.refreshStatusCore();
+            } catch (error) {
+                Trace.log(error);
+            }
+        });
     }
 
     // #region " Implementation of IRobotAgentProxy "
@@ -110,10 +118,10 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         }
     }
 
-    private async refreshStatusCore(force: boolean = false): Promise<void> {
+    private async refreshStatusCore(force: boolean = false, autoStart: boolean = false): Promise<void> {
         try {
             await this.ensureLogin();
-            this.updateProcesses(force);
+            this.updateProcesses(force, autoStart);
         } catch (error) {
             Trace.log(error);
         }
@@ -129,9 +137,9 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
             }
         }
     }
-    private async updateProcesses(force: boolean = false): Promise<void> {
+    private async updateProcesses(force: boolean = false, autoStart: boolean = false): Promise<void> {
         try {
-            const parameters = new UpstreamContract.GetProcessesParameters({ ForceRefresh: force });
+            const parameters = new UpstreamContract.GetProcessesParameters({ ForceRefresh: force, AutoStart: autoStart });
             // tslint:disable-next-line: variable-name
             const Processes = await this._proxy.GetAvailableProcesses(parameters);
             this._processListUpdated.next({ Processes });
@@ -171,7 +179,10 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         if (oldStatus === UpstreamContract.OrchestratorStatus.ConnectionFailed && args.OrchestratorStatus === UpstreamContract.OrchestratorStatus.Connected) {
             return;
         }
-        this.refreshStatusCore();
+
+        const _force = false;
+        const _autoStart = args.OrchestratorStatus === UpstreamContract.OrchestratorStatus.Connected;
+        this.refreshStatusCore(_force, _autoStart);
     }
     private onLogInSessionExpired(): void {
         this.raiseRobotStatusChanged(DownstreamContract.RobotStatus.LoggingIn);

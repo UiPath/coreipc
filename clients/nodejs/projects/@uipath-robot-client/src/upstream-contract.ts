@@ -42,13 +42,16 @@ export enum JobStatus {
 
 export class GetProcessesParameters extends Message<void> {
     public ForceRefresh: boolean;
+    public AutoStart: boolean;
 
-    constructor(options?: { ForceRefresh: boolean }) {
+    constructor(options?: { ForceRefresh: boolean, AutoStart: boolean }) {
         super();
         if (options) {
             this.ForceRefresh = options.ForceRefresh;
+            this.AutoStart = options.AutoStart;
         } else {
             this.ForceRefresh = false;
+            this.AutoStart = false;
         }
     }
 }
@@ -117,6 +120,11 @@ export class LogInParameters extends Message<void> {
         public readonly ClientProcessId: number
     ) { super(); }
 }
+export class GetProjectDetailsByKeyParameters extends Message<void> {
+    constructor(
+        public readonly ProcessKey: string
+    ) { super(); }
+}
 export interface UserStatus {
     // Unsupported --->
     OrchestratorStatus: OrchestratorStatus;
@@ -137,6 +145,22 @@ export enum RobotType {
     Attended = 1,
     Unattended = 2,
     Development = 3
+}
+
+export interface ProjectDetails {
+    readonly Settings: ProjectSettings;
+    readonly Description: string;
+    readonly InputArguments: readonly InputArgument[];
+}
+export interface InputArgument {
+    readonly Name: string;
+    readonly Type: string;
+    readonly IsRequired: boolean;
+    readonly HasDefault: boolean;
+}
+
+export class ProcessListChangedEventArgs extends Message<void> {
+    constructor() { super(); }
 }
 
 export class IAgentOperations {
@@ -169,6 +193,9 @@ export class IAgentOperations {
     // IClientOperations
     @__hasCancellationToken__
     public GetUserStatus(message: Message<void>, ct?: CancellationToken): Promise<UserStatus> { throw null; }
+
+    @__hasCancellationToken__
+    public GetProjectDetailsByKey(parameters: GetProjectDetailsByKeyParameters, ct?: CancellationToken): Promise<ProjectDetails> { throw null; }
 }
 
 export interface IAgentEvents {
@@ -176,4 +203,5 @@ export interface IAgentEvents {
     OnJobStatusUpdated(args: JobStatusChangedEventArgs): Promise<void>;
     OnOrchestratorStatusChanged(args: OrchestratorStatusChangedEventArgs): Promise<void>;
     OnLogInSessionExpired(message: Message<void>): Promise<void>;
+    OnProcessListChanged(args: ProcessListChangedEventArgs): Promise<void>;
 }

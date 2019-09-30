@@ -13,6 +13,7 @@ export interface IRobotProxy {
     readonly OrchestratorStatusChanged: Observable<UpstreamContract.OrchestratorStatusChangedEventArgs>;
     readonly ServiceUnavailable: Observable<void>;
     readonly LogInSessionExpired: Observable<void>;
+    readonly ProcessListChanged: Observable<UpstreamContract.ProcessListChangedEventArgs>;
 
     StartEvents(): void;
 
@@ -41,6 +42,7 @@ export class RobotProxy extends UpstreamContract.IAgentOperations implements IRo
     private readonly _orchestratorStatusChanged = RobotProxy.createSubject<UpstreamContract.OrchestratorStatusChangedEventArgs>();
     private readonly _serviceUnavailable = RobotProxy.createSubject<void>();
     private readonly _logInSessionExpired = RobotProxy.createSubject<void>();
+    private readonly _processListChanged = RobotProxy.createSubject<UpstreamContract.ProcessListChangedEventArgs>();
 
     private readonly _ipcClient: IpcClient<UpstreamContract.IAgentOperations>;
     private get channel(): UpstreamContract.IAgentOperations { return this._ipcClient.proxy; }
@@ -61,6 +63,9 @@ export class RobotProxy extends UpstreamContract.IAgentOperations implements IRo
             }
             public async OnLogInSessionExpired(message: Message<void>): Promise<void> {
                 this._owner._logInSessionExpired.next(undefined);
+            }
+            public async OnProcessListChanged(args: UpstreamContract.ProcessListChangedEventArgs): Promise<void> {
+                this._owner._processListChanged.next(args);
             }
         }
 
@@ -143,6 +148,7 @@ export class RobotProxy extends UpstreamContract.IAgentOperations implements IRo
     public get OrchestratorStatusChanged(): Observable<UpstreamContract.OrchestratorStatusChangedEventArgs> { return this._orchestratorStatusChanged; }
     public get ServiceUnavailable(): Observable<void> { return this._serviceUnavailable; }
     public get LogInSessionExpired(): Observable<void> { return this._logInSessionExpired; }
+    public get ProcessListChanged(): Observable<UpstreamContract.ProcessListChangedEventArgs> { return this._processListChanged; }
 
     public StartEvents(): void {
         (async () => {
