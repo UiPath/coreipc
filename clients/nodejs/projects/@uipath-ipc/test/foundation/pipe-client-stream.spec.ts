@@ -3,7 +3,7 @@ import { PipeClientStream } from '../../src/foundation/pipes/pipe-client-stream'
 import { ILogicalSocket } from '../../src/foundation/pipes/logical-socket';
 import { TimeSpan } from '../../src/foundation/tasks/timespan';
 import { CancellationToken } from '../../src/foundation/tasks/cancellation-token';
-import { IDisposable } from '../../src/foundation/disposable/disposable';
+import { IDisposable } from '../../src/foundation/disposable';
 import { PromiseCompletionSource } from '../../src';
 import { ObjectDisposedError } from '../../src/foundation/errors/object-disposed-error';
 import '../../src/foundation/tasks/promise-pal';

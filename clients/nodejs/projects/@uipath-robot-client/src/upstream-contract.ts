@@ -43,15 +43,18 @@ export enum JobStatus {
 export class GetProcessesParameters extends Message<void> {
     public ForceRefresh: boolean;
     public AutoStart: boolean;
+    public AutoInstall: boolean;
 
-    constructor(options?: { ForceRefresh: boolean, AutoStart: boolean }) {
+    constructor(options?: { ForceRefresh: boolean, AutoStart: boolean, AutoInstall: boolean }) {
         super();
         if (options) {
             this.ForceRefresh = options.ForceRefresh;
             this.AutoStart = options.AutoStart;
+            this.AutoInstall = options.AutoInstall;
         } else {
             this.ForceRefresh = false;
             this.AutoStart = false;
+            this.AutoInstall = false;
         }
     }
 }
@@ -202,6 +205,5 @@ export interface IAgentEvents {
     OnJobCompleted(args: JobCompletedEventArgs): Promise<void>;
     OnJobStatusUpdated(args: JobStatusChangedEventArgs): Promise<void>;
     OnOrchestratorStatusChanged(args: OrchestratorStatusChangedEventArgs): Promise<void>;
-    OnLogInSessionExpired(message: Message<void>): Promise<void>;
     OnProcessListChanged(args: ProcessListChangedEventArgs): Promise<void>;
 }

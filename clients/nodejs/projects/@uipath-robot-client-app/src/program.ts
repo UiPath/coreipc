@@ -149,6 +149,17 @@ InstallationState: {yellow-fg}${ProcessInstallationState[process.InstallationSta
                                     }
                                 }
                                 break;
+                            case 'refreshnoforce':
+                                {
+                                    Program.terminal.write('Refreshing......');
+                                    try {
+                                        Program.proxy.RefreshStatus({ ForceProcessListUpdate: false });
+                                        Program.terminal.writeLine('DONE!');
+                                    } catch (error) {
+                                        Trace.log(error);
+                                    }
+                                }
+                                break;
                             case 'settings':
                                 {
                                     await Program.proxy.OpenOrchestratorSettings();

@@ -31,7 +31,6 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
 
         this._proxy.ServiceUnavailable.subscribe(_ => this.raiseRobotStatusChanged(DownstreamContract.RobotStatus.ServiceUnavailable));
         this._proxy.OrchestratorStatusChanged.subscribe(this.onOrchestratorStatusChanged.bind(this));
-        this._proxy.LogInSessionExpired.subscribe(this.onLogInSessionExpired.bind(this));
 
         this._proxy.JobCompleted.subscribe(args => {
             this._finishedJobs[args.Job.Identifier] = RobotAgentProxy._finished;
@@ -118,10 +117,10 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         }
     }
 
-    private async refreshStatusCore(force: boolean = false, autoStart: boolean = false): Promise<void> {
+    private async refreshStatusCore(force: boolean = false, autoStart: boolean = false, autoInstall: boolean = false): Promise<void> {
         try {
             await this.ensureLogin();
-            this.updateProcesses(force, autoStart);
+            this.updateProcesses(force, autoStart, autoInstall || force);
         } catch (error) {
             Trace.log(error);
         }
@@ -137,9 +136,9 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
             }
         }
     }
-    private async updateProcesses(force: boolean = false, autoStart: boolean = false): Promise<void> {
+    private async updateProcesses(force: boolean = false, autoStart: boolean = false, autoInstall: boolean = false): Promise<void> {
         try {
-            const parameters = new UpstreamContract.GetProcessesParameters({ ForceRefresh: force, AutoStart: autoStart });
+            const parameters = new UpstreamContract.GetProcessesParameters({ ForceRefresh: force, AutoStart: autoStart, AutoInstall: autoInstall });
             // tslint:disable-next-line: variable-name
             const Processes = await this._proxy.GetAvailableProcesses(parameters);
             this._processListUpdated.next({ Processes });
@@ -181,12 +180,8 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         }
 
         const _force = false;
-        const _autoStart = args.OrchestratorStatus === UpstreamContract.OrchestratorStatus.Connected;
-        this.refreshStatusCore(_force, _autoStart);
-    }
-    private onLogInSessionExpired(): void {
-        this.raiseRobotStatusChanged(DownstreamContract.RobotStatus.LoggingIn);
-        this.updateProcesses();
+        const _autoStartAndInstall = args.OrchestratorStatus === UpstreamContract.OrchestratorStatus.Connected;
+        this.refreshStatusCore(_force, _autoStartAndInstall, _autoStartAndInstall);
     }
 
     // #endregion

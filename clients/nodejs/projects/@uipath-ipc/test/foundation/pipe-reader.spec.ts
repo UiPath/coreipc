@@ -3,7 +3,7 @@ import { _mock_ } from '../jest-extensions';
 import { PipeReader } from '../../src/foundation/pipes/pipe-reader';
 import { ArgumentNullError } from '../../src/foundation/errors/argument-null-error';
 import { ILogicalSocket } from '../../src/foundation/pipes/logical-socket';
-import { IDisposable } from '../../src/foundation/disposable/disposable';
+import { IDisposable } from '../../src/foundation/disposable';
 import { CancellationToken, CancellationTokenSource, PromiseCompletionSource } from '../../src';
 import { OperationCanceledError } from '../../src/foundation/errors/operation-canceled-error';
 import { ObjectDisposedError } from '../../src/foundation/errors/object-disposed-error';

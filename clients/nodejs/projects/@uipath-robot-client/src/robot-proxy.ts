@@ -12,7 +12,6 @@ export interface IRobotProxy {
     readonly JobStatusChanged: Observable<UpstreamContract.JobStatusChangedEventArgs>;
     readonly OrchestratorStatusChanged: Observable<UpstreamContract.OrchestratorStatusChangedEventArgs>;
     readonly ServiceUnavailable: Observable<void>;
-    readonly LogInSessionExpired: Observable<void>;
     readonly ProcessListChanged: Observable<UpstreamContract.ProcessListChangedEventArgs>;
 
     StartEvents(): void;
@@ -41,7 +40,6 @@ export class RobotProxy extends UpstreamContract.IAgentOperations implements IRo
     private readonly _jobStatusChanged = RobotProxy.createSubject<UpstreamContract.JobStatusChangedEventArgs>();
     private readonly _orchestratorStatusChanged = RobotProxy.createSubject<UpstreamContract.OrchestratorStatusChangedEventArgs>();
     private readonly _serviceUnavailable = RobotProxy.createSubject<void>();
-    private readonly _logInSessionExpired = RobotProxy.createSubject<void>();
     private readonly _processListChanged = RobotProxy.createSubject<UpstreamContract.ProcessListChangedEventArgs>();
 
     private readonly _ipcClient: IpcClient<UpstreamContract.IAgentOperations>;
@@ -60,9 +58,6 @@ export class RobotProxy extends UpstreamContract.IAgentOperations implements IRo
             }
             public async OnOrchestratorStatusChanged(args: UpstreamContract.OrchestratorStatusChangedEventArgs): Promise<void> {
                 this._owner._orchestratorStatusChanged.next(args);
-            }
-            public async OnLogInSessionExpired(message: Message<void>): Promise<void> {
-                this._owner._logInSessionExpired.next(undefined);
             }
             public async OnProcessListChanged(args: UpstreamContract.ProcessListChangedEventArgs): Promise<void> {
                 this._owner._processListChanged.next(args);
@@ -147,7 +142,6 @@ export class RobotProxy extends UpstreamContract.IAgentOperations implements IRo
     public get JobStatusChanged(): Observable<UpstreamContract.JobStatusChangedEventArgs> { return this._jobStatusChanged; }
     public get OrchestratorStatusChanged(): Observable<UpstreamContract.OrchestratorStatusChangedEventArgs> { return this._orchestratorStatusChanged; }
     public get ServiceUnavailable(): Observable<void> { return this._serviceUnavailable; }
-    public get LogInSessionExpired(): Observable<void> { return this._logInSessionExpired; }
     public get ProcessListChanged(): Observable<UpstreamContract.ProcessListChangedEventArgs> { return this._processListChanged; }
 
     public StartEvents(): void {
