@@ -1,6 +1,6 @@
 {
     "name": "@uipath/ipc",
-    "version": "0.0.18",
+    "version": "0.0.19",
     "description": "UiPath Ipc for Nodejs",
     "main": "dist/index.js",
     "typings": "dist/index",
@@ -19,7 +19,7 @@
         "@types/node": "^12.6.8"
     },
     "devDependencies": {
-        "@uipath/test-helpers": "^0.0.18",
+        "@uipath/test-helpers": "^0.0.19",
         "@types/jest": "^22.1.4",
         "@types/node": "^12.6.8",
         "jest": "^24.8.0",
