@@ -4,7 +4,7 @@ import { MockError } from '../../jest-extensions';
 import { ArgumentNullError } from '../../../src/foundation/errors/argument-null-error';
 import { CancellationToken } from '../../../src/foundation/tasks/cancellation-token';
 import { ILogicalSocket } from '../../../src/foundation/pipes/logical-socket';
-import { IDisposable } from '../../../src/foundation/disposable/disposable';
+import { IDisposable } from '../../../src/foundation/disposable';
 import { TimeSpan } from '../../../src/foundation/tasks/timespan';
 import { __returns__ } from '../../../src/core/surface/rtti';
 import '../../../src/foundation/tasks/promise-pal';

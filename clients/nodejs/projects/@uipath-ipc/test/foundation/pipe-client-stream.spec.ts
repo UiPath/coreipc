@@ -26,7 +26,7 @@ describe('Foundation-PipeClientStream', () => {
         }
 
         let promise: Promise<PipeClientStream> | null;
-        expect(() => promise = PipeClientStream.connectAsync(() => socket, 'foo', null)).not.toThrow();
+        expect(() => promise = PipeClientStream.connectAsync(() => socket, 'foo', null, false)).not.toThrow();
         expect(promise).toBeTruthy();
 
         expect(socket.connectAsync).toHaveBeenCalledTimes(1);
@@ -54,7 +54,7 @@ describe('Foundation-PipeClientStream', () => {
         }
 
         let promise: Promise<PipeClientStream> | null;
-        expect(() => promise = PipeClientStream.connectAsync(() => socket, 'foo', null)).not.toThrow();
+        expect(() => promise = PipeClientStream.connectAsync(() => socket, 'foo', null, false)).not.toThrow();
         expect(promise).toBeTruthy();
 
         expect(socket.connectAsync).toHaveBeenCalledTimes(1);
@@ -100,7 +100,7 @@ describe('Foundation-PipeClientStream', () => {
         });
 
         const mockBuffer0 = Buffer.alloc(0);
-        const stream = await PipeClientStream.connectAsync(() => socket, 'foo', null);
+        const stream = await PipeClientStream.connectAsync(() => socket, 'foo', null, false);
         await expect(stream.writeAsync(mockBuffer0)).resolves.toBeUndefined();
 
         expect(socket.writeAsync).not.toHaveBeenCalled();

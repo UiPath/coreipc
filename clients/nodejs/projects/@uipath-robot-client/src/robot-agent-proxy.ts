@@ -59,7 +59,10 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
             this._initialized = true;
             return;
         }
-        this.refreshStatusCore(parameters.ForceProcessListUpdate);
+        this.refreshStatusCore(new UpstreamContract.GetProcessesParameters({
+            ForceRefresh: parameters.ForceProcessListUpdate,
+            AutoInstall: parameters.ForceProcessListUpdate
+        }));
     }
     public async InstallProcess(parameters: UpstreamContract.InstallProcessParameters): Promise<void> {
         this.assertNotClosed();
@@ -108,10 +111,10 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
         }
     }
 
-    private async refreshStatusCore(force: boolean = false, autoStart: boolean = false, autoInstall: boolean = false): Promise<void> {
+    private async refreshStatusCore(parameters?: UpstreamContract.GetProcessesParameters): Promise<void> {
         try {
             await this.ensureLogin();
-            this.updateProcesses(force, autoStart, autoInstall || force);
+            this.updateProcesses(parameters);
         } catch (error) {
             Trace.log(error);
         }
@@ -127,11 +130,10 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
             }
         }
     }
-    private async updateProcesses(force: boolean = false, autoStart: boolean = false, autoInstall: boolean = false): Promise<void> {
+    private async updateProcesses(parameters?: UpstreamContract.GetProcessesParameters): Promise<void> {
         try {
-            const parameters = new UpstreamContract.GetProcessesParameters({ ForceRefresh: force, AutoStart: autoStart, AutoInstall: autoInstall });
             // tslint:disable-next-line: variable-name
-            const Processes = await this._proxy.GetAvailableProcesses(parameters);
+            const Processes = await this._proxy.GetAvailableProcesses(parameters || new UpstreamContract.GetProcessesParameters());
             this._processListUpdated.next({ Processes });
         } catch (error) {
             Trace.log(error);
@@ -170,9 +172,11 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
             return;
         }
 
-        const _force = false;
-        const _autoStartAndInstall = args.OrchestratorStatus === UpstreamContract.OrchestratorStatus.Connected;
-        this.refreshStatusCore(_force, _autoStartAndInstall, _autoStartAndInstall);
+        const triggerAutomaticActions = args.OrchestratorStatus === UpstreamContract.OrchestratorStatus.Connected;
+        this.refreshStatusCore(new UpstreamContract.GetProcessesParameters({
+            AutoStart: triggerAutomaticActions,
+            AutoInstall: triggerAutomaticActions
+        }));
     }
 
     // #endregion

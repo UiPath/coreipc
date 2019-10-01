@@ -45,12 +45,12 @@ export class GetProcessesParameters extends Message<void> {
     public AutoStart: boolean;
     public AutoInstall: boolean;
 
-    constructor(options?: { ForceRefresh: boolean, AutoStart: boolean, AutoInstall: boolean }) {
+    constructor(options?: Partial<{ ForceRefresh: boolean, AutoStart: boolean, AutoInstall: boolean }>) {
         super();
         if (options) {
-            this.ForceRefresh = options.ForceRefresh;
-            this.AutoStart = options.AutoStart;
-            this.AutoInstall = options.AutoInstall;
+            this.ForceRefresh = options.ForceRefresh || false;
+            this.AutoStart = options.AutoStart || false;
+            this.AutoInstall = options.AutoInstall || false;
         } else {
             this.ForceRefresh = false;
             this.AutoStart = false;
