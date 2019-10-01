@@ -1,6 +1,6 @@
 {
     "name": "@uipath/test-helpers",
-    "version": "0.0.19",
+    "version": "0.0.20",
     "description": "UiPath Helper library for launching CSX scripts with dotnet-script",
     "main": "dist/index.js",
     "typings": "dist/index",

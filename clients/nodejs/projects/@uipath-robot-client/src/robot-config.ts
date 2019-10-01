@@ -49,7 +49,7 @@ class RobotConfigPal {
 
         const userName = this._context.environment.userName;
         const userDomain = this._context.environment.userDomain;
-        const pipeName = serviceInstalled ? 'RobotEndpoint' : `RobotEndpoint_${userDomain}\\${userName}`;
+        const pipeName = serviceInstalled ? 'RobotEndpoint' : `RobotEndpoint_${userDomain}\\${userName}`.replace('\\', '@');
 
         const maybeUserHostServiceFilePath = serviceInstalled ? undefined : NodePath.join(serviceHome, this._context.filenameUserHostService);
         const oldAgentFilePath = NodePath.join(serviceHome, myself._context.filenameOldAgent);

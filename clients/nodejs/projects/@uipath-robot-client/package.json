@@ -1,6 +1,6 @@
 {
     "name": "@uipath/robot-client",
-    "version": "0.0.19",
+    "version": "0.0.20",
     "description": "UiPath Robot Client for Nodejs",
     "main": "dist/index.js",
     "typings": "dist/index",
@@ -15,7 +15,7 @@
         "dist/**/*"
     ],
     "dependencies": {
-        "@uipath/ipc": "^0.0.19",
+        "@uipath/ipc": "^0.0.20",
         "rxjs": "6.5.2"
     },
     "pkg": {
