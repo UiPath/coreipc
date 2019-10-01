@@ -19,7 +19,6 @@
         "@types/node": "^12.6.8"
     },
     "devDependencies": {
-        "@uipath/test-helpers": "^0.0.19",
         "@types/jest": "^22.1.4",
         "@types/node": "^12.6.8",
         "jest": "^24.8.0",
