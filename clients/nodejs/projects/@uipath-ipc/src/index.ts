@@ -1,19 +1,26 @@
-import { CancellationToken } from './foundation/tasks/cancellation-token';
-import { PipeClientStream } from './foundation/pipes/pipe-client-stream';
-import './foundation/tasks/promise-pal';
-import { IpcClient } from './core/surface/ipc-client';
-import { Message } from './core/surface/message';
-import { CancellationTokenSource } from './foundation/tasks/cancellation-token-source';
-import { PromiseCompletionSource } from './foundation/tasks/promise-completion-source';
-import { __hasCancellationToken__, __returns__ } from './core/surface/rtti';
-import { TimeSpan } from './foundation/tasks/timespan';
-import { Timeout } from './foundation/tasks/timeout';
-import { RemoteError } from './core/surface/remote-error';
-import { OperationCanceledError } from './foundation/errors/operation-canceled-error';
-import { Error as IpcError } from './core/internals/broker/wire-message';
-import { Trace } from './foundation/trace';
+import './foundation/threading/promise-pal';
 
-export { default } from './foundation/tasks/promise-pal';
+import {
+    CancellationTokenSource,
+    PromiseCompletionSource,
+    CancellationToken,
+    TimeSpan,
+    Timeout
+} from '@foundation/threading';
+
+import {
+    __hasCancellationToken__, __returns__,
+    RemoteError,
+    IpcClient,
+    Message
+} from '@core/surface';
+
+import { PipeClientStream } from '@foundation/pipes';
+import { OperationCanceledError } from '@foundation/errors';
+import { WireError as IpcError } from '@core/internals';
+import { Trace } from '@foundation/utils';
+
+export { default } from '@foundation/threading/promise-pal';
 export {
     CancellationToken,
     CancellationTokenSource,

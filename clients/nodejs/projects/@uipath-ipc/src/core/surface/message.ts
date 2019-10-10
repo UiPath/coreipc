@@ -1,4 +1,4 @@
-import { TimeSpan } from '../../foundation/tasks/timespan';
+import { TimeSpan } from '@foundation/threading/timespan';
 
 // tslint:disable: variable-name
 export class Message<T> {

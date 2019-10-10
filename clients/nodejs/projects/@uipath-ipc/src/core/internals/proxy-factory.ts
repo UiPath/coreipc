@@ -1,13 +1,13 @@
 // tslint:disable: ban-types
 // tslint:disable: only-arrow-functions
 
-import * as BrokerMessage from './broker/broker-message';
-import { Broker, IBroker } from './broker/broker';
+import * as BrokerMessage from './broker-message';
+import { Broker, IBroker } from './broker';
 import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
 import { rtti } from '../surface/rtti';
-import { CancellationToken } from '../../foundation/tasks/cancellation-token';
+import { CancellationToken } from '../../foundation/threading/cancellation-token';
 import { RemoteError } from '../surface/remote-error';
-import { PublicConstructor } from '../../foundation/reflection/reflection';
+import { PublicConstructor } from '@foundation/utils';
 import { Trace, OperationCanceledError } from '../..';
 
 const symbolofMaybeProxyCtor = Symbol('maybe:ProxyFactory');
@@ -55,7 +55,7 @@ export class Generator<TService> {
         const maybeReturnCtor = maybeMethodInfo ? maybeMethodInfo.maybeReturnValueCtor : null;
         const normalizeResult = Normalizers.getResultNormalizer(maybeReturnCtor);
 
-        return async function(this: IProxy<TService>) {
+        return async function (this: IProxy<TService>) {
             const args = normalizeArgs([...arguments]);
 
             const brokerOutboundRequest = new BrokerMessage.OutboundRequest(methodName, args);
@@ -89,7 +89,7 @@ export class Generator<TService> {
     }
 
     private static createCtor<TService>(): IProxyCtor<TService> {
-        const result = function(this: IProxy<TService>, broker: Broker): void {
+        const result = function (this: IProxy<TService>, broker: Broker): void {
             this[symbolofBroker] = broker;
         } as any as IProxyCtor<TService>;
         result.prototype = {};
@@ -123,7 +123,7 @@ class Normalizers {
 
     public static getResultNormalizer<T>(maybeCtor: Function | null): (result: T) => T {
         if (maybeCtor) {
-            return function(result: T) {
+            return function (result: T) {
                 if (result) {
                     (result as any).__proto__ = maybeCtor.prototype;
                 }

@@ -1,11 +1,10 @@
-import { PublicConstructor, Method } from '../../foundation/reflection/reflection';
-import { Maybe } from '../../foundation/data-structures/maybe';
-
 // tslint:disable: only-arrow-functions
 // tslint:disable: ban-types
 // tslint:disable: class-name
 // tslint:disable: no-namespace
 // tslint:disable: no-internal-module
+
+import { PublicConstructor, Method, Maybe } from '@foundation/utils';
 
 const $classInfo = Symbol();
 const $classGetOrCreateMethod = Symbol();
@@ -17,7 +16,7 @@ export function __hasCancellationToken__(target: any, propertyKey: string, descr
     rtti.ClassInfo.get(ctor)[$classGetOrCreateMethod](propertyKey)[$hasCancellationToken] = true;
 }
 export function __returns__(returnValueCtor: PublicConstructor<unknown>) {
-    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
         const ctor: PublicConstructor<unknown> = target.constructor;
         rtti.ClassInfo.get(ctor)[$classGetOrCreateMethod](propertyKey)[$maybeReturnValueCtor] = returnValueCtor;
     };

@@ -1,0 +1,12 @@
+###
+### mocha.opts
+###
+
+--ui bdd
+--reporter mochawesome
+--reporter-options reportDir=./reports/unit/,reportTitle=Ipc,inlineAssets=true
+--require ts-node/register
+--require source-map-support/register
+--require tsconfig-paths/register
+--recursive
+test/unit/**/*.test.ts

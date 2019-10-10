@@ -1,12 +1,13 @@
-import { Quack } from '../data-structures/quack';
+import { Quack } from '../utils/quack';
 import { InvalidOperationError } from '../errors/invalid-operation-error';
 import { IAsyncDisposable, IDisposable } from '../disposable';
 import { ObjectDisposedError } from '../errors/object-disposed-error';
-import { PromiseCompletionSource } from '../tasks/promise-completion-source';
-import { CancellationTokenSource } from '../tasks/cancellation-token-source';
-import { CancellationToken } from '../tasks/cancellation-token';
+import { PromiseCompletionSource } from '../threading/promise-completion-source';
+import { CancellationTokenSource } from '../threading/cancellation-token-source';
+import { CancellationToken } from '../threading/cancellation-token';
 import { ILogicalSocket } from './logical-socket';
 import { ArgumentNullError } from '../errors/argument-null-error';
+import { Subscription } from 'rxjs';
 
 /* @internal */
 export class PipeReader implements IAsyncDisposable {
@@ -16,20 +17,21 @@ export class PipeReader implements IAsyncDisposable {
     private _currentRead: Promise<number> | null = null;
     private _cts = new CancellationTokenSource();
     private _maybeDataAvailableSignal: PromiseCompletionSource<void> | null = null;
-    private _dataListenerSubscription: IDisposable;
-    private _endListenerSubscription: IDisposable;
+    private _subscription: Subscription;
 
-    constructor(private readonly _socket: ILogicalSocket) {
-        if (!_socket) { throw new ArgumentNullError('_socket'); }
-        this._dataListenerSubscription = _socket.addDataListener(this.onData.bind(this));
-        this._endListenerSubscription = _socket.addEndListener(this.onEnd.bind(this));
+    constructor(socket: ILogicalSocket) {
+        if (!socket) { throw new ArgumentNullError('socket'); }
+        this._subscription = socket.data.subscribe({
+            next: this.onNext.bind(this),
+            complete: this.onComplete.bind(this)
+        });
     }
 
-    private onData(data: Buffer): void {
+    private onNext(data: Buffer): void {
         this._buffers.enqueue(data);
         if (this._maybeDataAvailableSignal) { this._maybeDataAvailableSignal.setResult(undefined); }
     }
-    private onEnd(): void {
+    private onComplete(): void {
         this._buffers.enqueue(null);
         if (this._maybeDataAvailableSignal) { this._maybeDataAvailableSignal.setResult(undefined); }
     }
@@ -79,8 +81,7 @@ export class PipeReader implements IAsyncDisposable {
     public async disposeAsync(): Promise<void> {
         if (!this._isDisposed) {
             this._isDisposed = true;
-            this._dataListenerSubscription.dispose();
-            this._endListenerSubscription.dispose();
+            this._subscription.unsubscribe();
             this._cts.cancel();
         }
     }

@@ -8,6 +8,15 @@
         "sourceMap": true,
         "declarationMap": true,
         "outDir": "./dist",
+        "baseUrl": ".",
+        "paths": {
+            "@core/*": [
+                "src/core/*"
+            ],
+            "@foundation/*": [
+                "src/foundation/*"
+            ],
+        },
         "strict": true,
         "downlevelIteration": true,
         "stripInternal": true,
@@ -22,6 +31,6 @@
     ],
     "exclude": [
         "node_modules",
-        "**/*.spec.ts"
+        "**/*.test.ts"
     ]
 }

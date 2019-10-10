@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /* @internal */
 export interface ISocketLike {
     connect(path: string, connectionListener?: () => void): this;

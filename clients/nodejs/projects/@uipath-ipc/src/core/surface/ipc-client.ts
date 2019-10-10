@@ -1,12 +1,9 @@
-import { ProxyFactory } from '../internals/proxy-factory';
-import { Broker, IBroker } from '../internals/broker/broker';
-import { PhysicalSocket } from '../../foundation/pipes/physical-socket-adapter';
-import { TimeSpan } from '../../foundation/tasks/timespan';
-import { ILogicalSocketFactory } from '../../foundation/pipes/logical-socket';
-import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
-import { PublicConstructor } from '../../foundation/reflection/reflection';
-import { CancellationToken, PipeClientStream } from '../..';
-import { Maybe } from '../../foundation/data-structures/maybe';
+import { ProxyFactory } from '@core/internals/proxy-factory';
+import { Broker, IBroker } from '@core/internals/broker';
+import { ArgumentNullError } from '@foundation/errors';
+import { PublicConstructor, Maybe } from '@foundation/utils';
+import { PipeClientStream, ILogicalSocketFactory, PhysicalSocket } from '@foundation/pipes';
+import { CancellationToken, TimeSpan } from '@foundation/threading';
 
 export class IpcClient<TService> {
     private readonly _broker: IBroker;

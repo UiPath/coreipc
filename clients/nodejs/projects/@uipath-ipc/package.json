@@ -7,23 +7,71 @@
     "scripts": {
         "build": "tsc",
         "build:watch": "tsc --watch",
-        "lint": "tslint --project \"./tsconfig.json\""
+        "clean:test": "npm run clean:nyc && npm run clean:reports",
+        "clean:reports": "rimraf ./reports",
+        "clean:nyc": "rimraf .nyc_output",
+        "pretest": "npm run clean:test",
+        "test": "npm run lint && npm run test:unit && npm run test:report",
+        "posttest": "nyc report --reporter=text-lcov > ./coverage.lcov",
+        "test:unit": "nyc mocha --opts ./test/unit/mocha.opts",
+        "test:report": "nyc report --reporter=html",
+        "lint": "tslint -p tsconfig.json",
+        "refreshVSToken": "vsts-npm-auth -config .npmrc"
     },
     "author": "Eduard Dumitru",
     "license": "MIT",
+    "publishConfig": {
+        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages@Local/npm/registry/",
+        "access": "public"
+    },
     "files": [
         "dist/**/*"
     ],
+    "nyc": {
+        "include": [
+            "src/**/*.ts"
+        ],
+        "extension": [
+            ".ts",
+            ".tsx"
+        ],
+        "exclude": [
+            "**/*.d.ts",
+            "**/index.ts"
+        ],
+        "report-dir": "./reports/coverage",
+        "cache": false,
+        "all": true
+    },
     "dependencies": {
         "rxjs": "6.5.2",
         "@types/node": "^12.6.8"
     },
     "devDependencies": {
-        "@types/jest": "^22.1.4",
+        "@types/chai": "4.1.7",
+        "@types/chai-spies": "1.0.0",
+        "@types/chai-as-promised": "7.1.0",
+        "@types/mocha": "5.2.6",
         "@types/node": "^12.6.8",
-        "jest": "^24.8.0",
-        "ts-jest": "^24.0.2",
-        "typescript": "^3.5.3"
+        "chai": "4.2.0",
+        "chai-spies": "1.0.0",
+        "chai-as-promised": "7.1.1",
+        "concurrently": "4.1.0",
+        "istanbul-instrumenter-loader": "3.0.1",
+        "mocha": "6.1.4",
+        "mocha-loader": "2.0.1",
+        "mochawesome": "3.1.2",
+        "nyc": "14.1.0",
+        "rimraf": "2.6.3",
+        "source-map-support": "0.5.12",
+        "ts-node": "8.4.1",
+        "tsconfig-paths": "3.8.0",
+        "tslint": "5.16.0",
+        "tslint-consistent-codestyle": "1.15.1",
+        "tslint-eslint-rules": "5.4.0",
+        "typedoc": "^0.15.0",
+        "typedoc-plugin-markdown": "1.2.0",
+        "typescript": "3.4.5"
     },
     "gitHead": "edef4e238fde99232400d5270c6f54c3f054cb10"
 }

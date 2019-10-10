@@ -148,3 +148,5 @@ Scripts/*.lock
 $ AxoCover
 .axoCover
 *.slnf
+/clients/nodejs/projects/@uipath-ipc/.nyc_output
+/clients/nodejs/projects/@uipath-ipc/reports/unit
