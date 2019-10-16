@@ -8,22 +8,17 @@ import { ArgumentError } from '../errors/argument-error';
 import { OperationCanceledError } from '../errors/operation-canceled-error';
 import { ArgumentNullError } from '@foundation/errors';
 
-function subscribe<T>(promise: Promise<T>): Promise<T> {
-    promise.then();
-    return promise;
-}
-
 class PromisePal {
-    public static readonly completedPromise = subscribe(new Promise<void>(resolve => resolve(undefined)));
+    public static readonly completedPromise = PromisePal.observe(new Promise<void>(resolve => resolve(undefined)));
 
     public static fromResult<T>(result: T): Promise<T> {
-        return subscribe(new Promise<T>((resolve, _) => resolve(result)));
+        return PromisePal.observe(new Promise<T>((resolve, _) => resolve(result)));
     }
     public static fromError<T>(error: Error): Promise<T> {
-        return subscribe(new Promise<T>((_, reject) => reject(error)));
+        return PromisePal.observe(new Promise<T>((_, reject) => reject(error)));
     }
     public static fromCanceled<T>(): Promise<T> {
-        return subscribe(new Promise<T>((_, reject) => reject(new OperationCanceledError())));
+        return PromisePal.observe(new Promise<T>((_, reject) => reject(new OperationCanceledError())));
     }
 
     public static delay(timespan: TimeSpan, cancellationToken: CancellationToken): Promise<void> {
@@ -49,6 +44,11 @@ class PromisePal {
         setTimeout(pcs.setResult.bind(pcs), 0);
         return pcs.promise;
     }
+
+    public static observe<T>(promise: Promise<T>): Promise<T> {
+        promise.then(_ => { }, _ => { });
+        return promise;
+    }
 }
 
 export { };
@@ -65,6 +65,9 @@ declare global {
         fromCanceled<T>(): Promise<T>;
 
         yield(): Promise<void>;
+    }
+    interface Promise<T> {
+        observe(): Promise<T>;
     }
 }
 
@@ -94,6 +97,10 @@ Promise.delay = function (delayOrMillisecondsDelay: TimeSpan | number, cancellat
     }
 
     return PromisePal.delay(delay, cancellationToken);
+};
+
+Promise.prototype.observe = function <T>(this: Promise<T>): Promise<T> {
+    return PromisePal.observe(this);
 };
 
 (Promise as any).completedPromise = PromisePal.completedPromise;

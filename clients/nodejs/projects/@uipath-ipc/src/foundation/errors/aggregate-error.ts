@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 export class AggregateError extends Error {
     public static readonly defaultMessage = 'One or more errors occurred.';
     public readonly errors: ReadonlyArray<Error>;

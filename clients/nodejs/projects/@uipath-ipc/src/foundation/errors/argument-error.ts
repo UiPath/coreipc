@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 export class ArgumentError extends Error {
     public static readonly defaultMessage = 'Value does not fall within the expected range.';
 

@@ -3,6 +3,7 @@
 ###
 
 --ui bdd
+--inline-diffs
 --reporter mochawesome
 --reporter-options reportDir=./reports/unit/,reportTitle=Ipc,inlineAssets=true
 --require ts-node/register

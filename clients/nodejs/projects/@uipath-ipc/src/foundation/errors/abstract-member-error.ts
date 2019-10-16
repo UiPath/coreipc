@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 export class AbstractMemberError extends Error {
     public static readonly defaultMessage = 'The member you are invoking is abstract.';
 
@@ -11,5 +13,7 @@ export class AbstractMemberError extends Error {
         }
     }
 
-    constructor(message?: string, memberName?: string) { super(AbstractMemberError.computeMessage(message, memberName)); }
+    constructor(message?: string, public readonly maybeMemberName?: string) {
+        super(AbstractMemberError.computeMessage(message, maybeMemberName));
+    }
 }

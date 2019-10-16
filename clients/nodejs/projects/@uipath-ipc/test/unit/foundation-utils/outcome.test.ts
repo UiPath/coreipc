@@ -49,7 +49,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
 
         context(`field:kind`, () => {
             it(`should equal OutcomeKind.Succeeded`, () => {
-                new Succeeded<string>('foo').kind.should.equal(OutcomeKind.Succeeded);
+                new Succeeded<string>('foo').kind.should.be.equal(OutcomeKind.Succeeded);
             });
         });
 
@@ -91,7 +91,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
             });
 
             it(`should return the inner value`, () => {
-                new Succeeded<string>('foo').result.should.equal('foo');
+                new Succeeded<string>('foo').result.should.be.equal('foo');
             });
         });
     });
@@ -137,7 +137,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
 
         context(`field:kind`, () => {
             it(`should equal OutcomeKind.Faulted`, () => {
-                new Faulted<string>(error).kind.should.equal(OutcomeKind.Faulted);
+                new Faulted<string>(error).kind.should.be.equal(OutcomeKind.Faulted);
             });
         });
 
@@ -221,7 +221,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
 
         context(`field:kind`, () => {
             it(`should equal OutcomeKind.Canceled`, () => {
-                new Canceled<string>().kind.should.equal(OutcomeKind.Canceled);
+                new Canceled<string>().kind.should.be.equal(OutcomeKind.Canceled);
             });
         });
 

@@ -104,12 +104,14 @@ export class LogicalSocket implements ILogicalSocket {
             throw new InvalidOperationError();
         }
         const pcs = new PromiseCompletionSource<void>();
-        const ctreg = cancellationToken.register(() => pcs.setCanceled());
+        const ctreg = cancellationToken.register(() => {
+            pcs.trySetCanceled();
+        });
         this._socketLike.write(buffer, maybeError => {
             if (!maybeError) {
-                pcs.setResult(undefined);
+                pcs.trySetResult(undefined);
             } else {
-                pcs.setError(maybeError);
+                pcs.trySetError(maybeError);
             }
         });
         try {

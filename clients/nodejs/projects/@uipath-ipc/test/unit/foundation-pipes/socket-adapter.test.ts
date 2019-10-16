@@ -241,10 +241,10 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
         });
 
         it(`should reject when ISocketLike connects with a delay which is greater than an eventual prescribed ct timeout`, async () => {
-            const socketLikeMock = SocketLikeMocks.createDelayedConnectingMock(10);
+            const socketLikeMock = SocketLikeMocks.createDelayedConnectingMock(20);
             const instance = new SocketAdapter(socketLikeMock);
 
-            const cts = new CancellationTokenSource(5);
+            const cts = new CancellationTokenSource(1);
             await instance.connectAsync('path', null, cts.token).
                 should.eventually.be.rejectedWith(OperationCanceledError);
         });
@@ -470,13 +470,13 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
                 })();
                 return false;
             });
-            const instance = new SocketAdapter(socketLikeMock);
 
+            const instance = new SocketAdapter(socketLikeMock);
             await instance.connectAsync('path', null, CancellationToken.none);
 
             await instance.writeAsync(Buffer.from('buffer'), CancellationToken.none).
-                should.eventually.be.rejectedWith(Error).
-                which.satisfies((x: Error) => x === error);
+                should.be.eventually.rejectedWith(Error).
+                that.is.equal(error);
         });
 
         it(`should immediately reject with OperationCanceledError when provided a ct which is already canceled`, async () => {
@@ -497,7 +497,7 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
             cts.cancel();
             const promise = instance.writeAsync(Buffer.from('buffer'), cts.token);
             const fulfilledSpy = spy(() => { });
-            promise.then(fulfilledSpy);
+            promise.then(fulfilledSpy, _ => { });
 
             await Promise.yield();
             fulfilledSpy.should.have.been.called;

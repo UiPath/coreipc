@@ -34,7 +34,7 @@ export class Response extends Base {
         // tslint:disable-next-line: variable-name
         public readonly Data: string | null,
         // tslint:disable-next-line: no-shadowed-variable tslint:disable-next-line: variable-name
-        public readonly Error: Error | null
+        public readonly Error: Error | null | undefined
     ) {
         super();
     }
@@ -49,6 +49,6 @@ export class Error {
         // tslint:disable-next-line: variable-name tslint:disable-next-line: no-shadowed-variable
         public Type: string,
         // tslint:disable-next-line: no-shadowed-variable tslint:disable-next-line: variable-name
-        public InnerError: Error | null
+        public InnerError: Error | null | undefined
     ) { }
 }

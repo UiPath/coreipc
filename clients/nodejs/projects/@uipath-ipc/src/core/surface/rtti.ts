@@ -42,8 +42,6 @@ export module rtti {
         private [$hasCancellationToken]: boolean = false;
         private [$maybeReturnValueCtor]: Maybe<PublicConstructor<unknown>>;
 
-        public get method(): Method { return this.declaringClass.prototype[this.name]; }
-
         public get hasCancellationToken(): boolean { return this[$hasCancellationToken]; }
         public get maybeReturnValueCtor(): Maybe<PublicConstructor<unknown>> { return this[$maybeReturnValueCtor] || null; }
 

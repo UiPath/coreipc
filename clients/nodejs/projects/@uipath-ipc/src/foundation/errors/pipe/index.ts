@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 import { PipeError } from './pipe-error';
 import { PipeBrokenError } from './pipe-broken-error';
 import { PipeBusyError } from './pipe-busy-error';

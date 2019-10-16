@@ -34,9 +34,7 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
 
     const _timeSpans = [
         TimeSpan.fromMilliseconds(0),
-        TimeSpan.fromMilliseconds(100),
-        TimeSpan.fromMilliseconds(200),
-        TimeSpan.fromMilliseconds(300)
+        TimeSpan.fromMilliseconds(20)
     ];
 
     it(`should cause the callback's execution`, async () => {
@@ -50,7 +48,7 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
                 await Promise.yield();
                 expect(spyHandler).not.to.have.been.called();
 
-                await Promise.delay(timeSpan.totalMilliseconds / 20);
+                await Promise.delay(timeSpan.totalMilliseconds / 10);
                 expect(spyHandler).not.to.have.been.called();
             }
 

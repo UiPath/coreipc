@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 export class ObjectDisposedError extends Error {
     private static readonly defaultMessage = 'Cannot access a disposed object.';
 

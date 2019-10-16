@@ -1,4 +1,5 @@
 import { TimeSpan } from '@foundation/threading/timespan';
+import { ArgumentError } from '@foundation/errors';
 
 // tslint:disable: variable-name
 export class Message<T> {
@@ -15,12 +16,23 @@ export class Message<T> {
             this.RequestTimeout = null;
         } else if (maybePayloadOrRequestTimeout instanceof TimeSpan && maybeRequestTimeout === undefined) {
             this.Payload = undefined;
+            if (maybePayloadOrRequestTimeout.isNegative) {
+                throw new ArgumentError('Expecting a non-negative requestTimeout.', 'requestTimeout');
+            }
             this.RequestTimeout = maybePayloadOrRequestTimeout;
         } else {
             /* istanbul ignore else */
             if (!(maybePayloadOrRequestTimeout instanceof TimeSpan)) {
                 this.Payload = maybePayloadOrRequestTimeout as T;
-                this.RequestTimeout = maybeRequestTimeout || null;
+
+                if (maybeRequestTimeout) {
+                    if (maybeRequestTimeout.isNegative) {
+                        throw new ArgumentError('Expecting a non-negative requestTimeout.', 'requestTimeout');
+                    }
+                    this.RequestTimeout = maybeRequestTimeout;
+                } else {
+                    this.RequestTimeout = null;
+                }
             } else {
                 this.Payload = undefined;
                 this.RequestTimeout = null;

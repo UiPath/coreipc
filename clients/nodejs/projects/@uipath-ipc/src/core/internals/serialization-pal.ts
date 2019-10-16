@@ -5,6 +5,7 @@ import { CancellationToken, CancellationTokenSource, Trace } from '../..';
 import { ArgumentError } from '../../foundation/errors/argument-error';
 import { TimeSpan } from '../../foundation/threading/timespan';
 import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
+import { IDisposable } from '@foundation/disposable';
 
 /* @internal */
 export class SerializationPal {
@@ -18,23 +19,32 @@ export class SerializationPal {
     private static deserializeObject(json: string): any {
         return JSON.parse(json);
     }
-    private static serializeError(maybeError: Error | null): WireMessage.Error | null {
-        return maybeError
-            ? new WireMessage.Error(
-                maybeError.message,
-                maybeError.stack || '',
-                maybeError.name,
-                this.serializeError((maybeError as any).inner as Error | null))
-            : null;
+    private static serializeError(maybeError: Error | null | undefined): WireMessage.Error | null | undefined {
+        return (undefined === maybeError) ?
+            undefined :
+            (null === maybeError) ?
+                null :
+                new WireMessage.Error(
+                    maybeError.message,
+                    maybeError.stack || '',
+                    maybeError.name,
+                    this.serializeError((maybeError as any).inner as Error | null));
     }
-    private static deserializeError(maybeError: WireMessage.Error | null): Error | null {
-        let result: Error | null = null;
+    private static deserializeError(maybeError: WireMessage.Error | null | undefined): Error | null | undefined {
+        let result: Error | null | undefined;
 
-        if (maybeError) {
+        if (maybeError === undefined) {
+            result = undefined;
+        } else if (maybeError === null) {
+            result = null;
+        } else {
             result = new Error(maybeError.Message);
             result.name = maybeError.Type;
             result.stack = maybeError.StackTrace;
-            (result as any).inner = this.deserializeError(maybeError.InnerError);
+            const inner = this.deserializeError(maybeError.InnerError);
+            if (inner !== undefined) {
+                (result as any).inner = inner;
+            }
         }
 
         return result;
@@ -108,21 +118,24 @@ export class SerializationPal {
         return buffer;
     }
 
-    public static extract(request: BrokerMessage.Request, defaultTimeout: TimeSpan): {
+    public static extract(request: BrokerMessage.OutboundRequest, defaultTimeout: TimeSpan): {
         serializedArgs: string[],
         timeoutSeconds: number,
-        cancellationToken: CancellationToken
+        cancellationToken: CancellationToken,
+        disposable: IDisposable
     } {
         if (!request) { throw new ArgumentNullError('request'); }
         if (!defaultTimeout) { throw new ArgumentNullError('defaultTimeout'); }
+        if (defaultTimeout.isNegative) { throw new ArgumentError('Expecting a non-negative TimeSpan.', 'defaultTimeout'); }
 
         return SerializationPal.extractUnchecked(request, defaultTimeout);
     }
 
-    private static extractUnchecked(request: BrokerMessage.Request, defaultTimeout: TimeSpan): {
+    private static extractUnchecked(request: BrokerMessage.OutboundRequest, defaultTimeout: TimeSpan): {
         serializedArgs: string[],
         timeoutSeconds: number,
-        cancellationToken: CancellationToken
+        cancellationToken: CancellationToken,
+        disposable: IDisposable
     } {
         let timeoutSeconds = defaultTimeout.totalSeconds;
         let cancellationToken = CancellationToken.none;
@@ -149,15 +162,15 @@ export class SerializationPal {
         const linkedToken = CancellationToken.merge(ctsTimeout.token, cancellationToken);
         cancellationToken.register(ctsTimeout.dispose.bind(ctsTimeout));
 
-        return { serializedArgs, timeoutSeconds, cancellationToken: linkedToken };
+        return { serializedArgs, timeoutSeconds, cancellationToken: linkedToken, disposable: ctsTimeout };
     }
 
-    public static serializeRequest(id: string, methodName: string, serializedArgs: string[], timeoutSeconds: number, cancellationToken: CancellationToken): Buffer {
+    public static serializeRequest(id: string, methodName: string, serializedArgs: string[], timeoutSeconds: number): Buffer {
         if (!id) { throw new ArgumentNullError('id'); }
         if (!methodName) { throw new ArgumentNullError('methodName'); }
         if (!serializedArgs) { throw new ArgumentNullError('serializedArgs'); }
-        if (!timeoutSeconds) { throw new ArgumentNullError('timeoutSeconds'); }
-        if (!cancellationToken) { throw new ArgumentNullError('cancellationToken'); }
+        if (timeoutSeconds == null) { throw new ArgumentNullError('timeoutSeconds'); }
+        if (timeoutSeconds < 0) { throw new ArgumentError('Expecting a non-negative value for timeoutSeconds.', 'timeoutSeconds'); }
 
         const wireRequest = new WireMessage.Request(
             timeoutSeconds,

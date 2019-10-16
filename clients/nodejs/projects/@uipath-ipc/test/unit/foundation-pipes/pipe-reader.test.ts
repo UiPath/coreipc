@@ -47,11 +47,11 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
         it(`shouldn't throw provided falsy args (because it should return a Promise which will eventually reject)`, async () => {
             const pipeReader = new PipeReader(new SocketAdapter(SocketLikeMocks.createImmediatelyConnectingMock()));
 
-            (() => pipeReader.readPartiallyAsync(null as any, CancellationToken.none)).should.not.throw();
-            (() => pipeReader.readPartiallyAsync(undefined as any, CancellationToken.none)).should.not.throw();
+            (() => pipeReader.readPartiallyAsync(null as any, CancellationToken.none).observe()).should.not.throw();
+            (() => pipeReader.readPartiallyAsync(undefined as any, CancellationToken.none).observe()).should.not.throw();
 
-            (() => pipeReader.readPartiallyAsync(Buffer.from('buffer'), null as any)).should.not.throw();
-            (() => pipeReader.readPartiallyAsync(Buffer.from('buffer'), undefined as any)).should.not.throw();
+            (() => pipeReader.readPartiallyAsync(Buffer.from('buffer'), null as any).observe()).should.not.throw();
+            (() => pipeReader.readPartiallyAsync(Buffer.from('buffer'), undefined as any).observe()).should.not.throw();
         });
 
         it(`should be rejected with ArgumentNullError provided falsy args`, async () => {

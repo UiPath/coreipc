@@ -7,11 +7,14 @@ import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
 import { rtti } from '../surface/rtti';
 import { CancellationToken } from '../../foundation/threading/cancellation-token';
 import { RemoteError } from '../surface/remote-error';
-import { PublicConstructor } from '@foundation/utils';
+import { PublicConstructor, ITraceCategory } from '@foundation/utils';
 import { Trace, OperationCanceledError } from '../..';
+import { AggregateError } from '@foundation/errors';
 
 const symbolofMaybeProxyCtor = Symbol('maybe:ProxyFactory');
-const symbolofBroker = Symbol('broker');
+
+/* @internal */
+export const symbolofBroker = Symbol('broker');
 
 interface IProxyCtor<TService> {
     new(broker: IBroker): TService;
@@ -28,15 +31,19 @@ type IMethod = (...args: any[]) => any;
 /* @internal */
 export class Generator<TService> {
     public static generate<TService>(sampleCtor: PublicConstructor<TService>): IProxyCtor<TService> {
+        if (!sampleCtor) { throw new ArgumentNullError('sampleCtor'); }
+
         const instance = new Generator<TService>(sampleCtor);
         instance.run();
         return instance._generatedCtor;
     }
 
     private readonly _generatedCtor: IProxyCtor<TService>;
+    private readonly _traceCategory: ITraceCategory;
 
     constructor(private readonly _sampleCtor: PublicConstructor<TService>) {
         this._generatedCtor = Generator.createCtor<TService>();
+        this._traceCategory = Trace.category(`generated-proxy(${_sampleCtor})`);
     }
 
     private run(): void {
@@ -55,6 +62,8 @@ export class Generator<TService> {
         const maybeReturnCtor = maybeMethodInfo ? maybeMethodInfo.maybeReturnValueCtor : null;
         const normalizeResult = Normalizers.getResultNormalizer(maybeReturnCtor);
 
+        const traceCategory = this._traceCategory;
+
         return async function (this: IProxy<TService>) {
             const args = normalizeArgs([...arguments]);
 
@@ -71,11 +80,12 @@ export class Generator<TService> {
                     return normalizeResult(brokerResponse.maybeResult);
                 }
             } catch (error) {
-                Trace.log(`GeneratedProxy: error === ${JSON.stringify(error)}`);
-                if (error instanceof OperationCanceledError) {
+                traceCategory.log(`caught error ${JSON.stringify(error)}`);
+
+                if (error instanceof OperationCanceledError || error instanceof RemoteError) {
                     throw error;
                 } else {
-                    throw new RemoteError(error, methodName);
+                    throw new AggregateError(`An error was caught while trying to issue a remote procedure call.\r\nMethod name: ${methodName}`, error);
                 }
             }
         };
@@ -85,7 +95,11 @@ export class Generator<TService> {
         return Reflect.ownKeys(this._sampleCtor.prototype).filter(this.refersToAMethod.bind(this));
     }
     public refersToAMethod(key: string | number | symbol): key is string {
-        return typeof key === 'string' && typeof this._sampleCtor.prototype[key] === 'function' && this._sampleCtor !== this._sampleCtor.prototype[key];
+        try {
+            return typeof key === 'string' && typeof this._sampleCtor.prototype[key] === 'function' && this._sampleCtor !== this._sampleCtor.prototype[key];
+        } catch (error) {
+            return false;
+        }
     }
 
     private static createCtor<TService>(): IProxyCtor<TService> {
@@ -144,9 +158,9 @@ export class ProxyFactory {
         sampleCtor: PublicConstructor<TService>,
         broker: IBroker
     ): TService {
-        if (!sampleCtor) {
-            throw new ArgumentNullError('sampleInstance');
-        }
+        if (!sampleCtor) { throw new ArgumentNullError('sampleCtor'); }
+        if (!broker) { throw new ArgumentNullError('broker'); }
+
         const sampleProto = sampleCtor.prototype;
 
         const ownKeys = Reflect.ownKeys(sampleProto);

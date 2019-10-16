@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 import { PipeError } from './pipe-error';
 
 export class PipeNotFoundError extends PipeError {

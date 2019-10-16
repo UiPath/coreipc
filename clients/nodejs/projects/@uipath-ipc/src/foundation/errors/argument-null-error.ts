@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 export class ArgumentNullError extends Error {
     public static readonly defaultMessage = 'Value cannot be null.';
 

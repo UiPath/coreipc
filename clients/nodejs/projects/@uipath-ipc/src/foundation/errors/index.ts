@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 import { AbstractMemberError } from './abstract-member-error';
 import { AggregateError } from './aggregate-error';
 import { ArgumentError } from './argument-error';

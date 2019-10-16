@@ -196,8 +196,7 @@ export class Broker implements IBroker, IAsyncDisposable {
             context.id,
             brokerRequest.methodName,
             tuple1.serializedArgs,
-            tuple1.timeoutSeconds,
-            tuple1.cancellationToken
+            tuple1.timeoutSeconds
         );
         await this.sendBufferAsync(brokerRequest.methodName, buffer, tuple1.cancellationToken);
 

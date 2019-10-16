@@ -133,7 +133,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             await Promise.yield();
 
             fulfilledSpy.should.have.been.called.with(1);
-            destination.readInt8(0).should.equal(100);
+            destination.readInt8(0).should.be.equal(100);
         });
 
         it(`should be fulfilled when some data was already available in the underlying ILogicalSocket`, async () => {

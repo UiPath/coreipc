@@ -32,7 +32,7 @@ export class OutboundRequest extends Request {
 export class Response extends Base {
     constructor(
         public readonly maybeResult: any,
-        public readonly maybeError: Error | null
+        public readonly maybeError: Error | null | undefined
     ) {
         super();
     }
