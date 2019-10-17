@@ -168,7 +168,7 @@ describe(`foundation:threading -> class:PromisePal`, () => {
             }
         });
 
-        it(`should return a Promise which surely resolves in double the provided time`, async () => {
+        it(`should return a Promise which resolves in at most double the provided time`, async () => {
             for (const _case of _cases) {
                 const promise = Promise.delay(_case.arg);
                 const handler = spy(() => { });

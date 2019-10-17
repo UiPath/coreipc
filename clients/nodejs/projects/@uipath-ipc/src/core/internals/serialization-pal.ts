@@ -55,7 +55,7 @@ export class SerializationPal {
     public static fromJson(json: string, type: WireMessage.Type): WireMessage.Request | WireMessage.Response;
     public static fromJson(json: string, type: WireMessage.Type): WireMessage.Request | WireMessage.Response {
         if (!json) { throw new ArgumentNullError('json'); }
-        if (type === null || type === undefined) { throw new ArgumentNullError('type'); }
+        if (type == null) { throw new ArgumentNullError('type'); }
 
         switch (type) {
             default:

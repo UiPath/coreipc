@@ -39,6 +39,10 @@ describe(`core:internals -> class:SerializationPal`, () => {
         (error as any).inner = inner;
         return error;
     }
+    function setStackUndefined(error: Error): Error {
+        error.stack = undefined;
+        return error;
+    }
 
     const _erroneousResultCases = [
         {
@@ -117,6 +121,22 @@ describe(`core:internals -> class:SerializationPal`, () => {
                 inner.should.be.instanceOf(Error);
                 inner.name.should.be.equal('Error');
                 inner.message.should.be.equal('child');
+            }
+        },
+        {
+            error: setStackUndefined(new Error('root')),
+            assert(x: NonNullable2<WireMessage.Error>) {
+                expect(x.Type).not.to.be.null.and.not.to.be.undefined;
+                expect(x.InnerError).to.be.oneOf([null, undefined]);
+
+                x.Type.should.be.equal('Error');
+                x.Message.should.be.equal('root');
+            },
+            assert2(x: Error) {
+                x.should.be.instanceOf(Error);
+                x.name.should.be.equal('Error');
+                x.message.should.be.equal('root');
+                x.should.not.have.property('inner');
             }
         }
     ];
@@ -438,6 +458,54 @@ describe(`core:internals -> class:SerializationPal`, () => {
     context(`method:deserializeRequest`, () => {
         it(`should throw provided a falsy wireRequest`, () => {
             (() => SerializationPal.deserializeRequest(null as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'wireRequest');
+        });
+
+        it(`shouldn't throw provided a valid wireRequest`, () => {
+            const wireRequest = new WireMessage.Request(1, 'id', 'methodName', []);
+            (() => SerializationPal.deserializeRequest(wireRequest)).should.not.throw();
+        });
+    });
+
+    context(`method:fromJson`, () => {
+        it(`should throw provided a falsy json`, () => {
+            (() => SerializationPal.fromJson(null as any, WireMessage.Type.Request)).should.throw(ArgumentNullError).with.property('maybeParamName', 'json');
+            (() => SerializationPal.fromJson(undefined as any, WireMessage.Type.Request)).should.throw(ArgumentNullError).with.property('maybeParamName', 'json');
+            (() => SerializationPal.fromJson('', WireMessage.Type.Request)).should.throw(ArgumentNullError).with.property('maybeParamName', 'json');
+        });
+
+        it(`should throw provided a falsy type`, () => {
+            const wireRequest = new WireMessage.Request(1, 'id', 'methodName', []);
+            (() => SerializationPal.fromJson('{}', null as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'type');
+            (() => SerializationPal.fromJson('{}', undefined as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'type');
+        });
+
+        it(`should throw provided a type different from WireMessage.Type.Request or WireMessage.Type.Response`, () => {
+            (() => SerializationPal.fromJson('{}', 2 as any)).should.throw(ArgumentError).with.property('maybeParamName', 'type');
+        });
+
+        it(`should deserialize to a WireMessage.Request provided a type of WireMessage.Type.Request`, () => {
+            SerializationPal.fromJson('{}', WireMessage.Type.Request).should.be.instanceOf(WireMessage.Request);
+        });
+
+        it(`should deserialize to a WireMessage.Response provided a type of WireMessage.Type.Response`, () => {
+            SerializationPal.fromJson('{}', WireMessage.Type.Response).should.be.instanceOf(WireMessage.Response);
+        });
+
+        it(`should deserialize any error in the error linked list to WireMessage.Error`, () => {
+            const obj = {
+                Error: {
+                    InnerError: {
+                        InnerError: {
+                        }
+                    }
+                }
+            };
+            const json = JSON.stringify(obj);
+
+            const obj2 = SerializationPal.fromJson(json, WireMessage.Type.Response) as any;
+            expect(obj2.Error).to.be.instanceOf(WireMessage.Error);
+            expect(obj2.Error.InnerError).to.be.instanceOf(WireMessage.Error);
+            expect(obj2.Error.InnerError.InnerError).to.be.instanceOf(WireMessage.Error);
         });
     });
 });

@@ -8,7 +8,15 @@ import { PipeBrokenError } from '../errors/pipe/pipe-broken-error';
 import { Trace } from '@foundation/utils';
 import { ArgumentNullError } from '@foundation/errors';
 
-export class PipeClientStream implements IAsyncDisposable {
+/* @internal */
+export interface IPipeClientStream {
+    writeAsync(buffer: Buffer, cancellationToken: CancellationToken): Promise<void>;
+    readAsync(destination: Buffer, cancellationToken: CancellationToken): Promise<void>;
+    disposeAsync(): Promise<void>;
+}
+
+/* @internal */
+export class PipeClientStream implements IPipeClientStream, IAsyncDisposable {
     private static readonly _traceWrite = Trace.category('io:write');
     private static readonly _traceRead = Trace.category('io:read');
 

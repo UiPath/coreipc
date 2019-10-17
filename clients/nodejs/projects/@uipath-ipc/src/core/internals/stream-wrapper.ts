@@ -1,25 +1,44 @@
-import * as WireMessage from './wire-message';
 import { Observable, ReplaySubject } from 'rxjs';
-import { PipeClientStream, CancellationToken } from '../..';
+
+import { IPipeClientStream } from '@foundation/pipes';
+import { CancellationTokenSource, CancellationToken } from '@foundation/threading';
+import { IAsyncDisposable } from '@foundation/disposable';
+import { ArgumentNullError } from '@foundation/errors';
+
+import * as WireMessage from './wire-message';
 import { SerializationPal } from './serialization-pal';
-import { CancellationTokenSource } from '../../foundation/threading/cancellation-token-source';
-import { IAsyncDisposable } from '../../foundation/disposable';
 import { MessageEvent } from './message-event';
 
 /* @internal */
 export class StreamWrapper implements IAsyncDisposable {
     private readonly _messages = new ReplaySubject<MessageEvent>();
-    public get messages(): Observable<MessageEvent> { return this._messages; }
     private readonly _readIndefinitelyCts = new CancellationTokenSource();
     private readonly _readIndefinitelyPromise: Promise<void>;
     private readonly _headerBuffer = Buffer.alloc(5);
 
     private _isConnected = true;
+
+    public get messages(): Observable<MessageEvent> { return this._messages; }
     public get isConnected(): boolean { return this._isConnected; }
 
-    constructor(public readonly stream: PipeClientStream) {
+    constructor(public readonly stream: IPipeClientStream) {
+        if (!stream) { throw new ArgumentNullError('stream'); }
+
         this._readIndefinitelyPromise = this.readIndefinitelyAsync(this._readIndefinitelyCts.token);
     }
+
+    public async disposeAsync(): Promise<void> {
+        await this.stream.disposeAsync();
+
+        this._messages.complete();
+
+        this._readIndefinitelyCts.cancel(false);
+        try {
+            await this._readIndefinitelyPromise;
+        } catch (error) {
+        }
+    }
+
     private async readIndefinitelyAsync(token: CancellationToken): Promise<void> {
         try {
             while (!token.isCancellationRequested) {
@@ -30,6 +49,7 @@ export class StreamWrapper implements IAsyncDisposable {
             this._isConnected = false;
         }
     }
+
     private async readMessageAsync(token: CancellationToken): Promise<WireMessage.Request | WireMessage.Response> {
         await this.stream.readAsync(this._headerBuffer, token);
         const type = this._headerBuffer.readUInt8(0) as WireMessage.Type;
@@ -41,18 +61,5 @@ export class StreamWrapper implements IAsyncDisposable {
         const json = bytes.toString('utf8');
         const message = SerializationPal.fromJson(json, type);
         return message;
-    }
-    public async disposeAsync(): Promise<void> {
-        await this.stream.disposeAsync();
-
-        this._messages.complete();
-
-        this._readIndefinitelyCts.cancel(false);
-        try {
-
-            await this._readIndefinitelyPromise;
-        } catch (error) {
-            /* */
-        }
     }
 }
