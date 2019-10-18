@@ -183,7 +183,7 @@ describe(`foundation:threading -> class:CancellationTokenSource`, () => {
                     cts.token.register(spyHandler);
 
                     cts.cancel(arg);
-                    expect(spyHandler).to.have.been.called;
+                    expect(spyHandler).to.have.been.called();
 
                     cts.cancel(arg);
                     expect(spyHandler).not.to.have.been.called.twice;

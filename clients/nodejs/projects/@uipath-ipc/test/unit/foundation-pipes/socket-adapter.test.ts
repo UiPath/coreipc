@@ -342,7 +342,7 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
 
             instance.dispose();
 
-            completeSpy.should.have.been.called;
+            completeSpy.should.have.been.called();
         });
 
         it(`should return an observable which notifies new observers about completion if the SocketAdapter was already disposed`, async () => {
@@ -356,7 +356,7 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
                 complete: completeSpy
             });
 
-            completeSpy.should.have.been.called;
+            completeSpy.should.have.been.called();
         });
 
         it(`should return an observable which completes when the underlying ISocketLike emits end`, () => {
@@ -370,7 +370,7 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
 
             mock.emitEnd();
 
-            completeSpy.should.have.been.called;
+            completeSpy.should.have.been.called();
         });
 
         it(`should return an observable which notifies new observers about completion if the underlying ISocketLike had already emitted end`, async () => {
@@ -384,7 +384,7 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
                 complete: completeSpy
             });
 
-            completeSpy.should.have.been.called;
+            completeSpy.should.have.been.called();
         });
 
         it(`should return an observable which notifies observers about buffers emitted by the underlying ISocketLike`, async () => {
@@ -479,7 +479,7 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
                 that.is.equal(error);
         });
 
-        it(`should immediately reject with OperationCanceledError when provided a ct which is already canceled`, async () => {
+        it(`should immediately reject with OperationCanceledError when provided an already canceled ct`, async () => {
             const socketLikeMock = SocketLikeMocks.createWritableMock();
             (socketLikeMock as any).write = spy((_buffer: Uint8Array | string, cb?: (err?: Error) => void): boolean => {
                 expect(cb).not.to.be.null;
@@ -496,11 +496,16 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
             const cts = new CancellationTokenSource();
             cts.cancel();
             const promise = instance.writeAsync(Buffer.from('buffer'), cts.token);
-            const fulfilledSpy = spy(() => { });
-            promise.then(fulfilledSpy, _ => { });
+            const rejectedSpy = spy((reason: any) => {
+                expect(reason).to.be.instanceOf(OperationCanceledError);
+            });
+            promise.then(
+                _ => { },
+                rejectedSpy
+            );
 
             await Promise.yield();
-            fulfilledSpy.should.have.been.called;
+            rejectedSpy.should.have.been.called();
         });
     });
 });

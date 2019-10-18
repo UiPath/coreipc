@@ -7,7 +7,7 @@ import { CancellationTokenSource } from '../../foundation/threading/cancellation
 import { IAsyncDisposable } from '../../foundation/disposable';
 import { ArgumentError } from '../../foundation/errors/argument-error';
 import { InvalidOperationError } from '../../foundation/errors/invalid-operation-error';
-import { StreamWrapper } from './stream-wrapper';
+import { MessageStream, IMessageStream } from './message-stream';
 import { MessageEvent } from './message-event';
 import { Succeeded } from '@foundation/utils';
 import { ILogicalSocketFactory } from '../../foundation/pipes/logical-socket';
@@ -30,7 +30,7 @@ export class Broker implements IBroker, IAsyncDisposable {
     private _isDisposed = false;
     private readonly _cts = new CancellationTokenSource();
 
-    private _maybeWrapper: StreamWrapper | null = null;
+    private _maybeMessageStream: MessageStream | null = null;
     private readonly _calls = new CallContextTable();
 
     private _newConnection = true;
@@ -55,13 +55,13 @@ export class Broker implements IBroker, IAsyncDisposable {
         if (!_defaultCallTimeout) { throw new ArgumentNullError('_defaultCallTimeout'); }
     }
 
-    private async getOrCreateWrapperAsync(cancellationToken: CancellationToken): Promise<StreamWrapper> {
-        if (!this._maybeWrapper) {
-            const wrapper = new StreamWrapper(await this.connectAsync(cancellationToken));
-            wrapper.messages.subscribe(this.processInboundAsync.bind(this));
-            this._maybeWrapper = wrapper;
+    private async getOrCreateMessageStreamAsync(cancellationToken: CancellationToken): Promise<IMessageStream> {
+        if (!this._maybeMessageStream) {
+            const messageStream = new MessageStream(await this.connectAsync(cancellationToken));
+            messageStream.messages.subscribe(this.processInboundAsync.bind(this));
+            this._maybeMessageStream = messageStream;
         }
-        return this._maybeWrapper;
+        return this._maybeMessageStream;
     }
     private async connectAsync(cancellationToken: CancellationToken): Promise<PipeClientStream> {
         Trace.log(`Connecting to "${this._pipeName}"`);
@@ -113,7 +113,7 @@ export class Broker implements IBroker, IAsyncDisposable {
                 async brokerResponse => {
                     const buffer = SerializationPal.serializeResponse(brokerResponse, tuple.id);
                     try {
-                        await event.sender.stream.writeAsync(buffer, this._cts.token);
+                        await event.messageStream.writeAsync(buffer, this._cts.token);
                     } catch (error) {
                         Trace.log(error);
                     }
@@ -175,12 +175,12 @@ export class Broker implements IBroker, IAsyncDisposable {
     }
 
     private async ensureConnectedAsync(cancellationToken: CancellationToken): Promise<void> {
-        if (!this._maybeWrapper || !this._maybeWrapper.isConnected) {
-            if (this._maybeWrapper) {
-                await this._maybeWrapper.disposeAsync();
-                this._maybeWrapper = null;
+        if (!this._maybeMessageStream || !this._maybeMessageStream.isConnected) {
+            if (this._maybeMessageStream) {
+                await this._maybeMessageStream.disposeAsync();
+                this._maybeMessageStream = null;
             }
-            await this.getOrCreateWrapperAsync(cancellationToken);
+            await this.getOrCreateMessageStreamAsync(cancellationToken);
         }
     }
 
@@ -206,9 +206,9 @@ export class Broker implements IBroker, IAsyncDisposable {
     private async sendBufferAsync(methodName: string, buffer: Buffer, cancellationToken: CancellationToken): Promise<void> {
         let fulfilled = false;
         while (!fulfilled) {
-            let wrapper: StreamWrapper = null as any;
+            let messageStream: IMessageStream = null as any;
             try {
-                wrapper = await this.getOrCreateWrapperAsync(cancellationToken);
+                messageStream = await this.getOrCreateMessageStreamAsync(cancellationToken);
             } catch (error) {
                 Trace.log(`Broker.sendBufferAsync: Failed to obtain a StreamWrapper`);
                 Trace.log(error);
@@ -225,11 +225,11 @@ export class Broker implements IBroker, IAsyncDisposable {
                     this._newConnection = false;
                     this._insideBeforeCall = false;
                 }
-                await wrapper.stream.writeAsync(buffer, cancellationToken);
+                await messageStream.writeAsync(buffer, cancellationToken);
                 fulfilled = true;
             } catch (error) {
-                await wrapper.disposeAsync();
-                this._maybeWrapper = null;
+                await messageStream.disposeAsync();
+                this._maybeMessageStream = null;
             }
         }
     }
@@ -240,8 +240,8 @@ export class Broker implements IBroker, IAsyncDisposable {
 
             this._cts.cancel();
 
-            if (this._maybeWrapper) {
-                await this._maybeWrapper.disposeAsync();
+            if (this._maybeMessageStream) {
+                await this._maybeMessageStream.disposeAsync();
             }
 
             for (const promise of this._inFlightCallbackPromises) {

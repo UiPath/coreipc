@@ -107,8 +107,8 @@ describe(`foundation:threading -> class:RegistrarCancellationToken`, () => {
 
             token.cancel(false);
 
-            expect(spyHandler1).to.have.been.called;
-            expect(spyHandler2).to.have.been.called;
+            expect(spyHandler1).to.have.been.called();
+            expect(spyHandler2).to.have.been.called();
 
             token.cancel(false);
 
@@ -120,7 +120,7 @@ describe(`foundation:threading -> class:RegistrarCancellationToken`, () => {
             token.cancel(false);
             const spyHandler = spy(() => { });
             token.register(spyHandler);
-            expect(spyHandler).to.have.been.called;
+            expect(spyHandler).to.have.been.called();
         });
     });
     context(`unregister`, () => {
@@ -153,8 +153,8 @@ describe(`foundation:threading -> class:RegistrarCancellationToken`, () => {
 
             token.cancel(false);
 
-            expect(spyHandler1).not.to.have.been.called;
-            expect(spyHandler2).not.to.have.been.called;
+            expect(spyHandler1).not.to.have.been.called();
+            expect(spyHandler2).not.to.have.been.called();
         });
     });
 });
@@ -223,8 +223,8 @@ describe(`foundation:threading -> class:ProperCancellationToken`, () => {
                 token.register(spyHandler1);
                 token.register(spyHandler2);
                 token.cancel(_case);
-                expect(spyHandler1).to.have.been.called;
-                expect(spyHandler2).to.have.been.called;
+                expect(spyHandler1).to.have.been.called();
+                expect(spyHandler2).to.have.been.called();
             }
         });
     });

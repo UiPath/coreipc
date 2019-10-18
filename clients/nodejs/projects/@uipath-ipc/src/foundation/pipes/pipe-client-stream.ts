@@ -10,7 +10,7 @@ import { ArgumentNullError } from '@foundation/errors';
 
 /* @internal */
 export interface IPipeClientStream {
-    writeAsync(buffer: Buffer, cancellationToken: CancellationToken): Promise<void>;
+    writeAsync(source: Buffer, cancellationToken: CancellationToken): Promise<void>;
     readAsync(destination: Buffer, cancellationToken: CancellationToken): Promise<void>;
     disposeAsync(): Promise<void>;
 }
@@ -57,16 +57,16 @@ export class PipeClientStream implements IPipeClientStream, IAsyncDisposable {
         this._pipeReader = new PipeReader(_socket);
     }
 
-    public async writeAsync(buffer: Buffer, cancellationToken: CancellationToken = CancellationToken.none): Promise<void> {
-        if (!buffer) { throw new ArgumentNullError('buffer'); }
+    public async writeAsync(source: Buffer, cancellationToken: CancellationToken = CancellationToken.none): Promise<void> {
+        if (!source) { throw new ArgumentNullError('source'); }
         if (this._isDisposed) { return Promise.fromError(new ObjectDisposedError('PipeClientStream')); }
-        if (buffer.length === 0) { return; }
+        if (source.length === 0) { return; }
 
         if (this._traceNetwork) {
-            PipeClientStream._traceWrite.log(buffer.toString());
+            PipeClientStream._traceWrite.log(source.toString());
         }
 
-        return await this._socket.writeAsync(buffer, cancellationToken);
+        return await this._socket.writeAsync(source, cancellationToken);
     }
 
     public async readAsync(destination: Buffer, cancellationToken: CancellationToken = CancellationToken.none): Promise<void> {

@@ -150,7 +150,7 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
             promise.then(fulfilledSpy);
 
             await Promise.delay(1);
-            fulfilledSpy.should.not.have.been.called;
+            fulfilledSpy.should.not.have.been.called();
 
             const source = Buffer.from('b');
             mocks.emitData(source);

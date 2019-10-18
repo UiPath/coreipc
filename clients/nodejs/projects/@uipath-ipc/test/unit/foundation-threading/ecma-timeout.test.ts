@@ -69,10 +69,10 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
         it(`successfully cancels the timeout`, async () => {
             const spyHandler = spy(() => { });
             const ecmaTimeout = new EcmaTimeout(TimeSpan.fromMilliseconds(0), spyHandler);
-            expect(spyHandler).not.to.have.been.called;
+            expect(spyHandler).not.to.have.been.called();
             ecmaTimeout.dispose();
             await Promise.yield();
-            expect(spyHandler).not.to.have.been.called;
+            expect(spyHandler).not.to.have.been.called();
         });
     });
 
@@ -130,10 +130,10 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
                 const spyHandler = spy(() => { });
                 const result = EcmaTimeout.maybeCreate(_case.timeSpan as any, spyHandler);
 
-                expect(spyHandler).not.to.have.been.called;
+                expect(spyHandler).not.to.have.been.called();
                 const timeSpan = _case.timeSpan as any as TimeSpan;
                 await Promise.delay(timeSpan.add(timeSpan));
-                expect(spyHandler).to.have.been.called;
+                expect(spyHandler).to.have.been.called();
             }
         });
         it(`should return an IDisposable which when used will cancel the callback's execution (when the provided timespan is defined, non-null and non-negative)`, async () => {
@@ -141,11 +141,11 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
                 const spyHandler = spy(() => { });
                 const disposable = EcmaTimeout.maybeCreate(_case.timeSpan as any, spyHandler);
 
-                expect(spyHandler).not.to.have.been.called;
+                expect(spyHandler).not.to.have.been.called();
                 disposable.dispose();
                 const timeSpan = _case.timeSpan as any as TimeSpan;
                 await Promise.delay(timeSpan.add(timeSpan));
-                expect(spyHandler).not.to.have.been.called;
+                expect(spyHandler).not.to.have.been.called();
             }
         });
         it(`shouldn't cause the callback's execution when the provided timespan is undefined, null or negative`, async () => {
@@ -153,9 +153,9 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
                 const spyHandler = spy(() => { });
                 const result = EcmaTimeout.maybeCreate(_case.timeSpan as any, spyHandler);
 
-                expect(spyHandler).not.to.have.been.called;
+                expect(spyHandler).not.to.have.been.called();
                 await Promise.yield();
-                expect(spyHandler).not.to.have.been.called;
+                expect(spyHandler).not.to.have.been.called();
             }
         });
     });

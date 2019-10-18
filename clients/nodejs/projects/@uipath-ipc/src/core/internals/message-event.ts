@@ -1,10 +1,10 @@
 import * as WireMessage from './wire-message';
-import { StreamWrapper } from './stream-wrapper';
+import { IMessageStream } from './message-stream';
 
 /* @internal */
 export class MessageEvent {
     constructor(
-        public readonly sender: StreamWrapper,
+        public readonly messageStream: IMessageStream,
         public readonly message: WireMessage.Request | WireMessage.Response
     ) { }
 }

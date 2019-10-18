@@ -50,7 +50,7 @@ describe(`foundation:utils -> class:Trace`, () => {
             Trace.addListener(listenerSpy).dispose();
 
             Trace.log('foo');
-            listenerSpy.should.not.have.been.called;
+            listenerSpy.should.not.have.been.called();
         });
 
         it(`should return an IDisposable that unregisters the listener and is idempotent`, () => {
@@ -61,7 +61,7 @@ describe(`foundation:utils -> class:Trace`, () => {
             (() => disposable.dispose()).should.not.throw();
 
             Trace.log('foo');
-            listenerSpy.should.not.have.been.called;
+            listenerSpy.should.not.have.been.called();
         });
     });
 });

@@ -147,7 +147,7 @@ describe(`core:internals -> class:Generator`, () => {
 
                     const promise = proxy.testMethod('test-argument');
                     await promise.should.eventually.be.fulfilled.and.equal('test-result');
-                    broker.sendReceiveAsync.should.have.been.called;
+                    broker.sendReceiveAsync.should.have.been.called();
                 });
 
                 it(`should throw RemoteError for method calls provided the IBroker instance gracefully returns an error`, async () => {
@@ -266,7 +266,7 @@ describe(`core:internals -> class:Generator`, () => {
                     const proxy = new ctor(broker);
                     await proxy.testMethod(123, 'foo', undefined as any);
 
-                    broker.sendReceiveAsync.should.have.been.called;
+                    broker.sendReceiveAsync.should.have.been.called();
                 });
 
                 it(`should normalize it's args and not mind a missing last arg, when the contract's method isn't decorated with @__hasCancellationToken__`, async () => {
@@ -283,7 +283,7 @@ describe(`core:internals -> class:Generator`, () => {
                     const proxy = new ctor(broker);
                     await proxy.testMethod(123, 'foo');
 
-                    broker.sendReceiveAsync.should.have.been.called;
+                    broker.sendReceiveAsync.should.have.been.called();
                 });
 
                 it(`should normalize it's args and trim a potential trailing undefined while adding CancellationToken.none, when the contract's method is decorated with @__hasCancellationToken__`, async () => {
@@ -301,7 +301,7 @@ describe(`core:internals -> class:Generator`, () => {
                     const proxy = new ctor(broker);
                     await proxy.testMethod(123, 'foo', undefined as any);
 
-                    broker.sendReceiveAsync.should.have.been.called;
+                    broker.sendReceiveAsync.should.have.been.called();
                 });
 
                 it(`should normalize it's args and not mind a missing last arg, when the contract's method is decorated with @__hasCancellationToken__`, async () => {
@@ -319,7 +319,7 @@ describe(`core:internals -> class:Generator`, () => {
                     const proxy = new ctor(broker);
                     await proxy.testMethod(123, 'foo');
 
-                    broker.sendReceiveAsync.should.have.been.called;
+                    broker.sendReceiveAsync.should.have.been.called();
                 });
 
                 it(`should normalize it's args and not mind a present ct as its last arg, when the contract's method is decorated with @__hasCancellationToken__`, async () => {
@@ -337,7 +337,7 @@ describe(`core:internals -> class:Generator`, () => {
                     const proxy = new ctor(broker);
                     await proxy.testMethod(123, 'foo', CancellationToken.none);
 
-                    broker.sendReceiveAsync.should.have.been.called;
+                    broker.sendReceiveAsync.should.have.been.called();
                 });
             });
         });

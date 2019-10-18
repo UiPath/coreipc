@@ -127,7 +127,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             promise.then(fulfilledSpy);
 
             await Promise.delay(1);
-            fulfilledSpy.should.not.have.been.called;
+            fulfilledSpy.should.not.have.been.called();
 
             mocks.emitData(Buffer.from([100]));
             await Promise.yield();
@@ -171,12 +171,12 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             promise.then(undefined, rejectedSpy);
 
             await Promise.delay(1);
-            rejectedSpy.should.not.have.been.called;
+            rejectedSpy.should.not.have.been.called();
 
             mocks.emitEnd();
             await Promise.yield();
 
-            rejectedSpy.should.have.been.called;
+            rejectedSpy.should.have.been.called();
         });
 
         it(`should reject with PipeBrokerError if the underlying ILogicalSocket had already completed its data observable`, async () => {
@@ -197,7 +197,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             await Promise.yield();
 
-            rejectedSpy.should.have.been.called;
+            rejectedSpy.should.have.been.called();
         });
     });
 
@@ -223,14 +223,14 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             const factory: ILogicalSocketFactory = () => logicalSocket;
             const stream = await PipeClientStream.connectAsync(factory, 'name', null, false);
 
-            const destination = new Buffer(10);
+            const destination = Buffer.alloc(0);
 
             const promise = stream.readAsync(destination);
             const fulfilledSpy = spy(() => { });
             promise.then(fulfilledSpy);
 
             await Promise.yield();
-            fulfilledSpy.should.have.been.called;
+            fulfilledSpy.should.have.been.called();
         });
 
         it(`should resolve only after populating the entire destination buffer`, async () => {
@@ -248,24 +248,24 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             promise.then(fulfilledSpy);
 
             await Promise.yield();
-            fulfilledSpy.should.not.have.been.called;
+            fulfilledSpy.should.not.have.been.called();
 
             mocks.emitData(Buffer.from([4, 5, 6, 7, 8]));
 
             await Promise.yield();
-            fulfilledSpy.should.not.have.been.called;
+            fulfilledSpy.should.not.have.been.called();
 
             mocks.emitData(Buffer.from([9, 10, 11, 12, 13, 14]));
 
             await Promise.yield();
-            fulfilledSpy.should.have.been.called;
+            fulfilledSpy.should.have.been.called();
 
             destination.should.be.deep.equal(Buffer.from([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
         });
     });
 
     context(`method:writeAsync`, () => {
-        it(`shouldn't throw but it should reject with ArgumentNullError provided a falsy buffer`, async () => {
+        it(`shouldn't throw but it should reject with ArgumentNullError provided a falsy source`, async () => {
             const mocks = SocketLikeMocks.createEmittingMock();
             const logicalSocket = new SocketAdapter(mocks.socketLike);
             const factory: ILogicalSocketFactory = () => logicalSocket;
@@ -273,11 +273,11 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             await stream.writeAsync(null as any).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                with.property('maybeParamName', 'buffer');
+                with.property('maybeParamName', 'source');
 
             await stream.writeAsync(undefined as any).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                with.property('maybeParamName', 'buffer');
+                with.property('maybeParamName', 'source');
         });
 
         it(`shouldn't throw but it should reject with ObjectDisposedError if the PipeClientStream had been disposed`, async () => {
@@ -306,7 +306,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             promise.then(fulfilledSpy);
 
             await Promise.yield();
-            fulfilledSpy.should.have.been.called;
+            fulfilledSpy.should.have.been.called();
         });
 
         it(`should eventually be fulfilled after successfully writing the buffer to the underlying ILogicalSocket`, async () => {
@@ -334,13 +334,13 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             await Promise.yield();
 
-            fulfilledSpy.should.not.have.been.called;
+            fulfilledSpy.should.not.have.been.called();
 
             receivedCallback();
 
             await Promise.yield();
 
-            fulfilledSpy.should.have.been.called;
+            fulfilledSpy.should.have.been.called();
         });
     });
 

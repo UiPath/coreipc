@@ -10,7 +10,15 @@ import { SerializationPal } from './serialization-pal';
 import { MessageEvent } from './message-event';
 
 /* @internal */
-export class StreamWrapper implements IAsyncDisposable {
+export interface IMessageStream extends IAsyncDisposable {
+    readonly isConnected: boolean;
+    readonly messages: Observable<MessageEvent>;
+
+    writeAsync(source: Buffer, cancellationToken: CancellationToken): Promise<void>;
+}
+
+/* @internal */
+export class MessageStream implements IMessageStream {
     private readonly _messages = new ReplaySubject<MessageEvent>();
     private readonly _readIndefinitelyCts = new CancellationTokenSource();
     private readonly _readIndefinitelyPromise: Promise<void>;
@@ -21,14 +29,18 @@ export class StreamWrapper implements IAsyncDisposable {
     public get messages(): Observable<MessageEvent> { return this._messages; }
     public get isConnected(): boolean { return this._isConnected; }
 
-    constructor(public readonly stream: IPipeClientStream) {
-        if (!stream) { throw new ArgumentNullError('stream'); }
+    constructor(private readonly _stream: IPipeClientStream) {
+        if (!_stream) { throw new ArgumentNullError('stream'); }
 
         this._readIndefinitelyPromise = this.readIndefinitelyAsync(this._readIndefinitelyCts.token);
     }
 
+    public writeAsync(source: Buffer, cancellationToken: CancellationToken): Promise<void> {
+        return this._stream.writeAsync(source, cancellationToken);
+    }
+
     public async disposeAsync(): Promise<void> {
-        await this.stream.disposeAsync();
+        await this._stream.disposeAsync();
 
         this._messages.complete();
 
@@ -51,12 +63,12 @@ export class StreamWrapper implements IAsyncDisposable {
     }
 
     private async readMessageAsync(token: CancellationToken): Promise<WireMessage.Request | WireMessage.Response> {
-        await this.stream.readAsync(this._headerBuffer, token);
+        await this._stream.readAsync(this._headerBuffer, token);
         const type = this._headerBuffer.readUInt8(0) as WireMessage.Type;
         const length = this._headerBuffer.readInt32LE(1);
 
         const bytes = Buffer.alloc(length);
-        await this.stream.readAsync(bytes, token);
+        await this._stream.readAsync(bytes, token);
 
         const json = bytes.toString('utf8');
         const message = SerializationPal.fromJson(json, type);

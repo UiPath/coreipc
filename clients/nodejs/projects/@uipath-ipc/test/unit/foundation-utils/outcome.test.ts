@@ -237,7 +237,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
                     setCanceled: spy(() => { })
                 } as any;
                 new Canceled<string>().apply(mock);
-                mock.setCanceled.should.have.been.called;
+                mock.setCanceled.should.have.been.called();
             });
         });
 
@@ -253,7 +253,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
                     trySetCanceled: spy(() => { })
                 } as any;
                 new Canceled<string>().tryApply(mock);
-                mock.trySetCanceled.should.have.been.called;
+                mock.trySetCanceled.should.have.been.called();
             });
         });
 
