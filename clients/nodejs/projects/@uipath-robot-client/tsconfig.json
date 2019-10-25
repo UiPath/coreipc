@@ -6,12 +6,6 @@
         "module": "commonjs",
         "declaration": true,
         "outDir": "./dist",
-        "baseUrl": "..",
-        "paths": {
-            "@uipath/ipc": [
-                "@uipath-ipc/src"
-            ]
-        },
         "strict": true,
         "downlevelIteration": true,
         "stripInternal": true,
