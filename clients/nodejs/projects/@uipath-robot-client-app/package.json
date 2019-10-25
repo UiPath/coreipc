@@ -1,6 +1,6 @@
 {
     "name": "@uipath/robot-client-app",
-    "version": "0.0.24",
+    "version": "0.0.25",
     "private": true,
     "description": "UiPath Robot Client Test App",
     "main": "dist/program.js",
@@ -28,7 +28,7 @@
         ]
     },
     "dependencies": {
-        "@uipath/robot-client": "^0.0.24",
+        "@uipath/robot-client": "^0.0.25",
         "blessed": "0.1.81"
     },
     "devDependencies": {
