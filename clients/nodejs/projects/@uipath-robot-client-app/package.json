@@ -21,10 +21,6 @@
     "files": [
         "dist/**/*"
     ],
-    "publishConfig": {
-        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages@Local/npm/registry/",
-        "access": "public"
-    },
     "pkg": {
         "assets": [
             "node_modules/blessed/usr/xterm",

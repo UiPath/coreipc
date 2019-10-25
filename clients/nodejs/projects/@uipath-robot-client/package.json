@@ -11,10 +11,6 @@
     },
     "author": "Eduard Dumitru",
     "license": "MIT",
-    "publishConfig": {
-        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages@Local/npm/registry/",
-        "access": "public"
-    },
     "files": [
         "dist/**/*"
     ],
