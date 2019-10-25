@@ -15,7 +15,6 @@ export abstract class CancellationTokenRegistration implements IDisposable {
     public abstract dispose(): void;
 }
 
-/* @internal */
 export class ProperCancellationTokenRegistration extends CancellationTokenRegistration {
     constructor(
         private readonly _cancellationToken: RegistrarCancellationToken,
@@ -28,7 +27,6 @@ export class ProperCancellationTokenRegistration extends CancellationTokenRegist
     public dispose(): void { this._cancellationToken.unregister(this._callback); }
 }
 
-/* @internal */
 export class NoneCancellationTokenRegistration extends CancellationTokenRegistration {
     public static readonly instance = new NoneCancellationTokenRegistration();
     private constructor() { super(); }

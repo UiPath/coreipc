@@ -29,7 +29,6 @@ export abstract class CancellationToken {
     }
 }
 
-/* @internal */
 export abstract class RegistrarCancellationToken extends CancellationToken {
     private readonly _callbacks = new Array<() => void>();
 
@@ -72,7 +71,6 @@ export abstract class RegistrarCancellationToken extends CancellationToken {
     }
 }
 
-/* @internal */
 export class ProperCancellationToken extends RegistrarCancellationToken {
     private _isCancellationRequested = false;
 
@@ -87,7 +85,6 @@ export class ProperCancellationToken extends RegistrarCancellationToken {
     }
 }
 
-/* @internal */
 export class LinkedCancellationToken extends RegistrarCancellationToken {
     private readonly _registrations: CancellationTokenRegistration[];
     private _isCancellationRequested = false;

@@ -4,11 +4,8 @@ export interface PublicConstructor<T> {
     new(...args: any[]): T;
 }
 
-/* @internal */
 export type Method = (...args: any[]) => any;
 
-/* @internal */
 export type MemberMethod = (this: MethodContainer, ...args: any[]) => any;
 
-/* @internal */
 export interface MethodContainer { readonly [methodName: string]: MemberMethod | undefined; }

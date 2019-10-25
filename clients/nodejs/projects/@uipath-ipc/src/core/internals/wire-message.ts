@@ -1,16 +1,13 @@
 /* istanbul ignore file */
 
-/* @internal */
 export enum Type {
     Request,
     Response
 }
 
-/* @internal */
 export class Base {
 }
 
-/* @internal */
 export class Request extends Base {
     constructor(
         // tslint:disable-next-line: variable-name
@@ -26,7 +23,6 @@ export class Request extends Base {
     }
 }
 
-/* @internal */
 export class Response extends Base {
     constructor(
         // tslint:disable-next-line: variable-name

@@ -9,7 +9,6 @@ import { ILogicalSocket } from './logical-socket';
 import { ArgumentNullError } from '../errors/argument-null-error';
 import { Subscription } from 'rxjs';
 
-/* @internal */
 export class PipeReader implements IAsyncDisposable {
     private readonly _buffers = new Quack<Buffer | null>();
 
