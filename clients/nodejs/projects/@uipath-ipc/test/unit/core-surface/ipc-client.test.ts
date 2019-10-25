@@ -4,11 +4,12 @@ import { expect, spy, use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
 
-import { IpcClient, IIpcClientConfig } from '@core/surface';
+import { IpcClient } from '@core/surface';
 import { IpcClientConfig } from '@core/surface/ipc-client';
 import { IBroker } from '@core/internals/broker';
 import { ArgumentNullError } from '@foundation/errors';
-import { PromiseCompletionSource } from '@foundation/threading';
+import { PromiseCompletionSource, CancellationToken } from '@foundation/threading';
+import { IPipeClientStream } from '@foundation/pipes';
 
 import * as BrokerMessage from '@core/internals/broker-message';
 
@@ -102,6 +103,60 @@ describe(`core:surface -> class:IpcClient`, () => {
             const ipcClient = new IpcClient('pipeName', Object);
             await ipcClient.closeAsync().should.eventually.be.fulfilled;
             await ipcClient.closeAsync().should.eventually.be.fulfilled;
+        });
+    });
+});
+
+describe(`core:surface -> class:IpcClientConfig`, () => {
+    context(`ctor`, () => {
+        it(`shouldn't throw`, () => {
+            (() => new IpcClientConfig()).should.not.throw();
+        });
+    });
+
+    context(`method:setConnectionFactory`, () => {
+        it(`should throw provided a falsy delegate`, () => {
+            const instance = new IpcClientConfig();
+
+            (() => instance.setConnectionFactory(null as any)).should.throw(ArgumentNullError).with.property('paramName', 'delegate');
+            (() => instance.setConnectionFactory(undefined as any)).should.throw(ArgumentNullError).with.property('paramName', 'delegate');
+        });
+
+        it(`shouldn't throw provided a valid delegate`, () => {
+            const instance = new IpcClientConfig();
+
+            (() => instance.setConnectionFactory(async (connect, ct) => { })).should.not.throw();
+        });
+
+        it(`should set the maybeConnectionFactory field`, () => {
+            const instance = new IpcClientConfig();
+            const method = async (connect: () => Promise<IPipeClientStream>, cancellationToken: CancellationToken): Promise<IPipeClientStream | void> => { };
+
+            instance.setConnectionFactory(method);
+            expect(instance.maybeConnectionFactory).to.equal(method);
+        });
+    });
+
+    context(`method:setBeforeCall`, () => {
+        it(`should throw provided a falsy delegate`, () => {
+            const instance = new IpcClientConfig();
+
+            (() => instance.setBeforeCall(null as any)).should.throw(ArgumentNullError).with.property('paramName', 'delegate');
+            (() => instance.setBeforeCall(undefined as any)).should.throw(ArgumentNullError).with.property('paramName', 'delegate');
+        });
+
+        it(`shouldn't throw provided a valid delegate`, () => {
+            const instance = new IpcClientConfig();
+
+            (() => instance.setBeforeCall(async (connect, ct) => { })).should.not.throw();
+        });
+
+        it(`should set the maybeBeforeCall field`, () => {
+            const instance = new IpcClientConfig();
+            const method = async (methodName: string, newConnection: boolean, cancellationToken: CancellationToken): Promise<void> => { };
+
+            instance.setBeforeCall(method);
+            expect(instance.maybeBeforeCall).to.equal(method);
         });
     });
 });

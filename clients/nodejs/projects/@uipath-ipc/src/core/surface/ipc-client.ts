@@ -23,7 +23,16 @@ export class IpcClient<TService> {
         const config = new IpcClientConfig();
         if (configFunc) { configFunc(config); }
 
-        const params: IBrokerCtorParams = {
+        this._broker = config.maybeBroker || new Broker(IpcClient.buildBrokerCtorParams(pipeName, config));
+        this.proxy = ProxyFactory.create(serviceCtor, this._broker);
+    }
+
+    public async closeAsync(): Promise<void> {
+        await this._broker.disposeAsync();
+    }
+
+    private static buildBrokerCtorParams(pipeName: string, config: IpcClientConfig): IBrokerCtorParams {
+        return {
             factory: config.logicalSocketFactory,
             pipeName,
             connectTimeout: TimeSpan.fromSeconds(config.defaultCallTimeoutSeconds),
@@ -33,14 +42,6 @@ export class IpcClient<TService> {
             beforeCall: config.maybeBeforeCall,
             traceNetwork: config.traceNetwork
         };
-
-        this._broker = config.maybeBroker || new Broker(params);
-
-        this.proxy = ProxyFactory.create(serviceCtor, this._broker);
-    }
-
-    public async closeAsync(): Promise<void> {
-        await this._broker.disposeAsync();
     }
 }
 
@@ -71,15 +72,20 @@ export class IpcClientConfig implements IIpcClientConfig {
     protected _maybeBeforeCall: Maybe<BeforeCallDelegate> = null;
 
     public setConnectionFactory(delegate: (connect: () => Promise<IPipeClientStream>, cancellationToken: CancellationToken) => Promise<IPipeClientStream | void>): this {
+        if (!delegate) { throw new ArgumentNullError('delegate'); }
+
         this._maybeConnectionFactory = delegate;
         return this;
     }
     public setBeforeCall(delegate: (methodName: string, newConnection: boolean, cancellationToken: CancellationToken) => Promise<void>): this {
+        if (!delegate) { throw new ArgumentNullError('delegate'); }
+
         this._maybeBeforeCall = delegate;
         return this;
     }
     // #endregion
 
+    /* istanbul ignore next */
     public logicalSocketFactory: ILogicalSocketFactory = () => new PhysicalSocket();
     public maybeBroker: IBroker | null = null;
 
