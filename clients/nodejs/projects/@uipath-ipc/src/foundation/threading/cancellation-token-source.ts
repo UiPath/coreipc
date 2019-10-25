@@ -2,7 +2,7 @@ import { CancellationToken, ProperCancellationToken } from './cancellation-token
 import { IDisposable } from '../disposable';
 import { TimeSpan } from './timespan';
 import { EcmaTimeout } from './ecma-timeout';
-import { ObjectDisposedError, ArgumentError } from '@foundation/errors';
+import { ObjectDisposedError, ArgumentError } from '../../foundation/errors';
 
 export class CancellationTokenSource implements IDisposable {
     private readonly _token: ProperCancellationToken = new ProperCancellationToken();

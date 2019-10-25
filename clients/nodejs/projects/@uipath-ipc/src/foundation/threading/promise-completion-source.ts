@@ -1,4 +1,4 @@
-import { OperationCanceledError, InvalidOperationError } from '@foundation/errors';
+import { OperationCanceledError, InvalidOperationError } from '../../foundation/errors';
 import * as Outcome from '../utils/outcome';
 
 export class PromiseCompletionSource<T> {

@@ -1,5 +1,5 @@
-import { TimeSpan } from '@foundation/threading/timespan';
-import { ArgumentError } from '@foundation/errors';
+import { TimeSpan } from '../../foundation/threading/timespan';
+import { ArgumentError } from '../../foundation/errors';
 
 // tslint:disable: variable-name
 export class Message<T> {

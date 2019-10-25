@@ -1,5 +1,5 @@
-import { OperationCanceledError, ArgumentNullError } from '@foundation/errors';
-import { PromiseCompletionSource } from '@foundation/threading';
+import { OperationCanceledError, ArgumentNullError } from '../../foundation/errors';
+import { PromiseCompletionSource } from '../../foundation/threading';
 
 export type AnyOutcome<T> = Succeeded<T> | Faulted<T> | Canceled<T>;
 export enum OutcomeKind {

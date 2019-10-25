@@ -1,18 +1,18 @@
 import * as BrokerMessage from './broker-message';
 import * as WireMessage from './wire-message';
 
-import { ConnectionFactoryDelegate, BeforeCallDelegate } from '@core/surface';
+import { ConnectionFactoryDelegate, BeforeCallDelegate } from '../surface';
 
-import { CancellationTokenSource, CancellationToken } from '@foundation/threading';
-import { PipeClientStream, IPipeClientStream } from '@foundation/pipes';
-import { Trace } from '@foundation/utils';
-import { IAsyncDisposable } from '@foundation/disposable';
-import { InvalidOperationError, ArgumentError } from '@foundation/errors';
-import { Succeeded } from '@foundation/utils';
-import { ILogicalSocketFactory } from '@foundation/pipes';
-import { TimeSpan } from '@foundation/threading';
-import { ArgumentNullError } from '@foundation/errors';
-import { Maybe, MethodContainer, MemberMethod } from '@foundation/utils';
+import { CancellationTokenSource, CancellationToken } from '../../foundation/threading';
+import { PipeClientStream, IPipeClientStream } from '../../foundation/pipes';
+import { Trace } from '../../foundation/utils';
+import { IAsyncDisposable } from '../../foundation/disposable';
+import { InvalidOperationError, ArgumentError } from '../../foundation/errors';
+import { Succeeded } from '../../foundation/utils';
+import { ILogicalSocketFactory } from '../../foundation/pipes';
+import { TimeSpan } from '../../foundation/threading';
+import { ArgumentNullError } from '../../foundation/errors';
+import { Maybe, MethodContainer } from '../../foundation/utils';
 
 import { MessageEvent } from './message-event';
 import { SerializationPal } from './serialization-pal';

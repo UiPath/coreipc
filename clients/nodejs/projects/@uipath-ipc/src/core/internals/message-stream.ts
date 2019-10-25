@@ -1,9 +1,9 @@
 import { Observable, ReplaySubject } from 'rxjs';
 
-import { IPipeClientStream } from '@foundation/pipes';
-import { CancellationTokenSource, CancellationToken } from '@foundation/threading';
-import { IAsyncDisposable } from '@foundation/disposable';
-import { ArgumentNullError } from '@foundation/errors';
+import { IPipeClientStream } from '../../foundation/pipes';
+import { CancellationTokenSource, CancellationToken } from '../../foundation/threading';
+import { IAsyncDisposable } from '../../foundation/disposable';
+import { ArgumentNullError } from '../../foundation/errors';
 
 import * as WireMessage from './wire-message';
 import { SerializationPal } from './serialization-pal';

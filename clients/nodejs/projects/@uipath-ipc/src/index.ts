@@ -6,26 +6,25 @@ import {
     CancellationToken,
     TimeSpan,
     Timeout
-} from '@foundation/threading';
+} from './foundation/threading';
 
 import {
     __hasCancellationToken__, __returns__,
     RemoteError,
     IpcClient,
     Message
-} from '@core/surface';
+} from './core/surface';
 
-import { PipeClientStream } from '@foundation/pipes';
-import { OperationCanceledError } from '@foundation/errors';
-import { WireError as IpcError } from '@core/internals';
-import { Trace } from '@foundation/utils';
+import { IPipeClientStream } from './foundation/pipes';
+import { OperationCanceledError } from './foundation/errors';
+import { WireError as IpcError } from './core/internals';
+import { Trace } from './foundation/utils';
 
-export { default } from '@foundation/threading/promise-pal';
 export {
     CancellationToken,
     CancellationTokenSource,
     PromiseCompletionSource,
-    PipeClientStream,
+    IPipeClientStream,
     IpcClient,
     Message,
     TimeSpan,

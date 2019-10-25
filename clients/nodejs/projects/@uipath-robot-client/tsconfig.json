@@ -2,21 +2,15 @@
     "extends": "../../tsconfig.base",
     "compilerOptions": {
         "experimentalDecorators": true,
-        "esModuleInterop": true,
         "target": "es6",
         "module": "commonjs",
         "declaration": true,
-        "sourceMap": true,
-        "declarationMap": true,
         "outDir": "./dist",
-        "baseUrl": ".",
+        "baseUrl": "..",
         "paths": {
-            "@core/*": [
-                "src/core/*"
-            ],
-            "@foundation/*": [
-                "src/foundation/*"
-            ],
+            "@uipath/ipc": [
+                "@uipath-ipc/src"
+            ]
         },
         "strict": true,
         "downlevelIteration": true,
@@ -32,6 +26,6 @@
     ],
     "exclude": [
         "node_modules",
-        "**/*.test.ts"
+        "**/*.spec.ts"
     ]
 }

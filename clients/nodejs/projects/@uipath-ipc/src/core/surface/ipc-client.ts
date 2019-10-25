@@ -1,9 +1,9 @@
-import { ProxyFactory } from '@core/internals/proxy-factory';
-import { Broker, IBroker, IBrokerCtorParams } from '@core/internals/broker';
-import { ArgumentNullError } from '@foundation/errors';
-import { PublicConstructor, Maybe } from '@foundation/utils';
-import { ILogicalSocketFactory, PhysicalSocket, IPipeClientStream } from '@foundation/pipes';
-import { CancellationToken, TimeSpan } from '@foundation/threading';
+import { ProxyFactory } from '../internals/proxy-factory';
+import { Broker, IBroker, IBrokerCtorParams } from '../internals/broker';
+import { ArgumentNullError } from '../../foundation/errors';
+import { PublicConstructor, Maybe } from '../../foundation/utils';
+import { ILogicalSocketFactory, PhysicalSocket, IPipeClientStream } from '../../foundation/pipes';
+import { CancellationToken, TimeSpan } from '../../foundation/threading';
 
 export type ConnectionFactoryDelegate = (connect: () => Promise<IPipeClientStream>, cancellationToken: CancellationToken) => Promise<IPipeClientStream | void>;
 export type BeforeCallDelegate = (methodName: string, newConnection: boolean, cancellationToken: CancellationToken) => Promise<void>;

@@ -1,11 +1,11 @@
 import * as BrokerMessage from './broker-message';
 import * as WireMessage from './wire-message';
 import { Message } from '../surface/message';
-import { CancellationToken, CancellationTokenSource, Trace } from '../..';
+import { CancellationToken, CancellationTokenSource } from '../..';
 import { ArgumentError } from '../../foundation/errors/argument-error';
 import { TimeSpan } from '../../foundation/threading/timespan';
 import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
-import { IDisposable } from '@foundation/disposable';
+import { IDisposable } from '../../foundation/disposable';
 
 /* @internal */
 export class SerializationPal {

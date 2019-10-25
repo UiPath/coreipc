@@ -1,6 +1,6 @@
 import { IDisposable } from '../disposable';
 import { TimeSpan } from './timespan';
-import { ArgumentNullError, ArgumentError } from '@foundation/errors';
+import { ArgumentNullError, ArgumentError } from '../../foundation/errors';
 
 export class EcmaTimeout implements IDisposable {
     public static maybeCreate(maybeTimeSpan: TimeSpan | null, callback: () => void): IDisposable {

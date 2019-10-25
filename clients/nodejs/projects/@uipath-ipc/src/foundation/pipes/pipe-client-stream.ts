@@ -5,8 +5,8 @@ import { PipeReader } from './pipe-reader';
 import { ILogicalSocketFactory, ILogicalSocket } from './logical-socket';
 import { TimeSpan } from '../threading/timespan';
 import { PipeBrokenError } from '../errors/pipe/pipe-broken-error';
-import { Trace } from '@foundation/utils';
-import { ArgumentNullError } from '@foundation/errors';
+import { Trace } from '../../foundation/utils';
+import { ArgumentNullError } from '../../foundation/errors';
 
 /* @internal */
 export interface IPipeClientStream {

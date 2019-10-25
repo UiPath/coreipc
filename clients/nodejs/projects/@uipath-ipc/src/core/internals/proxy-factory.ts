@@ -7,9 +7,9 @@ import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
 import { rtti } from '../surface/rtti';
 import { CancellationToken } from '../../foundation/threading/cancellation-token';
 import { RemoteError } from '../surface/remote-error';
-import { PublicConstructor, ITraceCategory } from '@foundation/utils';
+import { PublicConstructor, ITraceCategory } from '../../foundation/utils';
 import { Trace, OperationCanceledError } from '../..';
-import { AggregateError } from '@foundation/errors';
+import { AggregateError } from '../../foundation/errors';
 
 const symbolofMaybeProxyCtor = Symbol('maybe:ProxyFactory');
 
@@ -64,7 +64,7 @@ export class Generator<TService> {
 
         const traceCategory = this._traceCategory;
 
-        return async function (this: IProxy) {
+        return async function(this: IProxy) {
             const args = normalizeArgs([...arguments]);
 
             const brokerOutboundRequest = new BrokerMessage.OutboundRequest(methodName, args);
@@ -103,7 +103,7 @@ export class Generator<TService> {
     }
 
     private static createCtor<TService>(): IProxyCtor<TService> {
-        const result = function (this: IProxy, broker: Broker): void {
+        const result = function(this: IProxy, broker: Broker): void {
             this[symbolofBroker] = broker;
         } as any as IProxyCtor<TService>;
         result.prototype = {};
@@ -137,7 +137,7 @@ class Normalizers {
 
     public static getResultNormalizer<T>(maybeCtor: Function | null): (result: T) => T {
         if (maybeCtor) {
-            return function (result: T) {
+            return function(result: T) {
                 if (result) {
                     (result as any).__proto__ = maybeCtor.prototype;
                 }

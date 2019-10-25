@@ -1,0 +1,30 @@
+{
+    "compilerOptions": {
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "lib": [
+            "es6"
+        ],
+        "module": "commonjs",
+        "noUnusedLocals": true,
+        "skipLibCheck": true,
+        "sourceMap": true,
+        "target": "ES2016",
+        "strictNullChecks": true,
+        "baseUrl": "projects",
+        "paths": {
+            "@uipath/ipc/*": [
+                "@uipath-ipc/src/*"
+            ],
+            "@uipath/robot-client/*": [
+                "@uipath-robot-client/src/*"
+            ],
+            "@core/*": [
+                "@uipath-ipc/src/core/*"
+            ],
+            "@foundation/*": [
+                "@uipath-ipc/src/foundation/*"
+            ]
+        }
+    }
+}

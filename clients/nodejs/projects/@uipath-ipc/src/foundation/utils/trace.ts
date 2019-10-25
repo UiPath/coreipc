@@ -1,5 +1,5 @@
 import { IDisposable } from '../disposable';
-import { ArgumentNullError } from '@foundation/errors';
+import { ArgumentNullError } from '../../foundation/errors';
 
 export class Trace {
     private static readonly _listeners = new Array<(errorOrText: Error | string, category?: string) => void>();
@@ -47,6 +47,28 @@ export class Trace {
         return new Trace.traceCategory(name);
     }
 }
+
+export { };
+
+declare global {
+    interface Promise<T> {
+        traceError(): void;
+    }
+}
+
+const promiseTrace = Trace.category('promise');
+
+// @ts-ignore
+// tslint:disable-next-line: only-arrow-functions
+Promise.prototype.traceError = function(): void {
+    this.then(undefined, (reason: any) => {
+        if (reason instanceof Error) {
+            promiseTrace.log(reason);
+        } else {
+            promiseTrace.log(`${reason}`);
+        }
+    });
+};
 
 export interface ITraceCategory {
     log(error: Error): void;

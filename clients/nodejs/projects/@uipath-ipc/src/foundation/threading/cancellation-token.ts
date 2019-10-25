@@ -1,8 +1,8 @@
-import { CancellationTokenRegistration, ProperCancellationTokenRegistration } from './cancellation-token-registration';
+import { CancellationTokenRegistration } from './cancellation-token-registration';
 import { OperationCanceledError } from '../errors/operation-canceled-error';
 import { AggregateError } from '../errors/aggregate-error';
 import { ArgumentError } from '../errors/argument-error';
-import { ArgumentNullError } from '@foundation/errors';
+import { ArgumentNullError } from '../../foundation/errors';
 
 export abstract class CancellationToken {
     public static merge(...tokens: CancellationToken[]): CancellationToken {

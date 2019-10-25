@@ -6,7 +6,7 @@ import { PromiseCompletionSource } from './promise-completion-source';
 import { TimeSpan } from './timespan';
 import { ArgumentError } from '../errors/argument-error';
 import { OperationCanceledError } from '../errors/operation-canceled-error';
-import { ArgumentNullError } from '@foundation/errors';
+import { ArgumentNullError } from '../../foundation/errors';
 
 class PromisePal {
     public static readonly completedPromise = PromisePal.observe(new Promise<void>(resolve => resolve(undefined)));
@@ -72,7 +72,7 @@ declare global {
 }
 
 // @ts-ignore
-Promise.delay = function (delayOrMillisecondsDelay: TimeSpan | number, cancellationToken: CancellationToken = CancellationToken.none): Promise<void> {
+Promise.delay = function(delayOrMillisecondsDelay: TimeSpan | number, cancellationToken: CancellationToken = CancellationToken.none): Promise<void> {
     if (delayOrMillisecondsDelay == null) { throw new ArgumentNullError('delayOrMillisecondsDelay'); }
 
     let delay: TimeSpan;
