@@ -1,6 +1,6 @@
 {
     "name": "@uipath/robot-client",
-    "version": "0.0.2",
+    "version": "0.0.24",
     "description": "UiPath Robot Client for Nodejs",
     "main": "dist/index.js",
     "typings": "dist/index",
@@ -11,11 +11,15 @@
     },
     "author": "Eduard Dumitru",
     "license": "MIT",
+    "publishConfig": {
+        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages@Local/npm/registry/",
+        "access": "public"
+    },
     "files": [
         "dist/**/*"
     ],
     "dependencies": {
-        "@uipath/ipc": "^0.0.2",
+        "@uipath/ipc": "^0.0.24",
         "rxjs": "^6.0.0"
     },
     "pkg": {
