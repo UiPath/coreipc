@@ -18,12 +18,6 @@
             ],
             "@uipath/robot-client/*": [
                 "@uipath-robot-client/src/*"
-            ],
-            "@core/*": [
-                "@uipath-ipc/src/core/*"
-            ],
-            "@foundation/*": [
-                "@uipath-ipc/src/foundation/*"
             ]
         }
     }

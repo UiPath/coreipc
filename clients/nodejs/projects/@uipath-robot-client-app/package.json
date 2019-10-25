@@ -1,0 +1,50 @@
+{
+    "name": "@uipath/robot-client-app",
+    "version": "0.0.23",
+    "private": true,
+    "description": "UiPath Robot Client Test App",
+    "main": "dist/program.js",
+    "bin": "dist/program.js",
+    "typings": "dist/program",
+    "scripts": {
+        "build": "tsc",
+        "build:watch": "tsc --watch",
+        "package": "pkg . --out-path ./bin",
+        "debug": "node --nolazy --inspect-brk=9229 ./dist/program.js",
+        "lint": "tslint --project \"./tsconfig.json\"",
+        "start": "node ./dist/program.js",
+        "start2": "node ./dist/program2.js",
+        "restart": "tsc & node ./dist/program.js"
+    },
+    "author": "Eduard Dumitru",
+    "license": "MIT",
+    "files": [
+        "dist/**/*"
+    ],
+    "publishConfig": {
+        "registry": "https://uipath.pkgs.visualstudio.com/_packaging/npm-packages@Local/npm/registry/",
+        "access": "public"
+    },
+    "pkg": {
+        "assets": [
+            "node_modules/blessed/usr/xterm",
+            "node_modules/blessed/usr/xterm-256color"
+        ]
+    },
+    "dependencies": {
+        "@uipath/robot-client": "^0.0.23",
+        "blessed": "0.1.81",
+        "winreg": "1.2.3"
+    },
+    "devDependencies": {
+        "@types/blessed": "0.1.10",
+        "@types/jest": "^22.1.4",
+        "@types/node": "^12.6.8",
+        "@types/winreg": "1.2.30",
+        "jest": "^24.8.0",
+        "pkg": "4.4.0",
+        "ts-jest": "^24.0.2",
+        "typescript": "^3.5.3"
+    },
+    "gitHead": "edef4e238fde99232400d5270c6f54c3f054cb10"
+}
