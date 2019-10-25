@@ -15,10 +15,10 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
     context(`ctor`, () => {
         it(`should throw provided a falsy ILogicalSocket`, () => {
             (() => new PipeReader(null as any)).should.throw(ArgumentNullError).
-                that.has.property('maybeParamName', 'socket');
+                with.property('paramName', 'socket');
 
             (() => new PipeReader(undefined as any)).should.throw(ArgumentNullError).
-                that.has.property('maybeParamName', 'socket');
+                with.property('paramName', 'socket');
         });
         it(`shouldn't throw provided a truthy ILogicalSocket`, () => {
             const logicalSocket = new SocketAdapter(SocketLikeMocks.createImmediatelyConnectingMock());
@@ -59,19 +59,19 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
 
             await pipeReader.readPartiallyAsync(null as any, CancellationToken.none).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                that.has.property('maybeParamName', 'destination');
+                with.property('paramName', 'destination');
 
             await pipeReader.readPartiallyAsync(undefined as any, CancellationToken.none).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                that.has.property('maybeParamName', 'destination');
+                with.property('paramName', 'destination');
 
             await pipeReader.readPartiallyAsync(Buffer.from('buffer'), null as any).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                that.has.property('maybeParamName', 'cancellationToken');
+                with.property('paramName', 'cancellationToken');
 
             await pipeReader.readPartiallyAsync(Buffer.from('buffer'), undefined as any).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                that.has.property('maybeParamName', 'cancellationToken');
+                with.property('paramName', 'cancellationToken');
         });
 
         it(`should be rejected with ObjectDisposedError if the PipeReader had been disposed`, async () => {
@@ -81,7 +81,7 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
 
             await pipeReader.readPartiallyAsync(Buffer.from('buffer'), CancellationToken.none).
                 should.eventually.be.rejectedWith(ObjectDisposedError).
-                that.has.property('objectName', 'PipeReader');
+                with.property('objectName', 'PipeReader');
         });
 
         it(`should be rejected with InvalidOperationError if another call is already in progrss`, async () => {
@@ -90,7 +90,7 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
             pipeReader.readPartiallyAsync(Buffer.from('buffer'), CancellationToken.none);
             await pipeReader.readPartiallyAsync(Buffer.from('buffer'), CancellationToken.none).
                 should.eventually.be.rejectedWith(InvalidOperationError).
-                that.has.property('message', 'Cannot read twice concurrently.');
+                with.property('message', 'Cannot read twice concurrently.');
         });
 
         it(`should be fulfilled and transfer the already available data from the underlying ILogicalSocket even when that data was smaller than the requested size`, async () => {
@@ -100,7 +100,7 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
             const source = Buffer.from('buffer');
             mocks.emitData(source);
 
-            const destination = new Buffer(20);
+            const destination = Buffer.alloc(20);
             await pipeReader.readPartiallyAsync(destination, CancellationToken.none).
                 should.eventually.be.fulfilled.
                 which.equals(source.length);
@@ -116,7 +116,7 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
             const source = Buffer.from('buffer');
             mocks.emitData(source);
 
-            const destination = new Buffer(2);
+            const destination = Buffer.alloc(2);
             await pipeReader.readPartiallyAsync(destination, CancellationToken.none).
                 should.eventually.be.fulfilled.
                 which.equals(destination.length);
@@ -131,7 +131,7 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
             const source = Buffer.from('buffer');
             mocks.emitData(source);
 
-            const destination = new Buffer(source.length);
+            const destination = Buffer.alloc(source.length);
             await pipeReader.readPartiallyAsync(destination, CancellationToken.none).
                 should.eventually.be.fulfilled.
                 which.equals(source.length);
@@ -143,7 +143,7 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
             const mocks = SocketLikeMocks.createEmittingMock();
             const pipeReader = new PipeReader(new SocketAdapter(mocks.socketLike));
 
-            const destination = new Buffer(10);
+            const destination = Buffer.alloc(10);
 
             const promise = pipeReader.readPartiallyAsync(destination, CancellationToken.none);
             const fulfilledSpy = spy(() => { });
@@ -164,7 +164,7 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
             const mocks = SocketLikeMocks.createEmittingMock();
             const pipeReader = new PipeReader(new SocketAdapter(mocks.socketLike));
 
-            const destination = new Buffer(10);
+            const destination = Buffer.alloc(10);
 
             const promise = pipeReader.readPartiallyAsync(destination, CancellationToken.none);
             const fulfilledSpy = spy(() => { });
@@ -182,7 +182,7 @@ describe(`foundation:pipes -> class:PipeReader`, () => {
 
             mocks.emitEnd();
 
-            const destination = new Buffer(10);
+            const destination = Buffer.alloc(10);
             await pipeReader.readPartiallyAsync(destination, CancellationToken.none).
                 should.eventually.be.fulfilled.
                 which.is.equal(0);

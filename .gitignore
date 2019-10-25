@@ -151,3 +151,4 @@ $ AxoCover
 /clients/nodejs/projects/@uipath-ipc/.nyc_output
 /clients/nodejs/projects/@uipath-ipc/reports/unit
 clients/nodejs/projects/@uipath-ipc/coverage.lcov
+clients/nodejs/projects/@uipath-ipc/coverage.lcov

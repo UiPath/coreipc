@@ -40,11 +40,10 @@ export class MessageStream implements IMessageStream {
     }
 
     public async disposeAsync(): Promise<void> {
+        this._messages.complete();
+        this._readIndefinitelyCts.cancel(false);
         await this._stream.disposeAsync();
 
-        this._messages.complete();
-
-        this._readIndefinitelyCts.cancel(false);
         try {
             await this._readIndefinitelyPromise;
         } catch (error) {
@@ -55,6 +54,7 @@ export class MessageStream implements IMessageStream {
         try {
             while (!token.isCancellationRequested) {
                 const message = await this.readMessageAsync(token);
+
                 this._messages.next(new MessageEvent(this, message));
             }
         } catch (error) {

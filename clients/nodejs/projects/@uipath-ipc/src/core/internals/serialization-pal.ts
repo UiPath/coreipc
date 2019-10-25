@@ -84,7 +84,7 @@ export class SerializationPal {
     }
 
     public static deserializeRequest(wireRequest: WireMessage.Request): {
-        brokerRequest: BrokerMessage.Request,
+        brokerRequest: BrokerMessage.InboundRequest,
         id: string
     } {
         if (!wireRequest) { throw new ArgumentNullError('wireRequest'); }

@@ -48,7 +48,8 @@ export class PipeClientStream implements IPipeClientStream, IAsyncDisposable {
     }
 
     private readonly _pipeReader: PipeReader;
-    private _isDisposed = false;
+    private _maybeDisposeTask: Promise<void> | null = null;
+    private get isDisposedOrDisposing(): boolean { return !!this._maybeDisposeTask; }
 
     private constructor(
         private readonly _socket: ILogicalSocket,
@@ -59,7 +60,7 @@ export class PipeClientStream implements IPipeClientStream, IAsyncDisposable {
 
     public async writeAsync(source: Buffer, cancellationToken: CancellationToken = CancellationToken.none): Promise<void> {
         if (!source) { throw new ArgumentNullError('source'); }
-        if (this._isDisposed) { return Promise.fromError(new ObjectDisposedError('PipeClientStream')); }
+        if (this.isDisposedOrDisposing) { return Promise.fromError(new ObjectDisposedError('PipeClientStream')); }
         if (source.length === 0) { return; }
 
         if (this._traceNetwork) {
@@ -79,7 +80,7 @@ export class PipeClientStream implements IPipeClientStream, IAsyncDisposable {
     }
     public async readPartiallyAsync(destination: Buffer, cancellationToken: CancellationToken = CancellationToken.none): Promise<number> {
         if (!destination) { throw new ArgumentNullError('destination'); }
-        if (this._isDisposed) { throw new ObjectDisposedError('PipeClientStream'); }
+        if (this.isDisposedOrDisposing) { throw new ObjectDisposedError('PipeClientStream'); }
 
         const cbRead = await this._pipeReader.readPartiallyAsync(destination, cancellationToken);
 
@@ -93,11 +94,11 @@ export class PipeClientStream implements IPipeClientStream, IAsyncDisposable {
         return cbRead;
     }
 
-    public async disposeAsync(): Promise<void> {
-        if (!this._isDisposed) {
-            this._isDisposed = true;
-            this._socket.dispose();
-            await this._pipeReader.disposeAsync();
-        }
+    public disposeAsync(): Promise<void> {
+        return this._maybeDisposeTask || (this._maybeDisposeTask = this.disposeCoreAsync().observe());
+    }
+    private async disposeCoreAsync(): Promise<void> {
+        this._socket.dispose();
+        await this._pipeReader.disposeAsync();
     }
 }

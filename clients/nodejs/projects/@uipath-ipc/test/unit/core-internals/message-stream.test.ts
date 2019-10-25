@@ -55,8 +55,8 @@ describe(`core:internals -> class:MessageStream`, () => {
 
     context(`ctor`, () => {
         it(`should throw provided a falsy stream`, () => {
-            (() => new MessageStream(null as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'stream');
-            (() => new MessageStream(undefined as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'stream');
+            (() => new MessageStream(null as any)).should.throw(ArgumentNullError).with.property('paramName', 'stream');
+            (() => new MessageStream(undefined as any)).should.throw(ArgumentNullError).with.property('paramName', 'stream');
         });
 
         it(`shouldn't throw provided a truthy stream`, () => {

@@ -1,9 +1,12 @@
 import { ProxyFactory } from '@core/internals/proxy-factory';
-import { Broker, IBroker } from '@core/internals/broker';
+import { Broker, IBroker, IBrokerCtorParams } from '@core/internals/broker';
 import { ArgumentNullError } from '@foundation/errors';
 import { PublicConstructor, Maybe } from '@foundation/utils';
-import { PipeClientStream, ILogicalSocketFactory, PhysicalSocket } from '@foundation/pipes';
+import { ILogicalSocketFactory, PhysicalSocket, IPipeClientStream } from '@foundation/pipes';
 import { CancellationToken, TimeSpan } from '@foundation/threading';
+
+export type ConnectionFactoryDelegate = (connect: () => Promise<IPipeClientStream>, cancellationToken: CancellationToken) => Promise<IPipeClientStream | void>;
+export type BeforeCallDelegate = (methodName: string, newConnection: boolean, cancellationToken: CancellationToken) => Promise<void>;
 
 export class IpcClient<TService> {
     private readonly _broker: IBroker;
@@ -12,24 +15,26 @@ export class IpcClient<TService> {
     constructor(
         public readonly pipeName: string,
         serviceCtor: PublicConstructor<TService>,
-        configFunc?: (config: IpcClientConfig<TService>) => void
+        configFunc?: (config: IIpcClientConfig) => void
     ) {
         if (!pipeName) { throw new ArgumentNullError('pipeName'); }
         if (!serviceCtor) { throw new ArgumentNullError('serviceCtor'); }
 
-        const config = new InternalIpcClientConfig<TService>();
+        const config = new IpcClientConfig();
         if (configFunc) { configFunc(config); }
 
-        this._broker = config.maybeBroker || new Broker(
-            config.logicalSocketFactory,
+        const params: IBrokerCtorParams = {
+            factory: config.logicalSocketFactory,
             pipeName,
-            TimeSpan.fromSeconds(config.defaultCallTimeoutSeconds),
-            TimeSpan.fromSeconds(config.defaultCallTimeoutSeconds),
-            config.callbackService,
-            config.maybeConnectionFactory,
-            config.maybeBeforeCall,
-            config.traceNetwork
-        );
+            connectTimeout: TimeSpan.fromSeconds(config.defaultCallTimeoutSeconds),
+            defaultCallTimeout: TimeSpan.fromSeconds(config.defaultCallTimeoutSeconds),
+            callback: config.callbackService,
+            connectionFactory: config.maybeConnectionFactory,
+            beforeCall: config.maybeBeforeCall,
+            traceNetwork: config.traceNetwork
+        };
+
+        this._broker = config.maybeBroker || new Broker(params);
 
         this.proxy = ProxyFactory.create(serviceCtor, this._broker);
     }
@@ -39,11 +44,24 @@ export class IpcClient<TService> {
     }
 }
 
-export type ConnectionFactoryDelegate = (connect: () => Promise<PipeClientStream>, cancellationToken: CancellationToken) => Promise<PipeClientStream | void>;
+export interface IIpcClientConfig {
+    defaultCallTimeoutSeconds: number;
 
-export type BeforeCallDelegate = (methodName: string, newConnection: boolean, cancellationToken: CancellationToken) => Promise<void>;
+    callbackService?: any;
+    traceNetwork: boolean;
 
-export class IpcClientConfig<TService> {
+    setConnectionFactory(
+        delegate: (connect: () => Promise<IPipeClientStream>, cancellationToken: CancellationToken) => Promise<IPipeClientStream | void>
+    ): this;
+
+    setBeforeCall(
+        delegate: (methodName: string, newConnection: boolean, cancellationToken: CancellationToken) => Promise<void>
+    ): this;
+}
+
+/* @internal */
+export class IpcClientConfig implements IIpcClientConfig {
+    // #region " Implementation of IIpcClientConfig "
     public defaultCallTimeoutSeconds: number = 40;
 
     public callbackService?: any;
@@ -52,7 +70,7 @@ export class IpcClientConfig<TService> {
     protected _maybeConnectionFactory: Maybe<ConnectionFactoryDelegate> = null;
     protected _maybeBeforeCall: Maybe<BeforeCallDelegate> = null;
 
-    public setConnectionFactory(delegate: (connect: () => Promise<PipeClientStream>, cancellationToken: CancellationToken) => Promise<PipeClientStream | void>): this {
+    public setConnectionFactory(delegate: (connect: () => Promise<IPipeClientStream>, cancellationToken: CancellationToken) => Promise<IPipeClientStream | void>): this {
         this._maybeConnectionFactory = delegate;
         return this;
     }
@@ -60,10 +78,8 @@ export class IpcClientConfig<TService> {
         this._maybeBeforeCall = delegate;
         return this;
     }
-}
+    // #endregion
 
-/* @internal */
-export class InternalIpcClientConfig<TService> extends IpcClientConfig<TService> {
     public logicalSocketFactory: ILogicalSocketFactory = () => new PhysicalSocket();
     public maybeBroker: IBroker | null = null;
 

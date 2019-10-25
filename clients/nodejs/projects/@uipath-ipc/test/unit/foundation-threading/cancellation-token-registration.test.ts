@@ -19,19 +19,19 @@ describe(`foundation:threading -> class:ProperCancellationTokenRegistration`, ()
         });
         it(`should throw when provided a falsy ct`, () => {
             const cb = () => { };
-            expect(() => new ProperCancellationTokenRegistration(null as any, cb)).to.throw(ArgumentNullError).property('maybeParamName', '_cancellationToken');
-            expect(() => new ProperCancellationTokenRegistration(undefined as any, cb)).to.throw(ArgumentNullError).property('maybeParamName', '_cancellationToken');
+            expect(() => new ProperCancellationTokenRegistration(null as any, cb)).to.throw(ArgumentNullError).with.property('paramName', '_cancellationToken');
+            expect(() => new ProperCancellationTokenRegistration(undefined as any, cb)).to.throw(ArgumentNullError).with.property('paramName', '_cancellationToken');
         });
         it(`should throw when provided a falsy callback`, () => {
             const ct = new ProperCancellationToken();
-            expect(() => new ProperCancellationTokenRegistration(ct, null as any)).to.throw(ArgumentNullError).property('maybeParamName', '_callback');
-            expect(() => new ProperCancellationTokenRegistration(ct, undefined as any)).to.throw(ArgumentNullError).property('maybeParamName', '_callback');
+            expect(() => new ProperCancellationTokenRegistration(ct, null as any)).to.throw(ArgumentNullError).with.property('paramName', '_callback');
+            expect(() => new ProperCancellationTokenRegistration(ct, undefined as any)).to.throw(ArgumentNullError).with.property('paramName', '_callback');
         });
         it(`should throw when provided both a falsy ct and a falsy callback`, () => {
-            expect(() => new ProperCancellationTokenRegistration(null as any, null as any)).to.throw(ArgumentNullError).property('maybeParamName', '_cancellationToken');
-            expect(() => new ProperCancellationTokenRegistration(null as any, undefined as any)).to.throw(ArgumentNullError).property('maybeParamName', '_cancellationToken');
-            expect(() => new ProperCancellationTokenRegistration(undefined as any, null as any)).to.throw(ArgumentNullError).property('maybeParamName', '_cancellationToken');
-            expect(() => new ProperCancellationTokenRegistration(undefined as any, undefined as any)).to.throw(ArgumentNullError).property('maybeParamName', '_cancellationToken');
+            expect(() => new ProperCancellationTokenRegistration(null as any, null as any)).to.throw(ArgumentNullError).with.property('paramName', '_cancellationToken');
+            expect(() => new ProperCancellationTokenRegistration(null as any, undefined as any)).to.throw(ArgumentNullError).with.property('paramName', '_cancellationToken');
+            expect(() => new ProperCancellationTokenRegistration(undefined as any, null as any)).to.throw(ArgumentNullError).with.property('paramName', '_cancellationToken');
+            expect(() => new ProperCancellationTokenRegistration(undefined as any, undefined as any)).to.throw(ArgumentNullError).with.property('paramName', '_cancellationToken');
         });
     });
 

@@ -67,12 +67,12 @@ describe(`core:internals -> class:SerializationPal`, () => {
                 expect(x.Type).not.to.be.null.and.not.to.be.undefined;
                 expect(x.InnerError).to.be.oneOf([null, undefined]);
 
-                x.Type.should.be.equal('Error');
+                x.Type.should.be.equal('InvalidOperationError');
                 x.Message.should.be.equal('root');
             },
             assert2(x: Error) {
                 x.should.be.instanceOf(Error);
-                x.name.should.be.equal('Error');
+                x.name.should.be.equal('InvalidOperationError');
                 x.message.should.be.equal('root');
                 x.should.not.have.property('inner');
             }
@@ -107,19 +107,19 @@ describe(`core:internals -> class:SerializationPal`, () => {
                 expect(x.InnerError).not.to.be.null.and.not.to.be.undefined;
                 expect(x.InnerError.InnerError).to.be.oneOf([null, undefined]);
 
-                x.Type.should.be.equal('Error');
+                x.Type.should.be.equal('InvalidOperationError');
                 x.Message.should.be.equal('root');
-                x.InnerError.Type.should.be.equal('Error');
+                x.InnerError.Type.should.be.equal('InvalidOperationError');
                 x.InnerError.Message.should.be.equal('child');
             },
             assert2(x: Error) {
                 x.should.be.instanceOf(Error);
-                x.name.should.be.equal('Error');
+                x.name.should.be.equal('InvalidOperationError');
                 x.message.should.be.equal('root');
                 expect((x as any).inner).not.to.be.null.and.not.to.be.undefined;
                 const inner = (x as any).inner as Error;
                 inner.should.be.instanceOf(Error);
-                inner.name.should.be.equal('Error');
+                inner.name.should.be.equal('InvalidOperationError');
                 inner.message.should.be.equal('child');
             }
         },
@@ -143,13 +143,13 @@ describe(`core:internals -> class:SerializationPal`, () => {
 
     context(`method:serializeResponse`, () => {
         it(`should throw provided a falsy BrokerMessage.Response`, () => {
-            (() => SerializationPal.serializeResponse(null as any, '')).should.throw(ArgumentNullError).with.property('maybeParamName', 'brokerResponse');
-            (() => SerializationPal.serializeResponse(undefined as any, '')).should.throw(ArgumentNullError).with.property('maybeParamName', 'brokerResponse');
+            (() => SerializationPal.serializeResponse(null as any, '')).should.throw(ArgumentNullError).with.property('paramName', 'brokerResponse');
+            (() => SerializationPal.serializeResponse(undefined as any, '')).should.throw(ArgumentNullError).with.property('paramName', 'brokerResponse');
         });
 
         it(`should throw provided a falsy id`, () => {
-            (() => SerializationPal.serializeResponse({} as any, null as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'id');
-            (() => SerializationPal.serializeResponse({} as any, undefined as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'id');
+            (() => SerializationPal.serializeResponse({} as any, null as any)).should.throw(ArgumentNullError).with.property('paramName', 'id');
+            (() => SerializationPal.serializeResponse({} as any, undefined as any)).should.throw(ArgumentNullError).with.property('paramName', 'id');
         });
 
         it(`shouldn't throw provided a truthy BrokerMessage.Response and id`, () => {
@@ -276,8 +276,8 @@ describe(`core:internals -> class:SerializationPal`, () => {
 
     context(`method:deserializeResponse`, () => {
         it(`should throw provided a falsy WireMessage`, () => {
-            (() => SerializationPal.deserializeResponse(null as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'wireResponse');
-            (() => SerializationPal.deserializeResponse(undefined as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'wireResponse');
+            (() => SerializationPal.deserializeResponse(null as any)).should.throw(ArgumentNullError).with.property('paramName', 'wireResponse');
+            (() => SerializationPal.deserializeResponse(undefined as any)).should.throw(ArgumentNullError).with.property('paramName', 'wireResponse');
         });
 
         it(`shouldn't throw provided a truthy WireMessage`, () => {
@@ -321,19 +321,19 @@ describe(`core:internals -> class:SerializationPal`, () => {
 
     context(`method:extract`, () => {
         it(`should throw provided a falsy request`, () => {
-            (() => SerializationPal.extract(null as any, TimeSpan.fromMilliseconds(0))).should.throw(ArgumentNullError).with.property('maybeParamName', 'request');
-            (() => SerializationPal.extract(undefined as any, TimeSpan.fromMilliseconds(0))).should.throw(ArgumentNullError).with.property('maybeParamName', 'request');
+            (() => SerializationPal.extract(null as any, TimeSpan.fromMilliseconds(0))).should.throw(ArgumentNullError).with.property('paramName', 'request');
+            (() => SerializationPal.extract(undefined as any, TimeSpan.fromMilliseconds(0))).should.throw(ArgumentNullError).with.property('paramName', 'request');
         });
 
         it(`should throw provided a falsy defaultTimeout`, () => {
             const request = new BrokerMessage.OutboundRequest('methodName', []);
-            (() => SerializationPal.extract(request, null as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'defaultTimeout');
-            (() => SerializationPal.extract(request, undefined as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'defaultTimeout');
+            (() => SerializationPal.extract(request, null as any)).should.throw(ArgumentNullError).with.property('paramName', 'defaultTimeout');
+            (() => SerializationPal.extract(request, undefined as any)).should.throw(ArgumentNullError).with.property('paramName', 'defaultTimeout');
         });
 
         it(`should throw provided a negative defaultTimeout`, () => {
             const request = new BrokerMessage.OutboundRequest('methodName', []);
-            (() => SerializationPal.extract(request, TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).with.property('maybeParamName', 'defaultTimeout');
+            (() => SerializationPal.extract(request, TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).with.property('paramName', 'defaultTimeout');
         });
 
         it(`shouldn't throw provided valid args`, () => {
@@ -409,28 +409,28 @@ describe(`core:internals -> class:SerializationPal`, () => {
 
     context(`method:serializeRequest`, () => {
         it(`should throw provided a null or undefined id`, () => {
-            (() => SerializationPal.serializeRequest(null as any, 'methodName', [], 1)).should.throw(ArgumentNullError).with.property('maybeParamName', 'id');
-            (() => SerializationPal.serializeRequest(undefined as any, 'methodName', [], 1)).should.throw(ArgumentNullError).with.property('maybeParamName', 'id');
-            (() => SerializationPal.serializeRequest('' as any, 'methodName', [], 1)).should.throw(ArgumentNullError).with.property('maybeParamName', 'id');
+            (() => SerializationPal.serializeRequest(null as any, 'methodName', [], 1)).should.throw(ArgumentNullError).with.property('paramName', 'id');
+            (() => SerializationPal.serializeRequest(undefined as any, 'methodName', [], 1)).should.throw(ArgumentNullError).with.property('paramName', 'id');
+            (() => SerializationPal.serializeRequest('' as any, 'methodName', [], 1)).should.throw(ArgumentNullError).with.property('paramName', 'id');
         });
         it(`should throw provided a falsy methodName`, () => {
-            (() => SerializationPal.serializeRequest('id', null as any, [], 1)).should.throw(ArgumentNullError).with.property('maybeParamName', 'methodName');
-            (() => SerializationPal.serializeRequest('id', undefined as any, [], 1)).should.throw(ArgumentNullError).with.property('maybeParamName', 'methodName');
-            (() => SerializationPal.serializeRequest('id', '' as any, [], 1)).should.throw(ArgumentNullError).with.property('maybeParamName', 'methodName');
+            (() => SerializationPal.serializeRequest('id', null as any, [], 1)).should.throw(ArgumentNullError).with.property('paramName', 'methodName');
+            (() => SerializationPal.serializeRequest('id', undefined as any, [], 1)).should.throw(ArgumentNullError).with.property('paramName', 'methodName');
+            (() => SerializationPal.serializeRequest('id', '' as any, [], 1)).should.throw(ArgumentNullError).with.property('paramName', 'methodName');
         });
         it(`should throw provided a falsy serializedArgs`, () => {
-            (() => SerializationPal.serializeRequest('id', 'methodName', null as any, 1)).should.throw(ArgumentNullError).with.property('maybeParamName', 'serializedArgs');
-            (() => SerializationPal.serializeRequest('id', 'methodName', undefined as any, 1)).should.throw(ArgumentNullError).with.property('maybeParamName', 'serializedArgs');
+            (() => SerializationPal.serializeRequest('id', 'methodName', null as any, 1)).should.throw(ArgumentNullError).with.property('paramName', 'serializedArgs');
+            (() => SerializationPal.serializeRequest('id', 'methodName', undefined as any, 1)).should.throw(ArgumentNullError).with.property('paramName', 'serializedArgs');
         });
         it(`should throw provided a null or undefined timeoutSeconds`, () => {
-            (() => SerializationPal.serializeRequest('id', 'methodName', [], null as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'timeoutSeconds');
-            (() => SerializationPal.serializeRequest('id', 'methodName', [], undefined as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'timeoutSeconds');
+            (() => SerializationPal.serializeRequest('id', 'methodName', [], null as any)).should.throw(ArgumentNullError).with.property('paramName', 'timeoutSeconds');
+            (() => SerializationPal.serializeRequest('id', 'methodName', [], undefined as any)).should.throw(ArgumentNullError).with.property('paramName', 'timeoutSeconds');
         });
         it(`shouldn't throw provided a timeoutSeconds of 0`, () => {
             (() => SerializationPal.serializeRequest('id', 'methodName', [], 0)).should.not.throw();
         });
         it(`should throw provided negative timeoutSeconds`, () => {
-            (() => SerializationPal.serializeRequest('id', 'methodName', [], -1)).should.throw(ArgumentError).with.property('maybeParamName', 'timeoutSeconds');
+            (() => SerializationPal.serializeRequest('id', 'methodName', [], -1)).should.throw(ArgumentError).with.property('paramName', 'timeoutSeconds');
         });
         it(`should write a byte of 0 (meaning WireMessage.Type.Request) followed by a 4 bytes for the payload byte count followed by the utf-8 encoding of the json serialization of a WireMessage.Request containing the provided args`, () => {
             const buffer = SerializationPal.serializeRequest('id', 'methodName', ['{}', 'true', '123', '[]'], 5);
@@ -457,7 +457,7 @@ describe(`core:internals -> class:SerializationPal`, () => {
 
     context(`method:deserializeRequest`, () => {
         it(`should throw provided a falsy wireRequest`, () => {
-            (() => SerializationPal.deserializeRequest(null as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'wireRequest');
+            (() => SerializationPal.deserializeRequest(null as any)).should.throw(ArgumentNullError).with.property('paramName', 'wireRequest');
         });
 
         it(`shouldn't throw provided a valid wireRequest`, () => {
@@ -468,19 +468,19 @@ describe(`core:internals -> class:SerializationPal`, () => {
 
     context(`method:fromJson`, () => {
         it(`should throw provided a falsy json`, () => {
-            (() => SerializationPal.fromJson(null as any, WireMessage.Type.Request)).should.throw(ArgumentNullError).with.property('maybeParamName', 'json');
-            (() => SerializationPal.fromJson(undefined as any, WireMessage.Type.Request)).should.throw(ArgumentNullError).with.property('maybeParamName', 'json');
-            (() => SerializationPal.fromJson('', WireMessage.Type.Request)).should.throw(ArgumentNullError).with.property('maybeParamName', 'json');
+            (() => SerializationPal.fromJson(null as any, WireMessage.Type.Request)).should.throw(ArgumentNullError).with.property('paramName', 'json');
+            (() => SerializationPal.fromJson(undefined as any, WireMessage.Type.Request)).should.throw(ArgumentNullError).with.property('paramName', 'json');
+            (() => SerializationPal.fromJson('', WireMessage.Type.Request)).should.throw(ArgumentNullError).with.property('paramName', 'json');
         });
 
         it(`should throw provided a falsy type`, () => {
             const wireRequest = new WireMessage.Request(1, 'id', 'methodName', []);
-            (() => SerializationPal.fromJson('{}', null as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'type');
-            (() => SerializationPal.fromJson('{}', undefined as any)).should.throw(ArgumentNullError).with.property('maybeParamName', 'type');
+            (() => SerializationPal.fromJson('{}', null as any)).should.throw(ArgumentNullError).with.property('paramName', 'type');
+            (() => SerializationPal.fromJson('{}', undefined as any)).should.throw(ArgumentNullError).with.property('paramName', 'type');
         });
 
         it(`should throw provided a type different from WireMessage.Type.Request or WireMessage.Type.Response`, () => {
-            (() => SerializationPal.fromJson('{}', 2 as any)).should.throw(ArgumentError).with.property('maybeParamName', 'type');
+            (() => SerializationPal.fromJson('{}', 2 as any)).should.throw(ArgumentError).with.property('paramName', 'type');
         });
 
         it(`should deserialize to a WireMessage.Request provided a type of WireMessage.Type.Request`, () => {

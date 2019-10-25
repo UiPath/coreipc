@@ -20,13 +20,13 @@ describe(`core:internals -> class:ProxyFactory`, () => {
         it(`should throw ArgumentNullError provided a falsy sampleCtor`, () => {
             (() => ProxyFactory.create(null as any, {} as any)).
                 should.throw(ArgumentNullError).
-                with.property('maybeParamName', 'sampleCtor');
+                with.property('paramName', 'sampleCtor');
         });
 
         it(`should throw ArgumentNullError provided a truthy sampleCtor and a falsy broker`, () => {
             (() => ProxyFactory.create(Object, null as any)).
                 should.throw(ArgumentNullError).
-                with.property('maybeParamName', 'broker');
+                with.property('paramName', 'broker');
         });
 
         it(`shouldn't throw provided truthy args`, () => {
@@ -83,7 +83,7 @@ describe(`core:internals -> class:Generator`, () => {
         it(`should throw ArgumentNullError provided a falsy sampleCtor`, () => {
             (() => Generator.generate(null as any)).
                 should.throw(ArgumentNullError).
-                with.property('maybeParamName', 'sampleCtor');
+                with.property('paramName', 'sampleCtor');
         });
 
         it(`shouldn't throw provided a truthy sampleCtor`, () => {

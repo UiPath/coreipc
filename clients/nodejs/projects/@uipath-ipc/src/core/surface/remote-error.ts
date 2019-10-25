@@ -1,3 +1,5 @@
+/* istanbul ignore file */
+
 export class RemoteError extends Error {
     private static readonly _defaultMessage = 'A remote method responded with an error.';
 

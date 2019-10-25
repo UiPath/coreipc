@@ -18,15 +18,15 @@ export const symbolofBroker = Symbol('broker');
 
 interface IProxyCtor<TService> {
     new(broker: IBroker): TService;
-    prototype: IProxyPrototype<TService>;
+    prototype: IProxyPrototype;
 }
-interface IProxyPrototype<TService> {
+interface IProxyPrototype {
     [methodName: string]: IMethod;
 }
-interface IProxy<TService> {
+interface IProxy {
     [symbolofBroker]: IBroker;
 }
-type IMethod = (...args: any[]) => any;
+type IMethod = (this: IProxy, ...args: any[]) => any;
 
 /* @internal */
 export class Generator<TService> {
@@ -64,7 +64,7 @@ export class Generator<TService> {
 
         const traceCategory = this._traceCategory;
 
-        return async function (this: IProxy<TService>) {
+        return async function (this: IProxy) {
             const args = normalizeArgs([...arguments]);
 
             const brokerOutboundRequest = new BrokerMessage.OutboundRequest(methodName, args);
@@ -103,7 +103,7 @@ export class Generator<TService> {
     }
 
     private static createCtor<TService>(): IProxyCtor<TService> {
-        const result = function (this: IProxy<TService>, broker: Broker): void {
+        const result = function (this: IProxy, broker: Broker): void {
             this[symbolofBroker] = broker;
         } as any as IProxyCtor<TService>;
         result.prototype = {};

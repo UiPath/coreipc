@@ -45,7 +45,7 @@ describe(`foundation:threading -> class:CancellationTokenSource`, () => {
         });
         it(`should throw when provided a negative delay`, () => {
             for (const _case of cases.filter(x => !!x.isNegative)) {
-                expect(_case.factory).to.throw(ArgumentError).property('maybeParamName', 'arg0');
+                expect(_case.factory).to.throw(ArgumentError).with.property('paramName', 'arg0');
             }
         });
     });
@@ -65,10 +65,10 @@ describe(`foundation:threading -> class:CancellationTokenSource`, () => {
 
                 cts.dispose();
 
-                expect(() => cts.cancel()).to.throw(ObjectDisposedError).property('objectName', 'CancellationTokenSource');
-                expect(() => cts.cancel(false)).to.throw(ObjectDisposedError).property('objectName', 'CancellationTokenSource');
-                expect(() => cts.cancel(true)).to.throw(ObjectDisposedError).property('objectName', 'CancellationTokenSource');
-                expect(() => cts.cancelAfter(TimeSpan.fromSeconds(10))).to.throw(ObjectDisposedError).property('objectName', 'CancellationTokenSource');
+                expect(() => cts.cancel()).to.throw(ObjectDisposedError).with.property('objectName', 'CancellationTokenSource');
+                expect(() => cts.cancel(false)).to.throw(ObjectDisposedError).with.property('objectName', 'CancellationTokenSource');
+                expect(() => cts.cancel(true)).to.throw(ObjectDisposedError).with.property('objectName', 'CancellationTokenSource');
+                expect(() => cts.cancelAfter(TimeSpan.fromSeconds(10))).to.throw(ObjectDisposedError).with.property('objectName', 'CancellationTokenSource');
             }
         });
     });
@@ -157,7 +157,7 @@ describe(`foundation:threading -> class:CancellationTokenSource`, () => {
 
                     cts.token.register(() => { throw error; });
 
-                    expect(() => cts.cancel(arg)).to.throw(AggregateError).property('errors').contains(error);
+                    expect(() => cts.cancel(arg)).to.throw(AggregateError).with.property('errors').contains(error);
                 }
             }
         });

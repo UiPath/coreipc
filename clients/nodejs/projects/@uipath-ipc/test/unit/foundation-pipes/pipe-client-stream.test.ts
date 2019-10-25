@@ -24,7 +24,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             await promise.
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                that.has.property('maybeParamName', 'factory');
+                with.property('paramName', 'factory');
 
             (() => promise = PipeClientStream.connectAsync((() => { }) as any, null as any, null, false)).
                 should.not.throw();
@@ -33,7 +33,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             await promise.
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                that.has.property('maybeParamName', 'name');
+                with.property('paramName', 'name');
 
             (() => promise = PipeClientStream.connectAsync((() => { }) as any, undefined as any, null, false)).
                 should.not.throw();
@@ -42,7 +42,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             await promise.
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                that.has.property('maybeParamName', 'name');
+                with.property('paramName', 'name');
         });
 
         it(`should resolve to a PipeClientStream provided truthy args`, async () => {
@@ -91,10 +91,10 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             expect(promise).not.to.be.undefined;
             await promise.
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                with.property('maybeParamName', 'destination');
+                with.property('paramName', 'destination');
         });
 
-        it(`shouldn't throw but it should reject with ObjectDisposedError if the PipeClientStream had been disposed`, async () => {
+        it(`should reject with ObjectDisposedError if the PipeClientStream had been disposed`, async () => {
             const mocks = SocketLikeMocks.createEmittingMock();
             const logicalSocket = new SocketAdapter(mocks.socketLike);
             const factory: ILogicalSocketFactory = () => logicalSocket;
@@ -102,7 +102,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             await stream.disposeAsync();
 
-            const destination = new Buffer(10);
+            const destination = Buffer.alloc(10);
 
             let promise: Promise<number> = null as any;
             (() => promise = stream.readPartiallyAsync(destination)).should.not.throw();
@@ -120,7 +120,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             const factory: ILogicalSocketFactory = () => logicalSocket;
             const stream = await PipeClientStream.connectAsync(factory, 'name', null, false);
 
-            const destination = new Buffer(10);
+            const destination = Buffer.alloc(10);
             const promise = stream.readPartiallyAsync(destination);
 
             const fulfilledSpy = spy(() => { });
@@ -145,7 +145,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             const source = Buffer.from([100, 101, 102]);
             mocks.emitData(source);
 
-            const destination = new Buffer(10);
+            const destination = Buffer.alloc(10);
             const promise = stream.readPartiallyAsync(destination);
 
             const fulfilledSpy = spy(() => { });
@@ -162,7 +162,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             const factory: ILogicalSocketFactory = () => logicalSocket;
             const stream = await PipeClientStream.connectAsync(factory, 'name', null, false);
 
-            const destination = new Buffer(10);
+            const destination = Buffer.alloc(10);
             const promise = stream.readPartiallyAsync(destination);
 
             const rejectedSpy = spy((error: any) => {
@@ -187,7 +187,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             mocks.emitEnd();
 
-            const destination = new Buffer(10);
+            const destination = Buffer.alloc(10);
             const promise = stream.readPartiallyAsync(destination);
 
             const rejectedSpy = spy((error: any) => {
@@ -202,7 +202,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
     });
 
     context(`method:readAsync`, () => {
-        it(`shouldn't throw but it should reject with ArgumentNullError provided a falsy destination`, async () => {
+        it(`should reject with ArgumentNullError provided a falsy destination`, async () => {
             const mocks = SocketLikeMocks.createEmittingMock();
             const logicalSocket = new SocketAdapter(mocks.socketLike);
             const factory: ILogicalSocketFactory = () => logicalSocket;
@@ -214,7 +214,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             expect(promise).not.to.be.undefined;
             await promise.
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                with.property('maybeParamName', 'destination');
+                with.property('paramName', 'destination');
         });
 
         it(`should immediately resolve provided an empty destination`, async () => {
@@ -241,7 +241,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             mocks.emitData(Buffer.from([0, 1, 2, 3]));
 
-            const destination = new Buffer(10);
+            const destination = Buffer.alloc(10);
 
             const promise = stream.readAsync(destination);
             const fulfilledSpy = spy(() => { });
@@ -265,7 +265,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
     });
 
     context(`method:writeAsync`, () => {
-        it(`shouldn't throw but it should reject with ArgumentNullError provided a falsy source`, async () => {
+        it(`should reject with ArgumentNullError provided a falsy source`, async () => {
             const mocks = SocketLikeMocks.createEmittingMock();
             const logicalSocket = new SocketAdapter(mocks.socketLike);
             const factory: ILogicalSocketFactory = () => logicalSocket;
@@ -273,14 +273,14 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             await stream.writeAsync(null as any).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                with.property('maybeParamName', 'source');
+                with.property('paramName', 'source');
 
             await stream.writeAsync(undefined as any).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                with.property('maybeParamName', 'source');
+                with.property('paramName', 'source');
         });
 
-        it(`shouldn't throw but it should reject with ObjectDisposedError if the PipeClientStream had been disposed`, async () => {
+        it(`should reject with ObjectDisposedError if the PipeClientStream had been disposed`, async () => {
             const mocks = SocketLikeMocks.createEmittingMock();
             const logicalSocket = new SocketAdapter(mocks.socketLike);
             const factory: ILogicalSocketFactory = () => logicalSocket;
@@ -288,7 +288,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             await stream.disposeAsync();
 
-            const buffer = new Buffer(10);
+            const buffer = Buffer.alloc(10);
             await stream.writeAsync(buffer).
                 should.eventually.be.rejectedWith(ObjectDisposedError).
                 with.property('objectName', 'PipeClientStream');
@@ -300,7 +300,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             const factory: ILogicalSocketFactory = () => logicalSocket;
             const stream = await PipeClientStream.connectAsync(factory, 'name', null, false);
 
-            const buffer = new Buffer(0);
+            const buffer = Buffer.alloc(0);
             const promise = stream.writeAsync(buffer);
             const fulfilledSpy = spy(() => { });
             promise.then(fulfilledSpy);
@@ -322,7 +322,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
                 return false;
             }) as any;
 
-            const buffer = new Buffer(10);
+            const buffer = Buffer.alloc(10);
             const promise = stream.writeAsync(buffer);
             const fulfilledSpy = spy(() => { });
             promise.then(fulfilledSpy);
@@ -355,7 +355,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             Trace.addListener(traceHandlerSpy);
 
             const source = Buffer.from('buffer');
-            const destination = new Buffer(source.length);
+            const destination = Buffer.alloc(source.length);
             const promise = stream.readAsync(destination);
 
             mocks.emitData(source);

@@ -29,11 +29,11 @@ export class PipeReader implements IAsyncDisposable {
 
     private onNext(data: Buffer): void {
         this._buffers.enqueue(data);
-        if (this._maybeDataAvailableSignal) { this._maybeDataAvailableSignal.setResult(undefined); }
+        if (this._maybeDataAvailableSignal) { this._maybeDataAvailableSignal.trySetResult(); }
     }
     private onComplete(): void {
         this._buffers.enqueue(null);
-        if (this._maybeDataAvailableSignal) { this._maybeDataAvailableSignal.setResult(undefined); }
+        if (this._maybeDataAvailableSignal) { this._maybeDataAvailableSignal.trySetResult(); }
     }
     public async readPartiallyAsync(destination: Buffer, cancellationToken: CancellationToken): Promise<number> {
         if (!destination) { throw new ArgumentNullError('destination'); }

@@ -57,7 +57,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
             it(`should throw ArgumentNullError provided a falsy pcs`, () => {
                 (() => new Succeeded<string>('foo').apply(null as any)).
                     should.throw(ArgumentNullError).
-                    with.property('maybeParamName', 'pcs');
+                    with.property('paramName', 'pcs');
             });
 
             it(`should call setResult on the provided pcs`, () => {
@@ -73,7 +73,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
             it(`should throw ArgumentNullError provided a falsy pcs`, () => {
                 (() => new Succeeded<string>('foo').tryApply(null as any)).
                     should.throw(ArgumentNullError).
-                    with.property('maybeParamName', 'pcs');
+                    with.property('paramName', 'pcs');
             });
 
             it(`should call trySetResult on the provided pcs`, () => {
@@ -145,7 +145,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
             it(`should throw ArgumentNullError provided a falsy pcs`, () => {
                 (() => new Faulted<string>(error).apply(null as any)).
                     should.throw(ArgumentNullError).
-                    with.property('maybeParamName', 'pcs');
+                    with.property('paramName', 'pcs');
             });
 
             it(`should call setError on the provided pcs`, () => {
@@ -161,7 +161,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
             it(`should throw ArgumentNullError provided a falsy pcs`, () => {
                 (() => new Faulted<string>(error).tryApply(null as any)).
                     should.throw(ArgumentNullError).
-                    with.property('maybeParamName', 'pcs');
+                    with.property('paramName', 'pcs');
             });
 
             it(`should call trySetError on the provided pcs`, () => {
@@ -229,7 +229,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
             it(`should throw ArgumentNullError provided a falsy pcs`, () => {
                 (() => new Canceled<string>().apply(null as any)).
                     should.throw(ArgumentNullError).
-                    with.property('maybeParamName', 'pcs');
+                    with.property('paramName', 'pcs');
             });
 
             it(`should call setCanceled on the provided pcs`, () => {
@@ -245,7 +245,7 @@ describe(`foundation:utils -> hierarchy:Outcome`, () => {
             it(`should throw ArgumentNullError provided a falsy pcs`, () => {
                 (() => new Canceled<string>().tryApply(null as any)).
                     should.throw(ArgumentNullError).
-                    with.property('maybeParamName', 'pcs');
+                    with.property('paramName', 'pcs');
             });
 
             it(`should call trySetCanceled on the provided pcs`, () => {

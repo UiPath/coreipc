@@ -42,7 +42,7 @@ describe(`foundation:threading -> class:CancellationToken`, () => {
 
     context(`method:merge`, () => {
         it(`should throw when called with zero tokens`, () => {
-            expect(() => CancellationToken.merge()).to.throw(ArgumentError).property('maybeParamName', 'tokens');
+            expect(() => CancellationToken.merge()).to.throw(ArgumentError).with.property('paramName', 'tokens');
         });
 
         it(`shouldn't throw when called with one token`, () => {

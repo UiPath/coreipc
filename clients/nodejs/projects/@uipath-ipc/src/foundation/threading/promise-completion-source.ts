@@ -13,8 +13,7 @@ export class PromiseCompletionSource<T> {
             const me = this as any;
             me._resolve = resolve;
             me._reject = reject;
-        });
-        this.promise.then(_ => { }, _ => { });
+        }).observe();
     }
 
     public trySet(outcome: Outcome.AnyOutcome<T>): boolean { return outcome.tryApply(this); }

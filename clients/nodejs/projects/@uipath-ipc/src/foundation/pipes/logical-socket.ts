@@ -14,10 +14,8 @@ import { ArgumentNullError } from '../errors/argument-null-error';
 
 export type ILogicalSocketFactory = () => ILogicalSocket;
 
-/*
-ILogicalSocket translates the operations defined by ISocketLike while employing TAP and the Observer Pattern for its methods and events.
- */
-
+/* ILogicalSocket translates the operations defined by ISocketLike while employing TAP and the Observer Pattern for its methods and events. */
+/* @internal */
 export interface ILogicalSocket extends IDisposable {
     connectAsync(path: string, maybeTimeout: TimeSpan | null, cancellationToken: CancellationToken): Promise<void>;
     writeAsync(buffer: Buffer, cancellationToken: CancellationToken): Promise<void>;
@@ -27,7 +25,6 @@ export interface ILogicalSocket extends IDisposable {
 }
 
 /* This class translates an ISocketLike into an ILogicalSocket. */
-
 /* @internal */
 export class LogicalSocket implements ILogicalSocket {
     private _isDisposed = false;

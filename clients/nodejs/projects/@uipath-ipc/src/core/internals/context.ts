@@ -1,14 +1,15 @@
 import * as BrokerMessage from './broker-message';
+import * as Outcome from '@foundation/utils';
+
 import { PromiseCompletionSource } from '../../foundation/threading/promise-completion-source';
 import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
-import * as Outcome from '@foundation/utils';
-import { IDisposable } from '../../foundation/disposable';
+import { IDisposable, IAsyncDisposable } from '../../foundation/disposable';
 import { ObjectDisposedError } from '../../foundation/errors/object-disposed-error';
 import { CancellationToken } from '../..';
 import { CancellationTokenRegistration } from '../../foundation/threading/cancellation-token-registration';
 
 /* @internal */
-export interface ICallContext {
+export interface ICallContext extends IDisposable {
     readonly id: string;
     readonly promise: Promise<BrokerMessage.Response>;
 }
@@ -18,32 +19,44 @@ export class CallContext implements ICallContext {
     private readonly _pcs = new PromiseCompletionSource<BrokerMessage.Response>();
     private readonly _ctreg: CancellationTokenRegistration;
 
-    public get promise(): Promise<BrokerMessage.Response> { return this._pcs.promise; }
+    public get promise(): Promise<BrokerMessage.Response> {
+        return this._pcs.promise;
+    }
 
-    constructor(public readonly id: string, cancellationToken: CancellationToken) {
+    constructor(public readonly id: string, cancellationToken: CancellationToken, private readonly _maybeDisposable?: IDisposable) {
         if (!id) { throw new ArgumentNullError('id'); }
         if (!cancellationToken) { throw new ArgumentNullError('cancellationToken'); }
 
         this._ctreg = cancellationToken.register(() => {
-            this.set(new Outcome.Canceled());
+            this.trySet(new Outcome.Canceled());
         });
     }
-    public set(outcome: Outcome.AnyOutcome<BrokerMessage.Response>) {
+
+    public trySet(outcome: Outcome.AnyOutcome<BrokerMessage.Response>) {
+        if (!outcome) { throw new ArgumentNullError('outcome'); }
+
         this._ctreg.dispose();
         this._pcs.trySet(outcome);
+    }
+
+    public dispose(): void {
+        if (this._maybeDisposable) {
+            this._maybeDisposable.dispose();
+        }
     }
 }
 
 /* @internal */
 export class CallbackContext {
     constructor(
-        public readonly request: BrokerMessage.Request,
+        public readonly request: BrokerMessage.InboundRequest,
         private readonly _respondAction: (response: BrokerMessage.Response) => Promise<void>
     ) {
         if (!request) { throw new ArgumentNullError('request'); }
         if (!_respondAction) { throw new ArgumentNullError('_respondAction'); }
     }
     public async respondAsync(response: BrokerMessage.Response): Promise<void> {
+        if (!response) { throw new ArgumentNullError('response'); }
         return await this._respondAction(response);
     }
 }
@@ -54,9 +67,11 @@ export class CallContextTable implements IDisposable {
     private _isDisposed = false;
     private readonly _contexts: { [id: string]: CallContext | undefined; } = {};
 
-    public createContext(cancellationToken: CancellationToken): ICallContext {
+    public createContext(cancellationToken: CancellationToken, maybeDisposable?: IDisposable): ICallContext {
+        if (!cancellationToken) { throw new ArgumentNullError(`cancellationToken`); }
         if (this._isDisposed) { throw new ObjectDisposedError('CallContextTable'); }
-        const context = new CallContext(`${this._nextId++}`, cancellationToken);
+
+        const context = new CallContext(`${this._nextId++}`, cancellationToken, maybeDisposable);
         this._contexts[context.id] = context;
         return context;
     }
@@ -72,7 +87,10 @@ export class CallContextTable implements IDisposable {
         const context = this._contexts[id];
         delete this._contexts[id];
 
-        if (context) { context.set(outcome); }
+        if (context) {
+            context.trySet(outcome);
+            context.dispose();
+        }
     }
 
     public dispose(): void {

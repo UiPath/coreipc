@@ -1,7 +1,6 @@
 import {
     IpcClient,
-    IpcClientConfig,
-    InternalIpcClientConfig,
+    IIpcClientConfig,
     BeforeCallDelegate,
     ConnectionFactoryDelegate
 } from './ipc-client';
@@ -12,8 +11,7 @@ import { RemoteError } from './remote-error';
 
 export {
     IpcClient,
-    IpcClientConfig,
-    InternalIpcClientConfig,
+    IIpcClientConfig,
     BeforeCallDelegate,
     ConnectionFactoryDelegate,
     __hasCancellationToken__, __returns__,

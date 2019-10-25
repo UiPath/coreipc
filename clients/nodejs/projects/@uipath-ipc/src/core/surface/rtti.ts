@@ -4,7 +4,7 @@
 // tslint:disable: no-namespace
 // tslint:disable: no-internal-module
 
-import { PublicConstructor, Method, Maybe } from '@foundation/utils';
+import { PublicConstructor, Maybe } from '@foundation/utils';
 
 const $classInfo = Symbol();
 const $classGetOrCreateMethod = Symbol();

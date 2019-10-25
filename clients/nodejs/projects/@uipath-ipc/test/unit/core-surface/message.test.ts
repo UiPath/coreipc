@@ -23,7 +23,7 @@ describe(`core:surface -> class:Message`, () => {
         it(`should throw provided a negative TimeSpan`, () => {
             (() => new Message(TimeSpan.fromMilliseconds(-1))).
                 should.throw(ArgumentError).
-                that.has.property('maybeParamName', 'requestTimeout');
+                with.property('paramName', 'requestTimeout');
         });
         it(`shouldn't throw provided a payload`, () => {
             (() => new Message(null)).should.not.throw();
@@ -46,11 +46,11 @@ describe(`core:surface -> class:Message`, () => {
             (() => new Message(true, TimeSpan.fromMilliseconds(1))).should.not.throw();
         });
         it(`should throw provided a payload and a negative TimeSpan`, () => {
-            (() => new Message(null, TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).that.has.property('maybeParamName', 'requestTimeout');
-            (() => new Message(undefined, TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).that.has.property('maybeParamName', 'requestTimeout');
-            (() => new Message('payload', TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).that.has.property('maybeParamName', 'requestTimeout');
-            (() => new Message(123, TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).that.has.property('maybeParamName', 'requestTimeout');
-            (() => new Message(true, TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).that.has.property('maybeParamName', 'requestTimeout');
+            (() => new Message(null, TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).with.property('paramName', 'requestTimeout');
+            (() => new Message(undefined, TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).with.property('paramName', 'requestTimeout');
+            (() => new Message('payload', TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).with.property('paramName', 'requestTimeout');
+            (() => new Message(123, TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).with.property('paramName', 'requestTimeout');
+            (() => new Message(true, TimeSpan.fromMilliseconds(-1))).should.throw(ArgumentError).with.property('paramName', 'requestTimeout');
         });
     });
 });

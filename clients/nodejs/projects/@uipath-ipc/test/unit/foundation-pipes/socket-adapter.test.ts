@@ -21,8 +21,8 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
         });
 
         it(`should throw provided a falsy ISocketLike`, () => {
-            expect(() => new SocketAdapter(null as any)).to.throw(ArgumentNullError).that.has.property('maybeParamName', '_socketLike');
-            expect(() => new SocketAdapter(undefined as any)).to.throw(ArgumentNullError).that.has.property('maybeParamName', '_socketLike');
+            expect(() => new SocketAdapter(null as any)).to.throw(ArgumentNullError).with.property('paramName', '_socketLike');
+            expect(() => new SocketAdapter(undefined as any)).to.throw(ArgumentNullError).with.property('paramName', '_socketLike');
         });
     });
 
@@ -33,22 +33,22 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
 
             await instance.connectAsync(null as any, null, CancellationToken.none).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                and.have.property('maybeParamName', 'path');
+                with.property('paramName', 'path');
 
             await instance.connectAsync(undefined as any, null, CancellationToken.none).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                and.have.property('maybeParamName', 'path');
+                with.property('paramName', 'path');
         });
         it(`should reject provided a falsy ct`, async () => {
             const instance = new SocketAdapter(SocketLikeMocks.createReadableMock());
 
             await instance.connectAsync('path', null, null as any).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                and.have.property('maybeParamName', 'cancellationToken');
+                with.property('paramName', 'cancellationToken');
 
             await instance.connectAsync('path', null, undefined as any).
                 should.eventually.be.rejectedWith(ArgumentNullError).
-                and.have.property('maybeParamName', 'cancellationToken');
+                with.property('paramName', 'cancellationToken');
         });
         it(`should resolve and connect immediately when ISocketLike connects immediately`, async () => {
             const socketLikeMock = SocketLikeMocks.createImmediatelyConnectingMock();
@@ -410,11 +410,11 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
 
             await instance.writeAsync(null as any, CancellationToken.none).
                 should.eventually.rejectedWith(ArgumentNullError).
-                which.has.property('maybeParamName', 'buffer');
+                with.property('paramName', 'buffer');
 
             await instance.writeAsync(undefined as any, CancellationToken.none).
                 should.eventually.rejectedWith(ArgumentNullError).
-                which.has.property('maybeParamName', 'buffer');
+                with.property('paramName', 'buffer');
         });
 
         it(`should reject with ArgumentNullError provided a falsy CancellationToken`, async () => {
@@ -423,11 +423,11 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
 
             await instance.writeAsync(Buffer.from('buffer'), null as any).
                 should.eventually.rejectedWith(ArgumentNullError).
-                which.has.property('maybeParamName', 'cancellationToken');
+                with.property('paramName', 'cancellationToken');
 
             await instance.writeAsync(Buffer.from('buffer'), undefined as any).
                 should.eventually.rejectedWith(ArgumentNullError).
-                which.has.property('maybeParamName', 'cancellationToken');
+                with.property('paramName', 'cancellationToken');
         });
 
         it(`should reject with ObjectDisposedError if the SocketAdapter had been disposed`, async () => {

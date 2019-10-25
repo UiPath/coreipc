@@ -76,8 +76,8 @@ describe(`foundation:threading -> class:TimeSpan`, () => {
             expect(() => TimeSpan.toTimeSpan(undefined as any)).to.throw();
         });
         it(`should throw for any arg other than number or TimeSpan`, () => {
-            expect(() => TimeSpan.toTimeSpan({} as any)).to.throw(ArgumentError).property('maybeParamName', 'arg0');
-            expect(() => TimeSpan.toTimeSpan(true as any)).to.throw(ArgumentError).property('maybeParamName', 'arg0');
+            expect(() => TimeSpan.toTimeSpan({} as any)).to.throw(ArgumentError).with.property('paramName', 'arg0');
+            expect(() => TimeSpan.toTimeSpan(true as any)).to.throw(ArgumentError).with.property('paramName', 'arg0');
         });
         it(`should return the exact TimeSpan provided as the single argument`, () => {
             for (const _case of _cases.filter(x => !x.isInvalid)) {

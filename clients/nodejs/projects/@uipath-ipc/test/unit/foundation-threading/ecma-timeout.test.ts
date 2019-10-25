@@ -14,21 +14,21 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
             expect(() => new EcmaTimeout(TimeSpan.fromMilliseconds(1), () => { })).not.to.throw();
         });
         it(`should throw when provided a negative timespan`, () => {
-            expect(() => new EcmaTimeout(TimeSpan.fromMilliseconds(-1), () => { })).to.throw(ArgumentError).property('maybeParamName', 'timespan');
+            expect(() => new EcmaTimeout(TimeSpan.fromMilliseconds(-1), () => { })).to.throw(ArgumentError).with.property('paramName', 'timespan');
         });
         it(`should throw when provided a falsy timespan`, () => {
-            expect(() => new EcmaTimeout(null as any, () => { })).to.throw(ArgumentNullError).property('maybeParamName', 'timespan');
-            expect(() => new EcmaTimeout(undefined as any, () => { })).to.throw(ArgumentNullError).property('maybeParamName', 'timespan');
+            expect(() => new EcmaTimeout(null as any, () => { })).to.throw(ArgumentNullError).with.property('paramName', 'timespan');
+            expect(() => new EcmaTimeout(undefined as any, () => { })).to.throw(ArgumentNullError).with.property('paramName', 'timespan');
         });
         it(`should throw when provided a falsy callback`, () => {
-            expect(() => new EcmaTimeout(TimeSpan.fromMilliseconds(1), null as any)).to.throw(ArgumentNullError).property('maybeParamName', '_callback');
-            expect(() => new EcmaTimeout(TimeSpan.fromMilliseconds(1), undefined as any)).to.throw(ArgumentNullError).property('maybeParamName', '_callback');
+            expect(() => new EcmaTimeout(TimeSpan.fromMilliseconds(1), null as any)).to.throw(ArgumentNullError).with.property('paramName', '_callback');
+            expect(() => new EcmaTimeout(TimeSpan.fromMilliseconds(1), undefined as any)).to.throw(ArgumentNullError).with.property('paramName', '_callback');
         });
         it(`should throw when provided both a falsy timespan and a falsy callback`, () => {
-            expect(() => new EcmaTimeout(null as any, null as any)).to.throw(ArgumentNullError).property('maybeParamName', 'timespan');
-            expect(() => new EcmaTimeout(null as any, undefined as any)).to.throw(ArgumentNullError).property('maybeParamName', 'timespan');
-            expect(() => new EcmaTimeout(undefined as any, null as any)).to.throw(ArgumentNullError).property('maybeParamName', 'timespan');
-            expect(() => new EcmaTimeout(undefined as any, undefined as any)).to.throw(ArgumentNullError).property('maybeParamName', 'timespan');
+            expect(() => new EcmaTimeout(null as any, null as any)).to.throw(ArgumentNullError).with.property('paramName', 'timespan');
+            expect(() => new EcmaTimeout(null as any, undefined as any)).to.throw(ArgumentNullError).with.property('paramName', 'timespan');
+            expect(() => new EcmaTimeout(undefined as any, null as any)).to.throw(ArgumentNullError).with.property('paramName', 'timespan');
+            expect(() => new EcmaTimeout(undefined as any, undefined as any)).to.throw(ArgumentNullError).with.property('paramName', 'timespan');
         });
     });
 
@@ -78,8 +78,8 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
 
     context(`method:maybeCreate`, () => {
         it(`should throw when provided a falsy callback`, () => {
-            expect(() => EcmaTimeout.maybeCreate(null, null as any)).to.throw(ArgumentNullError).property('maybeParamName', 'callback');
-            expect(() => EcmaTimeout.maybeCreate(null, undefined as any)).to.throw(ArgumentNullError).property('maybeParamName', 'callback');
+            expect(() => EcmaTimeout.maybeCreate(null, null as any)).to.throw(ArgumentNullError).with.property('paramName', 'callback');
+            expect(() => EcmaTimeout.maybeCreate(null, undefined as any)).to.throw(ArgumentNullError).with.property('paramName', 'callback');
         });
 
         const _cases: Array<{
@@ -122,7 +122,7 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
             for (const _case of _cases) {
                 const result = EcmaTimeout.maybeCreate(_case.timeSpan as any, () => { });
 
-                expect(result).property('dispose').instanceOf(Function);
+                expect(result).with.property('dispose').instanceOf(Function);
             }
         });
         it(`should cause the callback's execution when the provided timespan is defined, non-null and non-negative`, async () => {

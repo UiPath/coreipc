@@ -130,18 +130,18 @@ describe(`foundation:threading -> class:PromisePal`, () => {
         });
 
         it(`should throw provided 0 args`, () => {
-            expect(() => (Promise.delay as any as () => {})()).to.throw(ArgumentNullError).property('maybeParamName', 'delayOrMillisecondsDelay');
+            expect(() => (Promise.delay as any as () => {})()).to.throw(ArgumentNullError).with.property('paramName', 'delayOrMillisecondsDelay');
         });
 
         it(`should throw provided a 1st arg of type other than number or TimeSpan`, () => {
-            expect(() => Promise.delay(true as any)).to.throw(ArgumentError).property('message', 'Expecting a number or a TimeSpan as the first argument.');
-            expect(() => Promise.delay({} as any)).to.throw(ArgumentError).property('message', 'Expecting a number or a TimeSpan as the first argument.');
+            expect(() => Promise.delay(true as any)).to.throw(ArgumentError).with.property('message', 'Expecting a number or a TimeSpan as the first argument.');
+            expect(() => Promise.delay({} as any)).to.throw(ArgumentError).with.property('message', 'Expecting a number or a TimeSpan as the first argument.');
         });
 
         it(`should throw provided a negative number (delay milliseconds)`, () => {
             expect(() => Promise.delay(-1)).to.throw(ArgumentError).
                 that.satisfies((error: ArgumentError) => {
-                    expect(error).to.have.property('maybeParamName', 'millisecondsDelay');
+                    expect(error).to.have.property('paramName', 'millisecondsDelay');
                     expect(error).to.have.property('message').that.satisfies((message: string) => message.startsWith('Cannot delay for a negative timespan.'));
                     return true;
                 });
@@ -150,7 +150,7 @@ describe(`foundation:threading -> class:PromisePal`, () => {
         it(`should throw provided a negative TimeSpan (delay)`, () => {
             expect(() => Promise.delay(TimeSpan.fromMilliseconds(-1))).to.throw(ArgumentError).
                 that.satisfies((error: ArgumentError) => {
-                    expect(error).to.have.property('maybeParamName', 'delay');
+                    expect(error).to.have.property('paramName', 'delay');
                     expect(error).to.have.property('message').that.satisfies((message: string) => message.startsWith('Cannot delay for a negative timespan.'));
                     return true;
                 });
