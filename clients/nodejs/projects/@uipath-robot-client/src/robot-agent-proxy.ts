@@ -3,7 +3,6 @@ import * as UpstreamContract from './upstream-contract';
 import { Observable, Subject, Observer } from 'rxjs';
 import { IRobotProxy, RobotProxy } from './robot-proxy';
 import { Trace, Message } from '@uipath/ipc';
-import '@uipath-ipc';
 import { RobotConfig } from '.';
 import { spawn } from 'child_process';
 

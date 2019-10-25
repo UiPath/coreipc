@@ -1,6 +1,6 @@
 {
     "name": "@uipath/ipc",
-    "version": "0.0.28",
+    "version": "0.0.29",
     "description": "UiPath Ipc for Nodejs",
     "main": "dist/index.js",
     "typings": "dist/index",
