@@ -30,9 +30,9 @@ export class CallContext implements ICallContext {
     constructor(
         private readonly _data: ICallContextData
     ) {
-        if (!_data) { throw new ArgumentNullError('_params'); }
-        if (!_data.cancellationToken) { throw new ArgumentError('Expecting a non-null, non-undefined CancellationToken on the provided ICallContextData.', '_params'); }
-        if (!_data.wireRequest) { throw new ArgumentError('Expecting a non-null, non-undefined WireMessage.Request on the provided ICallContextData.', '_params'); }
+        if (!_data) { throw new ArgumentNullError('_data'); }
+        if (!_data.cancellationToken) { throw new ArgumentError('Expecting a non-null, non-undefined CancellationToken on the provided ICallContextData.', '_data'); }
+        if (!_data.wireRequest) { throw new ArgumentError('Expecting a non-null, non-undefined WireMessage.Request on the provided ICallContextData.', '_data'); }
 
         this._ctreg = _data.cancellationToken.register(() => {
             this.trySet(new Outcome.Canceled());
