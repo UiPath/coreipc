@@ -6,6 +6,7 @@ import { ArgumentError } from '../../foundation/errors/argument-error';
 import { TimeSpan } from '../../foundation/threading/timespan';
 import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
 import { IDisposable } from '../../foundation/disposable';
+import { ICallContextDataFactory } from './context';
 
 /* @internal */
 export class SerializationPal {
@@ -98,15 +99,28 @@ export class SerializationPal {
         );
         return { brokerRequest, id };
     }
-    public static serializeResponse(brokerResponse: BrokerMessage.Response, id: string): Buffer {
+
+    public static brokerResponseToWireResponse(brokerResponse: BrokerMessage.Response, id: string): WireMessage.Response {
         if (!brokerResponse) { throw new ArgumentNullError('brokerResponse'); }
         if (!id) { throw new ArgumentNullError('id'); }
 
+        return SerializationPal.brokerResponseToWireResponseUnchecked(brokerResponse, id);
+    }
+    private static brokerResponseToWireResponseUnchecked(brokerResponse: BrokerMessage.Response, id: string): WireMessage.Response {
         const wireResponse = new WireMessage.Response(
             id,
             brokerResponse.maybeError ? null : this.serializeObject(brokerResponse.maybeResult),
             this.serializeError(brokerResponse.maybeError)
         );
+        return wireResponse;
+    }
+
+    public static wireResponseToBuffer(wireResponse: WireMessage.Response): Buffer {
+        if (!wireResponse) { throw new ArgumentNullError('wireResponse'); }
+
+        return SerializationPal.wireResponseToBufferUnchecked(wireResponse);
+    }
+    private static wireResponseToBufferUnchecked(wireResponse: WireMessage.Response): Buffer {
         const json = JSON.stringify(wireResponse);
         const cbPayload = Buffer.byteLength(json, 'utf8');
         const buffer = Buffer.alloc(5 + cbPayload);
@@ -118,25 +132,15 @@ export class SerializationPal {
         return buffer;
     }
 
-    public static extract(request: BrokerMessage.OutboundRequest, defaultTimeout: TimeSpan): {
-        serializedArgs: string[],
-        timeoutSeconds: number,
-        cancellationToken: CancellationToken,
-        disposable: IDisposable
-    } {
+    public static prepareCallContext(request: BrokerMessage.OutboundRequest, defaultTimeout: TimeSpan): ICallContextDataFactory {
         if (!request) { throw new ArgumentNullError('request'); }
         if (!defaultTimeout) { throw new ArgumentNullError('defaultTimeout'); }
         if (defaultTimeout.isNegative) { throw new ArgumentError('Expecting a non-negative TimeSpan.', 'defaultTimeout'); }
 
-        return SerializationPal.extractUnchecked(request, defaultTimeout);
+        return SerializationPal.prepareCallContextUnchecked(request, defaultTimeout);
     }
 
-    private static extractUnchecked(request: BrokerMessage.OutboundRequest, defaultTimeout: TimeSpan): {
-        serializedArgs: string[],
-        timeoutSeconds: number,
-        cancellationToken: CancellationToken,
-        disposable: IDisposable
-    } {
+    private static prepareCallContextUnchecked(request: BrokerMessage.OutboundRequest, defaultTimeout: TimeSpan): ICallContextDataFactory {
         let timeoutSeconds = defaultTimeout.totalSeconds;
         let cancellationToken = CancellationToken.none;
         const serializedArgs = new Array<string>();
@@ -162,22 +166,40 @@ export class SerializationPal {
         const linkedToken = CancellationToken.merge(ctsTimeout.token, cancellationToken);
         cancellationToken.register(ctsTimeout.dispose.bind(ctsTimeout));
 
-        return { serializedArgs, timeoutSeconds, cancellationToken: linkedToken, disposable: ctsTimeout };
-    }
-
-    public static serializeRequest(id: string, methodName: string, serializedArgs: string[], timeoutSeconds: number): Buffer {
-        if (!id) { throw new ArgumentNullError('id'); }
-        if (!methodName) { throw new ArgumentNullError('methodName'); }
-        if (!serializedArgs) { throw new ArgumentNullError('serializedArgs'); }
-        if (timeoutSeconds == null) { throw new ArgumentNullError('timeoutSeconds'); }
-        if (timeoutSeconds < 0) { throw new ArgumentError('Expecting a non-negative value for timeoutSeconds.', 'timeoutSeconds'); }
-
-        const wireRequest = new WireMessage.Request(
+        const wireRequestFactory = (id: string) => new WireMessage.Request(
             timeoutSeconds,
             id,
-            methodName,
+            request.methodName,
             serializedArgs
         );
+
+        return (id: string) => ({
+            cancellationToken,
+            wireRequest: wireRequestFactory(id),
+            dispose() { ctsTimeout.dispose(); }
+        });
+    }
+
+    private static isRequest(obj: WireMessage.Request | WireMessage.Response): obj is WireMessage.Request { return obj instanceof WireMessage.Request; }
+    private static isResponse(obj: WireMessage.Request | WireMessage.Response): obj is WireMessage.Response { return obj instanceof WireMessage.Response; }
+
+    public static wireMessageToBuffer(wireMessage: WireMessage.Request | WireMessage.Response): Buffer {
+        switch (true) {
+            case wireMessage == null: throw new ArgumentNullError('wireMessage');
+            case typeof wireMessage !== 'object': throw new ArgumentError(`Expecting an argument whose typeof is "object".`);
+            default: throw new ArgumentError(`Expecting an argument which is either instanceof WireMessage.Request or instanceof WireMessage.Response.`, 'wireMessage');
+
+            case SerializationPal.isRequest(wireMessage): return SerializationPal.wireRequestToBufferUnchecked(wireMessage as any);
+            case SerializationPal.isResponse(wireMessage): return SerializationPal.wireResponseToBufferUnchecked(wireMessage as any);
+        }
+    }
+
+    public static wireRequestToBuffer(wireRequest: WireMessage.Request): Buffer {
+        if (!wireRequest) { throw new ArgumentNullError('wireRequest'); }
+
+        return SerializationPal.wireRequestToBufferUnchecked(wireRequest);
+    }
+    private static wireRequestToBufferUnchecked(wireRequest: WireMessage.Request): Buffer {
         const jsonRequest = JSON.stringify(wireRequest);
         const cbPayload = Buffer.byteLength(jsonRequest);
         const buffer = Buffer.alloc(5 + cbPayload);
@@ -187,6 +209,7 @@ export class SerializationPal {
 
         return buffer;
     }
+
     public static deserializeResponse(wireResponse: WireMessage.Response): {
         brokerResponse: BrokerMessage.Response,
         id: string

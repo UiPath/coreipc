@@ -1,17 +1,20 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
+
 import { expect, spy, use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
+import chaiAsPromised from 'chai-as-promised';
+use(spies);
+use(chaiAsPromised);
+
 import { SocketLikeMocks } from './socket-like-mocks.test-helper';
 
 import { Observable } from 'rxjs';
 
-import { SocketAdapter, ISocketLike } from '@foundation/pipes';
-import { CancellationToken, TimeSpan, CancellationTokenSource } from '@foundation/threading';
-import { ArgumentNullError, TimeoutError, OperationCanceledError, PipeBrokenError, ObjectDisposedError, InvalidOperationError } from '@foundation/errors';
-
-use(spies);
+import { SocketAdapter, ISocketLike } from '../../../src/foundation/pipes';
+import { CancellationToken, TimeSpan, CancellationTokenSource } from '../../../src/foundation/threading';
+import { ArgumentNullError, TimeoutError, OperationCanceledError, PipeBrokenError, ObjectDisposedError, InvalidOperationError } from '../../../src/foundation/errors';
 
 describe(`foundation:pipes -> class:SocketAdapter`, () => {
     context(`ctor`, () => {
@@ -293,7 +296,7 @@ describe(`foundation:pipes -> class:SocketAdapter`, () => {
             const socketLikeMock = SocketLikeMocks.createImmediatelyConnectingMock();
             const instance = new SocketAdapter(socketLikeMock);
 
-            const promise1 = instance.connectAsync('path', null, CancellationToken.none);
+            instance.connectAsync('path', null, CancellationToken.none);
             await instance.connectAsync('path', null, CancellationToken.none).
                 should.eventually.be.rejectedWith(InvalidOperationError);
         });

@@ -3,9 +3,9 @@
 import { spy, use } from 'chai';
 import spies from 'chai-spies';
 
-import { Succeeded, Faulted, Canceled, OutcomeKind } from '@foundation/utils';
-import { ArgumentNullError, OperationCanceledError } from '@foundation/errors';
-import { PromiseCompletionSource } from '@foundation/threading';
+import { Succeeded, Faulted, Canceled, OutcomeKind } from '../../../src/foundation/utils';
+import { ArgumentNullError, OperationCanceledError } from '../../../src/foundation/errors';
+import { PromiseCompletionSource } from '../../../src/foundation/threading';
 
 use(spies);
 

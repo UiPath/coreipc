@@ -17,31 +17,32 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
 
     private readonly _robotStatusChanged = RobotAgentProxy.createSubject<DownstreamContract.RobotStatusChangedEventArgs>();
     private readonly _processListUpdated = RobotAgentProxy.createSubject<DownstreamContract.ProcessListUpdatedArgs>();
-    private readonly _jobStatusChanged = RobotAgentProxy.createSubject<UpstreamContract.JobStatusChangedEventArgs>();
-    private readonly _jobCompleted = RobotAgentProxy.createSubject<UpstreamContract.JobCompletedEventArgs>();
+    private readonly _jobStatusChanged: Observable<UpstreamContract.JobStatusChangedEventArgs>;
+    private readonly _jobCompleted: Observable<UpstreamContract.JobCompletedEventArgs>;
 
     constructor();
     constructor(proxy: IRobotProxy);
     constructor(proxy?: IRobotProxy) {
         this._proxy = proxy || new RobotProxy();
 
-        this._proxy.ServiceUnavailable.subscribe(_ => this.raiseRobotStatusChanged(DownstreamContract.RobotStatus.ServiceUnavailable));
+        this._proxy.ServiceUnavailable.subscribe({
+            next: _ => this.raiseRobotStatusChanged(DownstreamContract.RobotStatus.ServiceUnavailable),
+            complete: () => this._robotStatusChanged.complete()
+        });
         this._proxy.OrchestratorStatusChanged.subscribe(this.onOrchestratorStatusChanged.bind(this));
 
-        this._proxy.JobCompleted.subscribe(args => {
-            this._jobCompleted.next(args);
-        });
+        this._jobCompleted = this._proxy.JobCompleted;
+        this._jobStatusChanged = this._proxy.JobStatusChanged;
 
-        this._proxy.JobStatusChanged.subscribe(args => {
-            this._jobStatusChanged.next(args);
-        });
-
-        this._proxy.ProcessListChanged.subscribe(async _ => {
-            try {
-                await this.refreshStatusCore();
-            } catch (error) {
-                Trace.log(error);
-            }
+        this._proxy.ProcessListChanged.subscribe({
+            next: async _ => {
+                try {
+                    await this.refreshStatusCore();
+                } catch (error) {
+                    Trace.log(error);
+                }
+            },
+            complete: () => this._processListUpdated.complete()
         });
     }
 

@@ -1,13 +1,14 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
-import { expect, spy, use } from 'chai';
+
+import { use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
 
-import { Message } from '@core/surface/message';
+import { Message } from '../../../src/core/surface/message';
 
-import { CancellationTokenSource, CancellationToken, TimeSpan } from '@foundation/threading';
-import { ArgumentError, ArgumentNullError, OperationCanceledError, AggregateError } from '@foundation/errors';
+import { TimeSpan } from '../../../src/foundation/threading';
+import { ArgumentError } from '../../../src/foundation/errors';
 
 use(spies);
 

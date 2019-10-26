@@ -1,15 +1,18 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
+
 import { expect, spy, use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
+import chaiAsPromised from 'chai-as-promised';
+use(spies);
+use(chaiAsPromised);
+
 import { SocketLikeMocks } from './socket-like-mocks.test-helper';
 
-import { PipeReader, SocketAdapter } from '@foundation/pipes';
-import { CancellationToken, } from '@foundation/threading';
-import { ArgumentNullError, ObjectDisposedError, InvalidOperationError } from '@foundation/errors';
-
-use(spies);
+import { PipeReader, SocketAdapter } from '../../../src/foundation/pipes';
+import { CancellationToken, } from '../../../src/foundation/threading';
+import { ArgumentNullError, ObjectDisposedError, InvalidOperationError } from '../../../src/foundation/errors';
 
 describe(`foundation:pipes -> class:PipeReader`, () => {
     context(`ctor`, () => {

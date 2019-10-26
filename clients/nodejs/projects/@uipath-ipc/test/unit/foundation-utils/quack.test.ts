@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import 'mocha';
-import { Quack } from '@foundation/utils';
-import { InvalidOperationError } from '@foundation/errors';
+import { Quack } from '../../../src/foundation/utils';
+import { InvalidOperationError } from '../../../src/foundation/errors';
 
 describe(`foundation:utils -> class:Quack`, () => {
     context(`ctor`, async () => {

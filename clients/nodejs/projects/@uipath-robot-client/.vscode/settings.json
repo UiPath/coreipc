@@ -5,7 +5,6 @@
     ],
     "mochaExplorer.mochaPath": "node_modules/mocha",
     "mochaExplorer.files": "test/unit/**/*.test.ts",
-    "mochaExplorer.optsFile": "test/unit/mocha.opts",
     "files.exclude": {
         ".nyc_output": true,
         "coverage.lcov": true,

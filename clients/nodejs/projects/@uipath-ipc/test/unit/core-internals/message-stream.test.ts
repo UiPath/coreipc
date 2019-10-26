@@ -1,22 +1,25 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
+
 import { expect, spy, use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
+import chaiAsPromised from 'chai-as-promised';
+
+use(spies);
+use(chaiAsPromised);
 
 import { PartialObserver } from 'rxjs';
 
-import { MessageStream } from '@core/internals/message-stream';
+import { MessageStream } from '../../../src/core/internals/message-stream';
 
-import * as WireMessage from '@core/internals/wire-message';
+import * as WireMessage from '../../../src/core/internals/wire-message';
 
-import { MessageEvent } from '@core/internals/message-event';
+import { MessageEvent } from '../../../src/core/internals/message-event';
 
-import { CancellationToken } from '@foundation/threading';
-import { ArgumentNullError } from '@foundation/errors';
-import { IPipeClientStream } from '@foundation/pipes';
-
-use(spies);
+import { CancellationToken } from '../../../src/foundation/threading';
+import { ArgumentNullError } from '../../../src/foundation/errors';
+import { IPipeClientStream } from '../../../src/foundation/pipes';
 
 describe(`core:internals -> class:MessageStream`, () => {
     class MockPipeClientStream implements IPipeClientStream {
@@ -124,7 +127,7 @@ describe(`core:internals -> class:MessageStream`, () => {
             (mock as any).writeAsync = spy(() => { });
 
             const messageStream = new MessageStream(mock);
-            messageStream.writeAsync(Buffer.of(0, 1, 2, 3), CancellationToken.none);
+            messageStream.writeAsync(new WireMessage.Request(1, 'id', 'methodName', []), CancellationToken.none);
             mock.writeAsync.should.have.been.called();
         });
     });

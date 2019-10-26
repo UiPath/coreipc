@@ -1,19 +1,22 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
+
 import { expect, spy, use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
-
-import { IpcClient } from '@core/surface';
-import { IpcClientConfig } from '@core/surface/ipc-client';
-import { IBroker } from '@core/internals/broker';
-import { ArgumentNullError } from '@foundation/errors';
-import { PromiseCompletionSource, CancellationToken } from '@foundation/threading';
-import { IPipeClientStream } from '@foundation/pipes';
-
-import * as BrokerMessage from '@core/internals/broker-message';
+import chaiAsPromised from 'chai-as-promised';
 
 use(spies);
+use(chaiAsPromised);
+
+import { IpcClient } from '../../../src/core/surface';
+import { IpcClientConfig } from '../../../src/core/surface/ipc-client';
+import { IBroker } from '../../../src/core/internals/broker';
+import { ArgumentNullError } from '../../../src/foundation/errors';
+import { PromiseCompletionSource, CancellationToken } from '../../../src/foundation/threading';
+import { IPipeClientStream } from '../../../src/foundation/pipes';
+
+import * as BrokerMessage from '../../../src/core/internals/broker-message';
 
 describe(`core:surface -> class:IpcClient`, () => {
     context(`ctor`, () => {

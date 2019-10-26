@@ -1,14 +1,14 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
-import { expect, should, spy, use, assert } from 'chai';
+import { expect, spy, use } from 'chai';
 import spies from 'chai-spies';
 import chaiAsPromised from 'chai-as-promised';
 
-import { OperationCanceledError, ArgumentNullError, ArgumentError } from '@foundation/errors';
-import { TimeSpan, CancellationTokenSource, CancellationToken } from '@foundation/threading';
+import { OperationCanceledError, ArgumentNullError, ArgumentError } from '../../../src/foundation/errors';
+import { TimeSpan, CancellationTokenSource, CancellationToken } from '../../../src/foundation/threading';
 
 use(spies);
-use(chaiAsPromised);
+// use(chaiAsPromised);
 
 describe(`foundation:threading -> class:PromisePal`, () => {
     context(`property:completedPromise`, () => {

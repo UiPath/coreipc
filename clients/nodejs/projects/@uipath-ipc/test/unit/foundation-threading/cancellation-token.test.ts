@@ -1,10 +1,10 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
-import { expect, should, spy, use } from 'chai';
+import { expect, spy, use } from 'chai';
 import spies from 'chai-spies';
 
-import { CancellationTokenSource, CancellationToken, ProperCancellationToken } from '@foundation/threading';
-import { ArgumentError, OperationCanceledError } from '@foundation/errors';
+import { CancellationTokenSource, CancellationToken, ProperCancellationToken } from '../../../src/foundation/threading';
+import { ArgumentError, OperationCanceledError } from '../../../src/foundation/errors';
 
 use(spies);
 

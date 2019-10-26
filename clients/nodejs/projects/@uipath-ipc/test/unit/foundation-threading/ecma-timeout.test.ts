@@ -1,10 +1,10 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
-import { expect, should, spy, use } from 'chai';
+import { expect, spy, use } from 'chai';
 import spies from 'chai-spies';
 
-import { EcmaTimeout, TimeSpan } from '@foundation/threading';
-import { ArgumentError, ArgumentNullError } from '@foundation/errors';
+import { EcmaTimeout, TimeSpan } from '../../../src/foundation/threading';
+import { ArgumentError, ArgumentNullError } from '../../../src/foundation/errors';
 
 use(spies);
 
@@ -40,7 +40,7 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
     it(`should cause the callback's execution`, async () => {
         for (const timeSpan of _timeSpans) {
             const spyHandler = spy(() => { });
-            const ecmaTimeout = new EcmaTimeout(timeSpan, spyHandler);
+            new EcmaTimeout(timeSpan, spyHandler);
 
             expect(spyHandler).not.to.have.been.called();
 
@@ -128,7 +128,7 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
         it(`should cause the callback's execution when the provided timespan is defined, non-null and non-negative`, async () => {
             for (const _case of _cases.filter(x => !!x.isEffective)) {
                 const spyHandler = spy(() => { });
-                const result = EcmaTimeout.maybeCreate(_case.timeSpan as any, spyHandler);
+                EcmaTimeout.maybeCreate(_case.timeSpan as any, spyHandler);
 
                 expect(spyHandler).not.to.have.been.called();
                 const timeSpan = _case.timeSpan as any as TimeSpan;
@@ -151,7 +151,7 @@ describe(`foundation:threading -> class:EcmaTimeout`, () => {
         it(`shouldn't cause the callback's execution when the provided timespan is undefined, null or negative`, async () => {
             for (const _case of _cases.filter(x => !x.isEffective)) {
                 const spyHandler = spy(() => { });
-                const result = EcmaTimeout.maybeCreate(_case.timeSpan as any, spyHandler);
+                EcmaTimeout.maybeCreate(_case.timeSpan as any, spyHandler);
 
                 expect(spyHandler).not.to.have.been.called();
                 await Promise.yield();

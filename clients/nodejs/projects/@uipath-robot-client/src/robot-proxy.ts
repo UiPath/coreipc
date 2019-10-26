@@ -32,6 +32,8 @@ export class RobotProxy implements IRobotProxy {
     private readonly _processListChanged = RobotProxy.createSubject<UpstreamContract.ProcessListChangedEventArgs>();
 
     private readonly _ipcClient: IpcClient<UpstreamContract.AgentOperations>;
+    private _disposed = false;
+
     private get channel(): UpstreamContract.AgentOperations { return this._ipcClient.proxy; }
 
     constructor() {
@@ -187,7 +189,16 @@ export class RobotProxy implements IRobotProxy {
     }
 
     public async CloseAsync(): Promise<void> {
-        await this._ipcClient.closeAsync();
+        if (!this._disposed) {
+            this._disposed = true;
+            await this._ipcClient.closeAsync();
+
+            this._jobCompleted.complete();
+            this._jobStatusChanged.complete();
+            this._orchestratorStatusChanged.complete();
+            this._processListChanged.complete();
+            this._serviceUnavailable.complete();
+        }
     }
 
     // #endregion

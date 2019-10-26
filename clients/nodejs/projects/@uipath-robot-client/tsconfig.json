@@ -2,6 +2,7 @@
     "extends": "../../tsconfig.base",
     "compilerOptions": {
         "experimentalDecorators": true,
+        "esModuleInterop": true,
         "target": "es6",
         "module": "commonjs",
         "declaration": true,
@@ -20,6 +21,6 @@
     ],
     "exclude": [
         "node_modules",
-        "**/*.spec.ts"
+        "**/*.test.ts"
     ]
 }

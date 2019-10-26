@@ -1,10 +1,10 @@
 // tslint:disable: no-unused-expression
 
-import { expect, spy, use } from 'chai';
+import { expect, use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
 
-import { ISocketLike } from '@foundation/pipes';
+import { ISocketLike } from '../../../src/foundation/pipes';
 
 use(spies);
 

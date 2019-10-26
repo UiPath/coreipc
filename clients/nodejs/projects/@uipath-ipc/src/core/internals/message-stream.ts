@@ -14,7 +14,7 @@ export interface IMessageStream extends IAsyncDisposable {
     readonly isConnected: boolean;
     readonly messages: Observable<MessageEvent>;
 
-    writeAsync(source: Buffer, cancellationToken: CancellationToken): Promise<void>;
+    writeAsync(wireMessage: WireMessage.Request | WireMessage.Response, cancellationToken: CancellationToken): Promise<void>;
 }
 
 /* @internal */
@@ -35,8 +35,11 @@ export class MessageStream implements IMessageStream {
         this._readIndefinitelyPromise = this.readIndefinitelyAsync(this._readIndefinitelyCts.token);
     }
 
-    public writeAsync(source: Buffer, cancellationToken: CancellationToken): Promise<void> {
-        return this._stream.writeAsync(source, cancellationToken);
+    public writeAsync(wireMessage: WireMessage.Request | WireMessage.Response, cancellationToken: CancellationToken): Promise<void> {
+        return this._stream.writeAsync(
+            SerializationPal.wireMessageToBuffer(wireMessage),
+            cancellationToken
+        );
     }
 
     public async disposeAsync(): Promise<void> {

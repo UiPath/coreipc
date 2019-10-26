@@ -1,11 +1,11 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
-import { expect, should, spy, use } from 'chai';
+import { expect, use } from 'chai';
 import spies from 'chai-spies';
 
-import { PromiseCompletionSource } from '@foundation/threading';
-import { InvalidOperationError } from '@foundation/errors';
-import { AnyOutcome, Succeeded, Faulted, Canceled } from '@foundation/utils/outcome';
+import { PromiseCompletionSource } from '../../../src/foundation/threading';
+import { InvalidOperationError } from '../../../src/foundation/errors';
+import { Succeeded, Faulted, Canceled } from '../../../src/foundation/utils/outcome';
 
 use(spies);
 

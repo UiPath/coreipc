@@ -3,9 +3,7 @@
 import { spy, use } from 'chai';
 import spies from 'chai-spies';
 
-import { Trace, Succeeded, Faulted, Canceled, OutcomeKind } from '@foundation/utils';
-import { ArgumentNullError, OperationCanceledError } from '@foundation/errors';
-import { PromiseCompletionSource } from '@foundation/threading';
+import { Trace } from '../../../src/foundation/utils';
 
 use(spies);
 

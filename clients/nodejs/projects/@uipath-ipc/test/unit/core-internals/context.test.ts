@@ -1,34 +1,50 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
+
 import { expect, spy, use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
+import chaiAsPromised from 'chai-as-promised';
 
 use(spies);
+use(chaiAsPromised);
 
-import * as Outcome from '@foundation/utils/outcome';
-import * as BrokerMessage from '@core/internals/broker-message';
+import * as Outcome from '../../../src/foundation/utils/outcome';
+import * as BrokerMessage from '../../../src/core/internals/broker-message';
+import * as WireMessage from '../../../src/core/internals/wire-message';
 
-import { CallContext, CallbackContext, CallContextTable } from '@core/internals/context';
-import { CancellationToken, CancellationTokenSource } from '@foundation/threading';
-import { ArgumentNullError, OperationCanceledError, ObjectDisposedError } from '@foundation/errors';
+import { CallContext, CallbackContext, CallContextTable, ICallContextDataFactory, ICallContextData, ICallContext } from '../../../src/core/internals/context';
+import { CancellationToken, CancellationTokenSource } from '../../../src/foundation/threading';
+import { ArgumentNullError, ArgumentError, OperationCanceledError, ObjectDisposedError } from '../../../src/foundation/errors';
+
+function callData(partial: Partial<ICallContextData>): ICallContextData {
+    return { ...partial, dispose() { } } as any;
+}
+
+const wireRequest = new WireMessage.Request(1, 'id', 'methodName', []);
+const validCallData = callData({ cancellationToken: CancellationToken.none, wireRequest });
+const validCallDataFactory = (id: string) => callData({ cancellationToken: CancellationToken.none, wireRequest: new WireMessage.Request(1, id, 'methodName', []) });
 
 describe(`core:internals -> class:CallContext`, () => {
     context(`ctor`, () => {
-        it(`should throw provided a falsy id`, () => {
-            (() => new CallContext(null as any, CancellationToken.none)).should.throw(ArgumentNullError).with.property('paramName', 'id');
-            (() => new CallContext(undefined as any, CancellationToken.none)).should.throw(ArgumentNullError).with.property('paramName', 'id');
-            (() => new CallContext('', CancellationToken.none)).should.throw(ArgumentNullError).with.property('paramName', 'id');
+        it(`should throw provided a falsy _data`, () => {
+            (() => new CallContext(null as any)).should.throw(ArgumentNullError).with.property('paramName', '_data');
+            (() => new CallContext(undefined as any)).should.throw(ArgumentNullError).with.property('paramName', '_data');
         });
 
-        it(`should throw provided a falsy ct`, () => {
-            (() => new CallContext('id', null as any)).should.throw(ArgumentNullError).with.property('paramName', 'cancellationToken');
-            (() => new CallContext('id', undefined as any)).should.throw(ArgumentNullError).with.property('paramName', 'cancellationToken');
+        it(`should throw provided a falsy _data.cancellationToken`, () => {
+            (() => new CallContext(callData({ cancellationToken: null as any, wireRequest }))).should.throw(ArgumentError).with.property('paramName', '_data');
+            (() => new CallContext(callData({ cancellationToken: undefined as any, wireRequest }))).should.throw(ArgumentError).with.property('paramName', '_data');
+        });
+
+        it(`should throw provided a falsy _data.wireRequest`, () => {
+            (() => new CallContext(callData({ cancellationToken: CancellationToken.none, wireRequest: null as any }))).should.throw(ArgumentError).with.property('paramName', '_data');
+            (() => new CallContext(callData({ cancellationToken: CancellationToken.none, wireRequest: undefined as any }))).should.throw(ArgumentError).with.property('paramName', '_data');
         });
 
         it(`should use the provided ct in the outcome of the promise property`, async () => {
             const cts = new CancellationTokenSource();
-            const cc = new CallContext('id', cts.token);
+            const cc = new CallContext(callData({ cancellationToken: cts.token, wireRequest }));
 
             const rejectedSpy = spy((reason: any) => {
                 expect(reason).to.be.instanceOf(OperationCanceledError);
@@ -47,24 +63,24 @@ describe(`core:internals -> class:CallContext`, () => {
 
     context(`property:promise`, () => {
         it(`shouldn't throw when accessed`, () => {
-            const cc = new CallContext('id', CancellationToken.none);
+            const cc = new CallContext(callData({ cancellationToken: CancellationToken.none, wireRequest }));
             (() => cc.promise).should.not.throw;
         });
 
         it(`should return a Promise`, () => {
-            const cc = new CallContext('id', CancellationToken.none);
+            const cc = new CallContext(callData({ cancellationToken: CancellationToken.none, wireRequest }));
             expect(cc.promise).to.be.instanceOf(Promise);
         });
 
         it(`should the same instance every time`, () => {
-            const cc = new CallContext('id', CancellationToken.none);
+            const cc = new CallContext(callData({ cancellationToken: CancellationToken.none, wireRequest }));
             cc.promise.should.be.equal(cc.promise);
         });
     });
 
     context(`method:trySet`, () => {
         it(`should throw provided a falsy outcome`, () => {
-            const cc = new CallContext('id', CancellationToken.none);
+            const cc = new CallContext(callData({ cancellationToken: CancellationToken.none, wireRequest }));
             (() => cc.trySet(null as any)).should.throw(ArgumentNullError).with.property('paramName', 'outcome');
             (() => cc.trySet(undefined as any)).should.throw(ArgumentNullError).with.property('paramName', 'outcome');
         });
@@ -75,14 +91,14 @@ describe(`core:internals -> class:CallContext`, () => {
             const faulted = new Outcome.Faulted<BrokerMessage.Response>(new Error());
             const canceled = new Outcome.Canceled<BrokerMessage.Response>();
 
-            const cc = new CallContext('id', CancellationToken.none);
+            const cc = new CallContext(callData({ cancellationToken: CancellationToken.none, wireRequest }));
             (() => cc.trySet(succeeded)).should.not.throw;
             (() => cc.trySet(faulted)).should.not.throw;
             (() => cc.trySet(canceled)).should.not.throw;
         });
 
         it(`should cause the Promise to be fulfilled provided an Outcome.Succeeded`, async () => {
-            const cc = new CallContext('id', CancellationToken.none);
+            const cc = new CallContext(callData({ cancellationToken: CancellationToken.none, wireRequest }));
 
             const promise = cc.promise;
             const fulfilledSpy = spy(() => { });
@@ -97,7 +113,7 @@ describe(`core:internals -> class:CallContext`, () => {
         });
 
         it(`should cause the Promise to be rejected provided an Outcome.Faulted`, async () => {
-            const cc = new CallContext('id', CancellationToken.none);
+            const cc = new CallContext(callData({ cancellationToken: CancellationToken.none, wireRequest }));
 
             const promise = cc.promise;
             const rejectedSpy = spy(() => { });
@@ -112,7 +128,7 @@ describe(`core:internals -> class:CallContext`, () => {
         });
 
         it(`should cause the Promise to be rejected provided an Outcome.Canceled`, async () => {
-            const cc = new CallContext('id', CancellationToken.none);
+            const cc = new CallContext(callData({ cancellationToken: CancellationToken.none, wireRequest }));
 
             const promise = cc.promise;
             const rejectedSpy = spy((reason: any) => {
@@ -196,20 +212,21 @@ describe(`core:internals -> class:CallContextTable`, () => {
     });
 
     context(`method:createContext`, () => {
-        it(`should throw provided a falsy cancellationToken`, () => {
-            const cct = new CallContextTable();
-            (() => cct.createContext(null as any)).should.throw(ArgumentNullError).with.property('paramName', 'cancellationToken');
+        it(`should throw provided a falsy factory`, () => {
+            const table = new CallContextTable();
+            (() => table.createContext(null as any)).should.throw(ArgumentNullError).with.property('paramName', 'factory');
+            (() => table.createContext(undefined as any)).should.throw(ArgumentNullError).with.property('paramName', 'factory');
         });
 
         it(`should throw if the CallContextTable had been disposed`, () => {
-            const cct = new CallContextTable();
-            cct.dispose();
-            (() => cct.createContext(CancellationToken.none)).should.throw(ObjectDisposedError);
+            const table = new CallContextTable();
+            table.dispose();
+            (() => table.createContext(validCallDataFactory)).should.throw(ObjectDisposedError);
         });
 
         it(`should return a truthy reference`, () => {
-            const cct = new CallContextTable();
-            expect(cct.createContext(CancellationToken.none)).not.to.be.null.and.not.to.be.undefined;
+            const table = new CallContextTable();
+            expect(table.createContext(validCallDataFactory)).not.to.be.null.and.not.to.be.undefined;
         });
     });
 
@@ -248,8 +265,8 @@ describe(`core:internals -> class:CallContextTable`, () => {
             const brokerResponse = new BrokerMessage.Response(1, null);
             const outcome = new Outcome.Succeeded<BrokerMessage.Response>(brokerResponse);
 
-            const context = cct.createContext(CancellationToken.none);
-            cct.signal(context.id, outcome);
+            const context = cct.createContext(validCallDataFactory);
+            cct.signal(context.wireRequest.Id, outcome);
 
             const fulfilledSpy = spy((x: BrokerMessage.Response) => {
                 expect(x).to.be.equal(brokerResponse);
@@ -272,8 +289,8 @@ describe(`core:internals -> class:CallContextTable`, () => {
         it(`should cancel all pending call contexts`, async () => {
             const cct = new CallContextTable();
 
-            const context1 = cct.createContext(CancellationToken.none);
-            const context2 = cct.createContext(CancellationToken.none);
+            const context1 = cct.createContext(validCallDataFactory);
+            const context2 = cct.createContext(validCallDataFactory);
 
             cct.dispose();
 

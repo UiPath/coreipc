@@ -45,8 +45,8 @@ export class Broker implements IBroker, IAsyncDisposable {
     private _isDisposed = false;
     private readonly _cts = new CancellationTokenSource();
 
-    private _maybeMessageStream: MessageStream | null = null;
-    private readonly _calls = new CallContextTable();
+    private _maybeMessageStream: IMessageStream | null = null;
+    private readonly _table = new CallContextTable();
 
     private _newConnection = true;
     private _insideConnectionFactory = false;
@@ -63,18 +63,11 @@ export class Broker implements IBroker, IAsyncDisposable {
     public async sendReceiveAsync(brokerRequest: BrokerMessage.OutboundRequest): Promise<BrokerMessage.Response> {
         if (!brokerRequest) { throw new ArgumentNullError('brokerRequest'); }
 
-        const tuple1 = SerializationPal.extract(brokerRequest, this._parameters.defaultCallTimeout);
-        const context = this._calls.createContext(tuple1.cancellationToken, tuple1.disposable);
+        const dataFactory = SerializationPal.prepareCallContext(brokerRequest, this._parameters.defaultCallTimeout);
+        const context = this._table.createContext(dataFactory);
 
-        await this.ensureConnectedAsync(tuple1.cancellationToken);
-
-        const buffer = SerializationPal.serializeRequest(
-            context.id,
-            brokerRequest.methodName,
-            tuple1.serializedArgs,
-            tuple1.timeoutSeconds
-        );
-        await this.sendBufferAsync(brokerRequest.methodName, buffer, tuple1.cancellationToken);
+        await this.ensureConnectedAsync(context.cancellationToken);
+        await this.sendAsync(context.wireRequest, context.cancellationToken);
 
         return await context.promise;
     }
@@ -93,7 +86,7 @@ export class Broker implements IBroker, IAsyncDisposable {
 
             await Promise.all(this._inFlightCallbackPromises);
 
-            this._calls.dispose();
+            this._table.dispose();
         }
     }
 
@@ -145,9 +138,9 @@ export class Broker implements IBroker, IAsyncDisposable {
             const callbackContext = new CallbackContext(
                 tuple.brokerRequest,
                 async brokerResponse => {
-                    const buffer = SerializationPal.serializeResponse(brokerResponse, tuple.id);
+                    const wireResponse = SerializationPal.brokerResponseToWireResponse(brokerResponse, tuple.id);
                     try {
-                        await event.messageStream.writeAsync(buffer, this._cts.token);
+                        await event.messageStream.writeAsync(wireResponse, this._cts.token);
                     } catch (error) {
                         Broker.traceCategory.log(error);
                     }
@@ -170,7 +163,7 @@ export class Broker implements IBroker, IAsyncDisposable {
             /* istanbul ignore else */
             if (event.message instanceof WireMessage.Response) {
                 const tuple = SerializationPal.deserializeResponse(event.message);
-                this._calls.signal(tuple.id, new Succeeded(tuple.brokerResponse));
+                this._table.signal(tuple.id, new Succeeded(tuple.brokerResponse));
             } else {
                 throw new ArgumentError('Unexpected message type', 'message');
             }
@@ -221,7 +214,7 @@ export class Broker implements IBroker, IAsyncDisposable {
         }
     }
 
-    private async sendBufferAsync(methodName: string, buffer: Buffer, cancellationToken: CancellationToken): Promise<void> {
+    private async sendAsync(wireRequest: WireMessage.Request, cancellationToken: CancellationToken): Promise<void> {
         let fulfilled = false;
         while (!fulfilled) {
             let messageStream: IMessageStream = null as any;
@@ -237,13 +230,13 @@ export class Broker implements IBroker, IAsyncDisposable {
                 if (this._parameters.beforeCall && !this._insideBeforeCall) {
                     this._insideBeforeCall = true;
                     try {
-                        await this._parameters.beforeCall(methodName, this._newConnection, cancellationToken);
+                        await this._parameters.beforeCall(wireRequest.MethodName, this._newConnection, cancellationToken);
                     } catch (error) {
                     }
                     this._newConnection = false;
                     this._insideBeforeCall = false;
                 }
-                await messageStream.writeAsync(buffer, cancellationToken);
+                await messageStream.writeAsync(wireRequest, cancellationToken);
                 fulfilled = true;
             } catch (error) {
                 await messageStream.disposeAsync();
@@ -251,4 +244,34 @@ export class Broker implements IBroker, IAsyncDisposable {
             }
         }
     }
+    // private async sendBufferAsync(methodName: string, buffer: Buffer, cancellationToken: CancellationToken): Promise<void> {
+    //     let fulfilled = false;
+    //     while (!fulfilled) {
+    //         let messageStream: IMessageStream = null as any;
+    //         try {
+    //             messageStream = await this.getOrCreateMessageStreamAsync(cancellationToken);
+    //         } catch (error) {
+    //             Broker.traceCategory.log(`Broker.sendBufferAsync: Failed to obtain a StreamWrapper`);
+    //             Broker.traceCategory.log(error);
+    //             throw error;
+    //         }
+
+    //         try {
+    //             if (this._parameters.beforeCall && !this._insideBeforeCall) {
+    //                 this._insideBeforeCall = true;
+    //                 try {
+    //                     await this._parameters.beforeCall(methodName, this._newConnection, cancellationToken);
+    //                 } catch (error) {
+    //                 }
+    //                 this._newConnection = false;
+    //                 this._insideBeforeCall = false;
+    //             }
+    //             await messageStream.writeAsync(buffer, cancellationToken);
+    //             fulfilled = true;
+    //         } catch (error) {
+    //             await messageStream.disposeAsync();
+    //             this._maybeMessageStream = null;
+    //         }
+    //     }
+    // }
 }

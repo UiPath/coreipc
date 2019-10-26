@@ -4,24 +4,26 @@
 import { expect, spy, use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
-
-import * as BrokerMessage from '@core/internals/broker-message';
-import * as WireMessage from '@core/internals/wire-message';
-
-import { Broker, IBrokerCtorParams } from '@core/internals/broker';
-import { ConnectionFactoryDelegate } from '@core/surface';
-import { MethodContainer } from '@foundation/utils';
-
-import { SerializationPal } from '@core/internals/serialization-pal';
-import { TimeSpan } from '@foundation/threading';
-import { ArgumentNullError, ArgumentError } from '@foundation/errors';
-
-import { PipeClientStream, IPipeClientStream } from '@foundation/pipes';
-import { ILogicalSocket } from '@foundation/pipes/logical-socket';
-import { CancellationToken, PromiseCompletionSource } from '@foundation/threading';
-import { Subject, ReplaySubject, Observable } from 'rxjs';
+import chaiAsPromised from 'chai-as-promised';
 
 use(spies);
+use(chaiAsPromised);
+
+import * as BrokerMessage from '../../../src/core/internals/broker-message';
+import * as WireMessage from '../../../src/core/internals/wire-message';
+
+import { Broker, IBrokerCtorParams } from '../../../src/core/internals/broker';
+import { ConnectionFactoryDelegate } from '../../../src/core/surface';
+import { MethodContainer } from '../../../src/foundation/utils';
+
+import { SerializationPal } from '../../../src/core/internals/serialization-pal';
+import { TimeSpan } from '../../../src/foundation/threading';
+import { ArgumentNullError, ArgumentError } from '../../../src/foundation/errors';
+
+import { PipeClientStream, IPipeClientStream } from '../../../src/foundation/pipes';
+import { ILogicalSocket } from '../../../src/foundation/pipes/logical-socket';
+import { CancellationToken, PromiseCompletionSource } from '../../../src/foundation/threading';
+import { Subject, ReplaySubject, Observable } from 'rxjs';
 
 describe(`core:internals -> class:Broker`, () => {
     class EmptyLogicalSocket implements ILogicalSocket {
@@ -64,7 +66,9 @@ describe(`core:internals -> class:Broker`, () => {
                     brokerResponse = new BrokerMessage.Response(null, error);
                 }
 
-                const responseBuffer = SerializationPal.serializeResponse(brokerResponse, obj.id);
+                const responseBuffer = SerializationPal.wireResponseToBuffer(
+                    SerializationPal.brokerResponseToWireResponse(brokerResponse, obj.id)
+                );
                 this._data.next(responseBuffer);
             })();
         }
@@ -75,12 +79,6 @@ describe(`core:internals -> class:Broker`, () => {
     function createBroker(remoteMethodContainer?: MethodContainer) {
         return createBrokerFromLogicalSocket(
             remoteMethodContainer ? new ShortCircuitLogicalSocket(remoteMethodContainer) : new EmptyLogicalSocket()
-        );
-    }
-    function createBrokerWithCallbacks(remoteMethodContainer: MethodContainer, callbackContainer: MethodContainer) {
-        return createBrokerFromLogicalSocket(
-            new ShortCircuitLogicalSocket(remoteMethodContainer),
-            callbackContainer
         );
     }
     function createBrokerFromLogicalSocket(logicalSocket: ILogicalSocket, callbackContainer?: MethodContainer, connectionFactory?: ConnectionFactoryDelegate): Broker {
@@ -104,6 +102,10 @@ describe(`core:internals -> class:Broker`, () => {
         );
     }
     context(`ctor`, () => {
+        it(`should throw provided a falsy _parameters arg`, () => {
+            (() => new Broker(null as any)).should.throw(ArgumentNullError).with.property('paramName', '_parameters');
+        });
+
         it(`should throw provided a falsy factory`, () => {
             const params = {
                 factory: null as any,
@@ -195,7 +197,6 @@ describe(`core:internals -> class:Broker`, () => {
                     return x + y;
                 }
             };
-            const mockServer = new ShortCircuitLogicalSocket(methodContainer);
             const spyConnectionFactory = spy(async (connect: () => Promise<IPipeClientStream>, cancellationToken: CancellationToken): Promise<PipeClientStream | void> => {
                 return await PipeClientStream.connectAsync(
                     () => new ShortCircuitLogicalSocket(methodContainer),
@@ -251,7 +252,7 @@ describe(`core:internals -> class:Broker`, () => {
                 expect(breqTuple.brokerRequest.args).to.deep.equal([]);
 
                 const bresp = new BrokerMessage.Response(null, null);
-                const responseBuffer = SerializationPal.serializeResponse(bresp, breqTuple.id);
+                const responseBuffer = SerializationPal.wireResponseToBuffer(SerializationPal.brokerResponseToWireResponse(bresp, breqTuple.id));
 
                 data.next(responseBuffer);
             });
@@ -263,7 +264,7 @@ describe(`core:internals -> class:Broker`, () => {
             write1.should.have.been.called();
             write2.should.not.have.been.called();
 
-            data.next(SerializationPal.serializeRequest('id', 'callbackMethodName', [], 2));
+            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(2, 'id', 'callbackMethodName', [])));
 
             write2.should.not.have.been.called();
 
@@ -307,7 +308,7 @@ describe(`core:internals -> class:Broker`, () => {
                 expect(breqTuple.brokerRequest.args).to.deep.equal([]);
 
                 const bresp = new BrokerMessage.Response(null, null);
-                const responseBuffer = SerializationPal.serializeResponse(bresp, breqTuple.id);
+                const responseBuffer = SerializationPal.wireResponseToBuffer(SerializationPal.brokerResponseToWireResponse(bresp, breqTuple.id));
 
                 data.next(responseBuffer);
             });
@@ -320,7 +321,7 @@ describe(`core:internals -> class:Broker`, () => {
             write1.should.have.been.called();
             write2.should.not.have.been.called();
 
-            data.next(SerializationPal.serializeRequest('id', 'callbackMethodName', [], 2));
+            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(2, 'id', 'callbackMethodName', [])));
 
             write2.should.not.have.been.called();
 
@@ -364,7 +365,7 @@ describe(`core:internals -> class:Broker`, () => {
                 expect(breqTuple.brokerRequest.args).to.deep.equal([]);
 
                 const bresp = new BrokerMessage.Response(null, null);
-                const responseBuffer = SerializationPal.serializeResponse(bresp, breqTuple.id);
+                const responseBuffer = SerializationPal.wireResponseToBuffer(SerializationPal.brokerResponseToWireResponse(bresp, breqTuple.id));
 
                 data.next(responseBuffer);
             });
@@ -378,7 +379,7 @@ describe(`core:internals -> class:Broker`, () => {
             const broker = createBrokerFromLogicalSocket(ls, callbackContainer);
 
             await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('primerMethod', []));
-            data.next(SerializationPal.serializeRequest('id', 'callbackMethod', ['3'], 1));
+            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(2, 'id', 'callbackMethod', ['3'])));
 
             await Promise.yield();
         });
@@ -469,8 +470,8 @@ describe(`core:internals -> class:Broker`, () => {
                     failAsync
                 });
 
-            data.next(SerializationPal.serializeRequest('id-1', 'succeedAsync', ['1', '2'], 1));
-            data.next(SerializationPal.serializeRequest('id-2', 'failAsync', ['1', '2'], 1));
+            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(1, 'id-1', 'succeedAsync', ['1', '2'])));
+            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(1, 'id-2', 'failAsync', ['1', '2'])));
             broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('inexistentMethod', [])).observe();
 
             await Promise.yield();

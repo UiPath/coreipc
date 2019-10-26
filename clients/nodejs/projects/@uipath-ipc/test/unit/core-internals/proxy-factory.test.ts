@@ -1,19 +1,21 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
+
 import { expect, spy, use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
-
-import { ProxyFactory, symbolofBroker, Generator } from '@core/internals/proxy-factory';
-import { IBroker } from '@core/internals/broker';
-import { RemoteError, __returns__, __hasCancellationToken__ } from '@core/surface';
-
-import * as BrokerMessage from '@core/internals/broker-message';
-
-import { CancellationTokenSource, CancellationToken, TimeSpan } from '@foundation/threading';
-import { ArgumentNullError, OperationCanceledError, AggregateError } from '@foundation/errors';
-
+import chaiAsPromised from 'chai-as-promised';
 use(spies);
+use(chaiAsPromised);
+
+import { ProxyFactory, symbolofBroker, Generator } from '../../../src/core/internals/proxy-factory';
+import { IBroker } from '../../../src/core/internals/broker';
+import { RemoteError, __returns__, __hasCancellationToken__ } from '../../../src/core/surface';
+
+import * as BrokerMessage from '../../../src/core/internals/broker-message';
+
+import { CancellationTokenSource, CancellationToken, TimeSpan } from '../../../src/foundation/threading';
+import { ArgumentNullError, OperationCanceledError, AggregateError } from '../../../src/foundation/errors';
 
 describe(`core:internals -> class:ProxyFactory`, () => {
     context(`method:create`, () => {
@@ -242,8 +244,9 @@ describe(`core:internals -> class:Generator`, () => {
 
                     const ctor = Generator.generate(IContract);
                     const broker = quickBroker(async (brokerRequest: BrokerMessage.Request): Promise<BrokerMessage.Response> => {
-                        const real = brokerRequest.args[0] as number;
-                        const imaginary = brokerRequest.args[1] as number;
+                        // const real = brokerRequest.args[0] as number;
+                        // const imaginary = brokerRequest.args[1] as number;
+                        // const result = new Complex(real, imaginary);
                         return new BrokerMessage.Response(null, null);
                     });
 

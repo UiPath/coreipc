@@ -1,17 +1,18 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
-import { use } from 'chai';
+
+import { expect, spy, use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
 
-import { PhysicalSocket } from '../../../src/foundation/pipes';
+import { RobotProxy } from '../../src/robot-proxy';
 
 use(spies);
 
-describe(`foundation:pipes -> class:PhysicalSocket`, () => {
+describe(`class:RobotProxy`, () => {
     context(`ctor`, () => {
         it(`shouldn't throw`, () => {
-            (() => new PhysicalSocket()).should.not.throw();
+            (() => new RobotProxy()).should.not.throw();
         });
     });
 });

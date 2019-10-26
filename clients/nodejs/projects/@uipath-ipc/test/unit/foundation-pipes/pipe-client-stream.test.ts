@@ -1,16 +1,18 @@
 // tslint:disable: max-line-length
 // tslint:disable: no-unused-expression
+
 import { expect, spy, use } from 'chai';
 import 'chai/register-should';
 import spies from 'chai-spies';
+import chaiAsPromised from 'chai-as-promised';
+use(spies);
+use(chaiAsPromised);
+
 import { SocketLikeMocks } from './socket-like-mocks.test-helper';
 
-import { PipeClientStream, PipeReader, ILogicalSocketFactory, ILogicalSocket, SocketAdapter, ISocketLike } from '@foundation/pipes';
-import { CancellationToken, TimeSpan, CancellationTokenSource } from '@foundation/threading';
-import { ArgumentNullError, TimeoutError, OperationCanceledError, PipeBrokenError, ObjectDisposedError, InvalidOperationError } from '@foundation/errors';
-import { Trace } from '@foundation/utils';
-
-use(spies);
+import { PipeClientStream, ILogicalSocketFactory, SocketAdapter } from '../../../src/foundation/pipes';
+import { ArgumentNullError, PipeBrokenError, ObjectDisposedError } from '../../../src/foundation/errors';
+import { Trace } from '../../../src/foundation/utils';
 
 describe(`foundation:pipes -> class:PipeClientStream`, () => {
     context(`method:connectAsync`, () => {
@@ -356,7 +358,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
 
             const source = Buffer.from('buffer');
             const destination = Buffer.alloc(source.length);
-            const promise = stream.readAsync(destination);
+            stream.readAsync(destination);
 
             mocks.emitData(source);
             await Promise.yield();

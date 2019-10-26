@@ -1,16 +1,19 @@
 import * as BrokerMessage from './broker-message';
+import * as WireMessage from './wire-message';
 import * as Outcome from '../../foundation/utils';
 
 import { PromiseCompletionSource } from '../../foundation/threading/promise-completion-source';
 import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
-import { IDisposable } from '../../foundation/disposable';
+import { IDisposable, IAsyncDisposable } from '../../foundation/disposable';
 import { ObjectDisposedError } from '../../foundation/errors/object-disposed-error';
 import { CancellationToken } from '../..';
 import { CancellationTokenRegistration } from '../../foundation/threading/cancellation-token-registration';
+import { ArgumentError } from '@uipath/ipc/foundation/errors';
 
 /* @internal */
 export interface ICallContext extends IDisposable {
-    readonly id: string;
+    readonly wireRequest: WireMessage.Request;
+    readonly cancellationToken: CancellationToken;
     readonly promise: Promise<BrokerMessage.Response>;
 }
 
@@ -19,15 +22,19 @@ export class CallContext implements ICallContext {
     private readonly _pcs = new PromiseCompletionSource<BrokerMessage.Response>();
     private readonly _ctreg: CancellationTokenRegistration;
 
-    public get promise(): Promise<BrokerMessage.Response> {
-        return this._pcs.promise;
-    }
+    public get cancellationToken(): CancellationToken { return this._data.cancellationToken; }
+    public get wireRequest(): WireMessage.Request { return this._data.wireRequest; }
 
-    constructor(public readonly id: string, cancellationToken: CancellationToken, private readonly _maybeDisposable?: IDisposable) {
-        if (!id) { throw new ArgumentNullError('id'); }
-        if (!cancellationToken) { throw new ArgumentNullError('cancellationToken'); }
+    public get promise(): Promise<BrokerMessage.Response> { return this._pcs.promise; }
 
-        this._ctreg = cancellationToken.register(() => {
+    constructor(
+        private readonly _data: ICallContextData
+    ) {
+        if (!_data) { throw new ArgumentNullError('_params'); }
+        if (!_data.cancellationToken) { throw new ArgumentError('Expecting a non-null, non-undefined CancellationToken on the provided ICallContextData.', '_params'); }
+        if (!_data.wireRequest) { throw new ArgumentError('Expecting a non-null, non-undefined WireMessage.Request on the provided ICallContextData.', '_params'); }
+
+        this._ctreg = _data.cancellationToken.register(() => {
             this.trySet(new Outcome.Canceled());
         });
     }
@@ -39,11 +46,7 @@ export class CallContext implements ICallContext {
         this._pcs.trySet(outcome);
     }
 
-    public dispose(): void {
-        if (this._maybeDisposable) {
-            this._maybeDisposable.dispose();
-        }
-    }
+    public dispose(): void { this._data.dispose(); }
 }
 
 /* @internal */
@@ -61,18 +64,27 @@ export class CallbackContext {
     }
 }
 
+export type ICallContextDataFactory = (id: string) => ICallContextData;
+
+/* @internal */
+export interface ICallContextData extends IDisposable {
+    readonly cancellationToken: CancellationToken;
+    readonly wireRequest: WireMessage.Request;
+}
+
 /* @internal */
 export class CallContextTable implements IDisposable {
     private _nextId = 0;
     private _isDisposed = false;
     private readonly _contexts: { [id: string]: CallContext | undefined; } = {};
 
-    public createContext(cancellationToken: CancellationToken, maybeDisposable?: IDisposable): ICallContext {
-        if (!cancellationToken) { throw new ArgumentNullError(`cancellationToken`); }
+    public createContext(factory: ICallContextDataFactory): ICallContext {
+        if (!factory) { throw new ArgumentNullError(`factory`); }
         if (this._isDisposed) { throw new ObjectDisposedError('CallContextTable'); }
 
-        const context = new CallContext(`${this._nextId++}`, cancellationToken, maybeDisposable);
-        this._contexts[context.id] = context;
+        const context = new CallContext(factory(`${this._nextId++}`));
+
+        this._contexts[context.wireRequest.Id] = context;
         return context;
     }
     public signal(id: string, outcome: Outcome.AnyOutcome<BrokerMessage.Response>): void {

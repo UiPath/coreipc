@@ -6,7 +6,7 @@
             "es6"
         ],
         "module": "commonjs",
-        "noUnusedLocals": true,
+        "noUnusedLocals": false,
         "skipLibCheck": true,
         "sourceMap": true,
         "target": "ES2016",
