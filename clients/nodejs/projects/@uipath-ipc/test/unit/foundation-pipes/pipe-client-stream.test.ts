@@ -95,21 +95,6 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             await stream.disposeAsync();
             disposeSpy.should.have.been.called();
         });
-
-        it(`should return the same promise every time it's called`, async () => {
-            const data: Observable<Buffer> = new Subject<Buffer>();
-            const logicalSocket: ILogicalSocket = {
-                data,
-                async connectAsync(path: string, timeout: TimeSpan | null, ct: CancellationToken) { },
-                async writeAsync(buffer: Buffer, ct: CancellationToken) { },
-                dispose() { }
-            };
-
-            const stream = await PipeClientStream.connectAsync(() => logicalSocket, 'name', null, false);
-            const promise = stream.disposeAsync();
-            expect(stream.disposeAsync()).to.be.equal(promise);
-            await promise;
-        });
     });
 
     context(`method:readPartiallyAsync`, () => {

@@ -4,11 +4,11 @@ import * as Outcome from '../../foundation/utils';
 
 import { PromiseCompletionSource } from '../../foundation/threading/promise-completion-source';
 import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
-import { IDisposable, IAsyncDisposable } from '../../foundation/disposable';
+import { IDisposable } from '../../foundation/disposable';
 import { ObjectDisposedError } from '../../foundation/errors/object-disposed-error';
 import { CancellationToken } from '../..';
 import { CancellationTokenRegistration } from '../../foundation/threading/cancellation-token-registration';
-import { ArgumentError } from '@uipath/ipc/foundation/errors';
+import { ArgumentError } from '../../foundation/errors';
 
 /* @internal */
 export interface ICallContext extends IDisposable {
