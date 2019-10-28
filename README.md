@@ -1,2 +1,2 @@
 # Ipc
-Offers a service model API for communication over named pipes.
+WCF-like service model API for communication over named pipes.
