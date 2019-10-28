@@ -45,8 +45,12 @@ export class PipeClientStream implements IPipeClientStream, IAsyncDisposable {
     }
 
     private readonly _pipeReader: PipeReader;
-    private _maybeDisposeTask: Promise<void> | null = null;
-    private get isDisposedOrDisposing(): boolean { return !!this._maybeDisposeTask; }
+    // private _maybeDisposeTask: Promise<void> | null = null;
+    private _isDisposed = false;
+    private get isDisposedOrDisposing(): boolean {
+        return this._isDisposed;
+        // return !!this._maybeDisposeTask;
+    }
 
     private constructor(
         private readonly _socket: ILogicalSocket,
@@ -92,7 +96,13 @@ export class PipeClientStream implements IPipeClientStream, IAsyncDisposable {
     }
 
     public disposeAsync(): Promise<void> {
-        return this._maybeDisposeTask || (this._maybeDisposeTask = this.disposeCoreAsync().observe());
+        if (!this._isDisposed) {
+            this._isDisposed = true;
+            return this.disposeCoreAsync();
+        } else {
+            return Promise.completedPromise;
+        }
+        // return this._maybeDisposeTask || (this._maybeDisposeTask = this.disposeCoreAsync().observe());
     }
     private async disposeCoreAsync(): Promise<void> {
         this._socket.dispose();

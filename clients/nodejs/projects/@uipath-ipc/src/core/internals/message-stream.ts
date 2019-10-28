@@ -43,9 +43,9 @@ export class MessageStream implements IMessageStream {
     }
 
     public async disposeAsync(): Promise<void> {
+        await this._stream.disposeAsync();
         this._messages.complete();
         this._readIndefinitelyCts.cancel(false);
-        await this._stream.disposeAsync();
 
         try {
             await this._readIndefinitelyPromise;
