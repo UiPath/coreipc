@@ -18,7 +18,7 @@ import * as WireMessage from '../../../src/core/internals/wire-message';
 import { MessageEvent } from '../../../src/core/internals/message-event';
 
 import { CancellationToken } from '../../../src/foundation/threading';
-import { ArgumentNullError } from '../../../src/foundation/errors';
+import { ArgumentNullError, OperationCanceledError } from '../../../src/foundation/errors';
 import { IPipeClientStream } from '../../../src/foundation/pipes';
 
 describe(`core:internals -> class:MessageStream`, () => {
@@ -153,6 +153,27 @@ describe(`core:internals -> class:MessageStream`, () => {
             await mockMessageStream.disposeAsync();
 
             expect(observer.complete).to.have.been.called();
+        });
+
+        it(`should dispose the underlying IPipeClientStream`, async () => {
+            const disposeAsync = spy(async () => { });
+            const mockPipeClientStream: IPipeClientStream = {
+                readAsync(destination: Buffer, ct: CancellationToken) {
+                    return new Promise<void>((_, reject) => ct.register(() => {
+                        reject(new OperationCanceledError());
+                    }));
+                },
+                async writeAsync(source: Buffer, ct: CancellationToken) {
+                    return new Promise<void>((_, reject) => ct.register(() => {
+                        reject(new OperationCanceledError());
+                    }));
+                },
+                disposeAsync
+            };
+            const messageStream = new MessageStream(mockPipeClientStream);
+
+            await messageStream.disposeAsync();
+            disposeAsync.should.have.been.called();
         });
     });
 });

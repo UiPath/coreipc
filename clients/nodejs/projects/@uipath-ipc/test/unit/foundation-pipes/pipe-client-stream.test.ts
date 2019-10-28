@@ -10,9 +10,11 @@ use(chaiAsPromised);
 
 import { SocketLikeMocks } from './socket-like-mocks.test-helper';
 
-import { PipeClientStream, ILogicalSocketFactory, SocketAdapter } from '../../../src/foundation/pipes';
+import { PipeClientStream, ILogicalSocketFactory, SocketAdapter, ILogicalSocket } from '../../../src/foundation/pipes';
 import { ArgumentNullError, PipeBrokenError, ObjectDisposedError } from '../../../src/foundation/errors';
 import { Trace } from '../../../src/foundation/utils';
+import { Observable, Subject } from 'rxjs';
+import { TimeSpan, CancellationToken } from '../../../src/foundation/threading';
 
 describe(`foundation:pipes -> class:PipeClientStream`, () => {
     context(`method:connectAsync`, () => {
@@ -59,7 +61,7 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
     });
 
     context(`method:disposeAsync`, () => {
-        it(`shouldn't throw or reject, even if called multiple times`, async () => {
+        it(`shouldn't reject even if called multiple times`, async () => {
             const mocks = SocketLikeMocks.createEmittingMock();
             const logicalSocket = new SocketAdapter(mocks.socketLike);
             const factory: ILogicalSocketFactory = () => logicalSocket;
@@ -77,6 +79,36 @@ describe(`foundation:pipes -> class:PipeClientStream`, () => {
             expect(promise).not.to.be.null;
             expect(promise).not.to.be.undefined;
             await promise.should.eventually.be.fulfilled;
+        });
+
+        it(`should dispose the underlying ILogicalSocket`, async () => {
+            const data: Observable<Buffer> = new Subject<Buffer>();
+            const disposeSpy = spy(() => { });
+            const logicalSocket: ILogicalSocket = {
+                data,
+                async connectAsync(path: string, timeout: TimeSpan | null, ct: CancellationToken) { },
+                async writeAsync(buffer: Buffer, ct: CancellationToken) { },
+                dispose: disposeSpy
+            };
+
+            const stream = await PipeClientStream.connectAsync(() => logicalSocket, 'name', null, false);
+            await stream.disposeAsync();
+            disposeSpy.should.have.been.called();
+        });
+
+        it(`should return the same promise every time it's called`, async () => {
+            const data: Observable<Buffer> = new Subject<Buffer>();
+            const logicalSocket: ILogicalSocket = {
+                data,
+                async connectAsync(path: string, timeout: TimeSpan | null, ct: CancellationToken) { },
+                async writeAsync(buffer: Buffer, ct: CancellationToken) { },
+                dispose() { }
+            };
+
+            const stream = await PipeClientStream.connectAsync(() => logicalSocket, 'name', null, false);
+            const promise = stream.disposeAsync();
+            expect(stream.disposeAsync()).to.be.equal(promise);
+            await promise;
         });
     });
 

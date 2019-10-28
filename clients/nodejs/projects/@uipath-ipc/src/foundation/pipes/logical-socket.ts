@@ -20,7 +20,6 @@ export interface ILogicalSocket extends IDisposable {
     writeAsync(buffer: Buffer, cancellationToken: CancellationToken): Promise<void>;
 
     readonly data: Observable<Buffer>;
-    dispose(): void;
 }
 
 /* This class translates an ISocketLike into an ILogicalSocket. */

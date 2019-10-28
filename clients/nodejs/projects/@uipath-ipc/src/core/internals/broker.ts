@@ -74,22 +74,6 @@ export class Broker implements IBroker, IAsyncDisposable {
 
     private static readonly traceCategory = Trace.category('broker');
 
-    public async disposeAsync(): Promise<void> {
-        if (!this._isDisposed) {
-            this._isDisposed = true;
-
-            this._cts.cancel();
-
-            if (this._maybeMessageStream) {
-                await this._maybeMessageStream.disposeAsync();
-            }
-
-            await Promise.all(this._inFlightCallbackPromises);
-
-            this._table.dispose();
-        }
-    }
-
     private async getOrCreateMessageStreamAsync(cancellationToken: CancellationToken): Promise<IMessageStream> {
         if (!this._maybeMessageStream) {
             const messageStream = new MessageStream(await this.connectAsync(cancellationToken));
@@ -98,32 +82,30 @@ export class Broker implements IBroker, IAsyncDisposable {
         }
         return this._maybeMessageStream;
     }
-    private async connectAsync(cancellationToken: CancellationToken): Promise<IPipeClientStream> {
-        Broker.traceCategory.log(`Connecting to "${this._parameters.pipeName}"`);
-
-        const connect = async () => await PipeClientStream.connectAsync(
+    private connectCoreAsync(cancellationToken: CancellationToken): Promise<IPipeClientStream> {
+        return PipeClientStream.connectAsync(
             this._parameters.factory,
             this._parameters.pipeName,
             this._parameters.connectTimeout,
             !!this._parameters.traceNetwork,
             cancellationToken
         );
+    }
+    private async connectAsync(cancellationToken: CancellationToken): Promise<IPipeClientStream> {
+        Broker.traceCategory.log(`Connecting to "${this._parameters.pipeName}"`);
+
+        const connectFunc = this.connectCoreAsync.bind(this, cancellationToken);
 
         let result: IPipeClientStream | void | null = null;
         if (this._parameters.connectionFactory && !this._insideConnectionFactory) {
             this._insideConnectionFactory = true;
             try {
-                result = await this._parameters.connectionFactory(connect, cancellationToken);
+                result = await this._parameters.connectionFactory(connectFunc, cancellationToken);
             } finally {
                 this._insideConnectionFactory = false;
             }
         }
-        result = result || await PipeClientStream.connectAsync(
-            this._parameters.factory,
-            this._parameters.pipeName,
-            this._parameters.connectTimeout,
-            !!this._parameters.traceNetwork,
-            cancellationToken);
+        result = result || await connectFunc();
 
         this._newConnection = true;
 
@@ -244,34 +226,20 @@ export class Broker implements IBroker, IAsyncDisposable {
             }
         }
     }
-    // private async sendBufferAsync(methodName: string, buffer: Buffer, cancellationToken: CancellationToken): Promise<void> {
-    //     let fulfilled = false;
-    //     while (!fulfilled) {
-    //         let messageStream: IMessageStream = null as any;
-    //         try {
-    //             messageStream = await this.getOrCreateMessageStreamAsync(cancellationToken);
-    //         } catch (error) {
-    //             Broker.traceCategory.log(`Broker.sendBufferAsync: Failed to obtain a StreamWrapper`);
-    //             Broker.traceCategory.log(error);
-    //             throw error;
-    //         }
 
-    //         try {
-    //             if (this._parameters.beforeCall && !this._insideBeforeCall) {
-    //                 this._insideBeforeCall = true;
-    //                 try {
-    //                     await this._parameters.beforeCall(methodName, this._newConnection, cancellationToken);
-    //                 } catch (error) {
-    //                 }
-    //                 this._newConnection = false;
-    //                 this._insideBeforeCall = false;
-    //             }
-    //             await messageStream.writeAsync(buffer, cancellationToken);
-    //             fulfilled = true;
-    //         } catch (error) {
-    //             await messageStream.disposeAsync();
-    //             this._maybeMessageStream = null;
-    //         }
-    //     }
-    // }
+    public async disposeAsync(): Promise<void> {
+        if (!this._isDisposed) {
+            this._isDisposed = true;
+
+            this._cts.cancel();
+
+            if (this._maybeMessageStream) {
+                await this._maybeMessageStream.disposeAsync();
+            }
+
+            await Promise.all(this._inFlightCallbackPromises);
+
+            this._table.dispose();
+        }
+    }
 }

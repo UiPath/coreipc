@@ -8,10 +8,9 @@ import { PipeBrokenError } from '../errors/pipe/pipe-broken-error';
 import { Trace } from '../../foundation/utils';
 import { ArgumentNullError } from '../../foundation/errors';
 
-export interface IPipeClientStream {
+export interface IPipeClientStream extends IAsyncDisposable {
     writeAsync(source: Buffer, cancellationToken: CancellationToken): Promise<void>;
     readAsync(destination: Buffer, cancellationToken: CancellationToken): Promise<void>;
-    disposeAsync(): Promise<void>;
 }
 
 export class PipeClientStream implements IPipeClientStream, IAsyncDisposable {

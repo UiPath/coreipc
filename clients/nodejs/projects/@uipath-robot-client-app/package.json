@@ -35,6 +35,7 @@
         "@types/blessed": "0.1.10",
         "@types/jest": "^22.1.4",
         "@types/node": "^12.6.8",
+        "@types/winreg": "^1.2.30",
         "pkg": "4.4.0",
         "typescript": "^3.6.4"
     },
