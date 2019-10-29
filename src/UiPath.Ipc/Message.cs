@@ -8,8 +8,6 @@ namespace UiPath.Ipc
         [JsonIgnore]
         public IClient Client { get; set; }
         [JsonIgnore]
-        public string ClientUserName => Client.UserName;
-        [JsonIgnore]
         public TimeSpan RequestTimeout { get; set; }
         public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => Client.GetCallback<TCallbackInterface>();
         public void ImpersonateClient(Action action) => Client.Impersonate(action);
@@ -28,7 +26,6 @@ namespace UiPath.Ipc
 
     public interface IClient : ICreateCallback
     {
-        string UserName { get; }
         void Impersonate(Action action);
     }
 
@@ -38,14 +35,11 @@ namespace UiPath.Ipc
         private readonly ICreateCallback _callbackFactory;
         private object _callback;
 
-        public Client(string userName, Action<Action> impersonationCallback, ICreateCallback callbackFactory)
+        public Client(Action<Action> impersonationCallback, ICreateCallback callbackFactory)
         {
             _impersonationCallback = impersonationCallback ?? throw new ArgumentNullException(nameof(impersonationCallback));
             _callbackFactory = callbackFactory ?? throw new ArgumentNullException(nameof(callbackFactory));
-            UserName = userName ?? throw new ArgumentNullException(nameof(userName));
         }
-
-        public string UserName { get; }
         public void Impersonate(Action action) => _impersonationCallback(action);
         public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class
         {

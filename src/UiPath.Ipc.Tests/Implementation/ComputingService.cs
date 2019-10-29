@@ -55,7 +55,7 @@ namespace UiPath.Ipc.Tests
             var callback = client.GetCallback<IComputingCallback>();
             var clientId = await callback.GetId(message);
             string returnValue = "";
-            client.Impersonate(() => returnValue = client.UserName + "_" + clientId + "_" + message.Text);
+            client.Impersonate(() => returnValue = client.GetUserName() + "_" + clientId + "_" + message.Text);
             return returnValue;
         }
 

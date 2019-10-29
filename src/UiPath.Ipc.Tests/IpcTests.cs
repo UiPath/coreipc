@@ -202,7 +202,7 @@ namespace UiPath.Ipc.Tests
         public async Task OptionalMessage()
         {
             var returnValue = await _systemClient.ImpersonateCaller();
-            returnValue.ShouldBe(Environment.UserName);
+            returnValue.ShouldBe(IpcHelpers.CurrentUserName());
         }
 
         [Fact]
@@ -338,7 +338,7 @@ namespace UiPath.Ipc.Tests
         {
             var message = new SystemMessage { Text = System.Guid.NewGuid().ToString() };
             var returnValue = await _computingClient.SendMessage(message);
-            returnValue.ShouldBe($"{Environment.UserName}_{_computingCallback.Id}_{message.Text}");
+            returnValue.ShouldBe($"{IpcHelpers.CurrentUserName()}_{_computingCallback.Id}_{message.Text}");
         }
 
         class JobFailedException : Exception

@@ -32,7 +32,7 @@ namespace UiPath.Ipc.NamedPipe
                     await server.WaitForConnectionAsync();
                 }
                 // pass the ownership of the connection
-                HandleConnection(server, callbackFactory => new Client(server.GetImpersonationUserName(), action => server.RunAsClient(() => action()), callbackFactory), token);
+                HandleConnection(server, callbackFactory => new Client(action => server.RunAsClient(() => action()), callbackFactory), token);
             }
             catch (Exception ex)
             {
