@@ -77,7 +77,7 @@ namespace UiPath.Ipc.Tests
             //{
             //    Console.WriteLine(ex.ToString());
             //}
-            return client.UserName +" " + domainName;
+            return client.GetUserName() +" " + domainName;
         }
 
         public async Task<bool> SlowOperation(CancellationToken cancellationToken = default)
@@ -116,7 +116,7 @@ namespace UiPath.Ipc.Tests
         {
             var client = message.Client;
             string returnValue = "";
-            client.Impersonate(() => returnValue = client.UserName);
+            client.Impersonate(() => returnValue = client.GetUserName());
             return returnValue;
         }
     }

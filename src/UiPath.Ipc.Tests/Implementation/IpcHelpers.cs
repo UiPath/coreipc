@@ -2,11 +2,25 @@
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Linq;
+using System.Security.Principal;
 
 namespace UiPath.Ipc
 {
     public static class IpcHelpers
     {
+        public static string CurrentUserName()
+        {
+            using (var identity = WindowsIdentity.GetCurrent())
+            {
+                return identity.Name;
+            }
+        }
+        public static string GetUserName(this IClient client)
+        {
+            string userName = null;
+            client.Impersonate(() => userName = CurrentUserName());
+            return userName;
+        }
         public static IServiceCollection AddIpcWithLogging(this IServiceCollection services, bool logToConsole = false)
         {
             services.AddLogging(builder =>
