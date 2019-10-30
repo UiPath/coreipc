@@ -1,6 +1,6 @@
 # CoreIpc
 WCF-like service model API for communication over named pipes.
-
+Check [the tests](https://github.com/UiPath/CoreIpc/blob/master/src/UiPath.CoreIpc.Tests/IpcTests.cs) for supported features.
 ```C#
 // configure the server
 var host = 
