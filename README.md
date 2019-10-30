@@ -1,6 +1,15 @@
 # CoreIpc
 WCF-like service model API for communication over named pipes.
-Check [the tests](https://github.com/UiPath/CoreIpc/blob/master/src/UiPath.CoreIpc.Tests/IpcTests.cs) for supported features.
+- async
+- json serialization
+- DI integration
+- cancellation
+- timeouts
+- callbacks
+- automatic reconnect
+- interception
+- custom task scheduler
+Check [the tests](https://github.com/UiPath/CoreIpc/blob/master/src/UiPath.CoreIpc.Tests/IpcTests.cs) and the sample.
 ```C#
 // configure the server
 var host = 
