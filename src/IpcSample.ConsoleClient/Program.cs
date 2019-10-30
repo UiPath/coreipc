@@ -37,7 +37,7 @@ namespace UiPath.CoreIpc.Tests
         {
             var serviceProvider = ConfigureServices();
             var callback = new ComputingCallback { Id = "custom made" };
-            var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>("computingPipe", serviceProvider).CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
+            var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>(serviceProvider).CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
             var stopwatch = Stopwatch.StartNew();
             int count = 0;
             try
@@ -46,7 +46,7 @@ namespace UiPath.CoreIpc.Tests
                 while (true)
                 {
                     var systemClient =
-                        new NamedPipeClientBuilder<ISystemService>("systemPipe")
+                        new NamedPipeClientBuilder<ISystemService>()
                         .RequestTimeout(TimeSpan.FromSeconds(2))
                         .Logger(serviceProvider)
                         .AllowImpersonation()

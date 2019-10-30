@@ -5,10 +5,10 @@ namespace UiPath.CoreIpc
 {
     public class EndpointSettings
     {
-        public EndpointSettings(string name, Type contract, object serviceInstance, Type callbackContract = null)
+        public EndpointSettings(Type contract, object serviceInstance, Type callbackContract = null)
         {
-            Name = name ?? throw new ArgumentNullException(nameof(name));
             Contract = contract ?? throw new ArgumentNullException(nameof(contract));
+            Name = contract.Name;
             ServiceInstance = serviceInstance;
             CallbackContract = callbackContract;
             IOHelpers.Validate(contract);
@@ -16,7 +16,7 @@ namespace UiPath.CoreIpc
         public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
         public byte ConcurrentAccepts { get; set; } = 5;
         public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
-        internal string Name { get; }
+        public string Name { get; set; }
         internal object ServiceInstance { get; }
         internal Type Contract { get; }
         internal Type CallbackContract { get; }

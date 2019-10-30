@@ -77,7 +77,7 @@ namespace UiPath.CoreIpc
             {
                 Logger(_serviceProvider);
             }
-            var endpointSettings = new EndpointSettings("", _callbackContract, _callbackInstance) { RequestTimeout = _requestTimeout };
+            var endpointSettings = new EndpointSettings(_callbackContract, _callbackInstance) { RequestTimeout = _requestTimeout };
             return BuildCore(new ServiceEndpoint(_serviceProvider, endpointSettings, _logger) { Scheduler = _taskScheduler });
         }
     }

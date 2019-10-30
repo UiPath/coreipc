@@ -6,10 +6,16 @@ namespace UiPath.CoreIpc.NamedPipe
 {
     public abstract class NamedPipeClientBuilderBase<TDerived, TInterface> : ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
     {
-        private readonly string _pipeName;
+        private string _pipeName = typeof(TInterface).Name;
         private bool _allowImpersonation;
 
-        protected NamedPipeClientBuilderBase(string pipeName, Type callbackContract = null, IServiceProvider serviceProvider = null) : base(callbackContract, serviceProvider) => _pipeName = pipeName;
+        protected NamedPipeClientBuilderBase(Type callbackContract = null, IServiceProvider serviceProvider = null) : base(callbackContract, serviceProvider) { }
+
+        public TDerived PipeName(string pipeName)
+        {
+            _pipeName = pipeName;
+            return this as TDerived;
+        }
 
         /// <summary>
         /// Don't set this if you can connect to less privileged processes. 
@@ -29,12 +35,11 @@ namespace UiPath.CoreIpc.NamedPipe
 
     public class NamedPipeClientBuilder<TInterface> : NamedPipeClientBuilderBase<NamedPipeClientBuilder<TInterface>, TInterface> where TInterface : class
     {
-        public NamedPipeClientBuilder(string pipeName) : base(pipeName) { }
     }
 
     public class NamedPipeClientBuilder<TInterface, TCallbackInterface> : NamedPipeClientBuilderBase<NamedPipeClientBuilder<TInterface, TCallbackInterface>, TInterface> where TInterface : class where TCallbackInterface : class
     {
-        public NamedPipeClientBuilder(string pipeName, IServiceProvider serviceProvider) : base(pipeName, typeof(TCallbackInterface), serviceProvider) { }
+        public NamedPipeClientBuilder(IServiceProvider serviceProvider) : base(typeof(TCallbackInterface), serviceProvider) { }
 
         public NamedPipeClientBuilder<TInterface, TCallbackInterface> CallbackInstance(TCallbackInterface singleton)
         {
