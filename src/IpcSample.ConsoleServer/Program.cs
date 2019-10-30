@@ -7,9 +7,9 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
-using UiPath.Ipc.NamedPipe;
+using UiPath.CoreIpc.NamedPipe;
 
-namespace UiPath.Ipc.Tests
+namespace UiPath.CoreIpc.Tests
 {
     class Program
     {

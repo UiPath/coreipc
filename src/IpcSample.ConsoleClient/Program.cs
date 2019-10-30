@@ -3,12 +3,12 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
-using UiPath.Ipc.NamedPipe;
+using UiPath.CoreIpc.NamedPipe;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Linq;
 
-namespace UiPath.Ipc.Tests
+namespace UiPath.CoreIpc.Tests
 {
     class Program
     {

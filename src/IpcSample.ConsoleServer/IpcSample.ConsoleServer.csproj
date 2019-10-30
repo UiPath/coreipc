@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\UiPath.Ipc.Tests\UiPath.Ipc.Tests.csproj" />
-    <ProjectReference Include="..\UiPath.Ipc\UiPath.Ipc.csproj" />
+    <ProjectReference Include="..\UiPath.CoreIpc.Tests\UiPath.CoreIpc.Tests.csproj" />
+    <ProjectReference Include="..\UiPath.CoreIpc\UiPath.CoreIpc.csproj" />
   </ItemGroup>
 
   <ItemGroup>
