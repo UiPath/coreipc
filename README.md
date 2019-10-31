@@ -13,13 +13,11 @@ WCF-like service model API for communication over named pipes.
 
 Check [the tests](https://github.com/UiPath/CoreIpc/blob/master/src/UiPath.CoreIpc.Tests/IpcTests.cs) and the sample.
 ```C#
-// configure the server
-var host = 
-    new ServiceHostBuilder(serviceProvider)
+// configure and start the server
+_ = new ServiceHostBuilder(serviceProvider)
     .AddEndpoint(new NamedPipeEndpointSettings<IComputingService>())
-    .Build();
-// start the server
-_ = host.RunAsync();
+    .Build()
+    .RunAsync();
 // configure the client
 var computingClient = 
     new NamedPipeClientBuilder<IComputingService>()
