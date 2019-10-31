@@ -5,6 +5,7 @@ import { IRobotProxy, RobotProxy } from './robot-proxy';
 import { Trace, Message } from '@uipath/ipc';
 import { RobotConfig } from '.';
 import { spawn } from 'child_process';
+import { ObjectDisposedError, OperationCanceledError } from '@uipath/ipc/dist/foundation/errors';
 
 /* @internal */
 export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
@@ -14,6 +15,7 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     private _orchestratorStatus: UpstreamContract.OrchestratorStatus = UpstreamContract.OrchestratorStatus.Offline;
     private _initialized = false;
     private _disposed = false;
+    private static readonly _trace = Trace.category('RobotAgentProxy');
 
     private readonly _robotStatusChanged = RobotAgentProxy.createSubject<DownstreamContract.RobotStatusChangedEventArgs>();
     private readonly _processListUpdated = RobotAgentProxy.createSubject<DownstreamContract.ProcessListUpdatedArgs>();
@@ -56,23 +58,30 @@ export class RobotAgentProxy implements DownstreamContract.IRobotAgentProxy {
     public RefreshStatus(parameters: DownstreamContract.RefreshStatusParameters): void {
         this.assertNotClosed();
         if (!this._initialized) {
-            this.connectToService().traceError();
+            console.log(`this._initialized === false`);
+            this.connectToService().observe().traceError();
             this._initialized = true;
+            console.log(`RefreshStatus: returning...`);
             return;
         }
         this.refreshStatusCore(new UpstreamContract.GetProcessesParameters({
             ForceRefresh: parameters.ForceProcessListUpdate,
             AutoInstall: parameters.ForceProcessListUpdate
-        }));
+        })).observe();
     }
 
     private async connectToService(): Promise<void> {
-        while (true) {
+        while (!this._disposed) {
             try {
                 await this._proxy.GetUserStatus(new Message<void>());
                 return;
             } catch (error) {
-                Trace.log(`error instanceof Error === ${error instanceof Error}`);
+                RobotAgentProxy._trace.log(`method "connectToService": caught error ${error}`);
+
+                if (error instanceof OperationCanceledError || error instanceof ObjectDisposedError) {
+                    throw error;
+                }
+
 
                 Trace.log(`RobotAgentProxy.connectToService: calling this._proxy.GetUserStatus() failed (will retry in 3 seconds)\r\nError: "${error}"`);
                 await Promise.delay(3000);

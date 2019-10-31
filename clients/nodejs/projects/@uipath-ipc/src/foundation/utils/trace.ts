@@ -56,17 +56,17 @@ declare global {
     }
 }
 
-const promiseTrace = Trace.category('promise');
+const promiseTrace = Trace.category('promise.traceError');
 
 // @ts-ignore
 // tslint:disable-next-line: only-arrow-functions
 Promise.prototype.traceError = function(): void {
-    this.then(undefined, (reason: any) => {
-        if (reason instanceof Error) {
-            promiseTrace.log(reason);
-        } else {
-            promiseTrace.log(`${reason}`);
-        }
+    this.then(_ => { }, (reason: any) => {
+        promiseTrace.log(`\r\n\tpromise: ${this}\r\n\treason: ${reason}`);
+        // if (reason instanceof Error) {
+        // } else {
+        //     promiseTrace.log(`${reason}`);
+        // }
     });
 };
 

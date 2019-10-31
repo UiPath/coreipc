@@ -8,6 +8,7 @@ import { ArgumentNullError } from '../../foundation/errors';
 import * as WireMessage from './wire-message';
 import { SerializationPal } from './serialization-pal';
 import { MessageEvent } from './message-event';
+import { Trace } from '../../foundation/utils/trace';
 
 /* @internal */
 export interface IMessageStream extends IAsyncDisposable {
@@ -19,6 +20,8 @@ export interface IMessageStream extends IAsyncDisposable {
 
 /* @internal */
 export class MessageStream implements IMessageStream {
+    private static readonly _trace = Trace.category('MessageStream');
+
     private readonly _messages = new ReplaySubject<MessageEvent>();
     private readonly _readIndefinitelyCts = new CancellationTokenSource();
     private readonly _readIndefinitelyPromise: Promise<void>;
@@ -32,6 +35,8 @@ export class MessageStream implements IMessageStream {
     constructor(private readonly _stream: IPipeClientStream) {
         if (!_stream) { throw new ArgumentNullError('stream'); }
 
+        MessageStream._trace.log(`instance created`);
+
         this._readIndefinitelyPromise = this.readIndefinitelyAsync(this._readIndefinitelyCts.token);
     }
 
@@ -43,8 +48,10 @@ export class MessageStream implements IMessageStream {
     }
 
     public async disposeAsync(): Promise<void> {
-        await this._stream.disposeAsync();
+        MessageStream._trace.log(`method:disposeAsync() is running`);
+
         this._messages.complete();
+        await this._stream.disposeAsync();
         this._readIndefinitelyCts.cancel(false);
 
         try {
@@ -56,6 +63,7 @@ export class MessageStream implements IMessageStream {
     private async readIndefinitelyAsync(token: CancellationToken): Promise<void> {
         try {
             while (!token.isCancellationRequested) {
+                MessageStream._trace.log(`method "readIndefinitelyAsync": running cycle`);
                 const message = await this.readMessageAsync(token);
 
                 this._messages.next(new MessageEvent(this, message));

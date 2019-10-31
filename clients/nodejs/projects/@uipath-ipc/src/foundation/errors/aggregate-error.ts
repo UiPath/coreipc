@@ -17,6 +17,11 @@ export class AggregateError extends Error {
         }
 
         super(_message || AggregateError.defaultMessage);
+        this.name = 'AggregateError';
         this.errors = _errors;
+    }
+
+    public toString(): string {
+        return `${this.name}: ${this.message}\r\n${this.errors.reduce((sum, x) => `${sum}\t- ${x}\r\n`, '')}`;
     }
 }

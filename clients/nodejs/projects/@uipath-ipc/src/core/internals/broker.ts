@@ -7,7 +7,7 @@ import { CancellationTokenSource, CancellationToken } from '../../foundation/thr
 import { PipeClientStream, IPipeClientStream } from '../../foundation/pipes';
 import { Trace } from '../../foundation/utils';
 import { IAsyncDisposable } from '../../foundation/disposable';
-import { InvalidOperationError, ArgumentError } from '../../foundation/errors';
+import { InvalidOperationError, ArgumentError, ObjectDisposedError } from '../../foundation/errors';
 import { Succeeded } from '../../foundation/utils';
 import { ILogicalSocketFactory } from '../../foundation/pipes';
 import { TimeSpan } from '../../foundation/threading';
@@ -52,6 +52,8 @@ export class Broker implements IBroker, IAsyncDisposable {
     private _insideConnectionFactory = false;
     private _insideBeforeCall = false;
 
+    private static readonly _trace = Trace.category('Broker');
+
     constructor(private readonly _parameters: IBrokerCtorParams) {
         if (!_parameters) { throw new ArgumentNullError('_parameters'); }
         if (!_parameters.factory) { throw new ArgumentError('_parameters.factory cannot be null or undefined.', '_parameters'); }
@@ -62,12 +64,18 @@ export class Broker implements IBroker, IAsyncDisposable {
 
     public async sendReceiveAsync(brokerRequest: BrokerMessage.OutboundRequest): Promise<BrokerMessage.Response> {
         if (!brokerRequest) { throw new ArgumentNullError('brokerRequest'); }
+        if (this._isDisposed) { throw new ObjectDisposedError('Broker'); }
 
-        const dataFactory = SerializationPal.prepareCallContext(brokerRequest, this._parameters.defaultCallTimeout);
+        const dataFactory = SerializationPal.prepareCallContext(brokerRequest, this._parameters.defaultCallTimeout, this._cts.token);
         const context = this._table.createContext(dataFactory);
 
-        await this.ensureConnectedAsync(context.cancellationToken);
-        await this.sendAsync(context.wireRequest, context.cancellationToken);
+        try {
+            await this.ensureConnectedAsync(context.cancellationToken);
+            await this.sendAsync(context.wireRequest, context.cancellationToken);
+        } catch (error) {
+            Broker._trace.log(`method "sendReceiveAsync": ensureConnectedAsync or sendAsync threw ${error}`);
+            throw error;
+        }
 
         return await context.promise;
     }
@@ -77,6 +85,7 @@ export class Broker implements IBroker, IAsyncDisposable {
     private async getOrCreateMessageStreamAsync(cancellationToken: CancellationToken): Promise<IMessageStream> {
         if (!this._maybeMessageStream) {
             const messageStream = new MessageStream(await this.connectAsync(cancellationToken));
+            Broker._trace.log(`method "getOrCreateMessageStreamAsync": created messageStream`);
             messageStream.messages.subscribe(this.processInboundAsync.bind(this));
             this._maybeMessageStream = messageStream;
         }
@@ -113,7 +122,11 @@ export class Broker implements IBroker, IAsyncDisposable {
     }
 
     private processInboundAsync(event: MessageEvent): void {
-        if (this._isDisposed) { return; }
+        Broker._trace.log(`method:processInboundAsync, this._isDisposed === ${this._isDisposed}`);
+        if (this._isDisposed) {
+            Broker._trace.log(`method:processInboundAsync, this._isDisposed === ${this._isDisposed} => returning`);
+            return;
+        }
 
         if (event.message instanceof WireMessage.Request) {
             const tuple = SerializationPal.deserializeRequest(event.message);
@@ -199,6 +212,9 @@ export class Broker implements IBroker, IAsyncDisposable {
     private async sendAsync(wireRequest: WireMessage.Request, cancellationToken: CancellationToken): Promise<void> {
         let fulfilled = false;
         while (!fulfilled) {
+            Broker._trace.log(`method:sendAsync, loop: "while (!fulfilled)", this._cts.token.isCancellationRequested === ${this._cts.token.isCancellationRequested}`);
+            this._cts.token.throwIfCancellationRequested();
+
             let messageStream: IMessageStream = null as any;
             try {
                 messageStream = await this.getOrCreateMessageStreamAsync(cancellationToken);
@@ -233,6 +249,7 @@ export class Broker implements IBroker, IAsyncDisposable {
 
             this._cts.cancel();
 
+            Broker._trace.log(`method "disposeAsync": !!this._maybeMessageStream === ${!!this._maybeMessageStream}`);
             if (this._maybeMessageStream) {
                 await this._maybeMessageStream.disposeAsync();
             }

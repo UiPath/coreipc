@@ -5,7 +5,6 @@ import { CancellationToken, CancellationTokenSource } from '../..';
 import { ArgumentError } from '../../foundation/errors/argument-error';
 import { TimeSpan } from '../../foundation/threading/timespan';
 import { ArgumentNullError } from '../../foundation/errors/argument-null-error';
-import { IDisposable } from '../../foundation/disposable';
 import { ICallContextDataFactory } from './context';
 
 /* @internal */
@@ -132,15 +131,15 @@ export class SerializationPal {
         return buffer;
     }
 
-    public static prepareCallContext(request: BrokerMessage.OutboundRequest, defaultTimeout: TimeSpan): ICallContextDataFactory {
+    public static prepareCallContext(request: BrokerMessage.OutboundRequest, defaultTimeout: TimeSpan, ctBroker: CancellationToken): ICallContextDataFactory {
         if (!request) { throw new ArgumentNullError('request'); }
         if (!defaultTimeout) { throw new ArgumentNullError('defaultTimeout'); }
         if (defaultTimeout.isNegative) { throw new ArgumentError('Expecting a non-negative TimeSpan.', 'defaultTimeout'); }
 
-        return SerializationPal.prepareCallContextUnchecked(request, defaultTimeout);
+        return SerializationPal.prepareCallContextUnchecked(request, defaultTimeout, ctBroker);
     }
 
-    private static prepareCallContextUnchecked(request: BrokerMessage.OutboundRequest, defaultTimeout: TimeSpan): ICallContextDataFactory {
+    private static prepareCallContextUnchecked(request: BrokerMessage.OutboundRequest, defaultTimeout: TimeSpan, ctBroker: CancellationToken): ICallContextDataFactory {
         let timeoutSeconds = defaultTimeout.totalSeconds;
         let cancellationToken = CancellationToken.none;
         const serializedArgs = new Array<string>();
@@ -163,7 +162,7 @@ export class SerializationPal {
         const ctsTimeout = new CancellationTokenSource();
         ctsTimeout.cancelAfter(TimeSpan.fromSeconds(timeoutSeconds));
 
-        const linkedToken = CancellationToken.merge(ctsTimeout.token, cancellationToken);
+        // const linkedToken = CancellationToken.merge(ctsTimeout.token, cancellationToken);
         cancellationToken.register(ctsTimeout.dispose.bind(ctsTimeout));
 
         const wireRequestFactory = (id: string) => new WireMessage.Request(
@@ -173,8 +172,10 @@ export class SerializationPal {
             serializedArgs
         );
 
+        const linkedToken = CancellationToken.merge(cancellationToken, ctBroker);
+
         return (id: string) => ({
-            cancellationToken,
+            cancellationToken: linkedToken,
             wireRequest: wireRequestFactory(id),
             dispose() { ctsTimeout.dispose(); }
         });

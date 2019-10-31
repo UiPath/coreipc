@@ -8,5 +8,8 @@ export class ObjectDisposedError extends Error {
         return `${message || this.defaultMessage}\r\nObject name: ${objectName}`;
     }
 
-    constructor(public readonly objectName: string, message?: string) { super(ObjectDisposedError.computeMessage(objectName, message)); }
+    constructor(public readonly objectName: string, message?: string) {
+        super(ObjectDisposedError.computeMessage(objectName, message));
+        this.name = 'ObjectDisposedError';
+    }
 }

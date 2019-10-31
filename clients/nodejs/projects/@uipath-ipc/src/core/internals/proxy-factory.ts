@@ -9,7 +9,8 @@ import { CancellationToken } from '../../foundation/threading/cancellation-token
 import { RemoteError } from '../surface/remote-error';
 import { PublicConstructor, ITraceCategory } from '../../foundation/utils';
 import { Trace, OperationCanceledError } from '../..';
-import { AggregateError } from '../../foundation/errors';
+import { AggregateError, ObjectDisposedError } from '../../foundation/errors';
+import { StackTrace } from '../../foundation/utils/stack-trace';
 
 const symbolofMaybeProxyCtor = Symbol('maybe:ProxyFactory');
 
@@ -43,7 +44,7 @@ export class Generator<TService> {
 
     constructor(private readonly _sampleCtor: PublicConstructor<TService>) {
         this._generatedCtor = Generator.createCtor<TService>();
-        this._traceCategory = Trace.category(`generated-proxy(${_sampleCtor})`);
+        this._traceCategory = Trace.category(`generated-proxy(${_sampleCtor.name})`);
     }
 
     private run(): void {
@@ -65,14 +66,15 @@ export class Generator<TService> {
         const traceCategory = this._traceCategory;
 
         return async function(this: IProxy) {
+            traceCategory.log(`executing "${methodName}", stack is:\r\n${new StackTrace()}`);
             const args = normalizeArgs([...arguments]);
 
             const brokerOutboundRequest = new BrokerMessage.OutboundRequest(methodName, args);
 
-            Trace.log(`GeneratedProxy: Sending brokerRequest === ${JSON.stringify(brokerOutboundRequest)}`);
+            traceCategory.log(`sending brokerRequest: ${JSON.stringify(brokerOutboundRequest)}`);
             try {
                 const brokerResponse = await this[symbolofBroker].sendReceiveAsync(brokerOutboundRequest);
-                Trace.log(`GeneratedProxy: brokerResponse === ${JSON.stringify(brokerOutboundRequest)}`);
+                traceCategory.log(`sending brokerResponse: ${JSON.stringify(brokerResponse)}`);
 
                 if (brokerResponse.maybeError) {
                     throw new RemoteError(brokerResponse.maybeError, methodName);
@@ -82,7 +84,8 @@ export class Generator<TService> {
             } catch (error) {
                 traceCategory.log(`caught error ${JSON.stringify(error)}`);
 
-                if (error instanceof OperationCanceledError || error instanceof RemoteError) {
+                if (error instanceof OperationCanceledError || error instanceof RemoteError || error instanceof ObjectDisposedError) {
+                    traceCategory.log(`rethrowing ${JSON.stringify(error)}`);
                     throw error;
                 } else {
                     throw new AggregateError(`An error was caught while trying to issue a remote procedure call.\r\nMethod name: ${methodName}`, error);

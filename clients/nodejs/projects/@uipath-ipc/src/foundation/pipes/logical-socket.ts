@@ -85,6 +85,13 @@ export class LogicalSocket implements ILogicalSocket {
         } finally {
             ctreg.dispose();
             timeout.dispose();
+
+            try {
+                this._socketLike.removeAllListeners();
+                this._socketLike.unref();
+                this._socketLike.destroy();
+            } catch (error2) {
+            }
         }
     }
     public async writeAsync(buffer: Buffer, cancellationToken: CancellationToken): Promise<void> {
