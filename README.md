@@ -8,7 +8,7 @@ WCF-like service model API for communication over named pipes.
 - callbacks
 - automatic reconnect
 - interception
-- custom task scheduler
+- configurable task scheduler
 - client impersonation
 
 Check [the tests](https://github.com/UiPath/CoreIpc/blob/master/src/UiPath.CoreIpc.Tests/IpcTests.cs) and the sample.
