@@ -1,5 +1,5 @@
 # CoreIpc
-WCF-like service model API for communication over named pipes. .Net and [node.js](https://github.com/UiPath/coreipc/tree/master/src/Clients/nodejs) clients.
+WCF-like service model API for communication over named pipes. .NET and [node.js](https://github.com/UiPath/coreipc/tree/master/src/Clients/nodejs) clients.
 - async
 - json serialization
 - DI integration
