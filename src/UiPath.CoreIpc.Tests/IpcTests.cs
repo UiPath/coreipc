@@ -44,6 +44,7 @@ namespace UiPath.CoreIpc.Tests
                     RequestTimeout = TimeSpan.FromSeconds(1),
                     MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,
                     Name = "system",
+                    ConcurrentAccepts = 10,
                 })
                 .Build();
 
