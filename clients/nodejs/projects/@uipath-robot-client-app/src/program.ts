@@ -1,7 +1,6 @@
 import {
     RobotProxyConstructor, StartJobParameters
 } from '@uipath/robot-client';
-import { PromiseHook } from './promise-hook';
 import { Trace } from '@uipath/ipc';
 
 async function main() {
@@ -15,9 +14,9 @@ async function main() {
     const client = new RobotProxyConstructor();
 
     client.RefreshStatus({ ForceProcessListUpdate: false });
-    // await Promise.yield();
-    // await Promise.delay(1000);
-    // await client.StartJob(new StartJobParameters(key));
+
+    await Promise.delay(1000);
+
     console.log(`Closing...`);
     await client.CloseAsync();
     console.log(`Closed.`);

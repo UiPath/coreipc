@@ -80,18 +80,12 @@ export class LogicalSocket implements ILogicalSocket {
                 if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'EPIPE') {
                     error = new PipeBrokenError();
                 }
+                this.dispose();
                 throw error;
             }
         } finally {
             ctreg.dispose();
             timeout.dispose();
-
-            try {
-                this._socketLike.removeAllListeners();
-                this._socketLike.unref();
-                this._socketLike.destroy();
-            } catch (error2) {
-            }
         }
     }
     public async writeAsync(buffer: Buffer, cancellationToken: CancellationToken): Promise<void> {
