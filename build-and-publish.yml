@@ -1,5 +1,5 @@
 trigger:
-- feature/init-azure-pipelines
+- "feature/init-azure-pipelines"
 
 pool:
   vmImage: 'windows-2019'
