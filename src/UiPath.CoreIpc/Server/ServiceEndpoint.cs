@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net.Security;
+using System.Diagnostics;
 
 namespace UiPath.CoreIpc
 {
@@ -64,7 +65,9 @@ namespace UiPath.CoreIpc
             }
             public async Task Listen()
             {
-                await ((NegotiateStream)_connection.Network).AuthenticateAsServerAsync();
+                var negotiateStream = (NegotiateStream)_connection.Network;
+                await negotiateStream.AuthenticateAsServerAsync();
+                Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
                 await _connection.Listen();
             }
         }

@@ -10,6 +10,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Runtime.ExceptionServices;
 using System.Net.Security;
+using System.Security.Principal;
+using System.Net;
+using System.Diagnostics;
 
 namespace UiPath.CoreIpc
 {
@@ -60,7 +63,8 @@ namespace UiPath.CoreIpc
         protected async Task CreateConnection(Stream network)
         {
             var negotiateStream = new NegotiateStream(network);
-            await negotiateStream.AuthenticateAsClientAsync();
+            await negotiateStream.AuthenticateAsClientAsync(new NetworkCredential(), "", ProtectionLevel.EncryptAndSign, TokenImpersonationLevel.Identification);
+            Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
             OnNewConnection(new Connection(negotiateStream, _logger, Name));
             _logger?.LogInformation($"CreateConnection {Name}.");
         }
