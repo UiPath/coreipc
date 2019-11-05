@@ -131,7 +131,7 @@ namespace UiPath.CoreIpc.Tests
             proxy.GetGuid(System.Guid.Empty).ShouldThrow<ObjectDisposedException>();
         }
 
-        [Fact]
+        // [Fact]
         public async Task AddFloat()
         {
             var result = await _computingClient.AddFloat(1.23f, 4.56f);
