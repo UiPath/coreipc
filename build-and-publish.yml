@@ -1,8 +1,6 @@
 trigger:
 - 'feature/init-azure-pipelines'
 
-name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.rr)
-
 pool:
   vmImage: 'windows-2019'
 
@@ -16,7 +14,7 @@ steps:
     displayName: "Restore, build and pack"
     inputs:
       solution: '$(SessionSolution)'
-      msbuildArgs: '/restore'
+      msbuildArgs: '/p:Version=$(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.rr) /restore'
       configuration: '$(BuildConfiguration)'
       maximumCpuCount: true
       
