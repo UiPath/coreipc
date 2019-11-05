@@ -13,8 +13,9 @@ steps:
   - task: VSBuild@1
     displayName: "Build"
     inputs:
-      solution: "$(SessionSolution)"
-      configuration: "$(BuildConfiguration)"
+      solution: '$(SessionSolution)'
+      msbuildArgs: '/restore'
+      configuration: '$(BuildConfiguration)'
       maximumCpuCount: true
       
   - task: DotNetCoreCLI@2
