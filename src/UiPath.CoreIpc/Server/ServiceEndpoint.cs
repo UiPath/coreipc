@@ -51,6 +51,17 @@ namespace UiPath.CoreIpc
                 _connection = new Connection(stream, Logger, _serviceEndpoint.Name, serviceEndpoint._maxMessageSize);
                 _server = new Server(_serviceEndpoint, _connection, cancellationToken, new Lazy<IClient>(() => clientFactory(this)));
                 Listen().LogException(Logger, serviceEndpoint.Name);
+
+                async Task Listen()
+                {
+                    if (Settings.EncryptAndSign)
+                    {
+                        var negotiateStream = (NegotiateStream)_connection.Network;
+                        await negotiateStream.AuthenticateAsServerAsync();
+                        Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
+                    }
+                    await _connection.Listen();
+                }
             }
             public ILogger Logger => _serviceEndpoint.Logger;
             public EndpointSettings Settings => _serviceEndpoint.Settings;
@@ -63,16 +74,6 @@ namespace UiPath.CoreIpc
                 }
                 Logger.LogInformation($"Create callback {_serviceEndpoint.Name}");
                 return new ServiceClient<TCallbackContract>(_serviceEndpoint.ServiceProvider.GetRequiredService<ISerializer>(), Settings.RequestTimeout, Logger, (_, __) => Task.FromResult(_connection)).CreateProxy();
-            }
-            public async Task Listen()
-            {
-                if (Settings.EncryptAndSign)
-                {
-                    var negotiateStream = (NegotiateStream)_connection.Network;
-                    await negotiateStream.AuthenticateAsServerAsync();
-                    Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
-                }
-                await _connection.Listen();
             }
         }
 
