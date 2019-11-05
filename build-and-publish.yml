@@ -9,6 +9,7 @@ pool:
 variables:
   BuildConfiguration: 'Release'
   SessionSolution: 'CoreIpc.sln'
+  MainProjectName: 'UiPath.CoreIpc'
 
 steps:
   # - task: VSBuild@1
@@ -47,6 +48,12 @@ steps:
       Contents: '*.nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
       CleanTargetFolder: true
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/$(UiPath.CoreIpc).$(Version)-$(Build.BuildNumber)'
+      artifact: 'NuGet package'
+      publishLocation: 'pipeline'
 
   - task: NuGetCommand@2
     displayName: 'Push Nuget'
