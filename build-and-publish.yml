@@ -23,7 +23,7 @@ steps:
     displayName: "Restore, build and pack"
     inputs:
       projects: '$(SessionSolution)'
-      arguments: '--configuration $(BuildConfiguration) -p:Version="$(Version)-$(Build.BuildNumber)"'
+      arguments: '--configuration $(BuildConfiguration) -p:Version="$(Build.BuildNumber)"'
       
   - task: DotNetCoreCLI@2
     displayName: "Run unit tests"
