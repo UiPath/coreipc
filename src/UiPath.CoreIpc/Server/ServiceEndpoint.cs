@@ -51,7 +51,7 @@ namespace UiPath.CoreIpc
                 _connection = new Connection(stream, Logger, _serviceEndpoint.Name, serviceEndpoint._maxMessageSize);
                 _server = new Server(_serviceEndpoint, _connection, cancellationToken, new Lazy<IClient>(() => clientFactory(this)));
                 Listen().LogException(Logger, serviceEndpoint.Name);
-
+                return;
                 async Task Listen()
                 {
                     if (Settings.EncryptAndSign)
