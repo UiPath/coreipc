@@ -57,7 +57,15 @@ namespace UiPath.CoreIpc
                     if (Settings.EncryptAndSign)
                     {
                         var negotiateStream = (NegotiateStream)_connection.Network;
-                        await negotiateStream.AuthenticateAsServerAsync();
+                        try
+                        {
+                            await negotiateStream.AuthenticateAsServerAsync();
+                        }
+                        catch
+                        {
+                            _connection.Dispose();
+                            throw;
+                        }
                         Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
                     }
                     await _connection.Listen();
