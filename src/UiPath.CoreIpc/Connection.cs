@@ -32,6 +32,8 @@ namespace UiPath.CoreIpc
         public ILogger Logger { get; }
         public string Name { get; }
 
+        public override string ToString() => Name;
+
         private Task SendMessage(MessageType messageType, byte[] data, CancellationToken cancellationToken) => SendMessage(new WireMessage(messageType, data)).WaitAsync(cancellationToken);
 
         private async Task SendMessage(WireMessage wireMessage)
