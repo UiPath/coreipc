@@ -23,8 +23,8 @@ namespace UiPath.CoreIpc
         }
 
         public Task Listen() => _receiveLoop.Value;
-        public event EventHandler<DataReceivedEventsArgs> RequestReceived;
-        public event EventHandler<DataReceivedEventsArgs> ResponseReceived;
+        internal event EventHandler<DataReceivedEventsArgs> RequestReceived;
+        internal event EventHandler<DataReceivedEventsArgs> ResponseReceived;
         public event EventHandler<EventArgs> Closed;
         public Task SendRequest(byte[] requestBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Request, requestBytes, cancellationToken);
         public Task SendResponse(byte[] responseBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Response, responseBytes, cancellationToken);
@@ -41,8 +41,19 @@ namespace UiPath.CoreIpc
                 await Network.WriteMessage(wireMessage);
             }
         }
-        
-        public void Dispose() => Network.Dispose();
+
+        public void Dispose()
+        {
+            Network.Dispose();
+            try
+            {
+                Interlocked.Exchange(ref Closed, null)?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogException(ex, this);
+            }
+        }
 
         private async Task ReceiveLoop()
         {
@@ -52,10 +63,10 @@ namespace UiPath.CoreIpc
                 while (!(message = await Network.ReadMessage(_maxMessageSize)).Empty)
                 {
                     var callback = message.MessageType == MessageType.Request ? RequestReceived : ResponseReceived;
-                    if(callback != null)
+                    if (callback != null)
                     {
                         var eventArgs = new DataReceivedEventsArgs(message.Data);
-                        Task.Run(()=>callback.Invoke(this, eventArgs)).LogException(Logger, this);
+                        Task.Run(() => callback.Invoke(this, eventArgs)).LogException(Logger, this);
                     }
                 }
             }
@@ -65,11 +76,10 @@ namespace UiPath.CoreIpc
             }
             Logger?.LogInformation($"{nameof(ReceiveLoop)} {Name} finished.");
             Dispose();
-            Closed?.Invoke(this, EventArgs.Empty);
         }
     }
 
-    public readonly struct DataReceivedEventsArgs
+    readonly struct DataReceivedEventsArgs
     {
         public DataReceivedEventsArgs(byte[] data) => Data = data;
         public byte[] Data { get; }

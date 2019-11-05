@@ -16,7 +16,7 @@ namespace UiPath.CoreIpc.NamedPipe
         private readonly bool _allowImpersonation;
         private NamedPipeClientStream _pipe;
 
-        public NamedPipeClient(ISerializer serializer, string pipeName, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall, ServiceEndpoint serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, beforeCall, serviceEndpoint)
+        public NamedPipeClient(ISerializer serializer, string pipeName, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign, BeforeCallHandler beforeCall, ServiceEndpoint serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, encryptAndSign, beforeCall, serviceEndpoint)
         {
             _pipeName = pipeName;
             _allowImpersonation = allowImpersonation;
@@ -44,7 +44,7 @@ namespace UiPath.CoreIpc.NamedPipe
                 _pipe.Dispose();
                 throw;
             }
-            await CreateConnection(_pipe);
+            await CreateConnection(_pipe, _pipeName);
             _connection.Listen().LogException(_logger, _pipeName);
             return true;
         }

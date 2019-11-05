@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Net.Security;
 
 namespace UiPath.CoreIpc
 {
@@ -23,6 +24,7 @@ namespace UiPath.CoreIpc
         protected BeforeCallHandler _beforeCall;
         protected object _callbackInstance;
         protected TaskScheduler _taskScheduler;
+        protected bool _encryptAndSign;
 
         protected ServiceClientBuilder(Type callbackContract, IServiceProvider serviceProvider)
         {
@@ -36,6 +38,12 @@ namespace UiPath.CoreIpc
         public TDerived ConnectionFactory(ConnectionFactory connectionFactory)
         {
             _connectionFactory = connectionFactory;
+            return (TDerived)this;
+        }
+
+        public TDerived EncryptAndSign()
+        {
+            _encryptAndSign = true;
             return (TDerived)this;
         }
 

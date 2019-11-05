@@ -44,12 +44,13 @@ namespace UiPath.CoreIpc
             private readonly ServiceEndpoint _serviceEndpoint;
             private readonly Connection _connection;
             private readonly Server _server;
-            public ServerConnection(ServiceEndpoint serviceEndpoint, Stream network, Func<ServerConnection, Client> clientFactory, CancellationToken cancellationToken)
+            public ServerConnection(ServiceEndpoint serviceEndpoint, Stream network, Func<ServerConnection, IClient> clientFactory, CancellationToken cancellationToken)
             {
                 _serviceEndpoint = serviceEndpoint;
-                var negotiateStream = new NegotiateStream(network);
-                _connection = new Connection(negotiateStream, Logger, _serviceEndpoint.Name, serviceEndpoint._maxMessageSize);
-                _server = new Server(_serviceEndpoint, _connection, cancellationToken, new Lazy<Client>(() => clientFactory(this)));
+                var stream = Settings.EncryptAndSign ? new NegotiateStream(network) : network;
+                _connection = new Connection(stream, Logger, _serviceEndpoint.Name, serviceEndpoint._maxMessageSize);
+                _server = new Server(_serviceEndpoint, _connection, cancellationToken, new Lazy<IClient>(() => clientFactory(this)));
+                Listen().LogException(Logger, serviceEndpoint.Name);
             }
             public ILogger Logger => _serviceEndpoint.Logger;
             public EndpointSettings Settings => _serviceEndpoint.Settings;
@@ -65,14 +66,16 @@ namespace UiPath.CoreIpc
             }
             public async Task Listen()
             {
-                var negotiateStream = (NegotiateStream)_connection.Network;
-                await negotiateStream.AuthenticateAsServerAsync();
-                Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
+                if (Settings.EncryptAndSign)
+                {
+                    var negotiateStream = (NegotiateStream)_connection.Network;
+                    await negotiateStream.AuthenticateAsServerAsync();
+                    Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
+                }
                 await _connection.Listen();
             }
         }
 
-        protected void HandleConnection(Stream network, Func<ICreateCallback, Client> clientFactory, CancellationToken cancellationToken) =>
-            new ServerConnection(this, network, clientFactory, cancellationToken).Listen().LogException(Logger, Name);
+        protected void HandleConnection(Stream network, Func<ICreateCallback, IClient> clientFactory, CancellationToken cancellationToken) => new ServerConnection(this, network, clientFactory, cancellationToken);
     }
 }

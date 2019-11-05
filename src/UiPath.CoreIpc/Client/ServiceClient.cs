@@ -21,7 +21,7 @@ namespace UiPath.CoreIpc
     using InvokeAsyncDelegate = Func<IServiceClient, string, object[], object>;
     using RequestCompletionSource = TaskCompletionSource<Response>;
 
-    public interface IServiceClient : IDisposable
+    interface IServiceClient : IDisposable
     {
         Task<TResult> InvokeAsync<TResult>(string methodName, object[] args);
     }
@@ -33,18 +33,20 @@ namespace UiPath.CoreIpc
         private readonly TimeSpan _requestTimeout;
         protected readonly ILogger _logger;
         protected readonly ConnectionFactory _connectionFactory;
+        private readonly bool _encryptAndSign;
         protected readonly BeforeCallHandler _beforeCall;
         protected readonly ServiceEndpoint _serviceEndpoint;
         private readonly AsyncLock _connectionLock = new AsyncLock();
         private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new ConcurrentDictionary<string, RequestCompletionSource>();
         protected Connection _connection;
 
-        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall = null, ServiceEndpoint serviceEndpoint = null)
+        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign = false, BeforeCallHandler beforeCall = null, ServiceEndpoint serviceEndpoint = null)
         {
             _serializer = serializer;
             _requestTimeout = requestTimeout;
             _logger = logger;
             _connectionFactory = connectionFactory ?? ((_, __)=>Task.FromResult((Connection)null));
+            _encryptAndSign = encryptAndSign;
             _beforeCall = beforeCall ?? ((_, __) => Task.CompletedTask);
             _serviceEndpoint = serviceEndpoint;
         }
@@ -60,21 +62,38 @@ namespace UiPath.CoreIpc
             return proxy;
         }
 
-        protected async Task CreateConnection(Stream network)
+        protected async Task CreateConnection(Stream network, string name)
         {
-            var negotiateStream = new NegotiateStream(network);
-            await negotiateStream.AuthenticateAsClientAsync(new NetworkCredential(), "", ProtectionLevel.EncryptAndSign, TokenImpersonationLevel.Identification);
-            Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
-            OnNewConnection(new Connection(negotiateStream, _logger, Name));
+            Stream stream;
+            if (_encryptAndSign)
+            {
+                var negotiateStream = new NegotiateStream(network);
+                try
+                {
+                    await negotiateStream.AuthenticateAsClientAsync(new NetworkCredential(), "", ProtectionLevel.EncryptAndSign, TokenImpersonationLevel.Identification);
+                }
+                catch
+                {
+                    negotiateStream.Dispose();
+                    throw;
+                }
+                Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
+                stream = negotiateStream;
+            }
+            else
+            {
+                stream = network;
+            }
+            OnNewConnection(new Connection(stream, _logger, name));
             _logger?.LogInformation($"CreateConnection {Name}.");
         }
 
-        protected Server OnNewConnection(Connection connection)
+        protected void OnNewConnection(Connection connection)
         {
             _connection = connection;
             connection.ResponseReceived += OnResponseReceived;
             connection.Closed += OnConnectionClosed;
-            return _serviceEndpoint == null ? null : new Server(_serviceEndpoint, connection);
+            var server = _serviceEndpoint == null ? null : new Server(_serviceEndpoint, connection);
         }
 
         private void OnConnectionClosed(object sender, EventArgs e)
@@ -189,7 +208,7 @@ namespace UiPath.CoreIpc
         private static readonly MethodInfo InvokeAsyncMethod = typeof(IServiceClient).GetMethod(nameof(IServiceClient.InvokeAsync));
         private static readonly ConcurrentDictionary<Type, InvokeAsyncDelegate> _invokeAsyncByType = new ConcurrentDictionary<Type, InvokeAsyncDelegate>();
 
-        public IServiceClient ServiceClient { get; internal set; }
+        internal IServiceClient ServiceClient { get; set; }
 
         protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvokeAsync(targetMethod.ReturnType)(ServiceClient, targetMethod.Name, args);
 

@@ -8,17 +8,17 @@ using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc
 {
-    public class Server
+    class Server
     {
         private readonly Connection _connection;
-        private readonly Lazy<Client> _client;
+        private readonly Lazy<IClient> _client;
         private readonly CancellationTokenSource _connectionClosed = new CancellationTokenSource();
 
-        public Server(ServiceEndpoint serviceEndpoint, Connection connection, CancellationToken cancellationToken = default, Lazy<Client> client = null)
+        public Server(ServiceEndpoint serviceEndpoint, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
         {
             ServiceEndpoint = serviceEndpoint;
             _connection = connection;
-            _client = client ?? new Lazy<Client>(()=>null);
+            _client = client ?? new Lazy<IClient>(()=>null);
             Serializer = ServiceProvider.GetRequiredService<ISerializer>();
             connection.RequestReceived += (sender, args) => OnRequestReceived(sender, args).LogException(Logger, nameof(OnRequestReceived));
             connection.Closed += (_, __) =>

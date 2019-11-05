@@ -38,6 +38,7 @@ namespace UiPath.CoreIpc.Tests
                     RequestTimeout = TimeSpan.FromSeconds(1),
                     AccessControl = security => _pipeSecurity = security,
                     Name = "computing",
+                    EncryptAndSign = true,
                 })
                 .AddEndpoint(new NamedPipeEndpointSettings<ISystemService>()
                 {
@@ -52,16 +53,19 @@ namespace UiPath.CoreIpc.Tests
             {
                 var taskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
                 _host.RunAsync(taskScheduler);
-                _computingClient = new NamedPipeClientBuilder<IComputingService, IComputingCallback>(_serviceProvider)
-                    .PipeName("computing")
-                    .AllowImpersonation()
-                    .RequestTimeout(TimeSpan.FromMilliseconds(500))
-                    .CallbackInstance(_computingCallback)
-                    .TaskScheduler(taskScheduler)
-                    .Build();
+                _computingClient = ComputingClientBuilder(taskScheduler).Build();
             }
             _systemClient = CreateSystemService();
         }
+
+        private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler) =>
+            new NamedPipeClientBuilder<IComputingService, IComputingCallback>(_serviceProvider)
+                .PipeName("computing")
+                .AllowImpersonation()
+                .EncryptAndSign()
+                .RequestTimeout(TimeSpan.FromMilliseconds(500))
+                .CallbackInstance(_computingCallback)
+                .TaskScheduler(taskScheduler);
 
         private ISystemService CreateSystemService() => SystemClientBuilder().Build();
 
@@ -123,6 +127,18 @@ namespace UiPath.CoreIpc.Tests
         }
 
         [Fact]
+        public async Task ReconnectWithEncrypt()
+        {
+            var proxy = ComputingClientBuilder(TaskScheduler.Default).Build();
+            for (int i = 0; i < 50; i++)
+            {
+                await proxy.AddFloat(1, 2);
+                ((IDisposable)proxy).Dispose();
+                await proxy.AddFloat(1, 2);
+            }
+        }
+
+        [Fact]
         public async Task DontReconnect()
         {
             var proxy = SystemClientBuilder().DontReconnect().Build();
@@ -169,10 +185,6 @@ namespace UiPath.CoreIpc.Tests
                 var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
                 _ = proxy.SendMessage(request);
                 await proxy.DoNothing();
-                while (!_systemService.Waiting)
-                {
-                    await Task.Yield();
-                }
                 ((IDisposable)proxy).Dispose();
                 while (_systemService.Exception == null)
                 {
