@@ -23,3 +23,11 @@ steps:
       command: 'test'
       projects: '**/*Tests*.csproj'
       arguments: '--configuration $(buildConfiguration)'
+
+  - task: CopyFiles@2
+    displayName: 'Copy nupkg to $(Build.ArtifactStagingDirectory)'
+    inputs:
+      SourceFolder: 'src\UiPath.CoreIpc\bin\$(BuildConfiguration)\'
+      Contents: '*.nupkg'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)'
+      CleanTargetFolder: true
