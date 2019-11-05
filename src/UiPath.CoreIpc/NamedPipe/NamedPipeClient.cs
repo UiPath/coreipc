@@ -34,10 +34,8 @@ namespace UiPath.CoreIpc.NamedPipe
                 _connection.Dispose();
             }
             var pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _allowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
-            _connection = new Connection(pipe, _logger, _pipeName);
+            CreateConnection(pipe);
             await pipe.ConnectAsync(cancellationToken);
-            OnNewConnection(_connection);
-            _logger?.LogInformation($"CreateConnection {Name}.");
             _connection.Listen().LogException(_logger, _pipeName);
             return true;
         }

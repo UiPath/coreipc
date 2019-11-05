@@ -56,8 +56,15 @@ namespace UiPath.CoreIpc
             return proxy;
         }
 
+        protected void CreateConnection(Stream network)
+        {
+            OnNewConnection(new Connection(network, _logger, Name));
+            _logger?.LogInformation($"CreateConnection {Name}.");
+        }
+
         protected Server OnNewConnection(Connection connection)
         {
+            _connection = connection;
             connection.ResponseReceived += OnResponseReceived;
             connection.Closed += OnConnectionClosed;
             return _serviceEndpoint == null ? null : new Server(_serviceEndpoint, connection);
@@ -146,8 +153,7 @@ namespace UiPath.CoreIpc
             {
                 if (_connection == null)
                 {
-                    _connection = externalConnection;
-                    OnNewConnection(_connection);
+                    OnNewConnection(externalConnection);
                     return true;
                 }
                 return false;
