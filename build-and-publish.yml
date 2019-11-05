@@ -1,6 +1,8 @@
 trigger:
 - 'feature/init-azure-pipelines'
 
+name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.rr)
+
 pool:
   vmImage: 'windows-2019'
 
@@ -11,7 +13,7 @@ variables:
 steps:
 
   - task: VSBuild@1
-    displayName: "Build"
+    displayName: "Restore, build and pack"
     inputs:
       solution: '$(SessionSolution)'
       msbuildArgs: '/restore'
@@ -19,6 +21,7 @@ steps:
       maximumCpuCount: true
       
   - task: DotNetCoreCLI@2
+    displayName: "Run unit tests"
     inputs:
       command: 'test'
       projects: '**/*Tests*.csproj'
@@ -33,7 +36,7 @@ steps:
       CleanTargetFolder: true
 
   - task: NuGetCommand@2
-    displayName: 'NuGet push'
+    displayName: 'Push Nuget'
     inputs:
       command: 'push'
       packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
