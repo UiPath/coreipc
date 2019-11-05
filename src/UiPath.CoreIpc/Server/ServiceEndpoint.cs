@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using System.Net.Security;
 
 namespace UiPath.CoreIpc
 {
@@ -45,7 +46,8 @@ namespace UiPath.CoreIpc
             public ServerConnection(ServiceEndpoint serviceEndpoint, Stream network, Func<ServerConnection, Client> clientFactory, CancellationToken cancellationToken)
             {
                 _serviceEndpoint = serviceEndpoint;
-                _connection = new Connection(network, Logger, _serviceEndpoint.Name, serviceEndpoint._maxMessageSize);
+                var negotiateStream = new NegotiateStream(network);
+                _connection = new Connection(negotiateStream, Logger, _serviceEndpoint.Name, serviceEndpoint._maxMessageSize);
                 _server = new Server(_serviceEndpoint, _connection, cancellationToken, new Lazy<Client>(() => clientFactory(this)));
             }
             public ILogger Logger => _serviceEndpoint.Logger;
@@ -60,7 +62,11 @@ namespace UiPath.CoreIpc
                 Logger.LogInformation($"Create callback {_serviceEndpoint.Name}");
                 return new ServiceClient<TCallbackContract>(_serviceEndpoint.ServiceProvider.GetRequiredService<ISerializer>(), Settings.RequestTimeout, Logger, (_, __) => Task.FromResult(_connection)).CreateProxy();
             }
-            public Task Listen() => _connection.Listen();
+            public async Task Listen()
+            {
+                await ((NegotiateStream)_connection.Network).AuthenticateAsServerAsync();
+                await _connection.Listen();
+            }
         }
 
         protected void HandleConnection(Stream network, Func<ICreateCallback, Client> clientFactory, CancellationToken cancellationToken) =>

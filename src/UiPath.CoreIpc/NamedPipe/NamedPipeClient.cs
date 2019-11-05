@@ -14,6 +14,7 @@ namespace UiPath.CoreIpc.NamedPipe
     {
         private readonly string _pipeName;
         private readonly bool _allowImpersonation;
+        private NamedPipeClientStream _pipe;
 
         public NamedPipeClient(ISerializer serializer, string pipeName, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall, ServiceEndpoint serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, beforeCall, serviceEndpoint)
         {
@@ -25,17 +26,25 @@ namespace UiPath.CoreIpc.NamedPipe
 
         protected override async Task<bool> ConnectToServerAsync(CancellationToken cancellationToken)
         {
-            if (_connection != null)
+            if (_pipe != null)
             {
-                if (((NamedPipeClientStream)_connection.Network).IsConnected)
+                if (_pipe.IsConnected)
                 {
                     return false;
                 }
                 _connection.Dispose();
             }
-            var pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _allowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
-            CreateConnection(pipe);
-            await pipe.ConnectAsync(cancellationToken);
+            _pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _allowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
+            try
+            {
+                await _pipe.ConnectAsync(cancellationToken);
+            }
+            catch
+            {
+                _pipe.Dispose();
+                throw;
+            }
+            await CreateConnection(_pipe);
             _connection.Listen().LogException(_logger, _pipeName);
             return true;
         }

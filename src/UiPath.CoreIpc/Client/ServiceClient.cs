@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Runtime.ExceptionServices;
+using System.Net.Security;
 
 namespace UiPath.CoreIpc
 {
@@ -56,9 +57,11 @@ namespace UiPath.CoreIpc
             return proxy;
         }
 
-        protected void CreateConnection(Stream network)
+        protected async Task CreateConnection(Stream network)
         {
-            OnNewConnection(new Connection(network, _logger, Name));
+            var negotiateStream = new NegotiateStream(network);
+            await negotiateStream.AuthenticateAsClientAsync();
+            OnNewConnection(new Connection(negotiateStream, _logger, Name));
             _logger?.LogInformation($"CreateConnection {Name}.");
         }
 
