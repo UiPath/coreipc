@@ -19,11 +19,19 @@ steps:
   #     configuration: '$(BuildConfiguration)'
   #     maximumCpuCount: true
 
+  - powershell: |
+      $xml = [Xml] (Get-Content .\src\UiPath.CoreIpc\UiPath.CoreIpc.csproj)
+      $version = [String] $xml.Project.PropertyGroup.Version
+      $version = $version.Trim()
+      
+      Write-Host "##vso[task.setvariable variable=Version;]$version"
+    displayName: 'Get version from csproj'
+
   - task: DotNetCoreCLI@2
     displayName: "Restore, build and pack"
     inputs:
       projects: '$(SessionSolution)'
-      arguments: '--configuration $(BuildConfiguration) -p:Version="$(Build.BuildNumber)"'
+      arguments: '--configuration $(BuildConfiguration) -p:Version="$(Version)-$(Build.BuildNumber)"'
       
   - task: DotNetCoreCLI@2
     displayName: "Run unit tests"
