@@ -158,33 +158,20 @@ namespace UiPath.CoreIpc.Tests
         }
 
         [Fact]
-        public Task CancelServerCallConcurrently() => Task.WhenAll(Enumerable.Range(1, 10).Select(async __ =>
+        public Task CancelServerCallConcurrently() => Task.WhenAll(Enumerable.Range(1, 10).Select(_ => CancelServerCallCore(20)));
+
+        [Fact]
+        public Task CancelServerCall() => CancelServerCallCore(100);
+
+        async Task CancelServerCallCore(int counter)
         {
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < counter; i++)
             {
                 var proxy = CreateSystemService();
                 var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
                 _ = proxy.SendMessage(request);
                 var newGuid = System.Guid.NewGuid();
                 (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
-                ((IDisposable)proxy).Dispose();
-                while (_systemService.Exception == null)
-                {
-                    await Task.Yield();
-                }
-                _systemService.Exception.ShouldBeOfType<TaskCanceledException>();
-            }
-        }));
-
-        [Fact]
-        public async Task CancelServerCall()
-        {
-            for (int i = 0; i < 100; i++)
-            {
-                var proxy = CreateSystemService();
-                var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
-                _ = proxy.SendMessage(request);
-                await proxy.DoNothing();
                 ((IDisposable)proxy).Dispose();
                 while (_systemService.Exception == null)
                 {
