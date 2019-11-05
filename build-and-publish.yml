@@ -51,7 +51,7 @@ steps:
 
   - task: PublishPipelineArtifact@1
     inputs:
-      targetPath: '$(Build.ArtifactStagingDirectory)/$(UiPath.CoreIpc).$(Version)-$(Build.BuildNumber)'
+      targetPath: '$(Build.ArtifactStagingDirectory)/$(MainProjectName).$(Version)-$(Build.BuildNumber).nupkg'
       artifact: 'NuGet package'
       publishLocation: 'pipeline'
 
