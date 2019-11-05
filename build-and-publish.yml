@@ -14,7 +14,7 @@ steps:
     displayName: "Restore, build and pack"
     inputs:
       solution: '$(SessionSolution)'
-      msbuildArgs: '/p:Version=$(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.rr) /restore'
+      msbuildArgs: '/p:Version=$(Date:yyyyMMdd)$(Rev:.rr) /restore'
       configuration: '$(BuildConfiguration)'
       maximumCpuCount: true
       
