@@ -9,5 +9,16 @@ variables:
 
 steps:
 
-- script: dotnet build --configuration $(buildConfiguration)
-  displayName: 'dotnet build $(buildConfiguration)'
+  - task: VSBuild@1
+    displayName: "Build UiPath.Session x86"
+    inputs:
+      solution: "$(SessionSolution)"
+      platform: "x86"
+      configuration: "$(BuildConfiguration)"
+      maximumCpuCount: true
+      
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: '**/*Tests*.csproj'
+      arguments: '--configuration $(buildConfiguration)'
