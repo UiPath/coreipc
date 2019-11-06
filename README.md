@@ -11,6 +11,7 @@ WCF-like service model API for communication over named pipes. .NET standard and
 - interception
 - configurable task scheduler
 - client authentication and impersonation
+- SSPI encryption and signing
 
 Check [the tests](https://github.com/UiPath/CoreIpc/blob/master/src/UiPath.CoreIpc.Tests/IpcTests.cs) and the sample.
 ```C#
