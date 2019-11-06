@@ -8,7 +8,7 @@ variables:
 
 steps:
   - powershell: |
-      $json = [Json] (Get-Content $(ProjectPath)/package.json)
+      $json = Get-Content '$(ProjectPath)/package.json' | Out-String | ConvertFrom-Json
       $version = [String] $json.version
       $version = $version.Trim()
       
