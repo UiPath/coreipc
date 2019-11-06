@@ -39,14 +39,13 @@ namespace UiPath.CoreIpc.Tests
                     AccessControl = security => _pipeSecurity = security,
                     Name = "computing",
                     EncryptAndSign = true,
-                    ConcurrentAccepts = 20,
                 })
                 .AddEndpoint(new NamedPipeEndpointSettings<ISystemService>()
                 {
                     RequestTimeout = TimeSpan.FromSeconds(1),
                     MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,
                     Name = "system",
-                    ConcurrentAccepts = 20,
+                    ConcurrentAccepts = 10,
                 })
                 .Build();
 
