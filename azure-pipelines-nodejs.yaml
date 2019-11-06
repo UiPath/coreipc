@@ -6,7 +6,7 @@ pool:
 
 steps:
 - task: Npm@1
-  displayName: Restore npm dependencies
+  displayName: Restore
   inputs:
     command: 'install'
     workingDir: 'clients/nodejs/projects/@uipath-ipc'
@@ -21,9 +21,8 @@ steps:
     customCommand: 'run build'
 
 - task: Npm@1
-  displayName: Build
+  displayName: Run unit tests
   inputs:
     command: 'custom'
     workingDir: 'clients/nodejs/projects/@uipath-ipc'
-    customCommand: 'run build'
-
+    customCommand: 'run test'
