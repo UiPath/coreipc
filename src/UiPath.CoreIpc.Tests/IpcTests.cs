@@ -35,7 +35,7 @@ namespace UiPath.CoreIpc.Tests
             _host = new ServiceHostBuilder(_serviceProvider)
                 .AddEndpoint(new NamedPipeEndpointSettings<IComputingService, IComputingCallback>()
                 {
-                    RequestTimeout = TimeSpan.FromSeconds(1),
+                    RequestTimeout = TimeSpan.FromSeconds(2),
                     AccessControl = security => _pipeSecurity = security,
                     Name = "computing",
                     EncryptAndSign = true,
@@ -63,7 +63,7 @@ namespace UiPath.CoreIpc.Tests
                 .PipeName("computing")
                 .AllowImpersonation()
                 .EncryptAndSign()
-                .RequestTimeout(TimeSpan.FromMilliseconds(500))
+                .RequestTimeout(TimeSpan.FromSeconds(1))
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);
 
