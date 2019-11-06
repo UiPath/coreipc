@@ -172,7 +172,7 @@ namespace UiPath.CoreIpc.Tests
                 var sendMessageResult = proxy.SendMessage(request);
                 var newGuid = System.Guid.NewGuid();
                 (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
-                await Task.Yield();
+                await Task.Delay(1);
                 ((IDisposable)proxy).Dispose();
                 sendMessageResult.ShouldThrow<Exception>();
             }
