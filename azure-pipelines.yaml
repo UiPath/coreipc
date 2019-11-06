@@ -7,7 +7,6 @@ variables:
   BuildConfiguration: 'Release'
   SessionSolution: 'CoreIpc.sln'
   MainProjectName: 'UiPath.CoreIpc'
-  FullVersion: ''
 
 steps:
   - powershell: |
