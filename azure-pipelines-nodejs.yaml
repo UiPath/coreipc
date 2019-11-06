@@ -64,7 +64,6 @@ steps:
     
   - task: Npm@1
     displayName: 'Publish the NPM package to the internal feed'
-    enabled: false
     inputs:
         command: 'publish'
         workingDir: $(ProjectPath)
@@ -75,7 +74,6 @@ steps:
 
   - task: Npm@1
     displayName: 'Publish the NPM package to the public feed (if PUBLISH)'
-    enabled: false
     inputs:
         command: 'publish'
         workingDir: $(ProjectPath)
