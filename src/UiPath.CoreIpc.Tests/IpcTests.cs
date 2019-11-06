@@ -296,7 +296,7 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task MaxMessageSize()
         {
-            _systemClient.ReverseBytes(new byte[MaxReceivedMessageSizeInMegabytes * 1024 * 1024]).ShouldThrow<IOException>().Message.ShouldBeOneOf("Pipe is broken.", "Broken pipe");
+            _systemClient.ReverseBytes(new byte[MaxReceivedMessageSizeInMegabytes * 1024 * 1024]).ShouldThrow<Exception>();
             await Guid();
         }
 
