@@ -32,7 +32,8 @@ namespace UiPath.CoreIpc.NamedPipe
                 {
                     return false;
                 }
-                _connection.Dispose();
+                _pipe.Dispose();
+                _connection?.Dispose();
             }
             _pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _allowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
             try
