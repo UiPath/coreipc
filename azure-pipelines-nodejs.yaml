@@ -1,0 +1,29 @@
+trigger:
+- master
+
+pool:
+  vmImage: 'windows-2019'
+
+steps:
+- task: Npm@1
+  displayName: Restore npm dependencies
+  inputs:
+    command: 'install'
+    workingDir: 'clients/nodejs/projects/@uipath-ipc'
+    customRegistry: 'useFeed'
+    customFeed: '06d72d2b-c76a-4d0a-be03-d2ba3a5a3f60/2add6d09-a439-4c6a-83af-cc2405604505'
+
+- task: Npm@1
+  displayName: Build
+  inputs:
+    command: 'custom'
+    workingDir: 'clients/nodejs/projects/@uipath-ipc'
+    customCommand: 'run build'
+
+- task: Npm@1
+  displayName: Build
+  inputs:
+    command: 'custom'
+    workingDir: 'clients/nodejs/projects/@uipath-ipc'
+    customCommand: 'run build'
+
