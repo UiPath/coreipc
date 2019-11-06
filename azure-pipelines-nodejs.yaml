@@ -38,7 +38,7 @@ steps:
     inputs:
       command: 'custom'
       workingDir: '$(ProjectPath)'
-      customCommand: 'version $(FullVersion)'
+      customCommand: 'version $(FullVersion) --allow-same-version'
 
   - task: Npm@1
     displayName: Restore
