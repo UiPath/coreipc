@@ -14,8 +14,9 @@ namespace UiPath.CoreIpc.NamedPipe
     {
         private readonly string _pipeName;
         private readonly bool _allowImpersonation;
+        private NamedPipeClientStream _pipe;
 
-        public NamedPipeClient(ISerializer serializer, string pipeName, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall, ServiceEndpoint serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, beforeCall, serviceEndpoint)
+        public NamedPipeClient(ISerializer serializer, string pipeName, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign, BeforeCallHandler beforeCall, ServiceEndpoint serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, encryptAndSign, beforeCall, serviceEndpoint)
         {
             _pipeName = pipeName;
             _allowImpersonation = allowImpersonation;
@@ -25,19 +26,25 @@ namespace UiPath.CoreIpc.NamedPipe
 
         protected override async Task<bool> ConnectToServerAsync(CancellationToken cancellationToken)
         {
-            if (_connection != null)
+            if (_pipe != null)
             {
-                if (((NamedPipeClientStream)_connection.Network).IsConnected)
+                if (_pipe.IsConnected)
                 {
                     return false;
                 }
                 _connection.Dispose();
             }
-            var pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _allowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
-            _connection = new Connection(pipe, _logger, _pipeName);
-            await pipe.ConnectAsync(cancellationToken);
-            OnNewConnection(_connection);
-            _logger?.LogInformation($"CreateConnection {Name}.");
+            _pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _allowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
+            try
+            {
+                await _pipe.ConnectAsync(cancellationToken);
+            }
+            catch
+            {
+                _pipe.Dispose();
+                throw;
+            }
+            await CreateConnection(_pipe, _pipeName);
             _connection.Listen().LogException(_logger, _pipeName);
             return true;
         }

@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using System.Net.Security;
+using System.Diagnostics;
 
 namespace UiPath.CoreIpc
 {
@@ -42,11 +44,37 @@ namespace UiPath.CoreIpc
             private readonly ServiceEndpoint _serviceEndpoint;
             private readonly Connection _connection;
             private readonly Server _server;
-            public ServerConnection(ServiceEndpoint serviceEndpoint, Stream network, Func<ServerConnection, Client> clientFactory, CancellationToken cancellationToken)
+            public ServerConnection(ServiceEndpoint serviceEndpoint, Stream network, Func<ServerConnection, IClient> clientFactory, CancellationToken cancellationToken)
             {
                 _serviceEndpoint = serviceEndpoint;
-                _connection = new Connection(network, Logger, _serviceEndpoint.Name, serviceEndpoint._maxMessageSize);
-                _server = new Server(_serviceEndpoint, _connection, cancellationToken, new Lazy<Client>(() => clientFactory(this)));
+                var stream = Settings.EncryptAndSign ? new NegotiateStream(network) : network;
+                _connection = new Connection(stream, Logger, _serviceEndpoint.Name, serviceEndpoint._maxMessageSize);
+                _server = new Server(_serviceEndpoint, _connection, cancellationToken, new Lazy<IClient>(() => clientFactory(this)));
+                Listen().LogException(Logger, serviceEndpoint.Name);
+                return;
+                async Task Listen()
+                {
+                    if (Settings.EncryptAndSign)
+                    {
+                        await AuthenticateAsServer();
+                    }
+                    await _connection.Listen();
+                    return;
+                    async Task AuthenticateAsServer()
+                    {
+                        var negotiateStream = (NegotiateStream)_connection.Network;
+                        try
+                        {
+                            await negotiateStream.AuthenticateAsServerAsync();
+                        }
+                        catch
+                        {
+                            _connection.Dispose();
+                            throw;
+                        }
+                        Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
+                    }
+                }
             }
             public ILogger Logger => _serviceEndpoint.Logger;
             public EndpointSettings Settings => _serviceEndpoint.Settings;
@@ -58,12 +86,11 @@ namespace UiPath.CoreIpc
                     throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackContract)}, but it's {configuredCallbackContract?.ToString() ?? "not configured"}.");
                 }
                 Logger.LogInformation($"Create callback {_serviceEndpoint.Name}");
-                return new ServiceClient<TCallbackContract>(_serviceEndpoint.ServiceProvider.GetRequiredService<ISerializer>(), Settings.RequestTimeout, Logger, (_, __) => Task.FromResult(_connection)).CreateProxy();
+                var serializer = _serviceEndpoint.ServiceProvider.GetRequiredService<ISerializer>();
+                return new ServiceClient<TCallbackContract>(serializer, Settings.RequestTimeout, Logger, (_, __) => Task.FromResult(_connection)).CreateProxy();
             }
-            public Task Listen() => _connection.Listen();
         }
 
-        protected void HandleConnection(Stream network, Func<ICreateCallback, Client> clientFactory, CancellationToken cancellationToken) =>
-            new ServerConnection(this, network, clientFactory, cancellationToken).Listen().LogException(Logger, Name);
+        protected void HandleConnection(Stream network, Func<ICreateCallback, IClient> clientFactory, CancellationToken cancellationToken) => new ServerConnection(this, network, clientFactory, cancellationToken);
     }
 }

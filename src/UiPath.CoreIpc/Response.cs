@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 
 namespace UiPath.CoreIpc
 {
-    public class Response
+    class Response
     {
         [JsonConstructor]
         private Response(string requestId, string data, Error error)
@@ -79,5 +79,5 @@ namespace UiPath.CoreIpc
         public bool Is<TException>() where TException : Exception => Type == typeof(TException).FullName;
     }
 
-    public enum MessageType : byte { Request, Response }
+    enum MessageType : byte { Request, Response }
 }

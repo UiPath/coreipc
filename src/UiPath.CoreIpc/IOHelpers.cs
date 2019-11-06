@@ -135,7 +135,7 @@ namespace UiPath.CoreIpc
             return File.Exists(@"\\.\pipe\" + pipeName);
         }
 
-        public static async Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
+        internal static async Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
         {
             await stream.WriteAsync(new[] { (byte)message.MessageType }, 0, 1, cancellationToken);
             var lengthBuffer = BitConverter.GetBytes(message.Data.Length);
@@ -146,7 +146,7 @@ namespace UiPath.CoreIpc
         private static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
 
-        public static async Task<WireMessage> ReadMessage(this Stream stream, int maxMessageSize = int.MaxValue, CancellationToken cancellationToken = default)
+        internal static async Task<WireMessage> ReadMessage(this Stream stream, int maxMessageSize = int.MaxValue, CancellationToken cancellationToken = default)
         {
             var messageTypeBuffer = await stream.ReadBuffer(1, cancellationToken);
             if (messageTypeBuffer.Length == 0)
@@ -222,7 +222,7 @@ namespace UiPath.CoreIpc
         }
     }
 
-    public readonly struct WireMessage
+    readonly struct WireMessage
     {
         public WireMessage(MessageType messageType, byte[] data)
         {

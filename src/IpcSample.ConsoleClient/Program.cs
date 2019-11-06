@@ -37,20 +37,21 @@ namespace UiPath.CoreIpc.Tests
         {
             var serviceProvider = ConfigureServices();
             var callback = new ComputingCallback { Id = "custom made" };
-            var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>(serviceProvider).CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
+            var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>(serviceProvider).EncryptAndSign().CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
             var stopwatch = Stopwatch.StartNew();
             int count = 0;
             try
             {
                 var computingClient = computingClientBuilder.Build();
+                var systemClient =
+                    new NamedPipeClientBuilder<ISystemService>()
+                    .RequestTimeout(TimeSpan.FromSeconds(2))
+                    .EncryptAndSign()
+                    .Logger(serviceProvider)
+                    .AllowImpersonation()
+                    .Build();
                 while (true)
                 {
-                    var systemClient =
-                        new NamedPipeClientBuilder<ISystemService>()
-                        .RequestTimeout(TimeSpan.FromSeconds(2))
-                        .Logger(serviceProvider)
-                        .AllowImpersonation()
-                        .Build();
                     // test 1: call IPC service method with primitive types
                     float result1 = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);
                     count++;
@@ -111,7 +112,9 @@ namespace UiPath.CoreIpc.Tests
             finally
             {
                 stopwatch.Stop();
-                Console.Out.WriteLine("Calls per second: " + count / stopwatch.Elapsed.TotalSeconds);
+                Console.WriteLine();
+                Console.WriteLine("Calls per second: " + count / stopwatch.Elapsed.TotalSeconds);
+                Console.WriteLine();
             }
             // test 10: call slow IPC service method
             //await systemClient.SlowOperation(cancellationToken);

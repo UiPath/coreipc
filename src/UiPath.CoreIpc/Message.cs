@@ -29,7 +29,7 @@ namespace UiPath.CoreIpc
         void Impersonate(Action action);
     }
 
-    public sealed class Client : IClient
+    sealed class Client : IClient
     {
         private readonly Action<Action> _impersonationCallback;
         private readonly ICreateCallback _callbackFactory;

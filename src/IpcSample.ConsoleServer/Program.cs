@@ -31,12 +31,14 @@ namespace UiPath.CoreIpc.Tests
             var host = new ServiceHostBuilder(serviceProvider)
                 .AddEndpoint(new NamedPipeEndpointSettings<IComputingService, IComputingCallback>() {
                     RequestTimeout = TimeSpan.FromSeconds(2),
-                    AccessControl = security=> security.AllowCurrentUser()
+                    AccessControl = security=> security.AllowCurrentUser(),
+                    EncryptAndSign = true
                 })
                 .AddEndpoint(new NamedPipeEndpointSettings<ISystemService>() {
                     RequestTimeout = TimeSpan.FromSeconds(2),
                     MaxReceivedMessageSizeInMegabytes = 1,
-                    AccessControl = security => security.AllowCurrentUser()
+                    AccessControl = security => security.AllowCurrentUser(),
+                    EncryptAndSign = true
                 })
                 .Build();
 

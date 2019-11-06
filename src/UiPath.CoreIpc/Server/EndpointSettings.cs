@@ -17,6 +17,7 @@ namespace UiPath.CoreIpc
         public byte ConcurrentAccepts { get; set; } = 5;
         public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
         public string Name { get; set; }
+        public bool EncryptAndSign { get; set; }
         internal object ServiceInstance { get; }
         internal Type Contract { get; }
         internal Type CallbackContract { get; }

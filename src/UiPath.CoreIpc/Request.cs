@@ -5,7 +5,7 @@ using System.Reflection;
 
 namespace UiPath.CoreIpc
 {
-    public class Request
+    class Request
     {
         public Request(string id, string methodName, string[] parameters, double timeoutInSeconds)
         {
