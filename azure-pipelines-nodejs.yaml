@@ -46,7 +46,7 @@ steps:
         command: 'install'
         workingDir: $(ProjectPath)
         customRegistry: 'useFeed'
-        customFeed: '06d72d2b-c76a-4d0a-be03-d2ba3a5a3f60/2add6d09-a439-4c6a-83af-cc2405604505'
+        customFeed: '2536608e-b06d-4173-9612-03ef4b89d519'
     
   - task: Npm@1
     displayName: Build
