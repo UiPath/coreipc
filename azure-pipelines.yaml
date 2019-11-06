@@ -1,0 +1,84 @@
+name: $(Date:yyyyMMdd)$(Rev:-rr)
+
+pool:
+  vmImage: 'windows-2019'
+
+variables:
+  BuildConfiguration: 'Release'
+  SessionSolution: 'CoreIpc.sln'
+  MainProjectName: 'UiPath.CoreIpc'
+  FullVersion: ''
+
+steps:
+  - powershell: |
+      $xml = [Xml] (Get-Content .\src\UiPath.CoreIpc\UiPath.CoreIpc.csproj)
+      $version = [String] $xml.Project.PropertyGroup.Version
+      $version = $version.Trim()
+      
+      Write-Host "##vso[task.setvariable variable=Version;]$version"
+    displayName: 'Get version from csproj'
+
+  - task: VariableTransformTask@1
+    displayName: 'Set FullVersion (if not PUBLISH)'
+    inputs:
+      value: '$(Version)-$(Build.BuildNumber)'
+      variableName: 'FullVersion'
+      IsSecret: false
+      transformAction: 'none'
+    condition: ne(variables['PublishRelease'], 'true')
+
+  - task: VariableTransformTask@1
+    displayName: 'Set FullVersion (if PUBLISH)'
+    inputs:
+      value: '$(Version)'
+      variableName: 'FullVersion'
+      IsSecret: false
+      transformAction: 'none'
+    condition: eq(variables['PublishRelease'], 'true')
+
+  - task: DotNetCoreCLI@2
+    displayName: "Restore, build and pack"
+    inputs:
+      projects: '$(SessionSolution)'
+      arguments: '--configuration $(BuildConfiguration) -p:Version="$(FullVersion)"'
+      
+  - task: DotNetCoreCLI@2
+    displayName: "Run unit tests"
+    inputs:
+      command: 'test'
+      projects: '**/*Tests*.csproj'
+      arguments: '--configuration $(buildConfiguration)'
+
+  - task: CopyFiles@2
+    displayName: 'Copy nupkg to $(Build.ArtifactStagingDirectory)'
+    inputs:
+      SourceFolder: 'src\UiPath.CoreIpc\bin\$(BuildConfiguration)\'
+      Contents: '*.nupkg'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)'
+      CleanTargetFolder: true
+
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish the NuGet package to the pipeline instance'
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/$(MainProjectName).$(FullVersion).nupkg'
+      artifact: 'NuGet package'
+      publishLocation: 'pipeline'
+
+  - task: NuGetCommand@2
+    displayName: 'Publish the NuGet package to the internal feed'
+    inputs:
+      command: 'push'
+      packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
+      nuGetFeedType: 'internal'
+      publishVstsFeed: '06d72d2b-c76a-4d0a-be03-d2ba3a5a3f60/2add6d09-a439-4c6a-83af-cc2405604505'
+      allowPackageConflicts: true
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+
+  - task: NuGetCommand@2
+    displayName: 'Publish the NuGet package to the public feed (if PUBLISH)'
+    inputs:
+      command: 'push'
+      packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
+      nuGetFeedType: 'internal'
+      publishVstsFeed: 'da2367e3-d53c-4676-a3bb-03e824b957df'
+    condition: and(eq(variables['PublishRelease'], 'true'), and(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
