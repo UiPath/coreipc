@@ -3,7 +3,6 @@ import { CancellationToken } from '../threading/cancellation-token';
 import { TimeSpan } from '../threading/timespan';
 import { Observable, Subject } from 'rxjs';
 import { ISocketLike } from './socket-like';
-import { ILogicalSocket } from './logical-socket';
 import { InvalidOperationError } from '../errors/invalid-operation-error';
 import { ObjectDisposedError } from '../errors/object-disposed-error';
 import { PromiseCompletionSource } from '../threading/promise-completion-source';
