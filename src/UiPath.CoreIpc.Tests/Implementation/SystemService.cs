@@ -32,9 +32,7 @@ namespace UiPath.CoreIpc.Tests
             }
         }
 
-        public Exception Exception { get; set; }
         public bool DidNothing { get; set; }
-        public bool Waiting { get; private set; }
 
         public async Task DoNothing(CancellationToken cancellationToken = default)
         {
@@ -55,17 +53,7 @@ namespace UiPath.CoreIpc.Tests
 
         public async Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default)
         {
-            Exception = null;
-            try
-            {
-                Waiting = true;
-                await Task.Delay(message.Delay, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                Exception = ex;
-            }
-            Waiting = false;
+            await Task.Delay(message.Delay, cancellationToken);
             var domainName = "";
             var client = message.Client;
             //client.RunAs(() => domainName = "test");

@@ -169,15 +169,11 @@ namespace UiPath.CoreIpc.Tests
             {
                 var proxy = CreateSystemService();
                 var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
-                _ = proxy.SendMessage(request);
+                var sendMessageResult = proxy.SendMessage(request);
                 var newGuid = System.Guid.NewGuid();
                 (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
                 ((IDisposable)proxy).Dispose();
-                while (_systemService.Exception == null)
-                {
-                    await Task.Yield();
-                }
-                _systemService.Exception.ShouldBeOfType<TaskCanceledException>();
+                sendMessageResult.ShouldThrow<Exception>();
             }
         }
 
