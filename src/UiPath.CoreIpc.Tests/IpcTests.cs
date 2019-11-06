@@ -158,10 +158,10 @@ namespace UiPath.CoreIpc.Tests
         }
 
         [Fact]
-        public Task CancelServerCallConcurrently() => Task.WhenAll(Enumerable.Range(1, 10).Select(_ => CancelServerCallCore(20)));
+        public Task CancelServerCallConcurrently() => Task.WhenAll(Enumerable.Range(1, 10).Select(_ => CancelServerCallCore(5)));
 
         [Fact]
-        public Task CancelServerCall() => CancelServerCallCore(100);
+        public Task CancelServerCall() => CancelServerCallCore(10);
 
         async Task CancelServerCallCore(int counter)
         {
@@ -280,10 +280,7 @@ namespace UiPath.CoreIpc.Tests
         public async Task VoidThreadName()
         {
             await _systemClient.VoidThreadName();
-            while (_systemService.ThreadName == null)
-            {
-                await Task.Yield();
-            }
+            await _systemClient.GetThreadName();
             _systemService.ThreadName.ShouldBe("GuiThread");
         }
 
