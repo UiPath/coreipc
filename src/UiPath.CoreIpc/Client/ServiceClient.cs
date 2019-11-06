@@ -87,6 +87,7 @@ namespace UiPath.CoreIpc
 
         protected void OnNewConnection(Connection connection)
         {
+            _connection?.Dispose();
             _connection = connection;
             connection.ResponseReceived += OnResponseReceived;
             connection.Closed += OnConnectionClosed;
