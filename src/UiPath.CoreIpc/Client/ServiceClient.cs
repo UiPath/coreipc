@@ -64,8 +64,11 @@ namespace UiPath.CoreIpc
 
         protected async Task CreateConnection(Stream network, string name)
         {
-            Stream stream;
-            if (_encryptAndSign)
+            var stream = _encryptAndSign ? await AuthenticateAsClient() : network;
+            OnNewConnection(new Connection(stream, _logger, name));
+            _logger?.LogInformation($"CreateConnection {Name}.");
+            return;
+            async Task<Stream> AuthenticateAsClient()
             {
                 var negotiateStream = new NegotiateStream(network);
                 try
@@ -78,14 +81,8 @@ namespace UiPath.CoreIpc
                     throw;
                 }
                 Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
-                stream = negotiateStream;
+                return negotiateStream;
             }
-            else
-            {
-                stream = network;
-            }
-            OnNewConnection(new Connection(stream, _logger, name));
-            _logger?.LogInformation($"CreateConnection {Name}.");
         }
 
         protected void OnNewConnection(Connection connection)

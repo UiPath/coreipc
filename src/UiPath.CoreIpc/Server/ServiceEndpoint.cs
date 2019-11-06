@@ -56,6 +56,12 @@ namespace UiPath.CoreIpc
                 {
                     if (Settings.EncryptAndSign)
                     {
+                        await AuthenticateAsServer();
+                    }
+                    await _connection.Listen();
+                    return;
+                    async Task AuthenticateAsServer()
+                    {
                         var negotiateStream = (NegotiateStream)_connection.Network;
                         try
                         {
@@ -68,7 +74,6 @@ namespace UiPath.CoreIpc
                         }
                         Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
                     }
-                    await _connection.Listen();
                 }
             }
             public ILogger Logger => _serviceEndpoint.Logger;
