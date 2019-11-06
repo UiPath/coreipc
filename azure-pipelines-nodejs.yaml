@@ -1,28 +1,86 @@
-trigger:
-- master
+name: $(Date:yyyyMMdd)$(Rev:-rr)
 
 pool:
   vmImage: 'windows-2019'
 
+variables:
+  ProjectPath: 'clients/nodejs/projects/@uipath-ipc'
+
 steps:
-- task: Npm@1
-  displayName: Restore
-  inputs:
-    command: 'install'
-    workingDir: 'clients/nodejs/projects/@uipath-ipc'
-    customRegistry: 'useFeed'
-    customFeed: '06d72d2b-c76a-4d0a-be03-d2ba3a5a3f60/2add6d09-a439-4c6a-83af-cc2405604505'
+  - powershell: |
+      $json = [Json] (Get-Content $(ProjectPath)/package.json)
+      $version = [String] $json.version
+      $version = $version.Trim()
+      
+      Write-Host "##vso[task.setvariable variable=Version;]$version"
+    displayName: 'Read Version from package.json'
 
-- task: Npm@1
-  displayName: Build
-  inputs:
-    command: 'custom'
-    workingDir: 'clients/nodejs/projects/@uipath-ipc'
-    customCommand: 'run build'
+  - task: VariableTransformTask@1
+    displayName: 'Compute FullVersion (if not PUBLISH)'
+    inputs:
+      value: '$(Version)-$(Build.BuildNumber)'
+      variableName: 'FullVersion'
+      IsSecret: false
+      transformAction: 'none'
+    condition: ne(variables['PublishRelease'], 'true')
 
-- task: Npm@1
-  displayName: Run unit tests
-  inputs:
-    command: 'custom'
-    workingDir: 'clients/nodejs/projects/@uipath-ipc'
-    customCommand: 'run test'
+  - task: VariableTransformTask@1
+    displayName: 'Compute FullVersion (if PUBLISH)'
+    inputs:
+      value: '$(Version)'
+      variableName: 'FullVersion'
+      IsSecret: false
+      transformAction: 'none'
+    condition: eq(variables['PublishRelease'], 'true')
+
+  - task: Npm@1
+    displayName: Write FullVersion in package.json
+    inputs:
+      command: 'custom'
+      workingDir: '$(ProjectPath)'
+      customCommand: 'version $(FullVersion)'
+
+  - task: Npm@1
+    displayName: Restore
+    inputs:
+        command: 'install'
+        workingDir: $(ProjectPath)
+        customRegistry: 'useFeed'
+        customFeed: '06d72d2b-c76a-4d0a-be03-d2ba3a5a3f60/2add6d09-a439-4c6a-83af-cc2405604505'
+    
+  - task: Npm@1
+    displayName: Build
+    inputs:
+        command: 'custom'
+        workingDir: $(ProjectPath)
+        customCommand: 'run build'
+    
+  - task: Npm@1
+    displayName: Run unit tests
+    inputs:
+        command: 'custom'
+        workingDir: $(ProjectPath)
+        customCommand: 'run test'
+    
+  - task: Npm@1
+    displayName: 'Publish the NPM package to the internal feed'
+    enabled: false
+    inputs:
+        command: 'publish'
+        workingDir: $(ProjectPath)
+        verbose: false
+        publishRegistry: 'useFeed'
+        publishFeed: '06d72d2b-c76a-4d0a-be03-d2ba3a5a3f60/2add6d09-a439-4c6a-83af-cc2405604505'
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+
+  - task: Npm@1
+    displayName: 'Publish the NPM package to the public feed (if PUBLISH)'
+    enabled: false
+    inputs:
+        command: 'publish'
+        workingDir: $(ProjectPath)
+        verbose: false
+        publishRegistry: 'useFeed'
+        publishFeed: 'da2367e3-d53c-4676-a3bb-03e824b957df'
+    condition: and(eq(variables['PublishRelease'], 'true'), and(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
+
