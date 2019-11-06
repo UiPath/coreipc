@@ -15,10 +15,10 @@ steps:
       $version = $version.Trim()
       
       Write-Host "##vso[task.setvariable variable=Version;]$version"
-    displayName: 'Get version from csproj'
+    displayName: 'Read $(Version) from the csproj'
 
   - task: VariableTransformTask@1
-    displayName: 'Set FullVersion (if not PUBLISH)'
+    displayName: 'Compute $(FullVersion) (if not PUBLISH)'
     inputs:
       value: '$(Version)-$(Build.BuildNumber)'
       variableName: 'FullVersion'
@@ -27,7 +27,7 @@ steps:
     condition: ne(variables['PublishRelease'], 'true')
 
   - task: VariableTransformTask@1
-    displayName: 'Set FullVersion (if PUBLISH)'
+    displayName: 'Compute $(FullVersion) (if PUBLISH)'
     inputs:
       value: '$(Version)'
       variableName: 'FullVersion'
@@ -64,12 +64,12 @@ steps:
       publishLocation: 'pipeline'
 
   - task: NuGetCommand@2
-    displayName: 'Publish the NuGet package to the internal feed'
+    displayName: 'Publish the NuGet package to the private feed'
     inputs:
       command: 'push'
       packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
       nuGetFeedType: 'internal'
-      publishVstsFeed: '06d72d2b-c76a-4d0a-be03-d2ba3a5a3f60/2add6d09-a439-4c6a-83af-cc2405604505'
+      publishVstsFeed: '6f78be3f-12c6-4e03-825f-5755f5b0d320'
       allowPackageConflicts: true
     condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
 
@@ -79,5 +79,5 @@ steps:
       command: 'push'
       packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
       nuGetFeedType: 'internal'
-      publishVstsFeed: 'da2367e3-d53c-4676-a3bb-03e824b957df'
+      publishVstsFeed: '8829e892-f54f-4979-8d72-b1dd5edb1603'
     condition: and(eq(variables['PublishRelease'], 'true'), and(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
