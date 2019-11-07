@@ -35,10 +35,6 @@ steps:
       transformAction: 'none'
     condition: eq(variables['PublishRelease'], 'true')
 
-  - powershell: |
-      Write-Host "##vso[build.updatebuildnumber]$FullVersion"
-    displayName: 'Rename the pipeline instance build number'
-
   - task: DotNetCoreCLI@2
     displayName: "Restore, build and pack"
     inputs:
