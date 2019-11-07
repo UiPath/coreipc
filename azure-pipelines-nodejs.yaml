@@ -4,7 +4,7 @@ pool:
   vmImage: 'windows-2019'
 
 variables:
-  ProjectPath: 'clients/nodejs/projects/@uipath-ipc'
+  ProjectPath: 'clients/nodejs'
 
 steps:
   - powershell: |
