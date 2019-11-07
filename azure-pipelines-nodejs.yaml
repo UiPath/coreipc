@@ -1,0 +1,84 @@
+name: $(Date:yyyyMMdd)$(Rev:-rr)
+
+pool:
+  vmImage: 'windows-2019'
+
+variables:
+  ProjectPath: 'clients/nodejs'
+
+steps:
+  - powershell: |
+      $json = Get-Content '$(ProjectPath)/package.json' | Out-String | ConvertFrom-Json
+      $version = [String] $json.version
+      $version = $version.Trim()
+      
+      Write-Host "##vso[task.setvariable variable=Version;]$version"
+    displayName: 'Read $(Version) from package.json'
+
+  - task: VariableTransformTask@1
+    displayName: 'Compute $(FullVersion) (if not PUBLISH)'
+    inputs:
+      value: '$(Version)-$(Build.BuildNumber)'
+      variableName: 'FullVersion'
+      IsSecret: false
+      transformAction: 'none'
+    condition: ne(variables['PublishRelease'], 'true')
+
+  - task: VariableTransformTask@1
+    displayName: 'Compute $(FullVersion) (if PUBLISH)'
+    inputs:
+      value: '$(Version)'
+      variableName: 'FullVersion'
+      IsSecret: false
+      transformAction: 'none'
+    condition: eq(variables['PublishRelease'], 'true')
+
+  - task: Npm@1
+    displayName: Write $(FullVersion) to package.json
+    inputs:
+      command: 'custom'
+      workingDir: '$(ProjectPath)'
+      customCommand: 'version $(FullVersion) --allow-same-version'
+
+  - task: Npm@1
+    displayName: Restore
+    inputs:
+        command: 'install'
+        workingDir: $(ProjectPath)
+        customRegistry: 'useFeed'
+        customFeed: '2536608e-b06d-4173-9612-03ef4b89d519'
+    
+  - task: Npm@1
+    displayName: Build
+    inputs:
+        command: 'custom'
+        workingDir: $(ProjectPath)
+        customCommand: 'run build'
+    
+  - task: Npm@1
+    displayName: Run unit tests
+    inputs:
+        command: 'custom'
+        workingDir: $(ProjectPath)
+        customCommand: 'run test'
+    
+  - task: Npm@1
+    displayName: 'Publish the NPM package to the private feed'
+    inputs:
+      command: 'publish'
+      workingDir: '$(ProjectPath)'
+      verbose: false
+      publishRegistry: 'useFeed'
+      publishFeed: '2536608e-b06d-4173-9612-03ef4b89d519'
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+
+  - task: Npm@1
+    displayName: 'Publish the NPM package to the public feed (if PUBLISH)'
+    inputs:
+      command: 'publish'
+      workingDir: '$(ProjectPath)'
+      verbose: false
+      publishRegistry: 'useFeed'
+      publishFeed: '7153aa1e-cb2e-4a87-b08d-2ea22fa76ab2'
+    condition: and(eq(variables['PublishRelease'], 'true'), and(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
+
