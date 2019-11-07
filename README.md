@@ -1,6 +1,6 @@
 [![Build Status](https://dev.azure.com/uipath/CoreIpc/_apis/build/status/CI?branchName=master)](https://dev.azure.com/uipath/CoreIpc/_build/latest?definitionId=630&branchName=master)
 # CoreIpc
-WCF-like service model API for communication over named pipes. .NET standard and [node.js](https://github.com/UiPath/coreipc/tree/master/src/Clients/nodejs) clients.
+WCF-like service model API for communication over named pipes. .NET standard and [node.js](src/Clients/nodejs) clients.
 - async
 - json serialization
 - DI integration
