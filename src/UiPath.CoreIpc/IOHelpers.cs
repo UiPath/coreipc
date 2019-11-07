@@ -64,9 +64,14 @@ namespace UiPath.CoreIpc
             return parameter.DefaultValue;
         }
 
-        public static PipeSecurity LocalOnly(this PipeSecurity pipeSecurity)
+        public static PipeSecurity LocalOnly(this PipeSecurity pipeSecurity) => pipeSecurity.Deny(WellKnownSidType.NetworkSid, PipeAccessRights.FullControl);
+
+        public static PipeSecurity Deny(this PipeSecurity pipeSecurity, WellKnownSidType sid, PipeAccessRights pipeAccessRights) =>
+            pipeSecurity.Deny(new SecurityIdentifier(sid, null), pipeAccessRights);
+
+        public static PipeSecurity Deny(this PipeSecurity pipeSecurity, IdentityReference sid, PipeAccessRights pipeAccessRights)
         {
-            pipeSecurity.SetAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.NetworkSid, null), PipeAccessRights.FullControl, AccessControlType.Deny));
+            pipeSecurity.SetAccessRule(new PipeAccessRule(sid, pipeAccessRights, AccessControlType.Deny));
             return pipeSecurity;
         }
 
@@ -75,7 +80,7 @@ namespace UiPath.CoreIpc
 
         public static PipeSecurity Allow(this PipeSecurity pipeSecurity, IdentityReference sid, PipeAccessRights pipeAccessRights)
         {
-            pipeSecurity.AddAccessRule(new PipeAccessRule(sid, pipeAccessRights, AccessControlType.Allow));
+            pipeSecurity.SetAccessRule(new PipeAccessRule(sid, pipeAccessRights, AccessControlType.Allow));
             return pipeSecurity;
         }
 
