@@ -62,7 +62,6 @@ namespace UiPath.CoreIpc.Tests
         private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
             new NamedPipeClientBuilder<IComputingService, IComputingCallback>(_serviceProvider)
                 .PipeName("computing")
-                .ServerName(Environment.MachineName)
                 .AllowImpersonation()
                 .EncryptAndSign()
                 .RequestTimeout(RequestTimeout)
@@ -206,6 +205,9 @@ namespace UiPath.CoreIpc.Tests
             var returnValue = await _systemClient.ImpersonateCaller();
             returnValue.ShouldBe(Environment.UserName);
         }
+
+        [Fact]
+        public Task ServerName() => SystemClientBuilder().ServerName(Environment.MachineName).Build().GetGuid(System.Guid.Empty);
 
         [Fact]
         public async Task ServerTimeout()
