@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Nito.AsyncEx;
 using Shouldly;
 using UiPath.CoreIpc.NamedPipe;
 using Xunit;
@@ -26,9 +27,11 @@ namespace UiPath.CoreIpc.Tests
         private readonly ComputingCallback _computingCallback;
         private readonly IServiceProvider _serviceProvider;
         private PipeSecurity _pipeSecurity;
+        private readonly AsyncContextThread _asyncContextThread = new AsyncContextThread();
 
         public IpcTests()
         {
+            _asyncContextThread.Context.SynchronizationContext.Send(() => Thread.CurrentThread.Name = "GuiThread");
             _computingCallback = new ComputingCallback { Id = System.Guid.NewGuid().ToString() };
             _serviceProvider = ConfigureServices();
             _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
@@ -50,12 +53,9 @@ namespace UiPath.CoreIpc.Tests
                 })
                 .Build();
 
-            using (GuiLikeSyncContext.Install())
-            {
-                var taskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
-                _host.RunAsync(taskScheduler);
-                _computingClient = ComputingClientBuilder(taskScheduler).Build();
-            }
+            var taskScheduler = _asyncContextThread.Context.Scheduler;
+            _host.RunAsync(taskScheduler);
+            _computingClient = ComputingClientBuilder(taskScheduler).Build();
             _systemClient = CreateSystemService();
         }
 
@@ -363,6 +363,7 @@ namespace UiPath.CoreIpc.Tests
             ((IDisposable)_computingClient).Dispose();
             ((IDisposable)_systemClient).Dispose();
             _host.Dispose();
+            _asyncContextThread.Dispose();
         }
     }
 }
