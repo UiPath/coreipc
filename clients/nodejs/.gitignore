@@ -2,5 +2,5 @@ node_modules
 coverage
 yarn.lock
 dist
-/projects/@uipath-ipc/.nyc_output
-/projects/@uipath-ipc/reports/unit
+/.nyc_output
+/reports/unit

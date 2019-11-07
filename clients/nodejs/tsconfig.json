@@ -1,3 +1,38 @@
 {
-    "extends": "./tsconfig.base"
+    "compilerOptions": {
+        "baseUrl": "projects",
+        "declaration": true,
+        "downlevelIteration": true,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "esModuleInterop": true,
+        "target": "es6",
+        "lib": [
+            "es6"
+        ],
+        "module": "commonjs",
+        "noUnusedLocals": false,
+        "skipLibCheck": true,
+        "skipDefaultLibCheck": true,
+        "sourceMap": true,
+        "paths": {
+            "@uipath/ipc/*": [
+                "@uipath-ipc/src/*"
+            ],
+            "@uipath/robot-client/*": [
+                "@uipath-robot-client/src/*"
+            ]
+        },
+        "outDir": "./dist",
+        "strict": true,
+        "strictNullChecks": true,
+        "stripInternal": true
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "**/*.test.ts"
+    ]
 }
