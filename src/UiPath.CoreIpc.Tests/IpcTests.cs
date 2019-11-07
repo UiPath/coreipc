@@ -40,7 +40,7 @@ namespace UiPath.CoreIpc.Tests
                 .AddEndpoint(new NamedPipeEndpointSettings<IComputingService, IComputingCallback>()
                 {
                     RequestTimeout = RequestTimeout,
-                    AccessControl = security => _pipeSecurity = security,
+                    AccessControl = security => _pipeSecurity = security.LocalOnly(),
                     Name = "computing",
                     EncryptAndSign = true,
                 })
