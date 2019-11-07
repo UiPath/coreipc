@@ -7,6 +7,7 @@ namespace UiPath.CoreIpc.NamedPipe
     public abstract class NamedPipeClientBuilderBase<TDerived, TInterface> : ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
     {
         private string _pipeName = typeof(TInterface).Name;
+        private string _serverName = ".";
         private bool _allowImpersonation;
 
         protected NamedPipeClientBuilderBase(Type callbackContract = null, IServiceProvider serviceProvider = null) : base(callbackContract, serviceProvider) { }
@@ -14,6 +15,12 @@ namespace UiPath.CoreIpc.NamedPipe
         public TDerived PipeName(string pipeName)
         {
             _pipeName = pipeName;
+            return this as TDerived;
+        }
+
+        public TDerived ServerName(string serverName)
+        {
+            _serverName = serverName;
             return this as TDerived;
         }
 
@@ -30,7 +37,7 @@ namespace UiPath.CoreIpc.NamedPipe
         }
 
         protected override TInterface BuildCore(ServiceEndpoint serviceEndpoint) =>
-            new NamedPipeClient<TInterface>(_serializer, _pipeName, _requestTimeout, _allowImpersonation, _logger, _connectionFactory, _encryptAndSign, _beforeCall, serviceEndpoint).CreateProxy();
+            new NamedPipeClient<TInterface>(_serverName, _pipeName, _serializer, _requestTimeout, _allowImpersonation, _logger, _connectionFactory, _encryptAndSign, _beforeCall, serviceEndpoint).CreateProxy();
     }
 
     public class NamedPipeClientBuilder<TInterface> : NamedPipeClientBuilderBase<NamedPipeClientBuilder<TInterface>, TInterface> where TInterface : class

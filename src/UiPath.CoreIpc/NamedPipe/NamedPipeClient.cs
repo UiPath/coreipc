@@ -12,12 +12,14 @@ namespace UiPath.CoreIpc.NamedPipe
 
     internal class NamedPipeClient<TInterface> : ServiceClient<TInterface> where TInterface : class
     {
+        private readonly string _serverName;
         private readonly string _pipeName;
         private readonly bool _allowImpersonation;
         private NamedPipeClientStream _pipe;
 
-        public NamedPipeClient(ISerializer serializer, string pipeName, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign, BeforeCallHandler beforeCall, ServiceEndpoint serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, encryptAndSign, beforeCall, serviceEndpoint)
+        public NamedPipeClient(string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign, BeforeCallHandler beforeCall, ServiceEndpoint serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, encryptAndSign, beforeCall, serviceEndpoint)
         {
+            _serverName = serverName;
             _pipeName = pipeName;
             _allowImpersonation = allowImpersonation;
         }
@@ -34,7 +36,7 @@ namespace UiPath.CoreIpc.NamedPipe
                 }
                 _pipe.Dispose();
             }
-            _pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _allowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
+            _pipe = new NamedPipeClientStream(_serverName, _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _allowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
             try
             {
                 await _pipe.ConnectAsync(cancellationToken);
