@@ -62,6 +62,7 @@ namespace UiPath.CoreIpc.Tests
         private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
             new NamedPipeClientBuilder<IComputingService, IComputingCallback>(_serviceProvider)
                 .PipeName("computing")
+                .ServerName(Environment.MachineName)
                 .AllowImpersonation()
                 .EncryptAndSign()
                 .RequestTimeout(RequestTimeout)
