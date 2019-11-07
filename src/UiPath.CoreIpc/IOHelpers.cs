@@ -64,6 +64,12 @@ namespace UiPath.CoreIpc
             return parameter.DefaultValue;
         }
 
+        public static PipeSecurity LocalOnly(this PipeSecurity pipeSecurity)
+        {
+            pipeSecurity.SetAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.NetworkSid, null), PipeAccessRights.FullControl, AccessControlType.Deny));
+            return pipeSecurity;
+        }
+
         public static PipeSecurity Allow(this PipeSecurity pipeSecurity, WellKnownSidType sid, PipeAccessRights pipeAccessRights) =>
             pipeSecurity.Allow(new SecurityIdentifier(sid, null), pipeAccessRights);
 
