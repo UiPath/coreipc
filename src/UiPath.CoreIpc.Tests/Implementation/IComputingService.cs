@@ -35,7 +35,7 @@ namespace UiPath.CoreIpc.Tests
         Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default);
         Task<bool> Infinite(CancellationToken cancellationToken = default);
         Task InfiniteVoid(CancellationToken cancellationToken = default);
-        Task<string> GetCallbackThreadName(Message message, CancellationToken cancellationToken = default);
+        Task<string> GetCallbackThreadName(Message message = null, CancellationToken cancellationToken = default);
     }
 
     public struct ComplexNumber

@@ -17,6 +17,7 @@ namespace UiPath.CoreIpc.Tests
     public class IpcTests : IDisposable
     {
         private const int MaxReceivedMessageSizeInMegabytes = 1;
+        private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
         private readonly ServiceHost _host;
         private readonly IComputingService _computingClient;
         private readonly ISystemService _systemClient;
@@ -35,14 +36,14 @@ namespace UiPath.CoreIpc.Tests
             _host = new ServiceHostBuilder(_serviceProvider)
                 .AddEndpoint(new NamedPipeEndpointSettings<IComputingService, IComputingCallback>()
                 {
-                    RequestTimeout = TimeSpan.FromSeconds(2),
+                    RequestTimeout = RequestTimeout,
                     AccessControl = security => _pipeSecurity = security,
                     Name = "computing",
                     EncryptAndSign = true,
                 })
                 .AddEndpoint(new NamedPipeEndpointSettings<ISystemService>()
                 {
-                    RequestTimeout = TimeSpan.FromSeconds(1),
+                    RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1)),
                     MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,
                     Name = "system",
                     ConcurrentAccepts = 10,
@@ -58,19 +59,19 @@ namespace UiPath.CoreIpc.Tests
             _systemClient = CreateSystemService();
         }
 
-        private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler) =>
+        private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
             new NamedPipeClientBuilder<IComputingService, IComputingCallback>(_serviceProvider)
                 .PipeName("computing")
                 .AllowImpersonation()
                 .EncryptAndSign()
-                .RequestTimeout(TimeSpan.FromSeconds(1))
+                .RequestTimeout(RequestTimeout)
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);
 
         private ISystemService CreateSystemService() => SystemClientBuilder().Build();
 
         private NamedPipeClientBuilder<ISystemService> SystemClientBuilder() =>
-            new NamedPipeClientBuilder<ISystemService>().PipeName("system").RequestTimeout(TimeSpan.FromSeconds(2)).AllowImpersonation().Logger(_serviceProvider);
+            new NamedPipeClientBuilder<ISystemService>().PipeName("system").RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
 
         public IServiceProvider ConfigureServices() =>
             new ServiceCollection()
@@ -129,7 +130,7 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task ReconnectWithEncrypt()
         {
-            var proxy = ComputingClientBuilder(TaskScheduler.Default).Build();
+            var proxy = ComputingClientBuilder().Build();
             for (int i = 0; i < 50; i++)
             {
                 await proxy.AddFloat(1, 2);
@@ -217,8 +218,9 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task ClientTimeout()
         {
-            _computingClient.Infinite().ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.Infinite)} timed out.");
-            await AddFloat();
+            var proxy = ComputingClientBuilder().RequestTimeout(TimeSpan.FromMilliseconds(10)).Build();
+            proxy.Infinite().ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.Infinite)} timed out.");
+            await proxy.AddFloat(0, 0);
         }
 
         [Fact]
@@ -274,7 +276,7 @@ namespace UiPath.CoreIpc.Tests
         public async Task GetThreadName() => (await _systemClient.GetThreadName()).ShouldBe("GuiThread");
 
         [Fact]
-        public async Task GetCallbackThreadName() => (await _computingClient.GetCallbackThreadName(new Message { RequestTimeout = TimeSpan.FromSeconds(2) })).ShouldBe("GuiThread");
+        public async Task GetCallbackThreadName() => (await _computingClient.GetCallbackThreadName()).ShouldBe("GuiThread");
 
         [Fact]
         public async Task VoidThreadName()
