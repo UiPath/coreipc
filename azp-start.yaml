@@ -1,0 +1,31 @@
+name: $(Date:yyyyMMdd)$(Rev:-rr)
+
+pool:
+  vmImage: 'windows-2019'
+
+variables:
+  Label_Initialization: 'Initialization:'
+  Label_DotNet: '.NET:'
+  Label_NodeJS: 'node.js:'
+
+  DotNet_BuildConfiguration: 'Release'
+  DotNet_SessionSolution: 'CoreIpc.sln'
+  DotNet_MainProjectName: 'UiPath.CoreIpc'
+  DotNet_MainProjectPath: '.\src\UiPath.CoreIpc\UiPath.CoreIpc.csproj'
+
+  NodeJS_ProjectPath: 'src/clients/nodejs'
+
+jobs:
+  # The following 2 jobs will run in parallel:
+
+  - job:
+    displayName: '.NET'
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-dotnet.yaml
+
+  - job:
+    displayName: 'node.js'
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-nodejs.yaml

@@ -1,0 +1,39 @@
+steps:
+  - task: Npm@1
+    displayName: '$(Label_NodeJS) Write $[FullVersion] to package.json'
+    inputs:
+      command: 'custom'
+      workingDir: '$(NodeJS_ProjectPath)'
+      customCommand: 'version $(FullVersion) --allow-same-version'
+
+  - task: Npm@1
+    displayName: '$(Label_NodeJS) Restore'
+    inputs:
+        command: 'install'
+        workingDir: $(NodeJS_ProjectPath)
+        customRegistry: 'useFeed'
+        customFeed: '2536608e-b06d-4173-9612-03ef4b89d519'
+    
+  - task: Npm@1
+    displayName: '$(Label_NodeJS) Build'
+    inputs:
+        command: 'custom'
+        workingDir: $(NodeJS_ProjectPath)
+        customCommand: 'run build'
+    
+  - task: Npm@1
+    displayName: '$(Label_NodeJS) Run unit tests'
+    inputs:
+        command: 'custom'
+        workingDir: $(NodeJS_ProjectPath)
+        customCommand: 'run test'
+    
+  - task: Npm@1
+    displayName: '$(Label_NodeJS) Publish the NPM package when Build.Reason is not "PullRequest"'
+    inputs:
+      command: 'publish'
+      workingDir: '$(NodeJS_ProjectPath)'
+      verbose: false
+      publishRegistry: 'useFeed'
+      publishFeed: '7153aa1e-cb2e-4a87-b08d-2ea22fa76ab2'
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
