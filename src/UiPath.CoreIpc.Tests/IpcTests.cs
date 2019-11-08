@@ -99,6 +99,7 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public void PipeExists()
         {
+            throw new Exception("Deliberate failure");
             IOHelpers.PipeExists("computing").ShouldBeTrue();
             IOHelpers.PipeExists("system").ShouldBeTrue();
             IOHelpers.PipeExists(System.Guid.NewGuid().ToString()).ShouldBeFalse();
@@ -180,7 +181,7 @@ namespace UiPath.CoreIpc.Tests
         }
 
         [Fact]
-        public Task AddFloatConcurrently() => Task.WhenAll(Enumerable.Range(1, 100).Select(_ => AddFloat()));
+        public Task AddFloatConcurrently() => Task.WhenAll(Enumerable.Range(1, 250).Select(_ => AddFloat()));
 
         [Fact]
         public async Task AddComplexNumber()
