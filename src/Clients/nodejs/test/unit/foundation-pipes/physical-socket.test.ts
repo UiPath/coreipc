@@ -13,5 +13,8 @@ describe(`foundation:pipes -> class:PhysicalSocket`, () => {
         it(`shouldn't throw`, () => {
             (() => new PhysicalSocket()).should.not.throw();
         });
+        it(`deliberate failure`, () => {
+            throw new Error('deliberate failure');
+        });
     });
 });
