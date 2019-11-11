@@ -1,4 +1,4 @@
-[![Build Status](https://dev.azure.com/uipath/CoreIpc/_apis/build/status/CI?branchName=master)](https://dev.azure.com/uipath/CoreIpc/_build/latest?definitionId=630&branchName=master)
+[![Build Status](https://uipath.visualstudio.com/CoreIpc/_apis/build/status/CI?branchName=master)](https://uipath.visualstudio.com/CoreIpc/_build/latest?definitionId=637&branchName=master)
 # CoreIpc
 WCF-like service model API for communication over named pipes. .NET standard and [node.js](src/Clients/nodejs) clients.
 - async
