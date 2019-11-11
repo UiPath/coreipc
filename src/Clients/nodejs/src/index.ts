@@ -19,6 +19,7 @@ import { IPipeClientStream } from './foundation/pipes';
 import { OperationCanceledError, ObjectDisposedError } from './foundation/errors';
 import { WireError as IpcError } from './core/internals';
 import { Trace } from './foundation/utils';
+import { IDisposable } from './foundation/disposable';
 
 export {
     CancellationToken,
@@ -33,6 +34,7 @@ export {
     IpcError,
     ObjectDisposedError,
     OperationCanceledError,
+    IDisposable,
     __hasCancellationToken__,
     __returns__,
     Trace
