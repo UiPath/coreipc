@@ -16,7 +16,7 @@ import {
 } from './core/surface';
 
 import { IPipeClientStream } from './foundation/pipes';
-import { OperationCanceledError } from './foundation/errors';
+import { OperationCanceledError, ObjectDisposedError } from './foundation/errors';
 import { WireError as IpcError } from './core/internals';
 import { Trace } from './foundation/utils';
 
@@ -31,6 +31,7 @@ export {
     Timeout,
     RemoteError,
     IpcError,
+    ObjectDisposedError,
     OperationCanceledError,
     __hasCancellationToken__,
     __returns__,
