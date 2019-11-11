@@ -12,7 +12,7 @@ steps:
         command: 'install'
         workingDir: $(NodeJS_ProjectPath)
         customRegistry: 'useFeed'
-        customFeed: '2536608e-b06d-4173-9612-03ef4b89d519'
+        customFeed: '7153aa1e-cb2e-4a87-b08d-2ea22fa76ab2'
     
   - task: Npm@1
     displayName: '$(Label_NodeJS) Build'
@@ -27,9 +27,6 @@ steps:
         command: 'custom'
         workingDir: $(NodeJS_ProjectPath)
         customCommand: 'run test'
-
-#   - script: mocha test --reporter mocha-junit-reporter
-#     displayName: '$(Label_NodeJS) Run unit tests'
 
   - task: PublishTestResults@2
     displayName: '$(Label_NodeJS) Publish test results'
