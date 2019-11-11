@@ -99,7 +99,6 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public void PipeExists()
         {
-            throw new Exception("Deliberate failure");
             IOHelpers.PipeExists("computing").ShouldBeTrue();
             IOHelpers.PipeExists("system").ShouldBeTrue();
             IOHelpers.PipeExists(System.Guid.NewGuid().ToString()).ShouldBeFalse();

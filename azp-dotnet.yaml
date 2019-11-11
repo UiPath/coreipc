@@ -10,6 +10,8 @@ steps:
     inputs:
       command: 'test'
       projects: '**/*Tests*.csproj'
+      publishTestResults: true
+      testRunTitle: '.NET tests'
       arguments: '--no-build --configuration $(DotNet_BuildConfiguration)'
 
   - task: CopyFiles@2
