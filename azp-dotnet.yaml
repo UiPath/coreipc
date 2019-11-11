@@ -1,0 +1,39 @@
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_DotNet) Restore, build and pack'
+    inputs:
+      projects: '$(DotNet_SessionSolution)'
+      arguments: '--configuration $(DotNet_BuildConfiguration) -p:Version="$(FullVersion)"'
+      
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_DotNet) Run unit tests'
+    inputs:
+      command: 'test'
+      projects: '**/*Tests*.csproj'
+      publishTestResults: true
+      testRunTitle: '.NET tests'
+      arguments: '--no-build --configuration $(DotNet_BuildConfiguration)'
+
+  - task: CopyFiles@2
+    displayName: '$(Label_DotNet) Copy nupkg to $(Build.ArtifactStagingDirectory)'
+    inputs:
+      SourceFolder: 'src\UiPath.CoreIpc\bin\$(DotNet_BuildConfiguration)\'
+      Contents: '*.nupkg'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)'
+      CleanTargetFolder: true
+
+  - task: PublishPipelineArtifact@1
+    displayName: '$(Label_DotNet) Publish the NuGet package to the pipeline instance'
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/$(DotNet_MainProjectName).$(FullVersion).nupkg'
+      artifact: 'NuGet package'
+      publishLocation: 'pipeline'
+
+  - task: NuGetCommand@2
+    displayName: '$(Label_DotNet) Publish the NuGet package when Build.Reason is not "PullRequest"'
+    inputs:
+      command: 'push'
+      packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
+      nuGetFeedType: 'internal'
+      publishVstsFeed: '8829e892-f54f-4979-8d72-b1dd5edb1603'
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
