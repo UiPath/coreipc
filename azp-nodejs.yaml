@@ -21,12 +21,22 @@ steps:
         workingDir: $(NodeJS_ProjectPath)
         customCommand: 'run build'
     
-  - task: Npm@1
+#   - task: Npm@1
+#     displayName: '$(Label_NodeJS) Run unit tests'
+#     inputs:
+#         command: 'custom'
+#         workingDir: $(NodeJS_ProjectPath)
+#         customCommand: 'run test'
+
+  - script: mocha test --reporter mocha-junit-reporter
     displayName: '$(Label_NodeJS) Run unit tests'
+
+  - task: PublishTestResults@2
+    displayName: '$(Label_NodeJS) Publish test results'
+    condition: succeededOrFailed()
     inputs:
-        command: 'custom'
-        workingDir: $(NodeJS_ProjectPath)
-        customCommand: 'run test'
+      testRunner: JUnit
+      testResultsFiles: '**/TEST-RESULTS.xml'
     
   - task: Npm@1
     displayName: '$(Label_NodeJS) Publish the NPM package when Build.Reason is not "PullRequest"'
