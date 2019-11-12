@@ -30,10 +30,10 @@ steps:
       publishLocation: 'pipeline'
 
   - task: NuGetCommand@2
-    displayName: '$(Label_DotNet) Publish the NuGet package when Build.Reason is not "PullRequest"'
+    displayName: '$(Label_DotNet) Publish the NuGet package to MyGet when Build.Reason is not "PullRequest"'
     inputs:
       command: 'push'
       packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
-      nuGetFeedType: 'internal'
-      publishVstsFeed: '8829e892-f54f-4979-8d72-b1dd5edb1603'
+      nuGetFeedType: 'external'
+      publishFeedCredentials: 'MyGet UiPath Dev'
     condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
