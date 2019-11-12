@@ -43,5 +43,5 @@ steps:
       workingDir: '$(NodeJS_ProjectPath)'
       verbose: false
       publishRegistry: 'useFeed'
-      publishFeed: '7153aa1e-cb2e-4a87-b08d-2ea22fa76ab2'
+      publishFeed: '424ca518-1f12-456b-a4f6-888197fc15ee'
     condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
