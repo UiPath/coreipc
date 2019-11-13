@@ -12,7 +12,7 @@ steps:
         command: 'install'
         workingDir: $(NodeJS_ProjectPath)
         customRegistry: 'useFeed'
-        customFeed: '7153aa1e-cb2e-4a87-b08d-2ea22fa76ab2'
+        customFeed: '424ca518-1f12-456b-a4f6-888197fc15ee'
     
   - task: Npm@1
     displayName: '$(Label_NodeJS) Build'
