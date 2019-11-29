@@ -12,8 +12,11 @@ variables:
   DotNet_SessionSolution: 'CoreIpc.sln'
   DotNet_MainProjectName: 'UiPath.CoreIpc'
   DotNet_MainProjectPath: '.\src\UiPath.CoreIpc\UiPath.CoreIpc.csproj'
+  DotNet_ArtifactName: 'NuGet package'
 
   NodeJS_ProjectPath: 'src/clients/nodejs'
+  NodeJS_ArchivePath: 'src/clients/nodejs.zip'
+  NodeJS_ArtifactName: 'NPM package'
 
 jobs:
   # The following 2 jobs will run in parallel:

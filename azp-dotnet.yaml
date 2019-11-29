@@ -22,18 +22,9 @@ steps:
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
       CleanTargetFolder: true
 
-  - task: PublishPipelineArtifact@1
-    displayName: '$(Label_DotNet) Publish the NuGet package to the pipeline instance'
+  - task: PublishBuildArtifacts@1
+    displayName: '$(Label_DotNet) Publish the $(DotNet_ArtifactName) to the pipeline instance'
     inputs:
-      targetPath: '$(Build.ArtifactStagingDirectory)/$(DotNet_MainProjectName).$(FullVersion).nupkg'
-      artifact: 'NuGet package'
-      publishLocation: 'pipeline'
-
-  - task: NuGetCommand@2
-    displayName: '$(Label_DotNet) Publish the NuGet package to MyGet when Build.Reason is not "PullRequest"'
-    inputs:
-      command: 'push'
-      packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
-      nuGetFeedType: 'external'
-      publishFeedCredentials: 'MyGet UiPath Dev'
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+      ArtifactName: '$(DotNet_ArtifactName)'
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)/$(DotNet_MainProjectName).$(FullVersion).nupkg'
+      ArtifactType: 'Container'

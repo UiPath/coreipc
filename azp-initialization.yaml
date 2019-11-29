@@ -1,4 +1,11 @@
 steps:
+
+  - powershell: |
+      $sourceBranch = $ENV:BUILD_SOURCEBRANCH
+      $isMaster = $sourceBranch -eq "refs/heads/master"
+      Write-Host "##vso[task.setvariable variable=PublishRelease;]$($isMaster.ToString().ToLowerInvariant())"
+    displayName: 'Compute PublishRelease variable'
+
     # Read $(Version) from the UiPath.CoreIpc.csproj file
   - powershell: |
       $xml = [Xml] ( Get-Content $env:DotNet_MainProjectPath )

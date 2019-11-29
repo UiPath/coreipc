@@ -35,13 +35,18 @@ steps:
       testRunner: JUnit
       workingDir: $(NodeJS_ProjectPath)
       testResultsFiles: './src/Clients/nodejs/test-results.xml'
-    
-  - task: Npm@1
-    displayName: '$(Label_NodeJS) Publish the NPM package when Build.Reason is not "PullRequest"'
+
+  - task: ArchiveFiles@2
+    displayName: '$(Label_NodeJS) Archive project directory'
     inputs:
-      command: 'publish'
-      workingDir: '$(NodeJS_ProjectPath)'
-      verbose: false
-      publishRegistry: 'useFeed'
-      publishFeed: '424ca518-1f12-456b-a4f6-888197fc15ee'
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+      archiveType: 'zip'
+      includeRootFolder: false
+      rootFolderOrFile: '$(NodeJS_ProjectPath)'
+      archiveFile: '$(NodeJS_ArchivePath)'
+
+  - task: PublishBuildArtifacts@1
+    displayName: '$(Label_NodeJS) Publish the $(NodeJS_ArtifactName) to the pipeline instance'
+    inputs:
+      ArtifactName: '$(NodeJS_ArtifactName)'
+      PathtoPublish: '$(NodeJS_ArchivePath)'
+      ArtifactType: 'Container'
