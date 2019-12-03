@@ -11,16 +11,18 @@ namespace UiPath.CoreIpc
     public class ServiceHost : IDisposable
     {
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-        private readonly IReadOnlyCollection<ServiceEndpoint> _endpoints;
+        private readonly IDictionary<string, ServiceEndpoint> _endpoints;
+        private readonly IReadOnlyCollection<Listener> _listeners;
         private readonly ILogger<ServiceHost> _logger;
 
-        public ServiceHost(IEnumerable<ServiceEndpoint> endpoints, IServiceProvider serviceProvider)
+        public ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, ServiceEndpoint> endpoints, IServiceProvider serviceProvider)
         {
-            _endpoints = endpoints.ToArray();
+            _endpoints = endpoints;
+            _listeners = listeners.ToArray();
             _logger = serviceProvider.GetRequiredService<ILogger<ServiceHost>>();
         }
 
-        public IServiceProvider ServiceProvider => _endpoints.FirstOrDefault()?.ServiceProvider;
+        public IServiceProvider ServiceProvider => _endpoints.Values.FirstOrDefault()?.ServiceProvider;
 
         public void Dispose()
         {
@@ -39,15 +41,15 @@ namespace UiPath.CoreIpc
 
         public Task RunAsync(TaskScheduler taskScheduler = null)
         {
-            var tasks = _endpoints.Select(endpoint => Task.Run(() =>
+            var tasks = _listeners.Select(listener => Task.Run(() =>
             {
-                endpoint.Scheduler = taskScheduler;
+                listener.Scheduler = taskScheduler;
 
-                _logger.LogDebug($"Starting endpoint '{endpoint.Name}'...");
+                _logger.LogDebug($"Starting endpoint '{listener}'...");
 
-                _cancellationTokenSource.Token.Register(() => _logger.LogDebug($"Stopping endpoint '{endpoint.Name}'..."));
+                _cancellationTokenSource.Token.Register(() => _logger.LogDebug($"Stopping endpoint '{listener}'..."));
 
-                return endpoint.ListenAsync(_cancellationTokenSource.Token).ContinueWith(_ => _logger.LogDebug($"Endpoint '{endpoint.Name}' stopped."));
+                return listener.ListenAsync(_cancellationTokenSource.Token).ContinueWith(_ => _logger.LogDebug($"Endpoint '{listener}' stopped."));
             }));
             return Task.WhenAll(tasks);
         }

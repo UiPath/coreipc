@@ -22,4 +22,12 @@ namespace UiPath.CoreIpc
         internal Type Contract { get; }
         internal Type CallbackContract { get; }
     }
+    public class EndpointSettings<TContract> : EndpointSettings where TContract : class
+    {
+        public EndpointSettings(TContract serviceInstance = null, Type callbackContract = null) : base(typeof(TContract), serviceInstance, callbackContract) { }
+    }
+    public class EndpointSettings<TContract, TCallbackContract> : EndpointSettings<TContract> where TContract : class where TCallbackContract : class
+    {
+        public EndpointSettings(TContract serviceInstance = null) : base(serviceInstance, typeof(TCallbackContract)) { }
+    }
 }

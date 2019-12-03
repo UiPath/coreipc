@@ -5,7 +5,8 @@ namespace UiPath.CoreIpc
 {
     public class ServiceHostBuilder
     {
-        private readonly List<ServiceEndpoint> _endpoints = new List<ServiceEndpoint>();
+        private readonly Dictionary<string, ServiceEndpoint> _endpoints = new Dictionary<string, ServiceEndpoint>();
+        private readonly List<Listener> _listeners = new List<Listener>();
 
         public ServiceHostBuilder(IServiceProvider serviceProvider)
         {
@@ -14,15 +15,22 @@ namespace UiPath.CoreIpc
 
         internal IServiceProvider ServiceProvider { get; }
 
-        public ServiceHostBuilder AddEndpoint(ServiceEndpoint endpoint)
+        internal ServiceHostBuilder AddEndpoint(ServiceEndpoint endpoint)
         {
-            _endpoints.Add(endpoint);
+            _endpoints.Add(endpoint.Name, endpoint);
+            return this;
+        }
+
+        internal ServiceHostBuilder AddListener(Listener listener)
+        {
+            _listeners.Add(listener);
+            listener.Endpoints = _endpoints;
             return this;
         }
 
         public ServiceHost Build()
         {
-            return new ServiceHost(_endpoints, ServiceProvider);
+            return new ServiceHost(_listeners, _endpoints, ServiceProvider);
         }
     }
 }

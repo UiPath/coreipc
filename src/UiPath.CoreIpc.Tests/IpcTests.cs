@@ -37,14 +37,14 @@ namespace UiPath.CoreIpc.Tests
             _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
             _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
             _host = new ServiceHostBuilder(_serviceProvider)
-                .AddEndpoint(new NamedPipeEndpointSettings<IComputingService, IComputingCallback>()
+                .AddEndpoint(new EndpointSettings<IComputingService, IComputingCallback>()
                 {
                     RequestTimeout = RequestTimeout,
                     AccessControl = security => _pipeSecurity = security.LocalOnly(),
                     Name = "computing",
                     EncryptAndSign = true,
                 })
-                .AddEndpoint(new NamedPipeEndpointSettings<ISystemService>()
+                .AddEndpoint(new EndpointSettings<ISystemService>()
                 {
                     RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1)),
                     MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,

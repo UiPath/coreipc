@@ -2,7 +2,7 @@
 {
     public static class NamedPipeServiceHostBuilderExtensions
     {
-        public static ServiceHostBuilder AddEndpoint<TContract>(this ServiceHostBuilder builder, NamedPipeEndpointSettings<TContract> settings) where TContract : class =>
-            builder.AddEndpoint(new NamedPipeServiceEndpoint<TContract>(builder.ServiceProvider, settings));
+        public static ServiceHostBuilder AddNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings) =>
+            builder.AddListener(new NamedPipeListener(builder.ServiceProvider, settings));
     }
 }
