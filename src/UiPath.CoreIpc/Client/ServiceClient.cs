@@ -92,9 +92,13 @@ namespace UiPath.CoreIpc
             _connection = connection;
             connection.ResponseReceived += OnResponseReceived;
             connection.Closed += OnConnectionClosed;
+            if (_serviceEndpoint == null)
+            {
+                return;
+            }
             var endpoints = new Dictionary<string, EndpointSettings> { { _serviceEndpoint.Name, _serviceEndpoint } };
             var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider };
-            var server = _serviceEndpoint == null ? null : new Server(listenerSettings, endpoints, connection);
+            var server = new Server(listenerSettings, endpoints, connection);
         }
 
         private void OnConnectionClosed(object sender, EventArgs e)
