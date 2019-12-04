@@ -37,19 +37,20 @@ namespace UiPath.CoreIpc.Tests
             _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
             _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
             _host = new ServiceHostBuilder(_serviceProvider)
-                .AddEndpoint(new EndpointSettings<IComputingService, IComputingCallback>()
+                .AddNamedPipes(new NamedPipeSettings
                 {
                     RequestTimeout = RequestTimeout,
+                    MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,
                     AccessControl = security => _pipeSecurity = security.LocalOnly(),
+                    ConcurrentAccepts = 10,
+                })
+                .AddEndpoint(new EndpointSettings<IComputingService, IComputingCallback>()
+                {
                     Name = "computing",
-                    EncryptAndSign = true,
                 })
                 .AddEndpoint(new EndpointSettings<ISystemService>()
                 {
-                    RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1)),
-                    MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,
                     Name = "system",
-                    ConcurrentAccepts = 10,
                 })
                 .Build();
 
@@ -93,7 +94,7 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public void TheCallbackContractMustBeAnInterface() => new Action(() => new NamedPipeClientBuilder<ISystemService, IpcTests>(_serviceProvider).Build()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
         [Fact]
-        public void TheServiceContractMustBeAnInterface() => new Action(() => new NamedPipeEndpointSettings<IpcTests>()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
+        public void TheServiceContractMustBeAnInterface() => new Action(() => new EndpointSettings<IpcTests>()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
 #endif
 
         [Fact]
