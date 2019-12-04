@@ -5,7 +5,7 @@ namespace UiPath.CoreIpc
 {
     public class ServiceHostBuilder
     {
-        private readonly Dictionary<string, ServiceEndpoint> _endpoints = new Dictionary<string, ServiceEndpoint>();
+        private readonly Dictionary<string, EndpointSettings> _endpoints = new Dictionary<string, EndpointSettings>();
         private readonly List<Listener> _listeners = new List<Listener>();
 
         public ServiceHostBuilder(IServiceProvider serviceProvider)
@@ -15,9 +15,9 @@ namespace UiPath.CoreIpc
 
         internal IServiceProvider ServiceProvider { get; }
 
-        internal ServiceHostBuilder AddEndpoint(ServiceEndpoint endpoint)
+        public ServiceHostBuilder AddEndpoint(EndpointSettings settings)
         {
-            _endpoints.Add(endpoint.Name, endpoint);
+            _endpoints.Add(settings.Name, settings);
             return this;
         }
 

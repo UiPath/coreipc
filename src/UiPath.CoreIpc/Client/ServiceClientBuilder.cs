@@ -73,7 +73,7 @@ namespace UiPath.CoreIpc
             return (TDerived) this;
         }
 
-        protected abstract TInterface BuildCore(ServiceEndpoint serviceEndpoint);
+        protected abstract TInterface BuildCore(EndpointSettings serviceEndpoint);
 
         public TInterface Build()
         {
@@ -85,8 +85,7 @@ namespace UiPath.CoreIpc
             {
                 Logger(_serviceProvider);
             }
-            var endpointSettings = new EndpointSettings(_callbackContract, _callbackInstance);
-            return BuildCore(new ServiceEndpoint(_serviceProvider, endpointSettings, _logger) { Scheduler = _taskScheduler });
+            return BuildCore(new EndpointSettings(_callbackContract, _callbackInstance) { Scheduler = _taskScheduler });
         }
     }
 

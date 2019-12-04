@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc
 {
@@ -14,9 +15,11 @@ namespace UiPath.CoreIpc
             IOHelpers.Validate(contract);
         }
         public string Name { get; set; }
+        public TaskScheduler Scheduler { get; internal set; }
         internal object ServiceInstance { get; }
         internal Type Contract { get; }
         internal Type CallbackContract { get; }
+        internal IServiceProvider ServiceProvider { get; set; }
     }
     public class EndpointSettings<TContract> : EndpointSettings where TContract : class
     {

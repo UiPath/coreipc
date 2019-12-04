@@ -11,11 +11,11 @@ namespace UiPath.CoreIpc
     public class ServiceHost : IDisposable
     {
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-        private readonly IDictionary<string, ServiceEndpoint> _endpoints;
+        private readonly IDictionary<string, EndpointSettings> _endpoints;
         private readonly IReadOnlyCollection<Listener> _listeners;
         private readonly ILogger<ServiceHost> _logger;
 
-        internal ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, ServiceEndpoint> endpoints, IServiceProvider serviceProvider)
+        internal ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, EndpointSettings> endpoints, IServiceProvider serviceProvider)
         {
             _endpoints = endpoints;
             _listeners = listeners.ToArray();

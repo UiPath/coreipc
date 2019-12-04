@@ -11,12 +11,12 @@ namespace UiPath.CoreIpc
 {
     class Server
     {
-        private readonly IDictionary<string, ServiceEndpoint> _endpoints;
+        private readonly IDictionary<string, EndpointSettings> _endpoints;
         private readonly Connection _connection;
         private readonly Lazy<IClient> _client;
         private readonly CancellationTokenSource _connectionClosed = new CancellationTokenSource();
 
-        public Server(ListenerSettings settings, IDictionary<string, ServiceEndpoint> endpoints, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
+        public Server(ListenerSettings settings, IDictionary<string, EndpointSettings> endpoints, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
         {
             Settings = settings;
             _endpoints = endpoints;
@@ -84,10 +84,10 @@ namespace UiPath.CoreIpc
             await _connection.SendResponse(Serializer.SerializeToBytes(response), responseCancellation);
         }
 
-        private async Task<Response> HandleRequest(ServiceEndpoint endpoint, Request request, IServiceScope scope, CancellationToken cancellationToken)
+        private async Task<Response> HandleRequest(EndpointSettings endpoint, Request request, IServiceScope scope, CancellationToken cancellationToken)
         {
-            var contract = endpoint.Settings.Contract;
-            var service = endpoint.Settings.ServiceInstance ?? scope.ServiceProvider.GetService(contract);
+            var contract = endpoint.Contract;
+            var service = endpoint.ServiceInstance ?? scope.ServiceProvider.GetService(contract);
             if (service == null)
             {
                 return Response.Fail(request, $"No implementation of interface '{contract.FullName}' found.");
@@ -105,7 +105,7 @@ namespace UiPath.CoreIpc
             return await InvokeMethod(endpoint, request, service, method, arguments);
         }
 
-        private async Task<Response> InvokeMethod(ServiceEndpoint endpoint, Request request, object service, MethodInfo method, object[] arguments)
+        private async Task<Response> InvokeMethod(EndpointSettings endpoint, Request request, object service, MethodInfo method, object[] arguments)
         {
             var hasReturnValue = method.ReturnType != typeof(Task);
             var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler);

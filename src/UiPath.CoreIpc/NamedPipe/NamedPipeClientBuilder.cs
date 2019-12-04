@@ -36,7 +36,7 @@ namespace UiPath.CoreIpc.NamedPipe
             return this as TDerived;
         }
 
-        protected override TInterface BuildCore(ServiceEndpoint serviceEndpoint) =>
+        protected override TInterface BuildCore(EndpointSettings serviceEndpoint) =>
             new NamedPipeClient<TInterface>(_serverName, _pipeName, _serializer, _requestTimeout, _allowImpersonation, _logger, _connectionFactory, _encryptAndSign, _beforeCall, serviceEndpoint).CreateProxy();
     }
 

@@ -36,12 +36,12 @@ namespace UiPath.CoreIpc
         protected readonly ConnectionFactory _connectionFactory;
         private readonly bool _encryptAndSign;
         protected readonly BeforeCallHandler _beforeCall;
-        protected readonly ServiceEndpoint _serviceEndpoint;
+        protected readonly EndpointSettings _serviceEndpoint;
         private readonly AsyncLock _connectionLock = new AsyncLock();
         private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new ConcurrentDictionary<string, RequestCompletionSource>();
         protected Connection _connection;
 
-        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign = false, BeforeCallHandler beforeCall = null, ServiceEndpoint serviceEndpoint = null)
+        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign = false, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
         {
             _serializer = serializer;
             _requestTimeout = requestTimeout;
@@ -92,11 +92,10 @@ namespace UiPath.CoreIpc
             _connection = connection;
             connection.ResponseReceived += OnResponseReceived;
             connection.Closed += OnConnectionClosed;
-            var endpoints = new Dictionary<string, ServiceEndpoint> { { _serviceEndpoint.Name, _serviceEndpoint } };
-            var server = _serviceEndpoint == null ? null : new Server(GetListenerSettings(), endpoints, connection);
+            var endpoints = new Dictionary<string, EndpointSettings> { { _serviceEndpoint.Name, _serviceEndpoint } };
+            var listenerSettings = new ListenerSettings { RequestTimeout = _requestTimeout, Name = Name };
+            var server = _serviceEndpoint == null ? null : new Server(listenerSettings, endpoints, connection);
         }
-
-        ListenerSettings GetListenerSettings() => new ListenerSettings { RequestTimeout = _requestTimeout, Name = Name };
 
         private void OnConnectionClosed(object sender, EventArgs e)
         {

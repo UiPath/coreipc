@@ -32,7 +32,7 @@ namespace UiPath.CoreIpc
         protected ILogger Logger { get; }
         public TaskScheduler Scheduler { get; internal set; }
         public int ConcurrentAccepts { get; private set; }
-        public IDictionary<string, ServiceEndpoint> Endpoints { get; set; }
+        public IDictionary<string, EndpointSettings> Endpoints { get; set; }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ListenerSettings Settings { get; }
         public int MaxMessageSize { get; }
