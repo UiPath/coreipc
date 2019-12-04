@@ -330,7 +330,7 @@ namespace UiPath.CoreIpc.Tests
         public async Task MissingCallback()
         {
             var ex = _systemClient.SendMessage(new SystemMessage()).ShouldThrow<RemoteException>();
-            ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's not configured.");
+            ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable.");
             ex.Is<ArgumentException>().ShouldBeTrue();
             await Guid();
         }

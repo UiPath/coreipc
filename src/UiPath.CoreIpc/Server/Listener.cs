@@ -31,7 +31,6 @@ namespace UiPath.CoreIpc
         }
         public string Name => Settings.Name;
         protected ILogger Logger { get; }
-        public TaskScheduler Scheduler { get; internal set; }
         public IDictionary<string, EndpointSettings> Endpoints { get; set; }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ListenerSettings Settings { get; }
@@ -88,7 +87,15 @@ namespace UiPath.CoreIpc
             {
                 Logger.LogInformation($"Create callback {_listener.Name}");
                 var serializer = _listener.ServiceProvider.GetRequiredService<ISerializer>();
-                return new ServiceClient<TCallbackContract>(serializer, Settings.RequestTimeout, Logger, (_, __) => Task.FromResult(_connection)).CreateProxy();
+                var serviceClient = new ServiceClient<TCallbackContract>(serializer, Settings.RequestTimeout, Logger, (_, __) => Task.FromResult(_connection));
+                try
+                {
+                    return serviceClient.CreateProxy();
+                }
+                catch (Exception ex)
+                {
+                    throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackContract)}.", ex);
+                }
             }
         }
         protected void HandleConnection(Stream network, Func<ICreateCallback, IClient> clientFactory, CancellationToken cancellationToken) => new ServerConnection(this, network, clientFactory, cancellationToken);

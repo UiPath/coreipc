@@ -41,14 +41,14 @@ namespace UiPath.CoreIpc
 
         public Task RunAsync(TaskScheduler taskScheduler = null)
         {
+            foreach (var endpoint in _endpoints.Values)
+            {
+                endpoint.Scheduler = taskScheduler;
+            }
             var tasks = _listeners.Select(listener => Task.Run(() =>
             {
-                listener.Scheduler = taskScheduler;
-
                 _logger.LogDebug($"Starting endpoint '{listener}'...");
-
                 _cancellationTokenSource.Token.Register(() => _logger.LogDebug($"Stopping endpoint '{listener}'..."));
-
                 return listener.ListenAsync(_cancellationTokenSource.Token).ContinueWith(_ => _logger.LogDebug($"Endpoint '{listener}' stopped."));
             }));
             return Task.WhenAll(tasks);
