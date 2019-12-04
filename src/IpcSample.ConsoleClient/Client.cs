@@ -10,7 +10,7 @@ using System.Linq;
 
 namespace UiPath.CoreIpc.Tests
 {
-    class Program
+    class Client
     {
         static async Task Main(string[] args)
         {
@@ -37,14 +37,14 @@ namespace UiPath.CoreIpc.Tests
         {
             var serviceProvider = ConfigureServices();
             var callback = new ComputingCallback { Id = "custom made" };
-            var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>(serviceProvider).EncryptAndSign().CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
+            var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>("test", serviceProvider).EncryptAndSign().CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
             var stopwatch = Stopwatch.StartNew();
             int count = 0;
             try
             {
                 var computingClient = computingClientBuilder.Build();
                 var systemClient =
-                    new NamedPipeClientBuilder<ISystemService>()
+                    new NamedPipeClientBuilder<ISystemService>("test")
                     .RequestTimeout(TimeSpan.FromSeconds(2))
                     .EncryptAndSign()
                     .Logger(serviceProvider)
@@ -74,7 +74,7 @@ namespace UiPath.CoreIpc.Tests
                     // test 4: call IPC service method without parameter or return
                     await systemClient.DoNothing(cancellationToken);
                     Console.WriteLine($"[TEST 4] invoked DoNothing()");
-                    ((IDisposable)systemClient).Dispose();
+                    //((IDisposable)systemClient).Dispose();
 
                     // test 5: call IPC service method with enum parameter
                     string text = await systemClient.ConvertText("hEllO woRd!", TextStyle.Upper, cancellationToken);
