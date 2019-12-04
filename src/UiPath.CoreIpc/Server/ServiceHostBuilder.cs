@@ -17,6 +17,7 @@ namespace UiPath.CoreIpc
 
         public ServiceHostBuilder AddEndpoint(EndpointSettings settings)
         {
+            settings.ServiceProvider = ServiceProvider;
             _endpoints.Add(settings.Name, settings);
             return this;
         }
