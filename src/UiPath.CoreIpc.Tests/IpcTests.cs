@@ -58,6 +58,7 @@ namespace UiPath.CoreIpc.Tests
 
             var taskScheduler = _guiThread.Scheduler;
             _computingHost.RunAsync(taskScheduler);
+            _systemHost.RunAsync(taskScheduler);
             _computingClient = ComputingClientBuilder(taskScheduler).Build();
             _systemClient = CreateSystemService();
         }
