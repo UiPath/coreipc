@@ -7,15 +7,15 @@ using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc.NamedPipe
 {
-    public class NamedPipeSettings
+    public class NamedPipeSettings : ListenerSettings
     {
         public string PipeName { get; set; }
         public Action<PipeSecurity> AccessControl { get; set; }
     }
     class NamedPipeListener : Listener
     {
-        public NamedPipeListener(IServiceProvider serviceProvider, NamedPipeSettings settings) : base(serviceProvider) => Settings = settings;
-        public NamedPipeSettings Settings { get; }
+        public NamedPipeListener(NamedPipeSettings settings) : base(settings) { }
+        public new NamedPipeSettings Settings => (NamedPipeSettings)base.Settings;
         protected override async Task AcceptConnection(CancellationToken token)
         {
             var server = new NamedPipeServerStream(Settings.PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous

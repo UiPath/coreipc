@@ -2,7 +2,11 @@
 {
     public static class NamedPipeServiceHostBuilderExtensions
     {
-        public static ServiceHostBuilder AddNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings) =>
-            builder.AddListener(new NamedPipeListener(builder.ServiceProvider, settings));
+        public static ServiceHostBuilder AddNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings)
+        {
+            settings.ServiceProvider = builder.ServiceProvider;
+            builder.AddListener(new NamedPipeListener(settings));
+            return builder;
+        }
     }
 }

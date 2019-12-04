@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -10,13 +11,15 @@ namespace UiPath.CoreIpc
 {
     class Server
     {
+        private readonly IDictionary<string, ServiceEndpoint> _endpoints;
         private readonly Connection _connection;
         private readonly Lazy<IClient> _client;
         private readonly CancellationTokenSource _connectionClosed = new CancellationTokenSource();
 
-        public Server(ServiceEndpoint serviceEndpoint, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
+        public Server(ListenerSettings settings, IDictionary<string, ServiceEndpoint> endpoints, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
         {
-            ServiceEndpoint = serviceEndpoint;
+            Settings = settings;
+            _endpoints = endpoints;
             _connection = connection;
             _client = client ?? new Lazy<IClient>(()=>null);
             Serializer = ServiceProvider.GetRequiredService<ISerializer>();
@@ -34,12 +37,17 @@ namespace UiPath.CoreIpc
                 {
                     request = Serializer.Deserialize<Request>(requestReceivedEventsArgs.Data);
                     Logger.LogInformation($"{Name} received request {request}...");
+                    if (!_endpoints.TryGetValue(request.Endpoint, out var endpoint))
+                    {
+                        await OnError(new Exception($"{Name} cannot find endpoint {request.Endpoint}..."));
+                        return;
+                    }
                     Response response;
                     await new[] { cancellationToken, _connectionClosed.Token }.WithTimeout(request.GetTimeout(Settings.RequestTimeout), async token =>
                     {
                         using (var scope = ServiceProvider.CreateScope())
                         {
-                            response = await HandleRequest(request, scope, token);
+                            response = await HandleRequest(endpoint, request, scope, token);
                         }
                         Logger.LogInformation($"{Name} sending response for {request}...");
                         await SendResponse(response, token);
@@ -62,10 +70,8 @@ namespace UiPath.CoreIpc
             }
         }
         private ILogger Logger => _connection.Logger;
-        public Type Contract => Settings.Contract;
-        private EndpointSettings Settings => ServiceEndpoint.Settings;
-        private ServiceEndpoint ServiceEndpoint { get; }
-        public IServiceProvider ServiceProvider => ServiceEndpoint.ServiceProvider;
+        private ListenerSettings Settings { get; }
+        public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ISerializer Serializer { get; }
         public string Name => _connection.Name;
 
@@ -78,30 +84,31 @@ namespace UiPath.CoreIpc
             await _connection.SendResponse(Serializer.SerializeToBytes(response), responseCancellation);
         }
 
-        private async Task<Response> HandleRequest(Request request, IServiceScope scope, CancellationToken cancellationToken)
+        private async Task<Response> HandleRequest(ServiceEndpoint endpoint, Request request, IServiceScope scope, CancellationToken cancellationToken)
         {
-            var service = Settings.ServiceInstance ?? scope.ServiceProvider.GetService(Contract);
+            var contract = endpoint.Settings.Contract;
+            var service = endpoint.Settings.ServiceInstance ?? scope.ServiceProvider.GetService(contract);
             if (service == null)
             {
-                return Response.Fail(request, $"No implementation of interface '{Contract.FullName}' found.");
+                return Response.Fail(request, $"No implementation of interface '{contract.FullName}' found.");
             }
-            var method = Contract.GetInheritedMethod(request.MethodName);
+            var method = contract.GetInheritedMethod(request.MethodName);
             if (method == null)
             {
-                return Response.Fail(request, $"Method '{request.MethodName}' not found in interface '{Contract.FullName}'.");
+                return Response.Fail(request, $"Method '{request.MethodName}' not found in interface '{contract.FullName}'.");
             }
             if (method.IsGenericMethod)
             {
                 return Response.Fail(request, "Generic methods are not supported " + method);
             }
             var arguments = GetArguments(method, request, cancellationToken);
-            return await InvokeMethod(request, service, method, arguments);
+            return await InvokeMethod(endpoint, request, service, method, arguments);
         }
 
-        private async Task<Response> InvokeMethod(Request request, object service, MethodInfo method, object[] arguments)
+        private async Task<Response> InvokeMethod(ServiceEndpoint endpoint, Request request, object service, MethodInfo method, object[] arguments)
         {
             var hasReturnValue = method.ReturnType != typeof(Task);
-            var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, ServiceEndpoint.Scheduler);
+            var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler);
             if (hasReturnValue)
             {
                 var methodResult = await methodCallTask;

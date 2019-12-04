@@ -17,15 +17,12 @@ namespace UiPath.CoreIpc
         {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            MaxMessageSize = Settings.MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
             Logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
-
         public ILogger Logger { get; }
         internal EndpointSettings Settings { get; }
         public string Name => Settings.Name;
         public IServiceProvider ServiceProvider { get; }
         public TaskScheduler Scheduler { get => _scheduler; set => _scheduler = value ?? TaskScheduler.Default; }
-        public int MaxMessageSize { get; }
     }
 }

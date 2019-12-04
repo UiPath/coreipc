@@ -11,16 +11,31 @@ using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc
 {
-    public abstract class Listener
+    public class ListenerSettings
     {
-        protected Listener(IServiceProvider serviceProvider)
+        public byte ConcurrentAccepts { get; set; } = 5;
+        public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
+        public bool EncryptAndSign { get; set; }
+        public string Name { get; set; }
+        public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
+        internal IServiceProvider ServiceProvider { get; set; }
+    }
+    abstract class Listener
+    {
+        protected Listener(ListenerSettings settings)
         {
-            Logger = serviceProvider.GetRequiredService<ILogger<Listener>>();
+            Settings = settings;
+            MaxMessageSize = settings.MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
+            Logger = ServiceProvider.GetRequiredService<ILogger<Listener>>();
         }
+        public string Name => Settings.Name;
         protected ILogger Logger { get; }
         public TaskScheduler Scheduler { get; internal set; }
         public int ConcurrentAccepts { get; private set; }
         public IDictionary<string, ServiceEndpoint> Endpoints { get; set; }
+        public IServiceProvider ServiceProvider => Settings.ServiceProvider;
+        public ListenerSettings Settings { get; }
+        public int MaxMessageSize { get; }
         public Task ListenAsync(CancellationToken token) =>
             Task.WhenAll(Enumerable.Range(1, ConcurrentAccepts).Select(async _ =>
             {
@@ -32,16 +47,16 @@ namespace UiPath.CoreIpc
         protected abstract Task AcceptConnection(CancellationToken token);
         class ServerConnection : ICreateCallback
         {
-            private readonly ServiceEndpoint _serviceEndpoint;
+            private readonly Listener _listener;
             private readonly Connection _connection;
             private readonly Server _server;
-            public ServerConnection(ServiceEndpoint serviceEndpoint, Stream network, Func<ServerConnection, IClient> clientFactory, CancellationToken cancellationToken)
+            public ServerConnection(Listener listener, Stream network, Func<ServerConnection, IClient> clientFactory, CancellationToken cancellationToken)
             {
-                _serviceEndpoint = serviceEndpoint;
+                _listener = listener;
                 var stream = Settings.EncryptAndSign ? new NegotiateStream(network) : network;
-                _connection = new Connection(stream, Logger, _serviceEndpoint.Name, serviceEndpoint.MaxMessageSize);
-                _server = new Server(_serviceEndpoint, _connection, cancellationToken, new Lazy<IClient>(() => clientFactory(this)));
-                Listen().LogException(Logger, serviceEndpoint.Name);
+                _connection = new Connection(stream, Logger, _listener.Name, _listener.MaxMessageSize);
+                _server = new Server(Settings, _listener.Endpoints, _connection, cancellationToken, new Lazy<IClient>(() => clientFactory(this)));
+                Listen().LogException(Logger, _listener.Name);
                 return;
                 async Task Listen()
                 {
@@ -67,20 +82,15 @@ namespace UiPath.CoreIpc
                     }
                 }
             }
-            public ILogger Logger => _serviceEndpoint.Logger;
-            public EndpointSettings Settings => _serviceEndpoint.Settings;
+            public ILogger Logger => _listener.Logger;
+            public ListenerSettings Settings => _listener.Settings;
             TCallbackContract ICreateCallback.GetCallback<TCallbackContract>()
             {
-                var configuredCallbackContract = Settings.CallbackContract;
-                if (configuredCallbackContract == null || !typeof(TCallbackContract).IsAssignableFrom(configuredCallbackContract))
-                {
-                    throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackContract)}, but it's {configuredCallbackContract?.ToString() ?? "not configured"}.");
-                }
-                Logger.LogInformation($"Create callback {_serviceEndpoint.Name}");
-                var serializer = _serviceEndpoint.ServiceProvider.GetRequiredService<ISerializer>();
+                Logger.LogInformation($"Create callback {_listener.Name}");
+                var serializer = _listener.ServiceProvider.GetRequiredService<ISerializer>();
                 return new ServiceClient<TCallbackContract>(serializer, Settings.RequestTimeout, Logger, (_, __) => Task.FromResult(_connection)).CreateProxy();
             }
         }
-        protected void HandleConnection(Stream network, Func<ICreateCallback, IClient> clientFactory, CancellationToken cancellationToken) => new ServerConnection(Endpoints, network, clientFactory, cancellationToken);
+        protected void HandleConnection(Stream network, Func<ICreateCallback, IClient> clientFactory, CancellationToken cancellationToken) => new ServerConnection(this, network, clientFactory, cancellationToken);
     }
 }

@@ -13,6 +13,7 @@ using System.Net.Security;
 using System.Security.Principal;
 using System.Net;
 using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace UiPath.CoreIpc
 {
@@ -91,8 +92,11 @@ namespace UiPath.CoreIpc
             _connection = connection;
             connection.ResponseReceived += OnResponseReceived;
             connection.Closed += OnConnectionClosed;
-            var server = _serviceEndpoint == null ? null : new Server(_serviceEndpoint, connection);
+            var endpoints = new Dictionary<string, ServiceEndpoint> { { _serviceEndpoint.Name, _serviceEndpoint } };
+            var server = _serviceEndpoint == null ? null : new Server(GetListenerSettings(), endpoints, connection);
         }
+
+        ListenerSettings GetListenerSettings() => new ListenerSettings { RequestTimeout = _requestTimeout, Name = Name };
 
         private void OnConnectionClosed(object sender, EventArgs e)
         {
@@ -120,7 +124,7 @@ namespace UiPath.CoreIpc
             void Serialize()
             {
                 var messageTimeout = args.OfType<Message>().FirstOrDefault()?.RequestTimeout.TotalSeconds;
-                var request = new Request(requestId, methodName, args.Select(_serializer.Serialize).ToArray(), messageTimeout.GetValueOrDefault());
+                var request = new Request(nameof(TInterface), requestId, methodName, args.Select(_serializer.Serialize).ToArray(), messageTimeout.GetValueOrDefault());
                 requestBytes = _serializer.SerializeToBytes(request);
                 timeout = request.GetTimeout(_requestTimeout);
             }

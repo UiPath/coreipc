@@ -15,7 +15,7 @@ namespace UiPath.CoreIpc
         private readonly IReadOnlyCollection<Listener> _listeners;
         private readonly ILogger<ServiceHost> _logger;
 
-        public ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, ServiceEndpoint> endpoints, IServiceProvider serviceProvider)
+        internal ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, ServiceEndpoint> endpoints, IServiceProvider serviceProvider)
         {
             _endpoints = endpoints;
             _listeners = listeners.ToArray();
