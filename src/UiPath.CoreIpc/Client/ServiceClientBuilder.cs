@@ -85,7 +85,7 @@ namespace UiPath.CoreIpc
             {
                 Logger(_serviceProvider);
             }
-            return BuildCore(new EndpointSettings(_callbackContract, _callbackInstance) { Scheduler = _taskScheduler });
+            return BuildCore(new EndpointSettings(_callbackContract, _callbackInstance) { Scheduler = _taskScheduler, ServiceProvider = _serviceProvider });
         }
     }
 

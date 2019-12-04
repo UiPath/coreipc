@@ -108,7 +108,7 @@ namespace UiPath.CoreIpc
         private async Task<Response> InvokeMethod(EndpointSettings endpoint, Request request, object service, MethodInfo method, object[] arguments)
         {
             var hasReturnValue = method.ReturnType != typeof(Task);
-            var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler);
+            var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler ?? TaskScheduler.Default);
             if (hasReturnValue)
             {
                 var methodResult = await methodCallTask;

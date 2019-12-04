@@ -93,7 +93,7 @@ namespace UiPath.CoreIpc
             connection.ResponseReceived += OnResponseReceived;
             connection.Closed += OnConnectionClosed;
             var endpoints = new Dictionary<string, EndpointSettings> { { _serviceEndpoint.Name, _serviceEndpoint } };
-            var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout };
+            var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider };
             var server = _serviceEndpoint == null ? null : new Server(listenerSettings, endpoints, connection);
         }
 
@@ -123,7 +123,7 @@ namespace UiPath.CoreIpc
             void Serialize()
             {
                 var messageTimeout = args.OfType<Message>().FirstOrDefault()?.RequestTimeout.TotalSeconds;
-                var request = new Request(nameof(TInterface), requestId, methodName, args.Select(_serializer.Serialize).ToArray(), messageTimeout.GetValueOrDefault());
+                var request = new Request(typeof(TInterface).Name, requestId, methodName, args.Select(_serializer.Serialize).ToArray(), messageTimeout.GetValueOrDefault());
                 requestBytes = _serializer.SerializeToBytes(request);
                 timeout = request.GetTimeout(_requestTimeout);
             }
