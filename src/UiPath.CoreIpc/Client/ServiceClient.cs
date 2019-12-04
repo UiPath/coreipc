@@ -93,7 +93,7 @@ namespace UiPath.CoreIpc
             connection.ResponseReceived += OnResponseReceived;
             connection.Closed += OnConnectionClosed;
             var endpoints = new Dictionary<string, EndpointSettings> { { _serviceEndpoint.Name, _serviceEndpoint } };
-            var listenerSettings = new ListenerSettings { RequestTimeout = _requestTimeout, Name = Name };
+            var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout };
             var server = _serviceEndpoint == null ? null : new Server(listenerSettings, endpoints, connection);
         }
 

@@ -13,10 +13,11 @@ namespace UiPath.CoreIpc
 {
     public class ListenerSettings
     {
+        public ListenerSettings(string name) => Name = name;
         public byte ConcurrentAccepts { get; set; } = 5;
         public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
         public bool EncryptAndSign { get; set; }
-        public string Name { get; set; }
+        public string Name { get; }
         public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
         internal IServiceProvider ServiceProvider { get; set; }
     }
@@ -31,13 +32,12 @@ namespace UiPath.CoreIpc
         public string Name => Settings.Name;
         protected ILogger Logger { get; }
         public TaskScheduler Scheduler { get; internal set; }
-        public int ConcurrentAccepts { get; private set; }
         public IDictionary<string, EndpointSettings> Endpoints { get; set; }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ListenerSettings Settings { get; }
         public int MaxMessageSize { get; }
         public Task ListenAsync(CancellationToken token) =>
-            Task.WhenAll(Enumerable.Range(1, ConcurrentAccepts).Select(async _ =>
+            Task.WhenAll(Enumerable.Range(1, Settings.ConcurrentAccepts).Select(async _ =>
             {
                 while (!token.IsCancellationRequested)
                 {

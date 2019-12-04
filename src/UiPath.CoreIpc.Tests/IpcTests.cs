@@ -19,7 +19,8 @@ namespace UiPath.CoreIpc.Tests
     {
         private const int MaxReceivedMessageSizeInMegabytes = 1;
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
-        private readonly ServiceHost _host;
+        private readonly ServiceHost _computingHost;
+        private readonly ServiceHost _systemHost;
         private readonly IComputingService _computingClient;
         private readonly ISystemService _systemClient;
         private readonly ComputingService _computingService;
@@ -36,33 +37,33 @@ namespace UiPath.CoreIpc.Tests
             _serviceProvider = ConfigureServices();
             _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
             _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
-            _host = new ServiceHostBuilder(_serviceProvider)
-                .AddNamedPipes(new NamedPipeSettings
+            _computingHost = new ServiceHostBuilder(_serviceProvider)
+                .AddNamedPipes(new NamedPipeSettings("computing")
                 {
                     RequestTimeout = RequestTimeout,
-                    MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,
                     AccessControl = security => _pipeSecurity = security.LocalOnly(),
+                    EncryptAndSign = true,
+                })
+                .AddEndpoint(new EndpointSettings<IComputingService, IComputingCallback>())
+                .Build();
+            _systemHost = new ServiceHostBuilder(_serviceProvider)
+                .AddNamedPipes(new NamedPipeSettings("system")
+                {
+                    RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1)),
+                    MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,
                     ConcurrentAccepts = 10,
                 })
-                .AddEndpoint(new EndpointSettings<IComputingService, IComputingCallback>()
-                {
-                    Name = "computing",
-                })
-                .AddEndpoint(new EndpointSettings<ISystemService>()
-                {
-                    Name = "system",
-                })
+                .AddEndpoint(new EndpointSettings<ISystemService>())
                 .Build();
 
             var taskScheduler = _guiThread.Scheduler;
-            _host.RunAsync(taskScheduler);
+            _computingHost.RunAsync(taskScheduler);
             _computingClient = ComputingClientBuilder(taskScheduler).Build();
             _systemClient = CreateSystemService();
         }
 
         private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
-            new NamedPipeClientBuilder<IComputingService, IComputingCallback>(_serviceProvider)
-                .PipeName("computing")
+            new NamedPipeClientBuilder<IComputingService, IComputingCallback>("computing", _serviceProvider)
                 .AllowImpersonation()
                 .EncryptAndSign()
                 .RequestTimeout(RequestTimeout)
@@ -72,7 +73,7 @@ namespace UiPath.CoreIpc.Tests
         private ISystemService CreateSystemService() => SystemClientBuilder().Build();
 
         private NamedPipeClientBuilder<ISystemService> SystemClientBuilder() =>
-            new NamedPipeClientBuilder<ISystemService>().PipeName("system").RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
+            new NamedPipeClientBuilder<ISystemService>("system").RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
 
         public IServiceProvider ConfigureServices() =>
             new ServiceCollection()
@@ -84,15 +85,15 @@ namespace UiPath.CoreIpc.Tests
 
 #if DEBUG
         [Fact]
-        public void MethodsMustReturnTask() => new Action(() => new NamedPipeClientBuilder<IInvalid>()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Method does not return Task!");
+        public void MethodsMustReturnTask() => new Action(() => new NamedPipeClientBuilder<IInvalid>("")).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Method does not return Task!");
         [Fact]
-        public void DuplicateMessageParameters() => new Action(() => new NamedPipeClientBuilder<IDuplicateMessage>()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
+        public void DuplicateMessageParameters() => new Action(() => new NamedPipeClientBuilder<IDuplicateMessage>("")).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
         [Fact]
-        public void TheMessageMustBeTheLastBeforeTheToken() => new Action(() => new NamedPipeClientBuilder<IMessageFirst>()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
+        public void TheMessageMustBeTheLastBeforeTheToken() => new Action(() => new NamedPipeClientBuilder<IMessageFirst>("")).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
         [Fact]
-        public void CancellationTokenMustBeLast() => new Action(() => new NamedPipeClientBuilder<IInvalidCancellationToken>()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The CancellationToken parameter must be the last!");
+        public void CancellationTokenMustBeLast() => new Action(() => new NamedPipeClientBuilder<IInvalidCancellationToken>("")).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The CancellationToken parameter must be the last!");
         [Fact]
-        public void TheCallbackContractMustBeAnInterface() => new Action(() => new NamedPipeClientBuilder<ISystemService, IpcTests>(_serviceProvider).Build()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
+        public void TheCallbackContractMustBeAnInterface() => new Action(() => new NamedPipeClientBuilder<ISystemService, IpcTests>("", _serviceProvider).Build()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
         [Fact]
         public void TheServiceContractMustBeAnInterface() => new Action(() => new EndpointSettings<IpcTests>()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
 #endif
@@ -366,7 +367,8 @@ namespace UiPath.CoreIpc.Tests
         {
             ((IDisposable)_computingClient).Dispose();
             ((IDisposable)_systemClient).Dispose();
-            _host.Dispose();
+            _computingHost.Dispose();
+            _systemHost.Dispose();
             _guiThread.Dispose();
         }
     }

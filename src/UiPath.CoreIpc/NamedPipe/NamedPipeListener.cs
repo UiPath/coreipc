@@ -9,7 +9,7 @@ namespace UiPath.CoreIpc.NamedPipe
 {
     public class NamedPipeSettings : ListenerSettings
     {
-        public string PipeName { get; set; }
+        public NamedPipeSettings(string pipeName) : base(pipeName) { }
         public Action<PipeSecurity> AccessControl { get; set; }
     }
     class NamedPipeListener : Listener
@@ -18,7 +18,7 @@ namespace UiPath.CoreIpc.NamedPipe
         public new NamedPipeSettings Settings => (NamedPipeSettings)base.Settings;
         protected override async Task AcceptConnection(CancellationToken token)
         {
-            var server = new NamedPipeServerStream(Settings.PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous
+            var server = new NamedPipeServerStream(Settings.Name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous
 #if NET461
                 , inBufferSize: 0, outBufferSize: 0, GetPipeSecurity()
 #endif
@@ -38,7 +38,7 @@ namespace UiPath.CoreIpc.NamedPipe
                 server.Dispose();
                 if (!token.IsCancellationRequested)
                 {
-                    Logger.LogException(ex, Settings.PipeName);
+                    Logger.LogException(ex, Settings.Name);
                 }
             }
         }
