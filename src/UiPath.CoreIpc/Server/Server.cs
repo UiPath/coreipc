@@ -11,7 +11,6 @@ namespace UiPath.CoreIpc
 {
     class Server
     {
-        private readonly IDictionary<string, EndpointSettings> _endpoints;
         private readonly Connection _connection;
         private readonly Lazy<IClient> _client;
         private readonly CancellationTokenSource _connectionClosed = new CancellationTokenSource();
@@ -19,7 +18,7 @@ namespace UiPath.CoreIpc
         public Server(ListenerSettings settings, IDictionary<string, EndpointSettings> endpoints, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
         {
             Settings = settings;
-            _endpoints = endpoints;
+            Endpoints = endpoints;
             _connection = connection;
             _client = client ?? new Lazy<IClient>(()=>null);
             Serializer = ServiceProvider.GetRequiredService<ISerializer>();
@@ -37,7 +36,7 @@ namespace UiPath.CoreIpc
                 {
                     request = Serializer.Deserialize<Request>(requestReceivedEventsArgs.Data);
                     Logger.LogInformation($"{Name} received request {request}...");
-                    if (!_endpoints.TryGetValue(request.Endpoint, out var endpoint))
+                    if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
                     {
                         await OnError(new Exception($"{Name} cannot find endpoint {request.Endpoint}..."));
                         return;
@@ -74,7 +73,7 @@ namespace UiPath.CoreIpc
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ISerializer Serializer { get; }
         public string Name => _connection.Name;
-
+        public IDictionary<string, EndpointSettings> Endpoints { get; }
         async Task SendResponse(Response response, CancellationToken responseCancellation)
         {
             if (_connectionClosed.IsCancellationRequested)
@@ -83,7 +82,6 @@ namespace UiPath.CoreIpc
             }
             await _connection.SendResponse(Serializer.SerializeToBytes(response), responseCancellation);
         }
-
         private async Task<Response> HandleRequest(EndpointSettings endpoint, Request request, IServiceScope scope, CancellationToken cancellationToken)
         {
             var contract = endpoint.Contract;
@@ -104,7 +102,6 @@ namespace UiPath.CoreIpc
             var arguments = GetArguments(method, request, cancellationToken);
             return await InvokeMethod(endpoint, request, service, method, arguments);
         }
-
         private async Task<Response> InvokeMethod(EndpointSettings endpoint, Request request, object service, MethodInfo method, object[] arguments)
         {
             var hasReturnValue = method.ReturnType != typeof(Task);
@@ -127,7 +124,6 @@ namespace UiPath.CoreIpc
                 return (Task)method.Invoke(service, arguments);
             }
         }
-
         private object[] GetArguments(MethodInfo method, Request request, CancellationToken cancellationToken)
         {
             var parameters = method.GetParameters();

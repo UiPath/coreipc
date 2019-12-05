@@ -177,7 +177,7 @@ namespace UiPath.CoreIpc.Tests
                 var newGuid = System.Guid.NewGuid();
                 (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
                 await Task.Delay(1);
-                ((IDisposable)proxy).Dispose();
+                ((InterceptorProxy)proxy).CloseConnection();
                 sendMessageResult.ShouldThrow<Exception>();
             }
         }
@@ -371,6 +371,7 @@ namespace UiPath.CoreIpc.Tests
             _computingHost.Dispose();
             _systemHost.Dispose();
             _guiThread.Dispose();
+            ClientConnectionsRegistry.Clear();
         }
     }
 }

@@ -14,6 +14,9 @@ using System.Security.Principal;
 using System.Net;
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("UiPath.CoreIpc.Tests")]
 
 namespace UiPath.CoreIpc
 {
@@ -29,7 +32,7 @@ namespace UiPath.CoreIpc
 
     public class ServiceClient<TInterface> : IServiceClient where TInterface : class
     {
-        private long _requestCounter = -1;
+        private static long _requestCounter = -1;
         private readonly ISerializer _serializer;
         private readonly TimeSpan _requestTimeout;
         protected readonly ILogger _logger;
@@ -40,6 +43,7 @@ namespace UiPath.CoreIpc
         private readonly AsyncLock _connectionLock = new AsyncLock();
         private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new ConcurrentDictionary<string, RequestCompletionSource>();
         protected Connection _connection;
+        private Server _server;
 
         internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign = false, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
         {
@@ -86,19 +90,19 @@ namespace UiPath.CoreIpc
             }
         }
 
-        protected void OnNewConnection(Connection connection)
+        private protected void OnNewConnection(Connection connection, bool alreadyHasServer = false)
         {
             _connection?.Dispose();
             _connection = connection;
             connection.ResponseReceived += OnResponseReceived;
             connection.Closed += OnConnectionClosed;
-            if (_serviceEndpoint == null)
+            if (alreadyHasServer || _serviceEndpoint == null)
             {
                 return;
             }
-            var endpoints = new Dictionary<string, EndpointSettings> { { _serviceEndpoint.Name, _serviceEndpoint } };
+            var endpoints = new ConcurrentDictionary<string, EndpointSettings> { [_serviceEndpoint.Name] = _serviceEndpoint };
             var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider };
-            var server = new Server(listenerSettings, endpoints, connection);
+            _server = new Server(listenerSettings, endpoints, connection);
         }
 
         private void OnConnectionClosed(object sender, EventArgs e)
@@ -192,6 +196,21 @@ namespace UiPath.CoreIpc
             return await ConnectToServerAsync(cancellationToken);
         }
 
+        private protected void OnNewClientConnection(ClientConnection clientConnection)
+        {
+            var alreadyHasServer = clientConnection.Server != null;
+            OnNewConnection(clientConnection.Connection, alreadyHasServer);
+            if (!alreadyHasServer)
+            {
+                clientConnection.Server = _server;
+            }
+            else if (_serviceEndpoint != null)
+            {
+                _server = clientConnection.Server;
+                _server.Endpoints[_serviceEndpoint.Name] = _serviceEndpoint;
+            }
+        }
+
         public void Dispose()
         {
             Dispose(true);
@@ -203,7 +222,15 @@ namespace UiPath.CoreIpc
             _logger?.LogInformation($"Dispose {Name}");
             if (disposing)
             {
-                _connection?.Dispose();
+                if (_connection != null)
+                {
+                    _connection.ResponseReceived -= OnResponseReceived;
+                    _connection.Closed -= OnConnectionClosed;
+                }
+                if (_server != null)
+                {
+                    _server.Endpoints.Remove(_serviceEndpoint.Name);
+                }
             }
         }
     }
@@ -218,6 +245,14 @@ namespace UiPath.CoreIpc
         protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvokeAsync(targetMethod.ReturnType)(ServiceClient, targetMethod.Name, args);
 
         public void Dispose() => ServiceClient.Dispose();
+
+        public void CloseConnection()
+        {
+            if (ClientConnectionsRegistry.TryGet((IConnectionKey)ServiceClient, out var connection))
+            {
+                connection.Close();
+            }
+        }
 
         private static InvokeAsyncDelegate GetInvokeAsync(Type returnType) => _invokeAsyncByType.GetOrAdd(returnType, CreateDelegate);
 

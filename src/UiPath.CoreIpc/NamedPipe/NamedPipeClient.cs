@@ -36,27 +36,41 @@ namespace UiPath.CoreIpc.NamedPipe
 
         protected override async Task<bool> ConnectToServerAsync(CancellationToken cancellationToken)
         {
-            if (_pipe != null)
+            if (_pipe?.IsConnected == true)
             {
-                if (_pipe.IsConnected)
+                return false;
+            }
+            var clientConnection = ClientConnectionsRegistry.GetOrCreate(this);
+            using (await clientConnection.LockAsync(cancellationToken))
+            {
+                var pipe = (NamedPipeClientStream)clientConnection.Network;
+                if (pipe != null)
                 {
-                    return false;
+                    if (pipe.IsConnected)
+                    {
+                        _pipe = pipe;
+                        OnNewClientConnection(clientConnection);
+                        return false;
+                    }
+                    pipe.Dispose();
                 }
-                _pipe.Dispose();
+                pipe = new NamedPipeClientStream(_serverName, _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _allowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
+                try
+                {
+                    await pipe.ConnectAsync(cancellationToken);
+                }
+                catch
+                {
+                    pipe.Dispose();
+                    throw;
+                }
+                _pipe = pipe;
+                await CreateConnection(pipe, _pipeName);
+                _connection.Listen().LogException(_logger, _pipeName);
+                clientConnection.Network = pipe;
+                clientConnection.Connection = _connection;
+                return true;
             }
-            _pipe = new NamedPipeClientStream(_serverName, _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _allowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
-            try
-            {
-                await _pipe.ConnectAsync(cancellationToken);
-            }
-            catch
-            {
-                _pipe.Dispose();
-                throw;
-            }
-            await CreateConnection(_pipe, _pipeName);
-            _connection.Listen().LogException(_logger, _pipeName);
-            return true;
         }
     }
 }
