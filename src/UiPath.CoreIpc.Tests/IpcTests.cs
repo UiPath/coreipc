@@ -120,7 +120,7 @@ namespace UiPath.CoreIpc.Tests
             await proxy.DoNothing();
             newConnection.ShouldBeFalse();
 
-            ((IDisposable)proxy).Dispose();
+            ((InterceptorProxy)proxy).CloseConnection();
             newConnection.ShouldBeFalse();
             await Task.Delay(1);
             await proxy.DoNothing();
@@ -137,7 +137,7 @@ namespace UiPath.CoreIpc.Tests
             for (int i = 0; i < 50; i++)
             {
                 await proxy.AddFloat(1, 2);
-                ((IDisposable)proxy).Dispose();
+                ((InterceptorProxy)proxy).CloseConnection();
                 await proxy.AddFloat(1, 2);
             }
         }
@@ -147,7 +147,7 @@ namespace UiPath.CoreIpc.Tests
         {
             var proxy = SystemClientBuilder().DontReconnect().Build();
             await proxy.GetGuid(System.Guid.Empty);
-            ((IDisposable)proxy).Dispose();
+            ((InterceptorProxy)proxy).CloseConnection();
             proxy.GetGuid(System.Guid.Empty).ShouldThrow<ObjectDisposedException>();
         }
 
@@ -160,9 +160,6 @@ namespace UiPath.CoreIpc.Tests
 #endif
             result.ShouldBe(5.79f);
         }
-
-        [Fact]
-        public Task CancelServerCallConcurrently() => Task.WhenAll(Enumerable.Range(1, 10).Select(_ => CancelServerCallCore(5)));
 
         [Fact]
         public Task CancelServerCall() => CancelServerCallCore(10);
