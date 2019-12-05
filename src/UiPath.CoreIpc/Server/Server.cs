@@ -70,6 +70,17 @@ namespace UiPath.CoreIpc
         }
         private ILogger Logger => _connection.Logger;
         private ListenerSettings Settings { get; }
+        public void AddEndpoints(IDictionary<string, EndpointSettings> serverEndpoints)
+        {
+            if (serverEndpoints == null)
+            {
+                return;
+            }
+            foreach (var endpoint in serverEndpoints)
+            {
+                Endpoints[endpoint.Key] = endpoint.Value;
+            }
+        }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ISerializer Serializer { get; }
         public string Name => _connection.Name;

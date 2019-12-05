@@ -65,7 +65,9 @@ namespace UiPath.CoreIpc.NamedPipe
                     throw;
                 }
                 _pipe = pipe;
+                var serverEndpoints = clientConnection.Server?.Endpoints;
                 await CreateConnection(pipe, _pipeName);
+                _server?.AddEndpoints(serverEndpoints);
                 _connection.Listen().LogException(_logger, _pipeName);
                 clientConnection.Network = pipe;
                 clientConnection.Connection = _connection;

@@ -41,7 +41,7 @@ namespace UiPath.CoreIpc
         private readonly AsyncLock _connectionLock = new AsyncLock();
         private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new ConcurrentDictionary<string, RequestCompletionSource>();
         protected Connection _connection;
-        private Server _server;
+        private protected Server _server;
 
         internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign = false, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
         {
