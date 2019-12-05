@@ -34,7 +34,7 @@ namespace UiPath.CoreIpc
         private readonly TimeSpan _requestTimeout;
         protected readonly ILogger _logger;
         protected readonly ConnectionFactory _connectionFactory;
-        private readonly bool _encryptAndSign;
+        protected readonly bool _encryptAndSign;
         protected readonly BeforeCallHandler _beforeCall;
         protected readonly EndpointSettings _serviceEndpoint;
         private readonly AsyncLock _connectionLock = new AsyncLock();
