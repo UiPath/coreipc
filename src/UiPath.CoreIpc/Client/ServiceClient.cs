@@ -16,8 +16,6 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("UiPath.CoreIpc.Tests")]
-
 namespace UiPath.CoreIpc
 {
     using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
@@ -246,13 +244,7 @@ namespace UiPath.CoreIpc
 
         public void Dispose() => ServiceClient.Dispose();
 
-        public void CloseConnection()
-        {
-            if (ClientConnectionsRegistry.TryGet((IConnectionKey)ServiceClient, out var connection))
-            {
-                connection.Close();
-            }
-        }
+        public void CloseConnection() => ClientConnectionsRegistry.Close((IConnectionKey)ServiceClient);
 
         private static InvokeAsyncDelegate GetInvokeAsync(Type returnType) => _invokeAsyncByType.GetOrAdd(returnType, CreateDelegate);
 
@@ -267,5 +259,7 @@ namespace UiPath.CoreIpc
             var lambda = Lambda<InvokeAsyncDelegate>(invokeAsyncCall, serviceClient, methodName, methodArgs);
             return lambda.Compile();
         }
+
+        public static void CloseConnections() => ClientConnectionsRegistry.Clear();
     }
 }

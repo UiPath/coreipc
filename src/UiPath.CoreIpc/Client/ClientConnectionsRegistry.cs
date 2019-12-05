@@ -20,6 +20,13 @@ namespace UiPath.CoreIpc
                 connection.Close();
             }
         }
+        public static void Close(IConnectionKey key)
+        {
+            if (TryGet(key, out var connection))
+            {
+                connection.Close();
+            }
+        }
     }
     public interface IConnectionKey : IEquatable<IConnectionKey>
     {

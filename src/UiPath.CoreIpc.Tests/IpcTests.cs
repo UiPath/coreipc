@@ -368,7 +368,7 @@ namespace UiPath.CoreIpc.Tests
             _computingHost.Dispose();
             _systemHost.Dispose();
             _guiThread.Dispose();
-            ClientConnectionsRegistry.Clear();
+            InterceptorProxy.CloseConnections();
         }
     }
 }
