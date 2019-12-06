@@ -51,7 +51,7 @@ namespace UiPath.CoreIpc.NamedPipe
                     if (pipe.IsConnected)
                     {
                         _pipe = pipe;
-                        OnNewClientConnection(clientConnection);
+                        ReuseChachedConnection(clientConnection);
                         return false;
                     }
                     pipe.Dispose();

@@ -194,7 +194,7 @@ namespace UiPath.CoreIpc
             return await ConnectToServerAsync(cancellationToken);
         }
 
-        private protected void OnNewClientConnection(ClientConnection clientConnection)
+        private protected void ReuseChachedConnection(ClientConnection clientConnection)
         {
             var alreadyHasServer = clientConnection.Server != null;
             OnNewConnection(clientConnection.Connection, alreadyHasServer);
