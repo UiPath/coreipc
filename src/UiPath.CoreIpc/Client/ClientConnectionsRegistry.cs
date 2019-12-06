@@ -36,7 +36,7 @@ namespace UiPath.CoreIpc
     class ClientConnection
     {
         AsyncLock _lock = new AsyncLock();
-        private Connection _connection;
+        Connection _connection;
         public ClientConnection(IConnectionKey connectionKey) => ConnectionKey = connectionKey;
         public Stream Network { get; set; }
         public Connection Connection
