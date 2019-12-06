@@ -65,8 +65,8 @@ namespace UiPath.CoreIpc
             }
         }
         public Server Server { get; set; }
-        public IConnectionKey ConnectionKey { get; }
-        internal Task<IDisposable> LockAsync(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
+        IConnectionKey ConnectionKey { get; }
+        public Task<IDisposable> LockAsync(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
         public void Close()
         {
             Connection?.Dispose();
