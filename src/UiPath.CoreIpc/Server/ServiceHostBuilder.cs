@@ -15,8 +15,8 @@ namespace UiPath.CoreIpc
             Endpoints.Add(settings.Name, settings);
             return this;
         }
-        public ServiceHostBuilder AddEndpoint<TInterface>() where TInterface : class => AddEndpoint(new EndpointSettings<TInterface>());
-        public ServiceHostBuilder AddEndpoint<TInterface, TCallback>() where TInterface : class where TCallback : class => AddEndpoint(new EndpointSettings<TInterface, TCallback>());
+        public ServiceHostBuilder AddEndpoint<TContract>(TContract serviceInstance = null) where TContract : class => AddEndpoint((EndpointSettings)new EndpointSettings<TContract>(serviceInstance));
+        public ServiceHostBuilder AddEndpoint<TContract, TCallbackContract>(TContract serviceInstance = null) where TContract : class where TCallbackContract : class => AddEndpoint((EndpointSettings)new EndpointSettings<TContract, TCallbackContract>(serviceInstance));
         internal ServiceHostBuilder AddListener(Listener listener)
         {
             _listeners.Add(listener);
