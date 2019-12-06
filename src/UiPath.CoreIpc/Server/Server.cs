@@ -91,7 +91,7 @@ namespace UiPath.CoreIpc
             {
                 return;
             }
-            await _connection.SendResponse(Serializer.SerializeToBytes(response), responseCancellation);
+            await _connection.SendResponse(response, responseCancellation);
         }
         private async Task<Response> HandleRequest(EndpointSettings endpoint, Request request, IServiceScope scope, CancellationToken cancellationToken)
         {

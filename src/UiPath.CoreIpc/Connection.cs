@@ -49,8 +49,9 @@ namespace UiPath.CoreIpc
                 _requests.TryRemove(request.Id, out _);
             }
         }
+        internal Task SendResponse(Response response, CancellationToken token) => SendResponse(_serializer.SerializeToBytes(response), token);
         private Task SendRequest(byte[] requestBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Request, requestBytes, cancellationToken);
-        public Task SendResponse(byte[] responseBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Response, responseBytes, cancellationToken);
+        private Task SendResponse(byte[] responseBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Response, responseBytes, cancellationToken);
         public Stream Network { get; }
         public ILogger Logger { get; }
         public string Name { get; }
