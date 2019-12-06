@@ -36,7 +36,7 @@ namespace UiPath.CoreIpc
         protected readonly EndpointSettings _serviceEndpoint;
         private readonly AsyncLock _connectionLock = new AsyncLock();
         protected Connection _connection;
-        private protected Server _server;
+        private Server _server;
 
         internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign = false, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
         {
@@ -81,7 +81,7 @@ namespace UiPath.CoreIpc
             }
         }
 
-        private protected void OnNewConnection(Connection connection, bool alreadyHasServer = false)
+        protected void OnNewConnection(Connection connection, bool alreadyHasServer = false)
         {
             _connection?.Dispose();
             _connection = connection;
