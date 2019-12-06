@@ -18,7 +18,6 @@ namespace UiPath.CoreIpc
         public Server(ListenerSettings settings, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
         {
             Settings = settings;
-            Endpoints = settings.Endpoints;
             _connection = connection;
             _client = client ?? new Lazy<IClient>(()=>null);
             Serializer = ServiceProvider.GetRequiredService<ISerializer>();
@@ -83,7 +82,7 @@ namespace UiPath.CoreIpc
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ISerializer Serializer { get; }
         public string Name => _connection.Name;
-        public IDictionary<string, EndpointSettings> Endpoints { get; }
+        public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
         async Task SendResponse(Response response, CancellationToken responseCancellation)
         {
             if (_connectionClosed.IsCancellationRequested)
