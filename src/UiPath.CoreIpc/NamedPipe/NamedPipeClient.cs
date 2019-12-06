@@ -43,6 +43,8 @@ namespace UiPath.CoreIpc.NamedPipe
             var clientConnection = ClientConnectionsRegistry.GetOrCreate(this);
             using (await clientConnection.LockAsync(cancellationToken))
             {
+                // check again just in case it was removed after GetOrCreate but before entering the lock
+                clientConnection = ClientConnectionsRegistry.GetOrCreate(this);
                 var pipe = (NamedPipeClientStream)clientConnection.Network;
                 if (pipe != null)
                 {

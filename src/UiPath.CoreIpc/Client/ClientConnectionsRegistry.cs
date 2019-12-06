@@ -1,4 +1,5 @@
-﻿using Nito.AsyncEx;
+﻿using Microsoft.Extensions.Logging;
+using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -11,7 +12,7 @@ namespace UiPath.CoreIpc
     static class ClientConnectionsRegistry
     {
         private static readonly ConcurrentDictionary<IConnectionKey, ClientConnection> _connections = new ConcurrentDictionary<IConnectionKey, ClientConnection>();
-        public static ClientConnection GetOrCreate(IConnectionKey key) => _connections.GetOrAdd(key, _=>new ClientConnection());
+        public static ClientConnection GetOrCreate(IConnectionKey key) => _connections.GetOrAdd(key, localKey=>new ClientConnection(localKey));
         public static bool TryGet(IConnectionKey key, out ClientConnection connection) => _connections.TryGetValue(key, out connection);
         public static void Clear()
         {
@@ -27,6 +28,7 @@ namespace UiPath.CoreIpc
                 connection.Close();
             }
         }
+        internal static bool Remove(IConnectionKey connectionKey) => _connections.TryRemove(connectionKey, out _);
     }
     public interface IConnectionKey : IEquatable<IConnectionKey>
     {
@@ -34,10 +36,37 @@ namespace UiPath.CoreIpc
     class ClientConnection
     {
         AsyncLock _lock = new AsyncLock();
+        private Connection _connection;
+        public ClientConnection(IConnectionKey connectionKey) => ConnectionKey = connectionKey;
         public Stream Network { get; set; }
-        public Connection Connection { get; set; }
+        public Connection Connection
+        {
+            get => _connection;
+            set
+            {
+                _connection = value;
+                _connection.Closed += (_, __) => OnConnectionClosed().LogException(_connection.Logger, _connection);
+            }
+        }
+        private async Task OnConnectionClosed()
+        {
+            if (!ClientConnectionsRegistry.TryGet(ConnectionKey, out var clientConnection) || clientConnection.Connection != Connection)
+            {
+                return;
+            }
+            using (await clientConnection.LockAsync())
+            {
+                if (clientConnection.Connection != Connection)
+                {
+                    return;
+                }
+                ClientConnectionsRegistry.Remove(ConnectionKey);
+                _connection.Logger.LogInformation($"Remove connection {_connection}.");
+            }
+        }
         public Server Server { get; set; }
-        internal Task<IDisposable> LockAsync(CancellationToken cancellationToken) => _lock.LockAsync(cancellationToken);
+        public IConnectionKey ConnectionKey { get; }
+        internal Task<IDisposable> LockAsync(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
         public void Close()
         {
             Connection?.Dispose();
