@@ -99,8 +99,8 @@ namespace UiPath.CoreIpc
                 return;
             }
             var endpoints = new ConcurrentDictionary<string, EndpointSettings> { [_serviceEndpoint.Name] = _serviceEndpoint };
-            var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider };
-            _server = new Server(listenerSettings, endpoints, connection);
+            var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
+            _server = new Server(listenerSettings, connection);
         }
 
         private void OnConnectionClosed(object sender, EventArgs e)

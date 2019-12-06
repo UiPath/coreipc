@@ -17,7 +17,7 @@ namespace UiPath.CoreIpc
 
         internal ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, EndpointSettings> endpoints, IServiceProvider serviceProvider)
         {
-            _endpoints = endpoints;
+            _endpoints = endpoints.ToReadOnlyDictionary();
             _listeners = listeners.ToArray();
             _logger = serviceProvider.GetRequiredService<ILogger<ServiceHost>>();
         }

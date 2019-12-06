@@ -15,10 +15,10 @@ namespace UiPath.CoreIpc
         private readonly Lazy<IClient> _client;
         private readonly CancellationTokenSource _connectionClosed = new CancellationTokenSource();
 
-        public Server(ListenerSettings settings, IDictionary<string, EndpointSettings> endpoints, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
+        public Server(ListenerSettings settings, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
         {
             Settings = settings;
-            Endpoints = endpoints;
+            Endpoints = settings.Endpoints;
             _connection = connection;
             _client = client ?? new Lazy<IClient>(()=>null);
             Serializer = ServiceProvider.GetRequiredService<ISerializer>();

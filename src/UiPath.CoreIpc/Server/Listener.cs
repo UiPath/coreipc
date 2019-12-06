@@ -20,6 +20,7 @@ namespace UiPath.CoreIpc
         public string Name { get; }
         public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
         internal IServiceProvider ServiceProvider { get; set; }
+        internal IDictionary<string, EndpointSettings> Endpoints { get; set; }
     }
     abstract class Listener
     {
@@ -31,7 +32,6 @@ namespace UiPath.CoreIpc
         }
         public string Name => Settings.Name;
         protected ILogger Logger { get; }
-        public IDictionary<string, EndpointSettings> Endpoints { get; set; }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ListenerSettings Settings { get; }
         public int MaxMessageSize { get; }
@@ -54,7 +54,7 @@ namespace UiPath.CoreIpc
                 _listener = listener;
                 var stream = Settings.EncryptAndSign ? new NegotiateStream(network) : network;
                 _connection = new Connection(stream, Logger, _listener.Name, _listener.MaxMessageSize);
-                _server = new Server(Settings, _listener.Endpoints.ToReadOnlyDictionary(), _connection, cancellationToken, new Lazy<IClient>(() => clientFactory(this)));
+                _server = new Server(Settings, _connection, cancellationToken, new Lazy<IClient>(() => clientFactory(this)));
                 Listen().LogException(Logger, _listener.Name);
                 return;
                 async Task Listen()
