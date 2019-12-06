@@ -176,6 +176,8 @@ namespace UiPath.CoreIpc.Tests
                 await Task.Delay(1);
                 ((InterceptorProxy)proxy).CloseConnection();
                 sendMessageResult.ShouldThrow<Exception>();
+                newGuid = System.Guid.NewGuid();
+                (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
             }
         }
 
