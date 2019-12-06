@@ -110,6 +110,10 @@ namespace UiPath.CoreIpc
             TimeSpan timeout, Func<CancellationToken, Task> func, string message, Func<Exception, Task> exceptionHandler) =>
             new[] { cancellationToken }.WithTimeout(timeout, func, message, exceptionHandler);
 
+        public static Task<TResult> WithTimeout<TResult>(this CancellationToken cancellationToken,
+            TimeSpan timeout, Func<CancellationToken, Task<TResult>> func, string message, Func<Exception, Task> exceptionHandler) =>
+            new[] { cancellationToken }.WithTimeout(timeout, func, message, exceptionHandler);
+
         public static Task WithTimeout(this IEnumerable<CancellationToken> cancellationTokens,
             TimeSpan timeout, Func<CancellationToken, Task> func, string message, Func<Exception, Task> exceptionHandler) =>
             cancellationTokens.WithTimeout(timeout, token => func(token).WithResult(), message, exceptionHandler);

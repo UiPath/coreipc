@@ -1,32 +1,55 @@
 ﻿using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc
 {
+    using RequestCompletionSource = TaskCompletionSource<Response>;
+
     public sealed class Connection : IDisposable
     {
+        private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new ConcurrentDictionary<string, RequestCompletionSource>();
+        private readonly ISerializer _serializer;
+        private long _requestCounter = -1;
         private readonly int _maxMessageSize;
         private readonly Lazy<Task> _receiveLoop;
         private readonly AsyncLock _sendLock = new AsyncLock();
 
-        public Connection(Stream network, ILogger logger, string name, int maxMessageSize = int.MaxValue)
+        public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
         {
             Network = network;
+            _serializer = serializer;
             Logger = logger;
             Name = $"{name} {GetHashCode()}";
             _maxMessageSize = maxMessageSize;
             _receiveLoop = new Lazy<Task>(ReceiveLoop);
+            ResponseReceived += OnResponseReceived;
         }
-
+        public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
         public Task Listen() => _receiveLoop.Value;
         internal event EventHandler<DataReceivedEventsArgs> RequestReceived;
         internal event EventHandler<DataReceivedEventsArgs> ResponseReceived;
         public event EventHandler<EventArgs> Closed;
-        public Task SendRequest(byte[] requestBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Request, requestBytes, cancellationToken);
+        internal async Task<Response> Send(Request request, CancellationToken token)
+        {
+            var requestBytes = _serializer.SerializeToBytes(request);
+            var requestCompletion = new RequestCompletionSource();
+            _requests[request.Id] = requestCompletion;
+            try
+            {
+                await SendRequest(requestBytes, token);
+                return await requestCompletion.Task.WaitAsync(token);
+            }
+            finally
+            {
+                _requests.TryRemove(request.Id, out _);
+            }
+        }
+        private Task SendRequest(byte[] requestBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Request, requestBytes, cancellationToken);
         public Task SendResponse(byte[] responseBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Response, responseBytes, cancellationToken);
         public Stream Network { get; }
         public ILogger Logger { get; }
@@ -49,11 +72,20 @@ namespace UiPath.CoreIpc
             Network.Dispose();
             try
             {
+                CompleteRequests();
                 Interlocked.Exchange(ref Closed, null)?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
                 Logger.LogException(ex, this);
+            }
+        }
+
+        private void CompleteRequests()
+        {
+            foreach (var completionSource in _requests.Values)
+            {
+                completionSource.TrySetException(new IOException("Connection closed."));
             }
         }
 
@@ -78,6 +110,16 @@ namespace UiPath.CoreIpc
             }
             Logger?.LogInformation($"{nameof(ReceiveLoop)} {Name} finished.");
             Dispose();
+        }
+
+        private void OnResponseReceived(object sender, DataReceivedEventsArgs responseReceivedEventsArgs)
+        {
+            var response = _serializer.Deserialize<Response>(responseReceivedEventsArgs.Data);
+            Logger?.LogInformation($"Received response for request {response.RequestId} {Name}.");
+            if (_requests.TryGetValue(response.RequestId, out var completionSource))
+            {
+                completionSource.TrySetResult(response);
+            }
         }
     }
 
