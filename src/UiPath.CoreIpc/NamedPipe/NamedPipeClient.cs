@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using System;
 using System.Security.Principal;
 using Microsoft.Extensions.Logging;
-using System.IO;
 
 namespace UiPath.CoreIpc.NamedPipe
 {

@@ -13,8 +13,6 @@ using System.Net.Security;
 using System.Security.Principal;
 using System.Net;
 using System.Diagnostics;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 namespace UiPath.CoreIpc
 {
