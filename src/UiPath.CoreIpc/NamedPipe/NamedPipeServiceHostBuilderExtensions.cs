@@ -2,7 +2,7 @@
 {
     public static class NamedPipeServiceHostBuilderExtensions
     {
-        public static ServiceHostBuilder AddNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings)
+        public static ServiceHostBuilder UseNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings)
         {
             settings.ServiceProvider = builder.ServiceProvider;
             settings.Endpoints = builder.Endpoints;

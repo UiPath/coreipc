@@ -29,14 +29,14 @@ namespace UiPath.CoreIpc.Tests
             var serviceProvider = ConfigureServices();
             // build and run service host
             var host = new ServiceHostBuilder(serviceProvider)
-                .AddNamedPipes(new NamedPipeSettings("test")
+                .UseNamedPipes(new NamedPipeSettings("test")
                 {
                     RequestTimeout = TimeSpan.FromSeconds(2),
                     AccessControl = security => security.AllowCurrentUser(),
                     EncryptAndSign = true
                 })
-                .AddEndpoint(new EndpointSettings<IComputingService, IComputingCallback>())
-                .AddEndpoint(new EndpointSettings<ISystemService>())
+                .AddEndpoint<IComputingService, IComputingCallback>()
+                .AddEndpoint<ISystemService>()
                 .Build();
 
             await await Task.WhenAny(host.RunAsync(), Task.Run(() =>

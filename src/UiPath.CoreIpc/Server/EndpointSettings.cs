@@ -6,7 +6,7 @@ namespace UiPath.CoreIpc
 {
     public class EndpointSettings
     {
-        public EndpointSettings(Type contract, object serviceInstance, Type callbackContract = null)
+        public EndpointSettings(Type contract, object serviceInstance = null, Type callbackContract = null)
         {
             Contract = contract ?? throw new ArgumentNullException(nameof(contract));
             Name = contract.Name;
@@ -15,7 +15,7 @@ namespace UiPath.CoreIpc
             IOHelpers.Validate(contract);
         }
         public string Name { get; set; }
-        public TaskScheduler Scheduler { get; internal set; }
+        internal TaskScheduler Scheduler { get; set; }
         internal object ServiceInstance { get; }
         internal Type Contract { get; }
         internal Type CallbackContract { get; }

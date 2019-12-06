@@ -38,22 +38,22 @@ namespace UiPath.CoreIpc.Tests
             _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
             _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
             _computingHost = new ServiceHostBuilder(_serviceProvider)
-                .AddNamedPipes(new NamedPipeSettings("computing")
+                .UseNamedPipes(new NamedPipeSettings("computing")
                 {
                     RequestTimeout = RequestTimeout,
                     AccessControl = security => _pipeSecurity = security.LocalOnly(),
                     EncryptAndSign = true,
                 })
-                .AddEndpoint(new EndpointSettings<IComputingService, IComputingCallback>())
+                .AddEndpoint<IComputingService, IComputingCallback>()
                 .Build();
             _systemHost = new ServiceHostBuilder(_serviceProvider)
-                .AddNamedPipes(new NamedPipeSettings("system")
+                .UseNamedPipes(new NamedPipeSettings("system")
                 {
                     RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1)),
                     MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,
                     ConcurrentAccepts = 10,
                 })
-                .AddEndpoint(new EndpointSettings<ISystemService>())
+                .AddEndpoint<ISystemService>()
                 .Build();
 
             var taskScheduler = _guiThread.Scheduler;
