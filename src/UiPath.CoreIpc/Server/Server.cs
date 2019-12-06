@@ -29,12 +29,11 @@ namespace UiPath.CoreIpc
                 _connectionClosed.Cancel();
             };
             return;
-            async Task OnRequestReceived(object sender, DataReceivedEventsArgs requestReceivedEventsArgs)
+            async Task OnRequestReceived(object sender, RequestReceivedEventsArgs requestReceivedEventsArgs)
             {
-                Request request = null;
+                var request = requestReceivedEventsArgs.Request;
                 try
                 {
-                    request = Serializer.Deserialize<Request>(requestReceivedEventsArgs.Data);
                     Logger.LogInformation($"{Name} received request {request}...");
                     if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
                     {

@@ -27,12 +27,10 @@ namespace UiPath.CoreIpc
             Name = $"{name} {GetHashCode()}";
             _maxMessageSize = maxMessageSize;
             _receiveLoop = new Lazy<Task>(ReceiveLoop);
-            ResponseReceived += OnResponseReceived;
         }
         public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
         public Task Listen() => _receiveLoop.Value;
-        internal event EventHandler<DataReceivedEventsArgs> RequestReceived;
-        internal event EventHandler<DataReceivedEventsArgs> ResponseReceived;
+        internal event EventHandler<RequestReceivedEventsArgs> RequestReceived;
         public event EventHandler<EventArgs> Closed;
         internal async Task<Response> Send(Request request, CancellationToken token)
         {
@@ -97,11 +95,22 @@ namespace UiPath.CoreIpc
             {
                 while (!(message = await Network.ReadMessage(_maxMessageSize)).Empty)
                 {
-                    var callback = message.MessageType == MessageType.Request ? RequestReceived : ResponseReceived;
+                    Action callback = null;
+                    var data = message.Data;
+                    if (message.MessageType == MessageType.Request)
+                    {
+                        if (RequestReceived != null)
+                        {
+                            callback = () => RequestReceived.Invoke(this, new RequestReceivedEventsArgs(_serializer.Deserialize<Request>(data)));
+                        }
+                    }
+                    else
+                    {
+                        callback = () => OnResponseReceived(data);
+                    }
                     if (callback != null)
                     {
-                        var eventArgs = new DataReceivedEventsArgs(message.Data);
-                        Task.Run(() => callback.Invoke(this, eventArgs)).LogException(Logger, this);
+                        Task.Run(callback).LogException(Logger, this);
                     }
                 }
             }
@@ -113,9 +122,9 @@ namespace UiPath.CoreIpc
             Dispose();
         }
 
-        private void OnResponseReceived(object sender, DataReceivedEventsArgs responseReceivedEventsArgs)
+        private void OnResponseReceived(byte[] data)
         {
-            var response = _serializer.Deserialize<Response>(responseReceivedEventsArgs.Data);
+            var response = _serializer.Deserialize<Response>(data);
             Logger?.LogInformation($"Received response for request {response.RequestId} {Name}.");
             if (_requests.TryGetValue(response.RequestId, out var completionSource))
             {
@@ -123,10 +132,9 @@ namespace UiPath.CoreIpc
             }
         }
     }
-
-    readonly struct DataReceivedEventsArgs
+    readonly struct RequestReceivedEventsArgs
     {
-        public DataReceivedEventsArgs(byte[] data) => Data = data;
-        public byte[] Data { get; }
+        public RequestReceivedEventsArgs(Request request) => Request = request;
+        public Request Request { get; }
     }
 }
