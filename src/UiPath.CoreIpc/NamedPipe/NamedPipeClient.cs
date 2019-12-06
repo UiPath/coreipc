@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System;
 using System.Security.Principal;
 using Microsoft.Extensions.Logging;
+using System.IO;
 
 namespace UiPath.CoreIpc.NamedPipe
 {
@@ -51,7 +52,7 @@ namespace UiPath.CoreIpc.NamedPipe
                     if (pipe.IsConnected)
                     {
                         _pipe = pipe;
-                        ReuseChachedConnection(clientConnection);
+                        ReuseClientConnection(clientConnection);
                         return false;
                     }
                     pipe.Dispose();
@@ -67,12 +68,7 @@ namespace UiPath.CoreIpc.NamedPipe
                     throw;
                 }
                 _pipe = pipe;
-                var serverEndpoints = clientConnection.Server?.Endpoints;
-                await CreateConnection(pipe, _pipeName);
-                _server?.AddEndpoints(serverEndpoints);
-                _connection.Listen().LogException(_logger, _pipeName);
-                clientConnection.Network = pipe;
-                clientConnection.Connection = _connection;
+                await CreateClientConnection(clientConnection, pipe, _pipeName);
                 return true;
             }
         }

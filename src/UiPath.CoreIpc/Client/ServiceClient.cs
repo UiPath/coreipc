@@ -194,7 +194,7 @@ namespace UiPath.CoreIpc
             return await ConnectToServerAsync(cancellationToken);
         }
 
-        private protected void ReuseChachedConnection(ClientConnection clientConnection)
+        private protected void ReuseClientConnection(ClientConnection clientConnection)
         {
             var alreadyHasServer = clientConnection.Server != null;
             OnNewConnection(clientConnection.Connection, alreadyHasServer);
@@ -207,6 +207,16 @@ namespace UiPath.CoreIpc
                 _server = clientConnection.Server;
                 _server.Endpoints[_serviceEndpoint.Name] = _serviceEndpoint;
             }
+        }
+
+        private protected async Task CreateClientConnection(ClientConnection clientConnection, Stream network, string name)
+        {
+            var serverEndpoints = clientConnection.Server?.Endpoints;
+            await CreateConnection(network, name);
+            _server?.AddEndpoints(serverEndpoints);
+            _connection.Listen().LogException(_logger, name);
+            clientConnection.Connection = _connection;
+            clientConnection.Network = network;
         }
 
         public void Dispose()
