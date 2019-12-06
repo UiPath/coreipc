@@ -33,7 +33,6 @@ namespace UiPath.CoreIpc.Tests
                 {
                     RequestTimeout = TimeSpan.FromSeconds(2),
                     AccessControl = security => security.AllowCurrentUser(),
-                    EncryptAndSign = true
                 })
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService>()
