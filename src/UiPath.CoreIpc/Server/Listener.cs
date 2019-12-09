@@ -84,19 +84,17 @@ namespace UiPath.CoreIpc
             }
             public ILogger Logger => _listener.Logger;
             public ListenerSettings Settings => _listener.Settings;
-            TCallbackContract ICreateCallback.GetCallback<TCallbackContract>()
+            TCallbackContract ICreateCallback.GetCallback<TCallbackContract>(EndpointSettings endpoint)
             {
+                var configuredCallbackContract = endpoint.CallbackContract;
+                if (configuredCallbackContract == null || !typeof(TCallbackContract).IsAssignableFrom(configuredCallbackContract))
+                {
+                    throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackContract)}, but it's {configuredCallbackContract?.ToString() ?? "not configured"}.");
+                }
                 Logger.LogInformation($"Create callback {_listener.Name}");
                 var serializer = _listener.ServiceProvider.GetRequiredService<ISerializer>();
                 var serviceClient = new ServiceClient<TCallbackContract>(serializer, Settings.RequestTimeout, Logger, (_, __) => Task.FromResult(_connection));
-                try
-                {
-                    return serviceClient.CreateProxy();
-                }
-                catch (Exception ex)
-                {
-                    throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackContract)}.", ex);
-                }
+                return serviceClient.CreateProxy();
             }
         }
         protected void HandleConnection(Stream network, Func<ICreateCallback, IClient> clientFactory, CancellationToken cancellationToken) => new ServerConnection(this, network, clientFactory, cancellationToken);

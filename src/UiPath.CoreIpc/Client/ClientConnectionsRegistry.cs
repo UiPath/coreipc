@@ -32,6 +32,7 @@ namespace UiPath.CoreIpc
     }
     public interface IConnectionKey : IEquatable<IConnectionKey>
     {
+        bool EncryptAndSign { get; }
     }
     class ClientConnection
     {

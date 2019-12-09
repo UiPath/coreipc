@@ -32,6 +32,16 @@ namespace UiPath.CoreIpc.Tests
             }
         }
 
+        public async Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default)
+        {
+            var client = message.Client;
+            var callback = message.GetCallback<ISystemCallback>();
+            var clientId = await callback.GetId(message);
+            string returnValue = "";
+            client.Impersonate(() => returnValue = client.GetUserName() + "_" + clientId + "_" + message.Text);
+            return returnValue;
+        }
+
         public bool DidNothing { get; set; }
 
         public async Task DoNothing(CancellationToken cancellationToken = default)
@@ -51,7 +61,7 @@ namespace UiPath.CoreIpc.Tests
             return input.Reverse().ToArray();
         }
 
-        public async Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default)
+        public async Task<string> MissingCallback(SystemMessage message, CancellationToken cancellationToken = default)
         {
             await Task.Delay(message.Delay, cancellationToken);
             var domainName = "";
@@ -59,7 +69,7 @@ namespace UiPath.CoreIpc.Tests
             //client.RunAs(() => domainName = "test");
             //try
             //{
-                client.GetCallback<IDisposable>();
+                message.GetCallback<IDisposable>();
             //}
             //catch(Exception ex)
             //{

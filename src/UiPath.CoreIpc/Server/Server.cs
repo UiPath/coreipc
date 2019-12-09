@@ -108,7 +108,7 @@ namespace UiPath.CoreIpc
             {
                 return Response.Fail(request, "Generic methods are not supported " + method);
             }
-            var arguments = GetArguments(method, request, cancellationToken);
+            var arguments = GetArguments(endpoint, method, request, cancellationToken);
             return await InvokeMethod(endpoint, request, service, method, arguments);
         }
         private async Task<Response> InvokeMethod(EndpointSettings endpoint, Request request, object service, MethodInfo method, object[] arguments)
@@ -133,7 +133,7 @@ namespace UiPath.CoreIpc
                 return (Task)method.Invoke(service, arguments);
             }
         }
-        private object[] GetArguments(MethodInfo method, Request request, CancellationToken cancellationToken)
+        private object[] GetArguments(EndpointSettings endpoint, MethodInfo method, Request request, CancellationToken cancellationToken)
         {
             var parameters = method.GetParameters();
             if (request.Parameters.Length > parameters.Length)
@@ -185,6 +185,7 @@ namespace UiPath.CoreIpc
                 }
                 if (allArguments[messageIndex] is Message message)
                 {
+                    message.Endpoint = endpoint;
                     message.Client = _client.Value;
                 }
             }

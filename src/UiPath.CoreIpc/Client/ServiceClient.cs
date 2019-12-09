@@ -31,7 +31,6 @@ namespace UiPath.CoreIpc
         private readonly TimeSpan _requestTimeout;
         protected readonly ILogger _logger;
         protected readonly ConnectionFactory _connectionFactory;
-        protected readonly bool _encryptAndSign;
         protected readonly BeforeCallHandler _beforeCall;
         protected readonly EndpointSettings _serviceEndpoint;
         private readonly AsyncLock _connectionLock = new AsyncLock();
@@ -44,12 +43,14 @@ namespace UiPath.CoreIpc
             _requestTimeout = requestTimeout;
             _logger = logger;
             _connectionFactory = connectionFactory ?? ((_, __)=>Task.FromResult((Connection)null));
-            _encryptAndSign = encryptAndSign;
+            EncryptAndSign = encryptAndSign;
             _beforeCall = beforeCall ?? ((_, __) => Task.CompletedTask);
             _serviceEndpoint = serviceEndpoint;
         }
 
         public virtual string Name => _connection?.Name;
+
+        public bool EncryptAndSign { get; }
 
         public TInterface CreateProxy()
         {
@@ -60,7 +61,7 @@ namespace UiPath.CoreIpc
 
         protected async Task CreateConnection(Stream network, string name)
         {
-            var stream = _encryptAndSign ? await AuthenticateAsClient() : network;
+            var stream = EncryptAndSign ? await AuthenticateAsClient() : network;
             OnNewConnection(new Connection(stream, _serializer, _logger, name));
             _logger?.LogInformation($"CreateConnection {Name}.");
             return;
@@ -168,6 +169,7 @@ namespace UiPath.CoreIpc
             _connection.Listen().LogException(_logger, name);
             clientConnection.Connection = _connection;
             clientConnection.Network = network;
+            clientConnection.Server = _server;
         }
 
         public void Dispose()

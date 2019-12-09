@@ -34,7 +34,7 @@ namespace UiPath.CoreIpc.Tests
         {
             _guiThread.SynchronizationContext.Send(() => Thread.CurrentThread.Name = "GuiThread");
             _computingCallback = new ComputingCallback { Id = System.Guid.NewGuid().ToString() };
-            _serviceProvider = ConfigureServices();
+            _serviceProvider = IpcHelpers.ConfigureServices();
             _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
             _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
             _computingHost = new ServiceHostBuilder(_serviceProvider)
@@ -75,14 +75,6 @@ namespace UiPath.CoreIpc.Tests
 
         private NamedPipeClientBuilder<ISystemService> SystemClientBuilder() =>
             new NamedPipeClientBuilder<ISystemService>("system").RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
-
-        public IServiceProvider ConfigureServices() =>
-            new ServiceCollection()
-                .AddLogging(b => b.AddTraceSource(new SourceSwitch("", "All")))
-                .AddIpc()
-                .AddSingleton<IComputingService, ComputingService>()
-                .AddSingleton<ISystemService, SystemService>()
-                .BuildServiceProvider();
 
 #if DEBUG
         [Fact]
@@ -170,7 +162,7 @@ namespace UiPath.CoreIpc.Tests
             {
                 var proxy = CreateSystemService();
                 var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
-                var sendMessageResult = proxy.SendMessage(request);
+                var sendMessageResult = proxy.MissingCallback(request);
                 var newGuid = System.Guid.NewGuid();
                 (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
                 await Task.Delay(1);
@@ -324,12 +316,12 @@ namespace UiPath.CoreIpc.Tests
             var reversed = await _systemClient.ReverseBytes(input);
             reversed.ShouldBe(input.Reverse());
         }
-
+        
         [Fact]
         public async Task MissingCallback()
         {
-            var ex = _systemClient.SendMessage(new SystemMessage()).ShouldThrow<RemoteException>();
-            ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable.");
+            var ex = _systemClient.MissingCallback(new SystemMessage()).ShouldThrow<RemoteException>();
+            ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's not configured.");
             ex.Is<ArgumentException>().ShouldBeTrue();
             await Guid();
         }
@@ -370,7 +362,8 @@ namespace UiPath.CoreIpc.Tests
             _computingHost.Dispose();
             _systemHost.Dispose();
             _guiThread.Dispose();
-            InterceptorProxy.CloseConnections();
+            ((InterceptorProxy)_computingClient).CloseConnection();
+            ((InterceptorProxy)_systemClient).CloseConnection();
         }
     }
 }

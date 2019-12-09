@@ -3,11 +3,19 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
 using System.Linq;
+using UiPath.CoreIpc.Tests;
 
 namespace UiPath.CoreIpc
 {
     public static class IpcHelpers
     {
+        public static IServiceProvider ConfigureServices() =>
+            new ServiceCollection()
+                .AddLogging(b => b.AddTraceSource(new SourceSwitch("", "All")))
+                .AddIpc()
+                .AddSingleton<IComputingService, ComputingService>()
+                .AddSingleton<ISystemService, SystemService>()
+                .BuildServiceProvider();
         public static string GetUserName(this IClient client)
         {
             string userName = null;
