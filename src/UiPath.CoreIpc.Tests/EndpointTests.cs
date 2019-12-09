@@ -66,5 +66,12 @@ namespace UiPath.CoreIpc.Tests
             systemTask.Result.ShouldBe($"{Environment.UserName}_{_systemCallback.Id}_{message.Text}");
             computingTask.Result.ShouldBe($"{Environment.UserName}_{_computingCallback.Id}_{message.Text}");
         }
+        [Fact]
+        public async Task MissingCallback()
+        {
+            var ex = _systemClient.MissingCallback(new SystemMessage()).ShouldThrow<RemoteException>();
+            ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.CoreIpc.Tests.ISystemCallback.");
+            ex.Is<ArgumentException>().ShouldBeTrue();
+        }
     }
 }

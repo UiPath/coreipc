@@ -1,6 +1,6 @@
 ﻿namespace UiPath.CoreIpc.NamedPipe
 {
-    public static class NamedPipeServiceHostBuilderExtensions
+    public static class NamedPipeServiceExtensions
     {
         public static ServiceHostBuilder UseNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings)
         {
