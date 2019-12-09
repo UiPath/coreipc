@@ -110,8 +110,9 @@ namespace UiPath.CoreIpc
                     }
                     await _beforeCall(new CallInfo(newConnection), token);
                     var requestId = _connection.NewRequestId();
+                    var arguments = args.Select(_serializer.Serialize).ToArray();
+                    var request = new Request(typeof(TInterface).Name, requestId, methodName, arguments, messageTimeout);
                     _logger?.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
-                    var request = new Request(typeof(TInterface).Name, requestId, methodName, args.Select(_serializer.Serialize).ToArray(), messageTimeout);
                     var response = await _connection.Send(request, token);
                     _logger?.LogInformation($"IpcClient called {methodName} {requestId} {Name}.");
                     return _serializer.Deserialize<TResult>(response.CheckError().Data ?? "");
