@@ -34,7 +34,8 @@ namespace UiPath.CoreIpc
                 try
                 {
                     Logger.LogInformation($"{Name} received request {request}...");
-                    if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
+                    var endpointName = request.Endpoint ?? EndpointSettings.Default;
+                    if (!Endpoints.TryGetValue(endpointName, out var endpoint))
                     {
                         await OnError(new Exception($"{Name} cannot find endpoint {request.Endpoint}..."));
                         return;

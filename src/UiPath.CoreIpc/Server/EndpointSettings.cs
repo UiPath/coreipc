@@ -6,6 +6,7 @@ namespace UiPath.CoreIpc
 {
     public class EndpointSettings
     {
+        internal static string Default { get; } = "Default";
         public EndpointSettings(Type contract, object serviceInstance = null, Type callbackContract = null)
         {
             Contract = contract ?? throw new ArgumentNullException(nameof(contract));
@@ -14,12 +15,17 @@ namespace UiPath.CoreIpc
             CallbackContract = callbackContract;
             IOHelpers.Validate(contract);
         }
-        public string Name { get; set; }
+        internal string Name { get; private set; }
         internal TaskScheduler Scheduler { get; set; }
         internal object ServiceInstance { get; }
         internal Type Contract { get; }
         internal Type CallbackContract { get; }
         internal IServiceProvider ServiceProvider { get; set; }
+        public bool IsDefault
+        {
+            get => Name == Default;
+            set => Name = (value ? Default : Name);
+        }
     }
     public class EndpointSettings<TContract> : EndpointSettings where TContract : class
     {
