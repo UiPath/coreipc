@@ -13,6 +13,7 @@ namespace UiPath.CoreIpc
             new ServiceCollection()
                 .AddLogging(b => b.AddTraceSource(new SourceSwitch("", "All")))
                 .AddIpc()
+                .AddSingleton<IComputingServiceBase, ComputingService>()
                 .AddSingleton<IComputingService, ComputingService>()
                 .AddSingleton<ISystemService, SystemService>()
                 .BuildServiceProvider();

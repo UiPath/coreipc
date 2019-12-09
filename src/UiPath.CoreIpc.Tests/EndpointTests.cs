@@ -30,6 +30,7 @@ namespace UiPath.CoreIpc.Tests
             _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
             _host = new ServiceHostBuilder(_serviceProvider)
                 .UseNamedPipes(new NamedPipeSettings("EndpointTests") { RequestTimeout = RequestTimeout })
+                .AddEndpoint<IComputingServiceBase>()
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService, ISystemCallback>()
                 .AddEndpoint(new EndpointSettings<ISystemService, ISystemCallback> { IsDefault = true })
@@ -60,12 +61,15 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task Callback()
         {
+            var proxy = new NamedPipeClientBuilder<IComputingServiceBase>("EndpointTests").RequestTimeout(RequestTimeout).AllowImpersonation().Build();
             var message = new SystemMessage { Text = Guid.NewGuid().ToString() };
             var computingTask = _computingClient.SendMessage(message);
             var systemTask = _systemClient.SendMessage(message);
-            await Task.WhenAll(computingTask, systemTask);
+            var computingBaseTask = proxy.AddFloat(1, 2);
+            await Task.WhenAll(computingTask, systemTask, computingBaseTask);
             systemTask.Result.ShouldBe($"{Environment.UserName}_{_systemCallback.Id}_{message.Text}");
             computingTask.Result.ShouldBe($"{Environment.UserName}_{_computingCallback.Id}_{message.Text}");
+            computingBaseTask.Result.ShouldBe(3);
         }
         [Fact]
         public async Task MissingCallback()
