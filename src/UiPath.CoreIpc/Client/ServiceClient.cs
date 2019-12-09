@@ -164,7 +164,7 @@ namespace UiPath.CoreIpc
         {
             var serverEndpoints = clientConnection.Server?.Endpoints;
             await CreateConnection(network, name);
-            _server?.AddEndpoints(serverEndpoints);
+            _server?.AddCallbackEndpoints(serverEndpoints);
             _connection.Listen().LogException(_logger, name);
             clientConnection.Connection = _connection;
             clientConnection.Network = network;

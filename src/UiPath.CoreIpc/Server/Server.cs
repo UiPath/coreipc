@@ -68,7 +68,7 @@ namespace UiPath.CoreIpc
         }
         private ILogger Logger => _connection.Logger;
         private ListenerSettings Settings { get; }
-        public void AddEndpoints(IDictionary<string, EndpointSettings> serverEndpoints)
+        public void AddCallbackEndpoints(IDictionary<string, EndpointSettings> serverEndpoints)
         {
             if (serverEndpoints == null)
             {
