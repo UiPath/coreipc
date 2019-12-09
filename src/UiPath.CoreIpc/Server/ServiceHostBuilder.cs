@@ -15,13 +15,18 @@ namespace UiPath.CoreIpc
             Endpoints.Add(settings.Name, settings);
             return this;
         }
-        public ServiceHostBuilder AddEndpoint<TContract>(TContract serviceInstance = null) where TContract : class => AddEndpoint((EndpointSettings)new EndpointSettings<TContract>(serviceInstance));
-        public ServiceHostBuilder AddEndpoint<TContract, TCallbackContract>(TContract serviceInstance = null) where TContract : class where TCallbackContract : class => AddEndpoint((EndpointSettings)new EndpointSettings<TContract, TCallbackContract>(serviceInstance));
         internal ServiceHostBuilder AddListener(Listener listener)
         {
             _listeners.Add(listener);
             return this;
         }
         public ServiceHost Build() => new ServiceHost(_listeners, Endpoints, ServiceProvider);
+    }
+    public static class ServiceHostBuilderExtensions
+    {
+        public static ServiceHostBuilder AddEndpoint<TContract>(this ServiceHostBuilder serviceHostBuilder, TContract serviceInstance = null) where TContract : class => 
+            serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract>(serviceInstance));
+        public static ServiceHostBuilder AddEndpoint<TContract, TCallbackContract>(this ServiceHostBuilder serviceHostBuilder, TContract serviceInstance = null) where TContract : class where TCallbackContract : class =>
+            serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract, TCallbackContract>(serviceInstance));
     }
 }

@@ -32,6 +32,7 @@ namespace UiPath.CoreIpc.Tests
                 .UseNamedPipes(new NamedPipeSettings("EndpointTests") { RequestTimeout = RequestTimeout })
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService, ISystemCallback>()
+                .AddEndpoint(new EndpointSettings<ISystemService, ISystemCallback> { IsDefault = true })
                 .Build();
             _host.RunAsync();
             _computingClient = ComputingClientBuilder().Build();
