@@ -27,5 +27,5 @@ var computingClient =
     new NamedPipeClientBuilder<IComputingService>("computing")
     .Build();
 // call a remote method
-var result = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);
+var result = await computingClient.AddFloat(1, 4, cancellationToken);
 ```
