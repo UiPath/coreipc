@@ -18,12 +18,13 @@ Check [the tests](https://github.com/UiPath/CoreIpc/blob/master/src/UiPath.CoreI
 ```C#
 // configure and start the server
 _ = new ServiceHostBuilder(serviceProvider)
-    .AddEndpoint(new NamedPipeEndpointSettings<IComputingService>())
+    .UseNamedPipes(new NamedPipeSettings("computing")) 
+    .AddEndpoint<IComputingService>()
     .Build()
     .RunAsync();
 // configure the client
 var computingClient = 
-    new NamedPipeClientBuilder<IComputingService>()
+    new NamedPipeClientBuilder<IComputingService>("computing")
     .Build();
 // call a remote method
 var result = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);
