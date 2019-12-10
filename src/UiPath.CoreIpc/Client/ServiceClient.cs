@@ -54,8 +54,8 @@ namespace UiPath.CoreIpc
 
         public TInterface CreateProxy()
         {
-            var proxy = DispatchProxy.Create<TInterface, InterceptorProxy>();
-            (proxy as InterceptorProxy).ServiceClient = this;
+            var proxy = DispatchProxy.Create<TInterface, IpcProxy>();
+            (proxy as IpcProxy).ServiceClient = this;
             return proxy;
         }
 
@@ -191,7 +191,7 @@ namespace UiPath.CoreIpc
         }
     }
 
-    public class InterceptorProxy : DispatchProxy, IDisposable
+    public class IpcProxy : DispatchProxy, IDisposable
     {
         private static readonly MethodInfo InvokeAsyncMethod = typeof(IServiceClient).GetMethod(nameof(IServiceClient.InvokeAsync));
         private static readonly ConcurrentDictionary<Type, InvokeAsyncDelegate> _invokeAsyncByType = new ConcurrentDictionary<Type, InvokeAsyncDelegate>();

@@ -112,7 +112,7 @@ namespace UiPath.CoreIpc.Tests
             await proxy.DoNothing();
             newConnection.ShouldBeFalse();
 
-            ((InterceptorProxy)proxy).CloseConnection();
+            ((IpcProxy)proxy).CloseConnection();
             newConnection.ShouldBeFalse();
             await Task.Delay(1);
             await proxy.DoNothing();
@@ -129,7 +129,7 @@ namespace UiPath.CoreIpc.Tests
             for (int i = 0; i < 50; i++)
             {
                 await proxy.AddFloat(1, 2);
-                ((InterceptorProxy)proxy).CloseConnection();
+                ((IpcProxy)proxy).CloseConnection();
                 await proxy.AddFloat(1, 2);
             }
         }
@@ -139,7 +139,7 @@ namespace UiPath.CoreIpc.Tests
         {
             var proxy = SystemClientBuilder().DontReconnect().Build();
             await proxy.GetGuid(System.Guid.Empty);
-            ((InterceptorProxy)proxy).CloseConnection();
+            ((IpcProxy)proxy).CloseConnection();
             proxy.GetGuid(System.Guid.Empty).ShouldThrow<ObjectDisposedException>();
         }
 
@@ -166,7 +166,7 @@ namespace UiPath.CoreIpc.Tests
                 var newGuid = System.Guid.NewGuid();
                 (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
                 await Task.Delay(1);
-                ((InterceptorProxy)proxy).CloseConnection();
+                ((IpcProxy)proxy).CloseConnection();
                 sendMessageResult.ShouldThrow<Exception>();
                 newGuid = System.Guid.NewGuid();
                 (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
@@ -362,8 +362,8 @@ namespace UiPath.CoreIpc.Tests
             _computingHost.Dispose();
             _systemHost.Dispose();
             _guiThread.Dispose();
-            ((InterceptorProxy)_computingClient).CloseConnection();
-            ((InterceptorProxy)_systemClient).CloseConnection();
+            ((IpcProxy)_computingClient).CloseConnection();
+            ((IpcProxy)_systemClient).CloseConnection();
         }
     }
 }
