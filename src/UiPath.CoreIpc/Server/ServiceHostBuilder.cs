@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using System;
 using System.Collections.Generic;
 
 namespace UiPath.CoreIpc
@@ -28,5 +29,13 @@ namespace UiPath.CoreIpc
             serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract>(serviceInstance));
         public static ServiceHostBuilder AddEndpoint<TContract, TCallbackContract>(this ServiceHostBuilder serviceHostBuilder, TContract serviceInstance = null) where TContract : class where TCallbackContract : class =>
             serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract, TCallbackContract>(serviceInstance));
+    }
+    public static class ServiceCollectionExtensions
+    {
+        public static IServiceCollection AddIpc(this IServiceCollection services)
+        {
+            services.AddSingleton<ISerializer, JsonSerializer>();
+            return services;
+        }
     }
 }
