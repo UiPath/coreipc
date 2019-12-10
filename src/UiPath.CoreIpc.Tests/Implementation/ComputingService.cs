@@ -52,7 +52,7 @@ namespace UiPath.CoreIpc.Tests
         {
             await Task.Delay(message.Delay);
             var client = message.Client;
-            var callback = client.GetCallback<IComputingCallback>();
+            var callback = message.GetCallback<IComputingCallback>();
             var clientId = await callback.GetId(message);
             string returnValue = "";
             client.Impersonate(() => returnValue = client.GetUserName() + "_" + clientId + "_" + message.Text);

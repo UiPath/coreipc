@@ -6,17 +6,11 @@ namespace UiPath.CoreIpc.NamedPipe
 {
     public abstract class NamedPipeClientBuilderBase<TDerived, TInterface> : ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
     {
-        private string _pipeName = typeof(TInterface).Name;
+        private readonly string _pipeName;
         private string _serverName = ".";
         private bool _allowImpersonation;
 
-        protected NamedPipeClientBuilderBase(Type callbackContract = null, IServiceProvider serviceProvider = null) : base(callbackContract, serviceProvider) { }
-
-        public TDerived PipeName(string pipeName)
-        {
-            _pipeName = pipeName;
-            return this as TDerived;
-        }
+        protected NamedPipeClientBuilderBase(string pipeName, Type callbackContract = null, IServiceProvider serviceProvider = null) : base(callbackContract, serviceProvider) => _pipeName = pipeName;
 
         public TDerived ServerName(string serverName)
         {
@@ -36,17 +30,18 @@ namespace UiPath.CoreIpc.NamedPipe
             return this as TDerived;
         }
 
-        protected override TInterface BuildCore(ServiceEndpoint serviceEndpoint) =>
+        protected override TInterface BuildCore(EndpointSettings serviceEndpoint) =>
             new NamedPipeClient<TInterface>(_serverName, _pipeName, _serializer, _requestTimeout, _allowImpersonation, _logger, _connectionFactory, _encryptAndSign, _beforeCall, serviceEndpoint).CreateProxy();
     }
 
     public class NamedPipeClientBuilder<TInterface> : NamedPipeClientBuilderBase<NamedPipeClientBuilder<TInterface>, TInterface> where TInterface : class
     {
+        public NamedPipeClientBuilder(string pipeName) : base(pipeName){}
     }
 
     public class NamedPipeClientBuilder<TInterface, TCallbackInterface> : NamedPipeClientBuilderBase<NamedPipeClientBuilder<TInterface, TCallbackInterface>, TInterface> where TInterface : class where TCallbackInterface : class
     {
-        public NamedPipeClientBuilder(IServiceProvider serviceProvider) : base(typeof(TCallbackInterface), serviceProvider) { }
+        public NamedPipeClientBuilder(string pipeName, IServiceProvider serviceProvider) : base(pipeName, typeof(TCallbackInterface), serviceProvider) { }
 
         public NamedPipeClientBuilder<TInterface, TCallbackInterface> CallbackInstance(TCallbackInterface singleton)
         {

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -14,9 +15,9 @@ namespace UiPath.CoreIpc
         private readonly Lazy<IClient> _client;
         private readonly CancellationTokenSource _connectionClosed = new CancellationTokenSource();
 
-        public Server(ServiceEndpoint serviceEndpoint, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
+        public Server(ListenerSettings settings, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
         {
-            ServiceEndpoint = serviceEndpoint;
+            Settings = settings;
             _connection = connection;
             _client = client ?? new Lazy<IClient>(()=>null);
             Serializer = ServiceProvider.GetRequiredService<ISerializer>();
@@ -27,19 +28,24 @@ namespace UiPath.CoreIpc
                 _connectionClosed.Cancel();
             };
             return;
-            async Task OnRequestReceived(object sender, DataReceivedEventsArgs requestReceivedEventsArgs)
+            async Task OnRequestReceived(object sender, RequestReceivedEventsArgs requestReceivedEventsArgs)
             {
-                Request request = null;
+                var request = requestReceivedEventsArgs.Request;
                 try
                 {
-                    request = Serializer.Deserialize<Request>(requestReceivedEventsArgs.Data);
                     Logger.LogInformation($"{Name} received request {request}...");
+                    var endpointName = request.Endpoint ?? EndpointSettings.Default;
+                    if (!Endpoints.TryGetValue(endpointName, out var endpoint))
+                    {
+                        await OnError(new Exception($"{Name} cannot find endpoint {request.Endpoint}..."));
+                        return;
+                    }
                     Response response;
                     await new[] { cancellationToken, _connectionClosed.Token }.WithTimeout(request.GetTimeout(Settings.RequestTimeout), async token =>
                     {
                         using (var scope = ServiceProvider.CreateScope())
                         {
-                            response = await HandleRequest(request, scope, token);
+                            response = await HandleRequest(endpoint, request, scope, token);
                         }
                         Logger.LogInformation($"{Name} sending response for {request}...");
                         await SendResponse(response, token);
@@ -62,46 +68,54 @@ namespace UiPath.CoreIpc
             }
         }
         private ILogger Logger => _connection.Logger;
-        public Type Contract => Settings.Contract;
-        private EndpointSettings Settings => ServiceEndpoint.Settings;
-        private ServiceEndpoint ServiceEndpoint { get; }
-        public IServiceProvider ServiceProvider => ServiceEndpoint.ServiceProvider;
+        private ListenerSettings Settings { get; }
+        public void AddCallbackEndpoints(IDictionary<string, EndpointSettings> serverEndpoints)
+        {
+            if (serverEndpoints == null)
+            {
+                return;
+            }
+            foreach (var endpoint in serverEndpoints)
+            {
+                Endpoints[endpoint.Key] = endpoint.Value;
+            }
+        }
+        public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ISerializer Serializer { get; }
         public string Name => _connection.Name;
-
+        public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
         async Task SendResponse(Response response, CancellationToken responseCancellation)
         {
             if (_connectionClosed.IsCancellationRequested)
             {
                 return;
             }
-            await _connection.SendResponse(Serializer.SerializeToBytes(response), responseCancellation);
+            await _connection.Send(response, responseCancellation);
         }
-
-        private async Task<Response> HandleRequest(Request request, IServiceScope scope, CancellationToken cancellationToken)
+        private async Task<Response> HandleRequest(EndpointSettings endpoint, Request request, IServiceScope scope, CancellationToken cancellationToken)
         {
-            var service = Settings.ServiceInstance ?? scope.ServiceProvider.GetService(Contract);
+            var contract = endpoint.Contract;
+            var service = endpoint.ServiceInstance ?? scope.ServiceProvider.GetService(contract);
             if (service == null)
             {
-                return Response.Fail(request, $"No implementation of interface '{Contract.FullName}' found.");
+                return Response.Fail(request, $"No implementation of interface '{contract.FullName}' found.");
             }
-            var method = Contract.GetInheritedMethod(request.MethodName);
+            var method = contract.GetInheritedMethod(request.MethodName);
             if (method == null)
             {
-                return Response.Fail(request, $"Method '{request.MethodName}' not found in interface '{Contract.FullName}'.");
+                return Response.Fail(request, $"Method '{request.MethodName}' not found in interface '{contract.FullName}'.");
             }
             if (method.IsGenericMethod)
             {
                 return Response.Fail(request, "Generic methods are not supported " + method);
             }
-            var arguments = GetArguments(method, request, cancellationToken);
-            return await InvokeMethod(request, service, method, arguments);
+            var arguments = GetArguments(endpoint, method, request, cancellationToken);
+            return await InvokeMethod(endpoint, request, service, method, arguments);
         }
-
-        private async Task<Response> InvokeMethod(Request request, object service, MethodInfo method, object[] arguments)
+        private async Task<Response> InvokeMethod(EndpointSettings endpoint, Request request, object service, MethodInfo method, object[] arguments)
         {
             var hasReturnValue = method.ReturnType != typeof(Task);
-            var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, ServiceEndpoint.Scheduler);
+            var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler ?? TaskScheduler.Default);
             if (hasReturnValue)
             {
                 var methodResult = await methodCallTask;
@@ -120,8 +134,7 @@ namespace UiPath.CoreIpc
                 return (Task)method.Invoke(service, arguments);
             }
         }
-
-        private object[] GetArguments(MethodInfo method, Request request, CancellationToken cancellationToken)
+        private object[] GetArguments(EndpointSettings endpoint, MethodInfo method, Request request, CancellationToken cancellationToken)
         {
             var parameters = method.GetParameters();
             if (request.Parameters.Length > parameters.Length)
@@ -173,6 +186,7 @@ namespace UiPath.CoreIpc
                 }
                 if (allArguments[messageIndex] is Message message)
                 {
+                    message.Endpoint = endpoint;
                     message.Client = _client.Value;
                 }
             }

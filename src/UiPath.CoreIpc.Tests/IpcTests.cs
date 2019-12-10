@@ -19,7 +19,8 @@ namespace UiPath.CoreIpc.Tests
     {
         private const int MaxReceivedMessageSizeInMegabytes = 1;
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
-        private readonly ServiceHost _host;
+        private readonly ServiceHost _computingHost;
+        private readonly ServiceHost _systemHost;
         private readonly IComputingService _computingClient;
         private readonly ISystemService _systemClient;
         private readonly ComputingService _computingService;
@@ -33,35 +34,37 @@ namespace UiPath.CoreIpc.Tests
         {
             _guiThread.SynchronizationContext.Send(() => Thread.CurrentThread.Name = "GuiThread");
             _computingCallback = new ComputingCallback { Id = System.Guid.NewGuid().ToString() };
-            _serviceProvider = ConfigureServices();
+            _serviceProvider = IpcHelpers.ConfigureServices();
             _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
             _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
-            _host = new ServiceHostBuilder(_serviceProvider)
-                .AddEndpoint(new NamedPipeEndpointSettings<IComputingService, IComputingCallback>()
+            _computingHost = new ServiceHostBuilder(_serviceProvider)
+                .UseNamedPipes(new NamedPipeSettings("computing")
                 {
                     RequestTimeout = RequestTimeout,
                     AccessControl = security => _pipeSecurity = security.LocalOnly(),
-                    Name = "computing",
                     EncryptAndSign = true,
                 })
-                .AddEndpoint(new NamedPipeEndpointSettings<ISystemService>()
+                .AddEndpoint<IComputingService, IComputingCallback>()
+                .Build();
+            _systemHost = new ServiceHostBuilder(_serviceProvider)
+                .UseNamedPipes(new NamedPipeSettings("system")
                 {
                     RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1)),
                     MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,
-                    Name = "system",
                     ConcurrentAccepts = 10,
                 })
+                .AddEndpoint<ISystemService>()
                 .Build();
 
             var taskScheduler = _guiThread.Scheduler;
-            _host.RunAsync(taskScheduler);
+            _computingHost.RunAsync(taskScheduler);
+            _systemHost.RunAsync(taskScheduler);
             _computingClient = ComputingClientBuilder(taskScheduler).Build();
             _systemClient = CreateSystemService();
         }
 
         private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
-            new NamedPipeClientBuilder<IComputingService, IComputingCallback>(_serviceProvider)
-                .PipeName("computing")
+            new NamedPipeClientBuilder<IComputingService, IComputingCallback>("computing", _serviceProvider)
                 .AllowImpersonation()
                 .EncryptAndSign()
                 .RequestTimeout(RequestTimeout)
@@ -71,29 +74,21 @@ namespace UiPath.CoreIpc.Tests
         private ISystemService CreateSystemService() => SystemClientBuilder().Build();
 
         private NamedPipeClientBuilder<ISystemService> SystemClientBuilder() =>
-            new NamedPipeClientBuilder<ISystemService>().PipeName("system").RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
-
-        public IServiceProvider ConfigureServices() =>
-            new ServiceCollection()
-                .AddLogging(b => b.AddTraceSource(new SourceSwitch("", "All")))
-                .AddIpc()
-                .AddSingleton<IComputingService, ComputingService>()
-                .AddSingleton<ISystemService, SystemService>()
-                .BuildServiceProvider();
+            new NamedPipeClientBuilder<ISystemService>("system").RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
 
 #if DEBUG
         [Fact]
-        public void MethodsMustReturnTask() => new Action(() => new NamedPipeClientBuilder<IInvalid>()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Method does not return Task!");
+        public void MethodsMustReturnTask() => new Action(() => new NamedPipeClientBuilder<IInvalid>("")).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Method does not return Task!");
         [Fact]
-        public void DuplicateMessageParameters() => new Action(() => new NamedPipeClientBuilder<IDuplicateMessage>()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
+        public void DuplicateMessageParameters() => new Action(() => new NamedPipeClientBuilder<IDuplicateMessage>("")).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
         [Fact]
-        public void TheMessageMustBeTheLastBeforeTheToken() => new Action(() => new NamedPipeClientBuilder<IMessageFirst>()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
+        public void TheMessageMustBeTheLastBeforeTheToken() => new Action(() => new NamedPipeClientBuilder<IMessageFirst>("")).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
         [Fact]
-        public void CancellationTokenMustBeLast() => new Action(() => new NamedPipeClientBuilder<IInvalidCancellationToken>()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The CancellationToken parameter must be the last!");
+        public void CancellationTokenMustBeLast() => new Action(() => new NamedPipeClientBuilder<IInvalidCancellationToken>("")).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The CancellationToken parameter must be the last!");
         [Fact]
-        public void TheCallbackContractMustBeAnInterface() => new Action(() => new NamedPipeClientBuilder<ISystemService, IpcTests>(_serviceProvider).Build()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
+        public void TheCallbackContractMustBeAnInterface() => new Action(() => new NamedPipeClientBuilder<ISystemService, IpcTests>("", _serviceProvider).Build()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
         [Fact]
-        public void TheServiceContractMustBeAnInterface() => new Action(() => new NamedPipeEndpointSettings<IpcTests>()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
+        public void TheServiceContractMustBeAnInterface() => new Action(() => new EndpointSettings<IpcTests>()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
 #endif
 
         [Fact]
@@ -117,7 +112,7 @@ namespace UiPath.CoreIpc.Tests
             await proxy.DoNothing();
             newConnection.ShouldBeFalse();
 
-            ((IDisposable)proxy).Dispose();
+            ((IpcProxy)proxy).CloseConnection();
             newConnection.ShouldBeFalse();
             await Task.Delay(1);
             await proxy.DoNothing();
@@ -134,7 +129,7 @@ namespace UiPath.CoreIpc.Tests
             for (int i = 0; i < 50; i++)
             {
                 await proxy.AddFloat(1, 2);
-                ((IDisposable)proxy).Dispose();
+                ((IpcProxy)proxy).CloseConnection();
                 await proxy.AddFloat(1, 2);
             }
         }
@@ -144,7 +139,7 @@ namespace UiPath.CoreIpc.Tests
         {
             var proxy = SystemClientBuilder().DontReconnect().Build();
             await proxy.GetGuid(System.Guid.Empty);
-            ((IDisposable)proxy).Dispose();
+            ((IpcProxy)proxy).CloseConnection();
             proxy.GetGuid(System.Guid.Empty).ShouldThrow<ObjectDisposedException>();
         }
 
@@ -159,9 +154,6 @@ namespace UiPath.CoreIpc.Tests
         }
 
         [Fact]
-        public Task CancelServerCallConcurrently() => Task.WhenAll(Enumerable.Range(1, 10).Select(_ => CancelServerCallCore(5)));
-
-        [Fact]
         public Task CancelServerCall() => CancelServerCallCore(10);
 
         async Task CancelServerCallCore(int counter)
@@ -170,12 +162,14 @@ namespace UiPath.CoreIpc.Tests
             {
                 var proxy = CreateSystemService();
                 var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
-                var sendMessageResult = proxy.SendMessage(request);
+                var sendMessageResult = proxy.MissingCallback(request);
                 var newGuid = System.Guid.NewGuid();
                 (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
                 await Task.Delay(1);
-                ((IDisposable)proxy).Dispose();
+                ((IpcProxy)proxy).CloseConnection();
                 sendMessageResult.ShouldThrow<Exception>();
+                newGuid = System.Guid.NewGuid();
+                (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
             }
         }
 
@@ -322,11 +316,11 @@ namespace UiPath.CoreIpc.Tests
             var reversed = await _systemClient.ReverseBytes(input);
             reversed.ShouldBe(input.Reverse());
         }
-
+        
         [Fact]
         public async Task MissingCallback()
         {
-            var ex = _systemClient.SendMessage(new SystemMessage()).ShouldThrow<RemoteException>();
+            var ex = _systemClient.MissingCallback(new SystemMessage()).ShouldThrow<RemoteException>();
             ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's not configured.");
             ex.Is<ArgumentException>().ShouldBeTrue();
             await Guid();
@@ -365,8 +359,11 @@ namespace UiPath.CoreIpc.Tests
         {
             ((IDisposable)_computingClient).Dispose();
             ((IDisposable)_systemClient).Dispose();
-            _host.Dispose();
+            _computingHost.Dispose();
+            _systemHost.Dispose();
             _guiThread.Dispose();
+            ((IpcProxy)_computingClient).CloseConnection();
+            ((IpcProxy)_systemClient).CloseConnection();
         }
     }
 }

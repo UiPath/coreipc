@@ -19,7 +19,6 @@ namespace UiPath.CoreIpc
     using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
     using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
     using InvokeAsyncDelegate = Func<IServiceClient, string, object[], object>;
-    using RequestCompletionSource = TaskCompletionSource<Response>;
 
     interface IServiceClient : IDisposable
     {
@@ -28,44 +27,42 @@ namespace UiPath.CoreIpc
 
     public class ServiceClient<TInterface> : IServiceClient where TInterface : class
     {
-        private long _requestCounter = -1;
         private readonly ISerializer _serializer;
         private readonly TimeSpan _requestTimeout;
         protected readonly ILogger _logger;
         protected readonly ConnectionFactory _connectionFactory;
-        private readonly bool _encryptAndSign;
         protected readonly BeforeCallHandler _beforeCall;
-        protected readonly ServiceEndpoint _serviceEndpoint;
+        protected readonly EndpointSettings _serviceEndpoint;
         private readonly AsyncLock _connectionLock = new AsyncLock();
-        private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new ConcurrentDictionary<string, RequestCompletionSource>();
         protected Connection _connection;
+        private Server _server;
 
-        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign = false, BeforeCallHandler beforeCall = null, ServiceEndpoint serviceEndpoint = null)
+        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign = false, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
         {
             _serializer = serializer;
             _requestTimeout = requestTimeout;
             _logger = logger;
             _connectionFactory = connectionFactory ?? ((_, __)=>Task.FromResult((Connection)null));
-            _encryptAndSign = encryptAndSign;
+            EncryptAndSign = encryptAndSign;
             _beforeCall = beforeCall ?? ((_, __) => Task.CompletedTask);
             _serviceEndpoint = serviceEndpoint;
         }
 
         public virtual string Name => _connection?.Name;
 
-        private string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
+        public bool EncryptAndSign { get; }
 
         public TInterface CreateProxy()
         {
-            var proxy = DispatchProxy.Create<TInterface, InterceptorProxy>();
-            (proxy as InterceptorProxy).ServiceClient = this;
+            var proxy = DispatchProxy.Create<TInterface, IpcProxy>();
+            (proxy as IpcProxy).ServiceClient = this;
             return proxy;
         }
 
         protected async Task CreateConnection(Stream network, string name)
         {
-            var stream = _encryptAndSign ? await AuthenticateAsClient() : network;
-            OnNewConnection(new Connection(stream, _logger, name));
+            var stream = EncryptAndSign ? await AuthenticateAsClient() : network;
+            OnNewConnection(new Connection(stream, _serializer, _logger, name));
             _logger?.LogInformation($"CreateConnection {Name}.");
             return;
             async Task<Stream> AuthenticateAsClient()
@@ -85,46 +82,26 @@ namespace UiPath.CoreIpc
             }
         }
 
-        protected void OnNewConnection(Connection connection)
+        protected void OnNewConnection(Connection connection, bool alreadyHasServer = false)
         {
             _connection?.Dispose();
             _connection = connection;
-            connection.ResponseReceived += OnResponseReceived;
-            connection.Closed += OnConnectionClosed;
-            var server = _serviceEndpoint == null ? null : new Server(_serviceEndpoint, connection);
-        }
-
-        private void OnConnectionClosed(object sender, EventArgs e)
-        {
-            foreach (var completionSource in _requests.Values)
+            if (alreadyHasServer || _serviceEndpoint == null)
             {
-                completionSource.TrySetException(new IOException("Connection closed."));
+                return;
             }
+            var endpoints = new ConcurrentDictionary<string, EndpointSettings> { [_serviceEndpoint.Name] = _serviceEndpoint };
+            var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
+            _server = new Server(listenerSettings, connection);
         }
 
         public async Task<TResult> InvokeAsync<TResult>(string methodName, object[] args)
         {
-            byte[] requestBytes;
-            TimeSpan timeout;
             var cancellationToken = args.OfType<CancellationToken>().LastOrDefault();
-            var requestId = NewRequestId();
-            Response response = null;
-            return await Task.Run(async () =>
-            {
-                Serialize();
-
-                await InvokeAsync();
-
-                return _serializer.Deserialize<TResult>(response.CheckError().Data ?? "");
-            }).ConfigureAwait(false);
-            void Serialize()
-            {
-                var messageTimeout = args.OfType<Message>().FirstOrDefault()?.RequestTimeout.TotalSeconds;
-                var request = new Request(requestId, methodName, args.Select(_serializer.Serialize).ToArray(), messageTimeout.GetValueOrDefault());
-                requestBytes = _serializer.SerializeToBytes(request);
-                timeout = request.GetTimeout(_requestTimeout);
-            }
-            Task InvokeAsync() =>
+            var messageTimeout = (args.OfType<Message>().FirstOrDefault()?.RequestTimeout.TotalSeconds).GetValueOrDefault();
+            var timeout = messageTimeout == 0 ? _requestTimeout : TimeSpan.FromSeconds(messageTimeout);
+            return await Task.Run(InvokeAsync).ConfigureAwait(false);
+            Task<TResult> InvokeAsync() =>
                 cancellationToken.WithTimeout(timeout, async token =>
                 {
                     bool newConnection;
@@ -133,19 +110,13 @@ namespace UiPath.CoreIpc
                         newConnection = await EnsureConnection(token);
                     }
                     await _beforeCall(new CallInfo(newConnection), token);
+                    var requestId = _connection.NewRequestId();
+                    var arguments = args.Select(_serializer.Serialize).ToArray();
+                    var request = new Request(typeof(TInterface).Name, requestId, methodName, arguments, messageTimeout);
                     _logger?.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
-                    var requestCompletion = new RequestCompletionSource();
-                    _requests[requestId] = requestCompletion;
-                    try
-                    {
-                        await _connection.SendRequest(requestBytes, token);
-                        response = await requestCompletion.Task.WaitAsync(token);
-                    }
-                    finally
-                    {
-                        _requests.TryRemove(requestId, out _);
-                    }
+                    var response = await _connection.Send(request, token);
                     _logger?.LogInformation($"IpcClient called {methodName} {requestId} {Name}.");
+                    return _serializer.Deserialize<TResult>(response.CheckError().Data ?? "");
                 }, methodName, ex =>
                 {
                     var exception = ex;
@@ -156,16 +127,6 @@ namespace UiPath.CoreIpc
                     ExceptionDispatchInfo.Capture(exception).Throw();
                     return Task.CompletedTask;
                 });
-        }
-
-        private void OnResponseReceived(object sender, DataReceivedEventsArgs responseReceivedEventsArgs)
-        {
-            var response = _serializer.Deserialize<Response>(responseReceivedEventsArgs.Data);
-            _logger?.LogInformation($"Received response for request {response.RequestId} {Name}.");
-            if (_requests.TryGetValue(response.RequestId, out var completionSource))
-            {
-                completionSource.TrySetResult(response);
-            }
         }
 
         protected virtual Task<bool> ConnectToServerAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
@@ -185,6 +146,32 @@ namespace UiPath.CoreIpc
             return await ConnectToServerAsync(cancellationToken);
         }
 
+        private protected void ReuseClientConnection(ClientConnection clientConnection)
+        {
+            var alreadyHasServer = clientConnection.Server != null;
+            OnNewConnection(clientConnection.Connection, alreadyHasServer);
+            if (!alreadyHasServer)
+            {
+                clientConnection.Server = _server;
+            }
+            else if (_serviceEndpoint != null)
+            {
+                _server = clientConnection.Server;
+                _server.Endpoints[_serviceEndpoint.Name] = _serviceEndpoint;
+            }
+        }
+
+        private protected async Task CreateClientConnection(ClientConnection clientConnection, Stream network, string name)
+        {
+            var serverEndpoints = clientConnection.Server?.Endpoints;
+            await CreateConnection(network, name);
+            _server?.AddCallbackEndpoints(serverEndpoints);
+            _connection.Listen().LogException(_logger, name);
+            clientConnection.Connection = _connection;
+            clientConnection.Network = network;
+            clientConnection.Server = _server;
+        }
+
         public void Dispose()
         {
             Dispose(true);
@@ -196,12 +183,15 @@ namespace UiPath.CoreIpc
             _logger?.LogInformation($"Dispose {Name}");
             if (disposing)
             {
-                _connection?.Dispose();
+                if (_server != null)
+                {
+                    _server.Endpoints.Remove(_serviceEndpoint.Name);
+                }
             }
         }
     }
 
-    public class InterceptorProxy : DispatchProxy, IDisposable
+    public class IpcProxy : DispatchProxy, IDisposable
     {
         private static readonly MethodInfo InvokeAsyncMethod = typeof(IServiceClient).GetMethod(nameof(IServiceClient.InvokeAsync));
         private static readonly ConcurrentDictionary<Type, InvokeAsyncDelegate> _invokeAsyncByType = new ConcurrentDictionary<Type, InvokeAsyncDelegate>();
@@ -211,6 +201,8 @@ namespace UiPath.CoreIpc
         protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvokeAsync(targetMethod.ReturnType)(ServiceClient, targetMethod.Name, args);
 
         public void Dispose() => ServiceClient.Dispose();
+
+        public void CloseConnection() => ClientConnectionsRegistry.Close((IConnectionKey)ServiceClient);
 
         private static InvokeAsyncDelegate GetInvokeAsync(Type returnType) => _invokeAsyncByType.GetOrAdd(returnType, CreateDelegate);
 
@@ -225,5 +217,7 @@ namespace UiPath.CoreIpc
             var lambda = Lambda<InvokeAsyncDelegate>(invokeAsyncCall, serviceClient, methodName, methodArgs);
             return lambda.Compile();
         }
+
+        public static void CloseConnections() => ClientConnectionsRegistry.Clear();
     }
 }

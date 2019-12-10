@@ -11,7 +11,7 @@ using UiPath.CoreIpc.NamedPipe;
 
 namespace UiPath.CoreIpc.Tests
 {
-    class Program
+    class Server
     {
         //private static readonly Timer _timer = new Timer(_ =>
         //{
@@ -21,7 +21,7 @@ namespace UiPath.CoreIpc.Tests
         //    GC.Collect();
         //}, null, 0, 3000);
 
-        static async Task Main(string[] args)
+        static async Task Main()
         {
             Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
             //GuiLikeSyncContext.Install();
@@ -29,17 +29,13 @@ namespace UiPath.CoreIpc.Tests
             var serviceProvider = ConfigureServices();
             // build and run service host
             var host = new ServiceHostBuilder(serviceProvider)
-                .AddEndpoint(new NamedPipeEndpointSettings<IComputingService, IComputingCallback>() {
+                .UseNamedPipes(new NamedPipeSettings("test")
+                {
                     RequestTimeout = TimeSpan.FromSeconds(2),
-                    AccessControl = security=> security.AllowCurrentUser(),
-                    EncryptAndSign = true
-                })
-                .AddEndpoint(new NamedPipeEndpointSettings<ISystemService>() {
-                    RequestTimeout = TimeSpan.FromSeconds(2),
-                    MaxReceivedMessageSizeInMegabytes = 1,
                     AccessControl = security => security.AllowCurrentUser(),
-                    EncryptAndSign = true
                 })
+                .AddEndpoint<IComputingService, IComputingCallback>()
+                .AddEndpoint<ISystemService>()
                 .Build();
 
             await await Task.WhenAny(host.RunAsync(), Task.Run(() =>

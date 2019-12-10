@@ -10,45 +10,67 @@ namespace UiPath.CoreIpc.NamedPipe
     using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
     using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 
-    internal class NamedPipeClient<TInterface> : ServiceClient<TInterface> where TInterface : class
+    interface INamedPipeKey : IConnectionKey
     {
-        private readonly string _serverName;
-        private readonly string _pipeName;
-        private readonly bool _allowImpersonation;
+        string ServerName { get; }
+        string PipeName { get; }
+        bool AllowImpersonation { get; }
+    }
+
+    internal class NamedPipeClient<TInterface> : ServiceClient<TInterface>, INamedPipeKey where TInterface : class
+    {
+        private readonly int _hashCode;
         private NamedPipeClientStream _pipe;
-
-        public NamedPipeClient(string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign, BeforeCallHandler beforeCall, ServiceEndpoint serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, encryptAndSign, beforeCall, serviceEndpoint)
+        public NamedPipeClient(string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, encryptAndSign, beforeCall, serviceEndpoint)
         {
-            _serverName = serverName;
-            _pipeName = pipeName;
-            _allowImpersonation = allowImpersonation;
+            ServerName = serverName;
+            PipeName = pipeName;
+            AllowImpersonation = allowImpersonation;
+            _hashCode = (serverName, pipeName, allowImpersonation, encryptAndSign).GetHashCode();
         }
-
-        public override string Name => base.Name ?? _pipeName;
-
+        public override string Name => base.Name ?? PipeName;
+        public string ServerName { get; }
+        public string PipeName { get; }
+        public bool AllowImpersonation { get; }
+        public override int GetHashCode() => _hashCode;
+        bool IEquatable<IConnectionKey>.Equals(IConnectionKey other) => other == this || (other is INamedPipeKey otherClient &&
+            otherClient.ServerName == ServerName && otherClient.PipeName == PipeName && otherClient.AllowImpersonation == AllowImpersonation && otherClient.EncryptAndSign == EncryptAndSign);
         protected override async Task<bool> ConnectToServerAsync(CancellationToken cancellationToken)
         {
-            if (_pipe != null)
+            if (_pipe?.IsConnected == true)
             {
-                if (_pipe.IsConnected)
+                return false;
+            }
+            var clientConnection = ClientConnectionsRegistry.GetOrCreate(this);
+            using (await clientConnection.LockAsync(cancellationToken))
+            {
+                // check again just in case it was removed after GetOrCreate but before entering the lock
+                clientConnection = ClientConnectionsRegistry.GetOrCreate(this);
+                var pipe = (NamedPipeClientStream)clientConnection.Network;
+                if (pipe != null)
                 {
-                    return false;
+                    if (pipe.IsConnected)
+                    {
+                        ReuseClientConnection(clientConnection);
+                        _pipe = pipe;
+                        return false;
+                    }
+                    pipe.Dispose();
                 }
-                _pipe.Dispose();
+                pipe = new NamedPipeClientStream(ServerName, PipeName, PipeDirection.InOut, PipeOptions.Asynchronous, AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
+                try
+                {
+                    await pipe.ConnectAsync(cancellationToken);
+                }
+                catch
+                {
+                    pipe.Dispose();
+                    throw;
+                }
+                await CreateClientConnection(clientConnection, pipe, PipeName);
+                _pipe = pipe;
+                return true;
             }
-            _pipe = new NamedPipeClientStream(_serverName, _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _allowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
-            try
-            {
-                await _pipe.ConnectAsync(cancellationToken);
-            }
-            catch
-            {
-                _pipe.Dispose();
-                throw;
-            }
-            await CreateConnection(_pipe, _pipeName);
-            _connection.Listen().LogException(_logger, _pipeName);
-            return true;
         }
     }
 }

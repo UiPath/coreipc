@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -17,6 +18,8 @@ namespace UiPath.CoreIpc
 {
     public static class IOHelpers
     {
+        public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new ReadOnlyDictionary<TKey, TValue>(dictionary);
+
         [Conditional("DEBUG")]
         public static void Validate(Type contract)
         {
@@ -105,6 +108,10 @@ namespace UiPath.CoreIpc
 
         public static Task WithTimeout(this CancellationToken cancellationToken,
             TimeSpan timeout, Func<CancellationToken, Task> func, string message, Func<Exception, Task> exceptionHandler) =>
+            new[] { cancellationToken }.WithTimeout(timeout, func, message, exceptionHandler);
+
+        public static Task<TResult> WithTimeout<TResult>(this CancellationToken cancellationToken,
+            TimeSpan timeout, Func<CancellationToken, Task<TResult>> func, string message, Func<Exception, Task> exceptionHandler) =>
             new[] { cancellationToken }.WithTimeout(timeout, func, message, exceptionHandler);
 
         public static Task WithTimeout(this IEnumerable<CancellationToken> cancellationTokens,

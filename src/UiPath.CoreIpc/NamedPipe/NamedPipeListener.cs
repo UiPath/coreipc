@@ -1,6 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.IO.Pipes;
 using System.Security.Principal;
 using System.Threading;
@@ -8,18 +7,18 @@ using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc.NamedPipe
 {
-    public class NamedPipeServiceEndpoint<TContract> : ServiceEndpoint where TContract : class
+    public class NamedPipeSettings : ListenerSettings
     {
-        public NamedPipeServiceEndpoint(IServiceProvider serviceProvider, NamedPipeEndpointSettings<TContract> namedPipeEndpointSettings) : 
-            base(serviceProvider, namedPipeEndpointSettings, serviceProvider.GetRequiredService<ILogger<NamedPipeServiceEndpoint<TContract>>>())
-        {
-        }
-
-        public new NamedPipeEndpointSettings<TContract> Settings => (NamedPipeEndpointSettings<TContract>)base.Settings;
-
+        public NamedPipeSettings(string pipeName) : base(pipeName) { }
+        public Action<PipeSecurity> AccessControl { get; set; }
+    }
+    class NamedPipeListener : Listener
+    {
+        public NamedPipeListener(NamedPipeSettings settings) : base(settings) { }
+        public new NamedPipeSettings Settings => (NamedPipeSettings)base.Settings;
         protected override async Task AcceptConnection(CancellationToken token)
         {
-            var server = new NamedPipeServerStream(Name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous
+            var server = new NamedPipeServerStream(Settings.Name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous
 #if NET461
                 , inBufferSize: 0, outBufferSize: 0, GetPipeSecurity()
 #endif
@@ -39,11 +38,10 @@ namespace UiPath.CoreIpc.NamedPipe
                 server.Dispose();
                 if (!token.IsCancellationRequested)
                 {
-                    Logger.LogException(ex, Name);
+                    Logger.LogException(ex, Settings.Name);
                 }
             }
         }
-
         private PipeSecurity GetPipeSecurity()
         {
             var setAccessControl = Settings.AccessControl;
@@ -57,7 +55,6 @@ namespace UiPath.CoreIpc.NamedPipe
             pipeSecurity.AllowCurrentUser(onlyNonAdmin: true);
             setAccessControl(pipeSecurity);
             return pipeSecurity;
-
             void FullControlFor(WellKnownSidType sid) => pipeSecurity.Allow(sid, PipeAccessRights.FullControl);
         }
     }

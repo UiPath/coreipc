@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27004.2002
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29519.87
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IpcSample.ConsoleServer", "src\IpcSample.ConsoleServer\IpcSample.ConsoleServer.csproj", "{24A3C4D2-95A2-48D9-86F2-648879EC74F4}"
 EndProject
