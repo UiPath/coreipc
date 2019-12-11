@@ -30,7 +30,7 @@ namespace UiPath.CoreIpc
         }
         internal static bool Remove(IConnectionKey connectionKey) => _connections.TryRemove(connectionKey, out _);
     }
-    public interface IConnectionKey : IEquatable<IConnectionKey>
+    interface IConnectionKey : IEquatable<IConnectionKey>
     {
         bool EncryptAndSign { get; }
     }

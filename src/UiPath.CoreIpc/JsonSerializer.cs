@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace UiPath.CoreIpc
 {
-    public class JsonSerializer : ISerializer
+    class JsonSerializer : ISerializer
     {
         public object Deserialize(string json, Type type)
         {
