@@ -104,9 +104,13 @@ namespace UiPath.CoreIpc
                             callback = () => RequestReceived.Invoke(this, new RequestReceivedEventsArgs(_serializer.Deserialize<Request>(data)));
                         }
                     }
-                    else
+                    else if (message.MessageType == MessageType.Response)
                     {
                         callback = () => OnResponseReceived(data);
+                    }
+                    else
+                    {
+                        Logger?.LogInformation("Unknown message type " + message.MessageType);
                     }
                     if (callback != null)
                     {
