@@ -163,9 +163,7 @@ namespace UiPath.CoreIpc
 
         private protected async Task CreateClientConnection(ClientConnection clientConnection, Stream network, string name)
         {
-            var serverEndpoints = clientConnection.Server?.Endpoints;
             await CreateConnection(network, name);
-            _server?.AddCallbackEndpoints(serverEndpoints);
             _connection.Listen().LogException(_logger, name);
             clientConnection.Connection = _connection;
             clientConnection.Network = network;
