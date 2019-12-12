@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -14,6 +15,7 @@ namespace UiPath.CoreIpc
         private readonly Connection _connection;
         private readonly Lazy<IClient> _client;
         private readonly CancellationTokenSource _connectionClosed = new CancellationTokenSource();
+        private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new ConcurrentDictionary<string, CancellationTokenSource>();
 
         public Server(ListenerSettings settings, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
         {
@@ -22,6 +24,13 @@ namespace UiPath.CoreIpc
             _client = client ?? new Lazy<IClient>(()=>null);
             Serializer = ServiceProvider.GetRequiredService<ISerializer>();
             connection.RequestReceived += (sender, args) => OnRequestReceived(sender, args).LogException(Logger, nameof(OnRequestReceived));
+            connection.CancellationRequestReceived += (sender, args) =>
+            {
+                if (_requests.TryGetValue(args.RequestId, out var cancellation))
+                {
+                    cancellation.Cancel();
+                }
+            };
             connection.Closed += (_, __) =>
             {
                 Logger.LogDebug($"{Name} closed.");
@@ -41,7 +50,9 @@ namespace UiPath.CoreIpc
                         return;
                     }
                     Response response;
-                    await new[] { cancellationToken, _connectionClosed.Token }.WithTimeout(request.GetTimeout(Settings.RequestTimeout), async token =>
+                    var requestCancellation = new CancellationTokenSource();
+                    _requests[request.Id] = requestCancellation;
+                    await new[] { cancellationToken, requestCancellation.Token, _connectionClosed.Token }.WithTimeout(request.GetTimeout(Settings.RequestTimeout), async token =>
                     {
                         using (var scope = ServiceProvider.CreateScope())
                         {
@@ -54,6 +65,10 @@ namespace UiPath.CoreIpc
                 catch (Exception ex)
                 {
                     Logger.LogException(ex, $"{Name} {request}");
+                }
+                if (_requests.TryRemove(request.Id, out var cancellation))
+                {
+                    cancellation.Dispose();
                 }
                 if (_connectionClosed.IsCancellationRequested)
                 {

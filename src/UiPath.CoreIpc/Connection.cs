@@ -31,23 +31,33 @@ namespace UiPath.CoreIpc
         public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
         public Task Listen() => _receiveLoop.Value;
         internal event EventHandler<RequestReceivedEventsArgs> RequestReceived;
+        internal event EventHandler<CancellationRequestReceivedEventsArgs> CancellationRequestReceived;
         public event EventHandler<EventArgs> Closed;
         internal async Task<Response> Send(Request request, CancellationToken token)
         {
-            var requestBytes = _serializer.SerializeToBytes(request);
+            var requestBytes = Serialize(request);
             var requestCompletion = new RequestCompletionSource();
             _requests[request.Id] = requestCompletion;
             try
             {
                 await SendRequest(requestBytes, token);
-                return await requestCompletion.Task.WaitAsync(token);
+                using (token.Register(CancelRequest))
+                {
+                    return await requestCompletion.Task;
+                }
             }
             finally
             {
                 _requests.TryRemove(request.Id, out _);
             }
+            void CancelRequest()
+            {
+                requestCompletion.TrySetCanceled();
+                CancelServerCall(request.Id).LogException(Logger, this);
+            }
+            Task CancelServerCall(string requestId) => SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId)), CancellationToken.None);
         }
-        internal Task Send(Response response, CancellationToken token) => SendResponse(_serializer.SerializeToBytes(response), token);
+        internal Task Send(Response response, CancellationToken token) => SendResponse(Serialize(response), token);
         private Task SendRequest(byte[] requestBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Request, requestBytes, cancellationToken);
         private Task SendResponse(byte[] responseBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Response, responseBytes, cancellationToken);
         public Stream Network { get; }
@@ -97,20 +107,26 @@ namespace UiPath.CoreIpc
                 {
                     Action callback = null;
                     var data = message.Data;
-                    if (message.MessageType == MessageType.Request)
+                    switch (message.MessageType)
                     {
-                        if (RequestReceived != null)
-                        {
-                            callback = () => RequestReceived.Invoke(this, new RequestReceivedEventsArgs(_serializer.Deserialize<Request>(data)));
-                        }
-                    }
-                    else if (message.MessageType == MessageType.Response)
-                    {
-                        callback = () => OnResponseReceived(data);
-                    }
-                    else
-                    {
-                        Logger?.LogInformation("Unknown message type " + message.MessageType);
+                        case MessageType.Request:
+                            if (RequestReceived != null)
+                            {
+                                callback = () => RequestReceived.Invoke(this, new RequestReceivedEventsArgs(Deserialize<Request>(data)));
+                            }
+                            break;
+                        case MessageType.Response:
+                            callback = () => OnResponseReceived(data);
+                            break;
+                        case MessageType.CancellationRequest:
+                            if (CancellationRequestReceived != null)
+                            {
+                                callback = () => CancellationRequestReceived.Invoke(this, new CancellationRequestReceivedEventsArgs(Deserialize<CancellationRequest>(data)));
+                            }
+                            break;
+                        default:
+                            Logger?.LogInformation("Unknown message type " + message.MessageType);
+                            break;
                     }
                     if (callback != null)
                     {
@@ -125,10 +141,11 @@ namespace UiPath.CoreIpc
             Logger?.LogInformation($"{nameof(ReceiveLoop)} {Name} finished.");
             Dispose();
         }
-
+        private byte[] Serialize(object value) => _serializer.SerializeToBytes(value);
+        private T Deserialize<T>(byte[] data) => _serializer.Deserialize<T>(data);
         private void OnResponseReceived(byte[] data)
         {
-            var response = _serializer.Deserialize<Response>(data);
+            var response = Deserialize<Response>(data);
             Logger?.LogInformation($"Received response for request {response.RequestId} {Name}.");
             if (_requests.TryGetValue(response.RequestId, out var completionSource))
             {
@@ -140,5 +157,10 @@ namespace UiPath.CoreIpc
     {
         public RequestReceivedEventsArgs(Request request) => Request = request;
         public Request Request { get; }
+    }
+    readonly struct CancellationRequestReceivedEventsArgs
+    {
+        public CancellationRequestReceivedEventsArgs(CancellationRequest cancellationRequest) => RequestId = cancellationRequest.RequestId;
+        public string RequestId { get; }
     }
 }

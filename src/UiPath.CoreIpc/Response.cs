@@ -79,5 +79,5 @@ namespace UiPath.CoreIpc
         public bool Is<TException>() where TException : Exception => Type == typeof(TException).FullName;
     }
 
-    enum MessageType : byte { Request, Response }
+    enum MessageType : byte { Request, Response, CancellationRequest }
 }

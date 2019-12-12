@@ -161,13 +161,17 @@ namespace UiPath.CoreIpc.Tests
             for (int i = 0; i < counter; i++)
             {
                 var proxy = CreateSystemService();
-                var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
+                var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite, Text = System.Guid.NewGuid().ToString() };
                 var sendMessageResult = proxy.MissingCallback(request);
                 var newGuid = System.Guid.NewGuid();
                 (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
                 await Task.Delay(1);
                 ((IpcProxy)proxy).CloseConnection();
                 sendMessageResult.ShouldThrow<Exception>();
+                while (_systemService.MessageText != request.Text)
+                {
+                    await Task.Yield();
+                }
                 newGuid = System.Guid.NewGuid();
                 (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
             }
