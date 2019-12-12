@@ -4,6 +4,29 @@ using Newtonsoft.Json;
 
 namespace UiPath.CoreIpc
 {
+    class Request
+    {
+        public Request(string endpoint, string id, string methodName, string[] parameters, double timeoutInSeconds)
+        {
+            Endpoint = endpoint;
+            Id = id;
+            MethodName = methodName;
+            Parameters = parameters;
+            TimeoutInSeconds = timeoutInSeconds;
+        }
+        public double TimeoutInSeconds { get; }
+        public string Endpoint { get; }
+        public string Id { get; }
+        public string MethodName { get; }
+        public string[] Parameters { get; }
+        public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
+        internal TimeSpan GetTimeout(TimeSpan @default) => TimeoutInSeconds == 0 ? @default : TimeSpan.FromSeconds(TimeoutInSeconds);
+    }
+    class CancellationRequest
+    {
+        public CancellationRequest(string requestId) => RequestId = requestId;
+        public string RequestId { get; }
+    }
     class Response
     {
         [JsonConstructor]
@@ -21,7 +44,6 @@ namespace UiPath.CoreIpc
         public static Response Success(Request request, string data) => new Response(request.Id, data, null);
         public Response CheckError() => Error == null ? this : throw new RemoteException(Error);
     }
-
     [Serializable]
     public class Error
     {
@@ -44,7 +66,6 @@ namespace UiPath.CoreIpc
         public override string ToString() => new RemoteException(this).ToString();
         private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
     }
-
     [Serializable]
     public class RemoteException : Exception
     {
@@ -78,6 +99,5 @@ namespace UiPath.CoreIpc
         }
         public bool Is<TException>() where TException : Exception => Type == typeof(TException).FullName;
     }
-
     enum MessageType : byte { Request, Response, CancellationRequest }
 }
