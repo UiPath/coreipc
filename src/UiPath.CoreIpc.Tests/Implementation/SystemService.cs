@@ -61,9 +61,19 @@ namespace UiPath.CoreIpc.Tests
             return input.Reverse().ToArray();
         }
 
+        public string MessageText;
+
         public async Task<string> MissingCallback(SystemMessage message, CancellationToken cancellationToken = default)
         {
-            await Task.Delay(message.Delay, cancellationToken);
+            try
+            {
+                await Task.Delay(message.Delay, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                MessageText = message.Text;
+                throw;
+            }
             var domainName = "";
             var client = message.Client;
             //client.RunAs(() => domainName = "test");

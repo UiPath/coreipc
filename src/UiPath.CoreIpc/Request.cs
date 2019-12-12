@@ -1,7 +1,4 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Globalization;
-using System.Reflection;
+﻿using System;
 
 namespace UiPath.CoreIpc
 {
@@ -22,5 +19,10 @@ namespace UiPath.CoreIpc
         public string[] Parameters { get; }
         public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
         internal TimeSpan GetTimeout(TimeSpan @default) => TimeoutInSeconds == 0 ? @default : TimeSpan.FromSeconds(TimeoutInSeconds);
+    }
+    class CancellationRequest
+    {
+        public CancellationRequest(string requestId) => RequestId = requestId;
+        public string RequestId { get; }
     }
 }
