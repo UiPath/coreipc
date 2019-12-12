@@ -25,6 +25,14 @@ namespace UiPath.CoreIpc
     }
     public static class ServiceHostBuilderExtensions
     {
+        public static ServiceHostBuilder AddEndpoints(this ServiceHostBuilder serviceHostBuilder, IEnumerable<EndpointSettings> endpoints)
+        {
+            foreach (var endpoint in endpoints)
+            {
+                serviceHostBuilder.AddEndpoint(endpoints);
+            }
+            return serviceHostBuilder;
+        }
         public static ServiceHostBuilder AddEndpoint<TContract>(this ServiceHostBuilder serviceHostBuilder, TContract serviceInstance = null) where TContract : class => 
             serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract>(serviceInstance));
         public static ServiceHostBuilder AddEndpoint<TContract, TCallbackContract>(this ServiceHostBuilder serviceHostBuilder, TContract serviceInstance = null) where TContract : class where TCallbackContract : class =>
