@@ -42,10 +42,17 @@ namespace UiPath.CoreIpc.NamedPipe
                 return false;
             }
             var clientConnection = ClientConnectionsRegistry.GetOrCreate(this);
-            using (await clientConnection.LockAsync(cancellationToken))
+            var asyncLock = await clientConnection.LockAsync(cancellationToken);
+            try
             {
                 // check again just in case it was removed after GetOrCreate but before entering the lock
-                clientConnection = ClientConnectionsRegistry.GetOrCreate(this);
+                var newClientConnection = ClientConnectionsRegistry.GetOrCreate(this);
+                while(newClientConnection != clientConnection)
+                {
+                    asyncLock.Dispose();
+                    asyncLock = await newClientConnection.LockAsync(cancellationToken);
+                    clientConnection = newClientConnection;
+                }
                 var pipe = (NamedPipeClientStream)clientConnection.Network;
                 if (pipe != null)
                 {
@@ -70,6 +77,10 @@ namespace UiPath.CoreIpc.NamedPipe
                 await CreateClientConnection(clientConnection, pipe, PipeName);
                 _pipe = pipe;
                 return true;
+            }
+            finally
+            {
+                asyncLock.Dispose();
             }
         }
     }
