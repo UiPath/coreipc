@@ -46,18 +46,18 @@ namespace UiPath.CoreIpc
             set
             {
                 _connection = value;
-                _connection.Closed += (_, __) => OnConnectionClosed().LogException(_connection.Logger, _connection);
+                _connection.Closed += (_, __) => OnConnectionClosed(_connection).LogException(_connection.Logger, _connection);
             }
         }
-        private async Task OnConnectionClosed()
+        private async Task OnConnectionClosed(Connection closedConnection)
         {
-            if (!ClientConnectionsRegistry.TryGet(ConnectionKey, out var clientConnection) || clientConnection.Connection != Connection)
+            if (!ClientConnectionsRegistry.TryGet(ConnectionKey, out var clientConnection) || clientConnection.Connection != closedConnection)
             {
                 return;
             }
             using (await clientConnection.LockAsync())
             {
-                if (clientConnection.Connection != Connection)
+                if (clientConnection.Connection != closedConnection)
                 {
                     return;
                 }
