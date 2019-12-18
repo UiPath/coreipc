@@ -62,7 +62,7 @@ namespace UiPath.CoreIpc
                     return;
                 }
                 ClientConnectionsRegistry.Remove(ConnectionKey);
-                _connection.Logger.LogInformation($"Remove connection {_connection}.");
+                _connection.Logger.LogInformation($"Remove connection {closedConnection}.");
             }
         }
         public Server Server { get; set; }
