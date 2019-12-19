@@ -58,9 +58,18 @@ namespace UiPath.CoreIpc.Tests
             ((IpcProxy)_systemClient).CloseConnection();
         }
         [Fact]
-        public Task CallbackConcurrently() => Task.WhenAll(Enumerable.Range(1, 50).Select(_ => Callback()));
+        public Task CallbackConcurrently() => Task.WhenAll(Enumerable.Range(1, 50).Select(_ => CallbackCore()));
         [Fact]
         public async Task Callback()
+        {
+            for (int index = 0; index < 50; index++)
+            {
+                await CallbackCore();
+                ((IpcProxy)_computingClient).CloseConnection();
+            }
+        }
+
+        private async Task CallbackCore()
         {
             var proxy = new NamedPipeClientBuilder<IComputingServiceBase>("EndpointTests").RequestTimeout(RequestTimeout).AllowImpersonation().Build();
             var message = new SystemMessage { Text = Guid.NewGuid().ToString() };
@@ -72,6 +81,7 @@ namespace UiPath.CoreIpc.Tests
             computingTask.Result.ShouldBe($"{Environment.UserName}_{_computingCallback.Id}_{message.Text}");
             computingBaseTask.Result.ShouldBe(3);
         }
+
         [Fact]
         public async Task MissingCallback()
         {
