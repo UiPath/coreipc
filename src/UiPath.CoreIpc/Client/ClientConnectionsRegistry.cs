@@ -3,6 +3,7 @@ using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -50,7 +51,11 @@ namespace UiPath.CoreIpc
                 connection.Close();
             }
         }
-        internal static bool Remove(IConnectionKey connectionKey) => _connections.TryRemove(connectionKey, out _);
+        internal static ClientConnection Remove(IConnectionKey connectionKey)
+        {
+            _connections.TryRemove(connectionKey, out var clientConnection);
+            return clientConnection;
+        }
     }
     readonly struct ClientConnectionHandle : IDisposable
     {
@@ -94,7 +99,8 @@ namespace UiPath.CoreIpc
                 {
                     return;
                 }
-                ClientConnectionsRegistry.Remove(ConnectionKey);
+                var removedConnection = ClientConnectionsRegistry.Remove(ConnectionKey);
+                Debug.Assert(removedConnection.Connection == closedConnection, "Removed the wrong connection.");
                 _connection.Logger.LogInformation($"Remove connection {closedConnection}.");
             }
         }
