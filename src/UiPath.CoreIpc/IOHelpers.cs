@@ -118,7 +118,18 @@ namespace UiPath.CoreIpc
             TimeSpan timeout, Func<CancellationToken, Task> func, string message, Func<Exception, Task> exceptionHandler) =>
             cancellationTokens.WithTimeout(timeout, token => func(token).WithResult(), message, exceptionHandler);
 
-        public static void LogException(this ILogger logger, Exception ex, object tag) => logger?.LogError($"{tag} # {ex}");
+        public static void LogException(this ILogger logger, Exception ex, object tag)
+        {
+            var message = $"{tag} # {ex}";
+            if (logger != null)
+            {
+                logger.LogError(message);
+            }
+            else
+            {
+                Trace.TraceError(message);
+            }
+        }
 
         public static void LogException(this Task task, ILogger logger, object tag) => task.ContinueWith(result => logger.LogException(result.Exception, tag), TaskContinuationOptions.NotOnRanToCompletion);
 

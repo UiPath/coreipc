@@ -17,12 +17,13 @@ namespace UiPath.CoreIpc
         private readonly CancellationTokenSource _connectionClosed = new CancellationTokenSource();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new ConcurrentDictionary<string, CancellationTokenSource>();
 
-        public Server(ListenerSettings settings, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
+        public Server(ILogger logger, ListenerSettings settings, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
         {
             Settings = settings;
             _connection = connection;
             _client = client ?? new Lazy<IClient>(()=>null);
             Serializer = ServiceProvider.GetRequiredService<ISerializer>();
+            Logger = logger;
             connection.RequestReceived += (sender, args) => OnRequestReceived(sender, args).LogException(Logger, nameof(OnRequestReceived));
             connection.CancellationRequestReceived += (sender, args) =>
             {
@@ -82,7 +83,7 @@ namespace UiPath.CoreIpc
                 }
             }
         }
-        private ILogger Logger => _connection.Logger;
+        private ILogger Logger { get; }
         private ListenerSettings Settings { get; }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ISerializer Serializer { get; }
