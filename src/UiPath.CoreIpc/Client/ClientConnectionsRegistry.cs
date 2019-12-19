@@ -73,5 +73,6 @@ namespace UiPath.CoreIpc
             Connection?.Dispose();
             Server?.Endpoints.Clear();
         }
+        public override string ToString() => _connection?.ToString() ?? base.ToString();
     }
 }

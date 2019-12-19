@@ -149,6 +149,7 @@ namespace UiPath.CoreIpc
         private protected void ReuseClientConnection(ClientConnection clientConnection)
         {
             var alreadyHasServer = clientConnection.Server != null;
+            _logger?.LogInformation(nameof(ReuseClientConnection)+" "+clientConnection);
             OnNewConnection(clientConnection.Connection, alreadyHasServer);
             if (!alreadyHasServer)
             {
