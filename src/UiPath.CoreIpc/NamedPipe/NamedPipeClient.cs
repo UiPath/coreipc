@@ -47,7 +47,7 @@ namespace UiPath.CoreIpc.NamedPipe
             {
                 // check again just in case it was removed after GetOrCreate but before entering the lock
                 var newClientConnection = ClientConnectionsRegistry.GetOrCreate(this);
-                while(newClientConnection != clientConnection)
+                if(newClientConnection != clientConnection)
                 {
                     asyncLock.Dispose();
                     asyncLock = await newClientConnection.LockAsync(cancellationToken);
