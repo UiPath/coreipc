@@ -18,9 +18,9 @@ namespace UiPath.CoreIpc
             var asyncLock = await clientConnection.LockAsync(cancellationToken);
             try
             {
-                // check again just in case it was removed after GetOrCreate but before entering the lock
-                var newClientConnection = GetOrAdd(key);
-                if (newClientConnection != clientConnection)
+                // check again just in case it was removed after GetOrAdd but before entering the lock
+                ClientConnection newClientConnection;
+                while ((newClientConnection = GetOrAdd(key)) != clientConnection)
                 {
                     asyncLock.Dispose();
                     asyncLock = await newClientConnection.LockAsync(cancellationToken);
