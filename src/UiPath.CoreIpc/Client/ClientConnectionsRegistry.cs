@@ -12,7 +12,29 @@ namespace UiPath.CoreIpc
     static class ClientConnectionsRegistry
     {
         private static readonly ConcurrentDictionary<IConnectionKey, ClientConnection> _connections = new ConcurrentDictionary<IConnectionKey, ClientConnection>();
-        public static ClientConnection GetOrCreate(IConnectionKey key) => _connections.GetOrAdd(key, localKey=>new ClientConnection(localKey));
+        public static async Task<(ClientConnection, IDisposable)> GetOrCreate(IConnectionKey key, CancellationToken cancellationToken)
+        {
+            var clientConnection = GetOrAdd(key);
+            var asyncLock = await clientConnection.LockAsync(cancellationToken);
+            try
+            {
+                // check again just in case it was removed after GetOrCreate but before entering the lock
+                var newClientConnection = GetOrAdd(key);
+                if (newClientConnection != clientConnection)
+                {
+                    asyncLock.Dispose();
+                    asyncLock = await newClientConnection.LockAsync(cancellationToken);
+                    clientConnection = newClientConnection;
+                }
+            }
+            catch
+            {
+                asyncLock.Dispose();
+                throw;
+            }
+            return (clientConnection, asyncLock);
+        }
+        private static ClientConnection GetOrAdd(IConnectionKey key)=>_connections.GetOrAdd(key, localKey => new ClientConnection(localKey));
         public static bool TryGet(IConnectionKey key, out ClientConnection connection) => _connections.TryGetValue(key, out connection);
         public static void Clear()
         {
