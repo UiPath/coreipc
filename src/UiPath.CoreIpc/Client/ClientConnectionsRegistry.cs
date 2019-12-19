@@ -107,11 +107,7 @@ namespace UiPath.CoreIpc
         public Server Server { get; set; }
         IConnectionKey ConnectionKey { get; }
         public Task<IDisposable> LockAsync(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
-        public void Close()
-        {
-            Connection?.Dispose();
-            Server?.Endpoints.Clear();
-        }
+        public void Close() => Connection?.Dispose();
         public override string ToString() => _connection?.ToString() ?? base.ToString();
     }
 }
