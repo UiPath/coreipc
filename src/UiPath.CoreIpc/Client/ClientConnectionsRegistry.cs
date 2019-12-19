@@ -12,7 +12,7 @@ namespace UiPath.CoreIpc
     static class ClientConnectionsRegistry
     {
         private static readonly ConcurrentDictionary<IConnectionKey, ClientConnection> _connections = new ConcurrentDictionary<IConnectionKey, ClientConnection>();
-        public static async Task<(ClientConnection, IDisposable)> GetOrCreate(IConnectionKey key, CancellationToken cancellationToken)
+        public static async Task<ClientConnectionHandle> GetOrCreate(IConnectionKey key, CancellationToken cancellationToken)
         {
             var clientConnection = GetOrAdd(key);
             var asyncLock = await clientConnection.LockAsync(cancellationToken);
@@ -32,7 +32,7 @@ namespace UiPath.CoreIpc
                 asyncLock.Dispose();
                 throw;
             }
-            return (clientConnection, asyncLock);
+            return new ClientConnectionHandle(clientConnection, asyncLock);
         }
         private static ClientConnection GetOrAdd(IConnectionKey key)=>_connections.GetOrAdd(key, localKey => new ClientConnection(localKey));
         public static bool TryGet(IConnectionKey key, out ClientConnection connection) => _connections.TryGetValue(key, out connection);
@@ -51,6 +51,17 @@ namespace UiPath.CoreIpc
             }
         }
         internal static bool Remove(IConnectionKey connectionKey) => _connections.TryRemove(connectionKey, out _);
+    }
+    readonly struct ClientConnectionHandle : IDisposable
+    {
+        private readonly IDisposable _asyncLock;
+        public ClientConnectionHandle(ClientConnection clientConnection, IDisposable asyncLock)
+        {
+            ClientConnection = clientConnection;
+            _asyncLock = asyncLock;
+        }
+        public ClientConnection ClientConnection { get; }
+        public void Dispose() => _asyncLock.Dispose();
     }
     interface IConnectionKey : IEquatable<IConnectionKey>
     {

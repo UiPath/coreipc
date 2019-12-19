@@ -41,9 +41,9 @@ namespace UiPath.CoreIpc.NamedPipe
             {
                 return false;
             }
-            var (clientConnection, asyncLock) = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
-            using (asyncLock)
+            using (var connectionHandle = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken))
             {
+                var clientConnection = connectionHandle.ClientConnection;
                 var pipe = (NamedPipeClientStream)clientConnection.Network;
                 if (pipe != null)
                 {
