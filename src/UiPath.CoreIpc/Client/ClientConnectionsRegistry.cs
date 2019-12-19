@@ -95,7 +95,7 @@ namespace UiPath.CoreIpc
             }
             using (await clientConnection.LockAsync())
             {
-                if (clientConnection.Connection != closedConnection)
+                if (!ClientConnectionsRegistry.TryGet(ConnectionKey, out clientConnection) || clientConnection.Connection != closedConnection)
                 {
                     return;
                 }
