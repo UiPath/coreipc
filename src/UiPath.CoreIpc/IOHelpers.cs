@@ -250,16 +250,4 @@ namespace UiPath.CoreIpc
             }
         }
     }
-
-    readonly struct WireMessage
-    {
-        public WireMessage(MessageType messageType, byte[] data)
-        {
-            MessageType = messageType;
-            Data = data;
-        }
-        public MessageType MessageType { get; }
-        public byte[] Data { get; }
-        public bool Empty => Data.Length == 0;
-    }
 }
