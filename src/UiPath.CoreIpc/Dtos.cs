@@ -76,6 +76,7 @@ namespace UiPath.CoreIpc
         }
         public string Type { get; }
         public override string StackTrace { get; }
+        public new RemoteException InnerException => (RemoteException)base.InnerException;
         public override string ToString()
         {
             var result = new StringBuilder();
@@ -92,7 +93,7 @@ namespace UiPath.CoreIpc
             else
             {
                 result.Append(" ---> ");
-                ((RemoteException)InnerException).GatherInnerExceptions(result);
+                InnerException.GatherInnerExceptions(result);
                 result.Append("\n\t--- End of inner exception stack trace ---\n");
             }
             result.Append(StackTrace);
