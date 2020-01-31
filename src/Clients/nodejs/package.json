@@ -75,7 +75,7 @@
         "tslint-eslint-rules": "5.4.0",
         "typedoc": "^0.15.0",
         "typedoc-plugin-markdown": "1.2.0",
-        "typescript": "^3.6.4"
+        "typescript": "~3.5.0"
     },
     "gitHead": "edef4e238fde99232400d5270c6f54c3f054cb10"
 }
