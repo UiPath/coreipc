@@ -167,6 +167,7 @@ export class SerializationPal {
 
         const wireRequestFactory = (id: string) => new WireMessage.Request(
             timeoutSeconds,
+            request.endpointName,
             id,
             request.methodName,
             serializedArgs

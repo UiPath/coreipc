@@ -173,7 +173,7 @@ describe(`core:internals -> class:Broker`, () => {
                 }
             );
 
-            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('sumAsync', [1, 2]));
+            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'sumAsync', [1, 2]));
             spyConnectionFactory.should.have.been.called();
         });
 
@@ -187,7 +187,7 @@ describe(`core:internals -> class:Broker`, () => {
                 }
             );
 
-            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('sumAsync', [1, 2]));
+            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'sumAsync', [1, 2]));
             spyConnectionFactory.should.have.been.called();
         });
 
@@ -210,7 +210,7 @@ describe(`core:internals -> class:Broker`, () => {
                 methodContainer
             );
 
-            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('sumAsync', [1, 2]));
+            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'sumAsync', [1, 2]));
             spyConnectionFactory.should.have.been.called();
         });
     });
@@ -260,11 +260,11 @@ describe(`core:internals -> class:Broker`, () => {
 
             const broker = createBrokerFromLogicalSocket(ls);
 
-            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('primerMethod', []));
+            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'primerMethod', []));
             write1.should.have.been.called();
             write2.should.not.have.been.called();
 
-            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(2, 'id', 'callbackMethodName', [])));
+            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(2, 'ENDPOINT_NAME', 'id', 'callbackMethodName', [])));
 
             write2.should.not.have.been.called();
 
@@ -317,11 +317,11 @@ describe(`core:internals -> class:Broker`, () => {
             const callbackContainer = {};
             const broker = createBrokerFromLogicalSocket(ls, callbackContainer);
 
-            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('primerMethod', []));
+            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'primerMethod', []));
             write1.should.have.been.called();
             write2.should.not.have.been.called();
 
-            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(2, 'id', 'callbackMethodName', [])));
+            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(2, 'ENDPOINT_NAME', 'id', 'callbackMethodName', [])));
 
             write2.should.not.have.been.called();
 
@@ -378,8 +378,8 @@ describe(`core:internals -> class:Broker`, () => {
             };
             const broker = createBrokerFromLogicalSocket(ls, callbackContainer);
 
-            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('primerMethod', []));
-            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(2, 'id', 'callbackMethod', ['3'])));
+            await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'primerMethod', []));
+            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(2, 'ENDPOINT_NAME', 'id', 'callbackMethod', ['3'])));
 
             await Promise.yield();
         });
@@ -404,7 +404,7 @@ describe(`core:internals -> class:Broker`, () => {
                     return x + y;
                 }
             });
-            const brokerRequest = new BrokerMessage.OutboundRequest('sumAsync', [1, 2]);
+            const brokerRequest = new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'sumAsync', [1, 2]);
             await broker.sendReceiveAsync(brokerRequest).
                 should.eventually.be.fulfilled.and.satisfy((x: BrokerMessage.Response) => {
                     expect(x).not.to.be.null.and.not.to.be.undefined;
@@ -430,7 +430,7 @@ describe(`core:internals -> class:Broker`, () => {
                     return x + y;
                 }
             });
-            const brokerRequest = new BrokerMessage.OutboundRequest('sumAsync', [1, 2]);
+            const brokerRequest = new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'sumAsync', [1, 2]);
             const promise = broker.sendReceiveAsync(brokerRequest);
 
             const rejectedSpy = spy(() => { });
@@ -470,9 +470,9 @@ describe(`core:internals -> class:Broker`, () => {
                     failAsync
                 });
 
-            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(1, 'id-1', 'succeedAsync', ['1', '2'])));
-            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(1, 'id-2', 'failAsync', ['1', '2'])));
-            broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('inexistentMethod', [])).observe();
+            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(1, 'ENDPOINT_NAME', 'id-1', 'succeedAsync', ['1', '2'])));
+            data.next(SerializationPal.wireRequestToBuffer(new WireMessage.Request(1, 'ENDPOINT_NAME', 'id-2', 'failAsync', ['1', '2'])));
+            broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'inexistentMethod', [])).observe();
 
             await Promise.yield();
             succeedAsync.should.have.been.called();
@@ -501,7 +501,7 @@ describe(`core:internals -> class:Broker`, () => {
             const broker = createBroker();
             try {
                 const invalidBrokerRequest: BrokerMessage.OutboundRequest = null as any;
-                const validBrokerRequest = new BrokerMessage.OutboundRequest('method-name', []);
+                const validBrokerRequest = new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'method-name', []);
 
                 function maybeObserve<T>(promise: Promise<T> | null | undefined): Promise<T> | null | undefined {
                     if (promise) {
@@ -534,9 +534,9 @@ describe(`core:internals -> class:Broker`, () => {
             });
 
             try {
-                const breq1 = new BrokerMessage.OutboundRequest('succeedAsync', [1, 2]);
-                const breq2 = new BrokerMessage.OutboundRequest('failLogicallyAsync', []);
-                const breq3 = new BrokerMessage.OutboundRequest('breqFailInfrastructurallyAsync', []);
+                const breq1 = new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'succeedAsync', [1, 2]);
+                const breq2 = new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'failLogicallyAsync', []);
+                const breq3 = new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'breqFailInfrastructurallyAsync', []);
 
                 const promise1 = broker.sendReceiveAsync(breq1);
                 const promise2 = broker.sendReceiveAsync(breq2);
@@ -591,7 +591,7 @@ describe(`core:internals -> class:Broker`, () => {
             };
             const broker = createBrokerFromLogicalSocket(ls);
             try {
-                await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('method', [])).
+                await broker.sendReceiveAsync(new BrokerMessage.OutboundRequest('ENDPOINT_NAME', 'method', [])).
                     should.be.eventually.rejected;
             } finally {
                 await broker.disposeAsync();

@@ -21,9 +21,9 @@ function callData(partial: Partial<ICallContextData>): ICallContextData {
     return { ...partial, dispose() { } } as any;
 }
 
-const wireRequest = new WireMessage.Request(1, 'id', 'methodName', []);
+const wireRequest = new WireMessage.Request(1, 'ENDPOINT_NAME', 'id', 'methodName', []);
 const validCallData = callData({ cancellationToken: CancellationToken.none, wireRequest });
-const validCallDataFactory = (id: string) => callData({ cancellationToken: CancellationToken.none, wireRequest: new WireMessage.Request(1, id, 'methodName', []) });
+const validCallDataFactory = (id: string) => callData({ cancellationToken: CancellationToken.none, wireRequest: new WireMessage.Request(1, 'ENDPOINT_NAME', id, 'methodName', []) });
 
 describe(`core:internals -> class:CallContext`, () => {
     context(`ctor`, () => {

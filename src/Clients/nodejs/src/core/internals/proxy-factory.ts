@@ -65,11 +65,13 @@ export class Generator<TService> {
 
         const traceCategory = this._traceCategory;
 
+        const endpointName = this._sampleCtor.name;
+
         return async function(this: IProxy) {
             traceCategory.log(`executing "${methodName}", stack is:\r\n${new StackTrace()}`);
             const args = normalizeArgs([...arguments]);
 
-            const brokerOutboundRequest = new BrokerMessage.OutboundRequest(methodName, args);
+            const brokerOutboundRequest = new BrokerMessage.OutboundRequest(endpointName, methodName, args);
 
             traceCategory.log(`sending brokerRequest: ${JSON.stringify(brokerOutboundRequest)}`);
             try {

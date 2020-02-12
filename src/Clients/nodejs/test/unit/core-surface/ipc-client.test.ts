@@ -15,10 +15,43 @@ import { IBroker } from '../../../src/core/internals/broker';
 import { ArgumentNullError } from '../../../src/foundation/errors';
 import { PromiseCompletionSource, CancellationToken } from '../../../src/foundation/threading';
 import { IPipeClientStream } from '../../../src/foundation/pipes';
+import { Message } from '../../../src/core/surface/message';
+
 
 import * as BrokerMessage from '../../../src/core/internals/broker-message';
 
 describe(`core:surface -> class:IpcClient`, () => {
+    if (1 as any === 2) {
+        context(`temporary-e2e`, () => {
+            it(`should work`, async () => {
+
+                class IAlgebra {
+                    public Multiply(x: number, y: number, message: Message<void>): Promise<number> {
+                        throw null;
+                    }
+                }
+
+                interface IArithmetics {
+                    Sum(x: number, y: number): Promise<number>;
+                }
+
+                class Arithmetics implements IArithmetics {
+                    public async Sum(x: number, y: number): Promise<number> {
+                        return x + y;
+                    }
+                }
+
+                const client = new IpcClient('foobar', IAlgebra, x => {
+                    x.callbackService = new Arithmetics();
+                });
+                const result = await client.proxy.Multiply(5, 6, new Message<void>());
+
+                console.log(`result == ${result}`);
+
+            });
+        });
+    }
+
     context(`ctor`, () => {
         it(`should throw provided a falsy pipeName`, () => {
             (() => new IpcClient(null as any, Object)).should.throw(ArgumentNullError).with.property('paramName', 'pipeName');
