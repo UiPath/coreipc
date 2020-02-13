@@ -22,6 +22,12 @@ export function __returns__(returnValueCtor: PublicConstructor<unknown>) {
     };
 }
 
+export function __endpoint__(name: string) {
+    return (ctor: PublicConstructor<unknown>) => {
+        rtti.ClassInfo.get(ctor).maybeEndpointName = name;
+    };
+}
+
 /* @internal */
 export module rtti {
     export class ClassInfo<T> {
@@ -34,6 +40,7 @@ export module rtti {
             public readonly constructor: PublicConstructor<T>,
             public readonly prototype: any
         ) { }
+        public maybeEndpointName: string | null = null;
         public tryGetMethod(name: string): Maybe<MethodInfo<T>> { return this._methods[name] || null; }
         private [$classGetOrCreateMethod](name: string): MethodInfo<T> { return this._methods[name] || (this._methods[name] = new MethodInfo(this, name)); }
     }

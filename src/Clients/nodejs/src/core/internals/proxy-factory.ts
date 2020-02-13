@@ -56,7 +56,8 @@ export class Generator<TService> {
     }
 
     private generateMethod(methodName: string): IMethod {
-        const maybeMethodInfo = rtti.ClassInfo.get(this._sampleCtor as any).tryGetMethod(methodName);
+        const classInfo = rtti.ClassInfo.get(this._sampleCtor as any);
+        const maybeMethodInfo = classInfo.tryGetMethod(methodName);
         const hasCancellationToken = maybeMethodInfo ? maybeMethodInfo.hasCancellationToken : false;
 
         const normalizeArgs = Normalizers.getArgListNormalizer(hasCancellationToken);
@@ -65,7 +66,7 @@ export class Generator<TService> {
 
         const traceCategory = this._traceCategory;
 
-        const endpointName = this._sampleCtor.name;
+        const endpointName = classInfo.maybeEndpointName || this._sampleCtor.name;
 
         return async function(this: IProxy) {
             traceCategory.log(`executing "${methodName}", stack is:\r\n${new StackTrace()}`);

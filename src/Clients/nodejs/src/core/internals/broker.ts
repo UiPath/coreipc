@@ -118,7 +118,7 @@ export class Broker implements IBroker, IAsyncDisposable {
 
         this._newConnection = true;
 
-        return result;
+        return result as any;
     }
 
     private processInboundAsync(event: MessageEvent): void {
