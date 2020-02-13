@@ -16,6 +16,7 @@ import * as BrokerMessage from '../../../src/core/internals/broker-message';
 
 import { CancellationTokenSource, CancellationToken, TimeSpan } from '../../../src/foundation/threading';
 import { ArgumentNullError, OperationCanceledError, AggregateError } from '../../../src/foundation/errors';
+import { __endpoint__ } from '../../../src/core/surface/rtti';
 
 describe(`core:internals -> class:ProxyFactory`, () => {
     context(`method:create`, () => {
@@ -122,7 +123,7 @@ describe(`core:internals -> class:Generator`, () => {
             });
 
             context(`the proxy instantiated using the ctor`, () => {
-                function quickBroker(sendReceiveAsync: (brokerRequest: BrokerMessage.Request) => Promise<BrokerMessage.Response>): IBroker {
+                function quickBroker(sendReceiveAsync: (brokerRequest: BrokerMessage.OutboundRequest) => Promise<BrokerMessage.Response>): IBroker {
                     const broker: IBroker = {
                         async disposeAsync(): Promise<void> { },
                         sendReceiveAsync: spy(sendReceiveAsync)
@@ -132,6 +133,45 @@ describe(`core:internals -> class:Generator`, () => {
                 class TestError extends Error {
                     constructor(message: string) { super(message); }
                 }
+
+                it(`should outbound requests with the implicit endpoint name when not overriden`, async () => {
+                    class IContract {
+                        public testMethod(): Promise<string> { throw null; }
+                    }
+
+                    const ctor = Generator.generate(IContract);
+                    const broker = quickBroker(async (brokerRequest: BrokerMessage.OutboundRequest): Promise<BrokerMessage.Response> => {
+                        brokerRequest.args.should.be.eql([]);
+                        brokerRequest.methodName.should.be.equal('testMethod');
+                        'IContract'.should.be.equal(brokerRequest.endpointName);
+
+                        return new BrokerMessage.Response('test-result', null);
+                    });
+
+                    const proxy = new ctor(broker);
+                    await proxy.testMethod().should.eventually.be.fulfilled.and.equal('test-result');
+                    broker.sendReceiveAsync.should.have.been.called();
+                });
+
+                it(`should outbound requests with the explicit endpoint name when overriden`, async () => {
+                    @__endpoint__('SomeOtherName')
+                    class IContract {
+                        public testMethod(): Promise<string> { throw null; }
+                    }
+
+                    const ctor = Generator.generate(IContract);
+                    const broker = quickBroker(async (brokerRequest: BrokerMessage.OutboundRequest): Promise<BrokerMessage.Response> => {
+                        brokerRequest.args.should.be.eql([]);
+                        brokerRequest.methodName.should.be.equal('testMethod');
+                        'SomeOtherName'.should.be.equal(brokerRequest.endpointName);
+
+                        return new BrokerMessage.Response('test-result', null);
+                    });
+
+                    const proxy = new ctor(broker);
+                    await proxy.testMethod().should.eventually.be.fulfilled.and.equal('test-result');
+                    broker.sendReceiveAsync.should.have.been.called();
+                });
 
                 it(`should dispatch its calls to the IBroker instance`, async () => {
                     class IContract {
