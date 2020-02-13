@@ -9,7 +9,7 @@ import {
 } from './foundation/threading';
 
 import {
-    __hasCancellationToken__, __returns__,
+    __hasCancellationToken__, __returns__, __endpoint__,
     RemoteError,
     IpcClient,
     Message
@@ -37,5 +37,6 @@ export {
     IDisposable,
     __hasCancellationToken__,
     __returns__,
+    __endpoint__,
     Trace
 };

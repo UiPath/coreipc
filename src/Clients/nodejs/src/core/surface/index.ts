@@ -5,7 +5,7 @@ import {
     ConnectionFactoryDelegate
 } from './ipc-client';
 
-import { __hasCancellationToken__, __returns__ } from './rtti';
+import { __hasCancellationToken__, __returns__, __endpoint__ } from './rtti';
 import { Message } from './message';
 import { RemoteError } from './remote-error';
 
@@ -14,7 +14,7 @@ export {
     IIpcClientConfig,
     BeforeCallDelegate,
     ConnectionFactoryDelegate,
-    __hasCancellationToken__, __returns__,
+    __hasCancellationToken__, __returns__, __endpoint__,
     Message,
     RemoteError
 };
