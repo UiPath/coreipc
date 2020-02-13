@@ -271,7 +271,7 @@ namespace UiPath.CoreIpc.Tests
         }
 
         [Fact]
-        public Task VoidIsAsync() => _systemClient.VoidSyncThrow();
+        public async Task VoidIsAsync() => await _systemClient.VoidSyncThrow();
 
         [Fact]
         public async Task GetThreadName() => (await _systemClient.GetThreadName()).ShouldBe("GuiThread");
@@ -366,8 +366,6 @@ namespace UiPath.CoreIpc.Tests
             _computingHost.Dispose();
             _systemHost.Dispose();
             _guiThread.Dispose();
-            ((IpcProxy)_computingClient).CloseConnection();
-            ((IpcProxy)_systemClient).CloseConnection();
         }
     }
 }

@@ -64,7 +64,11 @@ namespace UiPath.CoreIpc
                     {
                         await AuthenticateAsServer();
                     }
-                    await _connection.Listen();
+                    // close the connection when the service host closes
+                    using (cancellationToken.Register(_connection.Dispose))
+                    {
+                        await _connection.Listen();
+                    }
                     return;
                     async Task AuthenticateAsServer()
                     {

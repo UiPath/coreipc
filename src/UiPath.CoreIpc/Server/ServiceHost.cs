@@ -48,8 +48,8 @@ namespace UiPath.CoreIpc
             var tasks = _listeners.Select(listener => Task.Run(() =>
             {
                 _logger.LogDebug($"Starting endpoint '{listener}'...");
-                _cancellationTokenSource.Token.Register(() => _logger.LogDebug($"Stopping endpoint '{listener}'..."));
-                return listener.ListenAsync(_cancellationTokenSource.Token).ContinueWith(_ => _logger.LogDebug($"Endpoint '{listener}' stopped."));
+                _cancellationTokenSource.Token.Register(() => _logger.LogInformation($"Stopping endpoint '{listener}'..."));
+                return listener.ListenAsync(_cancellationTokenSource.Token).ContinueWith(_ => _logger.LogInformation($"Endpoint '{listener}' stopped."));
             }));
             return Task.WhenAll(tasks);
         }
