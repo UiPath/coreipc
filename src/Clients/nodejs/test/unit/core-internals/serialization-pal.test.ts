@@ -458,7 +458,7 @@ describe(`core:internals -> class:SerializationPal`, () => {
         });
 
         it(`shouldn't throw provided a valid wireRequest`, () => {
-            const wireRequest = new WireMessage.Request(1, 'id', 'methodName', []);
+            const wireRequest = new WireMessage.Request(1, 'ENDPOINT_NAME', 'id', 'methodName', []);
             (() => SerializationPal.deserializeRequest(wireRequest)).should.not.throw();
         });
     });

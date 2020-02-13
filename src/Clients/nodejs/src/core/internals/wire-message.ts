@@ -13,6 +13,8 @@ export class Request extends Base {
         // tslint:disable-next-line: variable-name
         public readonly TimeoutInSeconds: number,
         // tslint:disable-next-line: variable-name
+        public readonly Endpoint: string,
+        // tslint:disable-next-line: variable-name
         public readonly Id: string,
         // tslint:disable-next-line: variable-name
         public readonly MethodName: string,

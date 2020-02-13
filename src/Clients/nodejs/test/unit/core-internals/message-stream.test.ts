@@ -73,7 +73,7 @@ describe(`core:internals -> class:MessageStream`, () => {
         });
 
         it(`should emit when there's data avaible`, async () => {
-            const sourceObj = new WireMessage.Request(1, 'id', 'methodName', ['1', 'true', 'null']);
+            const sourceObj = new WireMessage.Request(1, 'ENDPOINT_NAME', 'id', 'methodName', ['1', 'true', 'null']);
             const sourceJson = JSON.stringify(sourceObj);
             const sourceBufferPayload = Buffer.from(sourceJson, 'utf-8');
             const sourceBufferCb = Buffer.alloc(4);
@@ -127,7 +127,7 @@ describe(`core:internals -> class:MessageStream`, () => {
             (mock as any).writeAsync = spy(() => { });
 
             const messageStream = new MessageStream(mock);
-            messageStream.writeAsync(new WireMessage.Request(1, 'id', 'methodName', []), CancellationToken.none);
+            messageStream.writeAsync(new WireMessage.Request(1, 'ENDPOINT_NAME', 'id', 'methodName', []), CancellationToken.none);
             mock.writeAsync.should.have.been.called();
         });
     });

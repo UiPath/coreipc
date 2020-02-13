@@ -22,6 +22,7 @@ export class InboundRequest extends Request {
 /* @internal */
 export class OutboundRequest extends Request {
     constructor(
+        public readonly endpointName: string,
         methodName: string,
         args: ReadonlyArray<any>
     ) {
