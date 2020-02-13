@@ -34,7 +34,6 @@ namespace UiPath.CoreIpc.Tests
                 .AddEndpoint<IComputingServiceBase>()
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService, ISystemCallback>()
-                .AddEndpoint(new EndpointSettings<ISystemService, ISystemCallback> { IsDefault = true })
                 .Build();
             _host.RunAsync();
             _computingClient = ComputingClientBuilder().Build();
