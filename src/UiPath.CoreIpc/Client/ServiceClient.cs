@@ -164,7 +164,7 @@ namespace UiPath.CoreIpc
                 }
                 catch (ArgumentException ex)
                 {
-                    throw new InvalidOperationException($"Duplicate callback proxy instance {Name} <{typeof(TInterface).Name}, {_serviceEndpoint.Contract.Name}>. Use a singleton callback proxy.", ex);
+                    throw new InvalidOperationException($"Duplicate callback proxy instance {Name} <{typeof(TInterface).Name}, {_serviceEndpoint.Contract.Name}>. Consider using a singleton callback proxy.", ex);
                 }
             }
         }

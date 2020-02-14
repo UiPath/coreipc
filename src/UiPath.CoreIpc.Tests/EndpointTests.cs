@@ -122,7 +122,7 @@ namespace UiPath.CoreIpc.Tests
             var proxy = CreateSystemService();
             var message = proxy.GetThreadName().ShouldThrow<InvalidOperationException>().Message;
             message.ShouldStartWith("Duplicate callback proxy instance EndpointTests");
-            message.ShouldEndWith("<ISystemService, ISystemCallback>. Use a singleton callback proxy.");
+            message.ShouldEndWith("<ISystemService, ISystemCallback>. Consider using a singleton callback proxy.");
         }
     }
 }
