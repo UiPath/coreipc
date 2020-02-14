@@ -189,10 +189,7 @@ namespace UiPath.CoreIpc
             _logger?.LogInformation($"Dispose {Name}");
             if (disposing)
             {
-                if (_server != null)
-                {
-                    _server.Endpoints.Remove(_serviceEndpoint.Name);
-                }
+                _server?.Endpoints.Remove(_serviceEndpoint.Name);
             }
         }
     }
