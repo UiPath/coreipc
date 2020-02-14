@@ -111,7 +111,18 @@ namespace UiPath.CoreIpc.Tests
                     newGuid = Guid.NewGuid();
                     (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
                 }
+                ((IDisposable)proxy).Dispose();
             }
+        }
+
+        [Fact]
+        public async Task DuplicateCallbackProxies()
+        {
+            await _systemClient.GetThreadName();
+            var proxy = CreateSystemService();
+            var message = proxy.GetThreadName().ShouldThrow<InvalidOperationException>().Message;
+            message.ShouldStartWith("Duplicate callback proxy instance EndpointTests");
+            message.ShouldEndWith("<ISystemService, ISystemCallback>. Use a singleton callback proxy.");
         }
     }
 }
