@@ -30,7 +30,7 @@ namespace UiPath.CoreIpc
         {
             foreach (var endpoint in endpoints)
             {
-                serviceHostBuilder.AddEndpoint(endpoints);
+                serviceHostBuilder.AddEndpoint(endpoint);
             }
             return serviceHostBuilder;
         }
