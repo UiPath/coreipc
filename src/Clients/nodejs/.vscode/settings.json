@@ -1,4 +1,6 @@
 {
     "javascript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
-    "typescript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false
+    "typescript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
+    "mochaExplorer.files": "test/unit/**/*.ts",
+    "mochaExplorer.optsFile": "test/unit/mocha.opts"
 }
