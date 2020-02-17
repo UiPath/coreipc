@@ -16,7 +16,26 @@ import * as BrokerMessage from '../../../src/core/internals/broker-message';
 
 import { CancellationTokenSource, CancellationToken, TimeSpan } from '../../../src/foundation/threading';
 import { ArgumentNullError, OperationCanceledError, AggregateError } from '../../../src/foundation/errors';
-import { __endpoint__ } from '../../../src/core/surface/rtti';
+import { __endpoint__, rtti } from '../../../src/core/surface/rtti';
+
+class ContractTest1 {
+    public testMethod(): Promise<string> { throw null; }
+}
+
+@__endpoint__('Contract2_overriden')
+class Contract2 {
+    public testMethod(): Promise<string> { throw null; }
+}
+
+@__endpoint__('Contract3_overriden')
+class Contract3 {
+    public testMethod(): Promise<string> { throw null; }
+}
+
+@__endpoint__('SomeOtherName')
+class ISomeContract {
+    public testMethod(): Promise<string> { throw null; }
+}
 
 describe(`core:internals -> class:ProxyFactory`, () => {
     context(`method:create`, () => {
@@ -153,13 +172,48 @@ describe(`core:internals -> class:Generator`, () => {
                     broker.sendReceiveAsync.should.have.been.called();
                 });
 
-                it(`should outbound requests with the explicit endpoint name when overriden`, async () => {
-                    @__endpoint__('SomeOtherName')
-                    class IContract {
-                        public testMethod(): Promise<string> { throw null; }
+                it(`simple prototype type`, () => {
+                    class Foo { }
+                    class Bar { }
+
+                    expect(Foo.prototype).not.to.equal(Bar.prototype);
+                });
+
+                it(`shouldn't interfere with itself on different contracts`, async () => {
+                    expect(rtti.ClassInfo.get(ContractTest1).maybeEndpointName).to.be.null;
+                    expect(rtti.ClassInfo.get(Contract2).maybeEndpointName).to.be.equal('Contract2_overriden');
+                    expect(rtti.ClassInfo.get(Contract3).maybeEndpointName).to.be.equal('Contract3_overriden');
+
+                    const ctor1 = Generator.generate(ContractTest1);
+                    const ctor2 = Generator.generate(Contract2);
+                    const ctor3 = Generator.generate(Contract3);
+
+                    function createQuickBroker() {
+                        return quickBroker(async (brokerRequest: BrokerMessage.OutboundRequest): Promise<BrokerMessage.Response> => {
+                            return new BrokerMessage.Response(brokerRequest.endpointName, null);
+                        });
                     }
 
-                    const ctor = Generator.generate(IContract);
+                    const broker1 = createQuickBroker();
+                    const broker2 = createQuickBroker();
+                    const broker3 = createQuickBroker();
+
+                    const proxy1 = new ctor1(broker1);
+                    const proxy2 = new ctor2(broker2);
+                    const proxy3 = new ctor3(broker3);
+
+                    await proxy1.testMethod().should.eventually.be.fulfilled.and.equal('ContractTest1');
+                    broker1.sendReceiveAsync.should.have.been.called();
+
+                    await proxy2.testMethod().should.eventually.be.fulfilled.and.equal('Contract2_overriden');
+                    broker2.sendReceiveAsync.should.have.been.called();
+
+                    await proxy3.testMethod().should.eventually.be.fulfilled.and.equal('Contract3_overriden');
+                    broker3.sendReceiveAsync.should.have.been.called();
+                });
+
+                it(`should outbound requests with the explicit endpoint name when overriden`, async () => {
+                    const ctor = Generator.generate(ISomeContract);
                     const broker = quickBroker(async (brokerRequest: BrokerMessage.OutboundRequest): Promise<BrokerMessage.Response> => {
                         brokerRequest.args.should.be.eql([]);
                         brokerRequest.methodName.should.be.equal('testMethod');

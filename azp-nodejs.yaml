@@ -1,4 +1,24 @@
 steps:
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_NodeJS) Install dotnet-script'
+    inputs:
+      command: 'custom'
+      custom: 'tool'
+      arguments: 'install -g dotnet-script'
+
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_NodeJS) Check dotnet-script'
+    inputs:
+      command: 'custom'
+      custom: 'script'
+      arguments: 'eval "Console.WriteLine(1 + 2)"'
+
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_NodeJS) Restore and build .NET'
+    inputs:
+      projects: '$(DotNet_SessionSolution)'
+      arguments: '--configuration $(DotNet_BuildConfiguration) -p:Version="$(FullVersion)"'
+
   - task: Npm@1
     displayName: '$(Label_NodeJS) Write $[FullVersion] to package.json'
     inputs:
