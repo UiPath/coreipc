@@ -3,7 +3,6 @@ import { LineEmitter } from './line-emitter';
 import { Writable } from 'stream';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Trace } from '../../../../src/foundation/utils';
 
 export interface IAsyncDisposable {
     disposeAsync(): Promise<void>;
@@ -53,13 +52,6 @@ export class DotNetScript implements IAsyncDisposable {
             cwd: this._cwd,
             stdio: 'pipe'
         });
-        this._process.on('error', error => {
-            console.log('######## the child process emitted an error', error);
-        });
-        this._process.on('close', code => {
-            console.log('######## the child process ended with code', code);
-        });
-        this._stdin = this._process.stdin.setDefaultEncoding('utf-8');
 
         const lineEmitter = new LineEmitter(this._process.stdout.setEncoding('utf-8'));
 
@@ -80,6 +72,22 @@ export class DotNetScript implements IAsyncDisposable {
                 this._lines.push(null);
                 lineEmitter.removeAllListeners();
             });
+
+        this._process.on('error', error => {
+            console.log('######## the child process emitted an error', error);
+        });
+        this._process.on('close', code => {
+            if (this._awaiter) {
+                this._awaiter(null);
+            }
+            if (this._process) {
+                this._process.stdout.destroy();
+            }
+            lineEmitter.emit('eof');
+            lineEmitter.emit('line', null);
+            console.log('######## the child process ended with code', code);
+        });
+        this._stdin = this._process.stdin.setDefaultEncoding('utf-8');
     }
 
     public async writeLineAsync(line: string): Promise<void> {
@@ -97,13 +105,15 @@ export class DotNetScript implements IAsyncDisposable {
                 } else {
                     reject(maybeError);
                 }
-            })
+            });
         });
     }
 
     public async readLineAsync(): Promise<string | null> {
+        console.log(`!!! readLineAsync()`);
+
         await this._initTask;
-        return await new Promise<string | null>((resolve, reject) => {
+        const result = await new Promise<string | null>((resolve, reject) => {
             if (this._disposed) {
                 reject(new Error(`Cannot access a disposed object.\r\nObject name: ${DotNetScript.name}.`));
                 return;
@@ -116,21 +126,33 @@ export class DotNetScript implements IAsyncDisposable {
 
             this._awaiter = resolve;
         });
+
+        console.log(`!!! readLineAsync() yields ${result}`);
+
+        return result;
     }
 
     public async waitForLineAsync(line: string): Promise<void> {
-        function isTerminal(x: string | null) { return x == null || x == line; }
+        await this._initTask;
 
-        while (!isTerminal(await this.readLineAsync())) {
+        function isTerminal(x: string | null) {
+            return x == null || x === line;
+        }
+
+        const process = this._process as ChildProcessWithoutNullStreams;
+
+        while (!process.killed && !isTerminal(await this.readLineAsync())) {
         }
     }
 
     public async disposeAsync(): Promise<void> {
         await this._initTask;
-        await new Promise<void>(resolve => {
-            (this._process as ChildProcessWithoutNullStreams).kill();
-            (this._process as ChildProcessWithoutNullStreams).once('exit', resolve);
-        });
+        if (this._process && !this._process.killed) {
+            await new Promise<void>(resolve => {
+                (this._process as ChildProcessWithoutNullStreams).kill();
+                (this._process as ChildProcessWithoutNullStreams).once('exit', resolve);
+            });
+        }
         await new Promise<void>((resolve, reject) => fs.unlink(this._path, error => {
             if (!error) {
                 resolve();
