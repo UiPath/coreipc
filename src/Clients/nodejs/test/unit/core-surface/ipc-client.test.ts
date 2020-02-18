@@ -19,7 +19,6 @@ import { IPipeClientStream } from '../../../src/foundation/pipes';
 import { Message } from '../../../src/core/surface/message';
 
 import * as BrokerMessage from '../../../src/core/internals/broker-message';
-import { DotNetScript } from './helpers/dotnet-script';
 
 class IAlgebra {
     public Multiply(x: number, y: number, message: Message<void>): Promise<number> {
@@ -28,117 +27,6 @@ class IAlgebra {
 }
 
 describe(`core:surface -> class:IpcClient`, () => {
-    // tslint:disable-next-line: only-arrow-functions
-    context(`e2e`, function() {
-        this.timeout(10 * 1000);
-
-        it(`should work`, async () => {
-            const relativePathTargetDir = process.env['NodeJS_NetStandardTargetDir_RelativePath'] || '..\\..\\UiPath.CoreIpc\\bin\\Debug\\netstandard2.0';
-            const pathCwd = path.join(process.cwd(), relativePathTargetDir);
-
-            function getCSharpCode() {
-                return /* javascript */ `
-#r "nuget: Microsoft.Extensions.DependencyInjection.Abstractions, 3.0.0"
-#r "nuget: Microsoft.Extensions.Logging.Abstractions, 3.0.0"
-
-#r "nuget: Microsoft.Extensions.DependencyInjection, 3.0.0"
-#r "nuget: Microsoft.Extensions.Logging, 3.0.0"
-
-#r "nuget: Nito.AsyncEx.Context, 5.0.0"
-#r "nuget: Nito.AsyncEx.Tasks, 5.0.0"
-#r "nuget: Nito.AsyncEx.Coordination, 5.0.0"
-
-#r "UiPath.CoreIpc.dll"
-
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Nito.AsyncEx;
-using UiPath.CoreIpc;
-using UiPath.CoreIpc.NamedPipe;
-
-// Debugger.Launch();
-
-public interface IArithmetics
-{
-    Task<int> Sum(int x, int y);
-}
-
-public interface IAlgebra
-{
-    Task<int> Multiply(int x, int y, Message message = default);
-}
-
-public sealed class Algebra : IAlgebra
-{
-    public async Task<int> Multiply(int x, int y, Message message = default)
-    {
-        var arithmetics = message.GetCallback<IArithmetics>();
-
-        int result = 0;
-        for (int i = 0; i < x; i++)
-        {
-            result = await arithmetics.Sum(result, y);
-        }
-
-        return result;
-    }
-}
-
-var services = new ServiceCollection();
-
-var sp = services
-    .AddLogging()
-    .AddIpc()
-    .AddSingleton<IAlgebra, Algebra>()
-    .BuildServiceProvider();
-
-var serviceHost = new ServiceHostBuilder(sp)
-    .UseNamedPipes(new NamedPipeSettings("foobar"))
-    .AddEndpoint<IAlgebra, IArithmetics>()
-    .Build();
-
-var thread = new AsyncContextThread();
-thread.Context.SynchronizationContext.Send(_ => Thread.CurrentThread.Name = "GuiThread", null);
-var sched = thread.Context.Scheduler;
-Console.WriteLine("###DONE###");
-await serviceHost.RunAsync(sched);
-`;
-            }
-
-            const cSharpCode = getCSharpCode();
-
-            const dotNetScript = new DotNetScript(pathCwd, cSharpCode);
-            try {
-                await dotNetScript.waitForLineAsync('###DONE###');
-                await Promise.delay(TimeSpan.fromSeconds(1));
-
-                interface IArithmetics {
-                    Sum(x: number, y: number): Promise<number>;
-                }
-
-                class Arithmetics implements IArithmetics {
-                    public async Sum(x: number, y: number): Promise<number> {
-                        return x + y;
-                    }
-                }
-                const arithmetics = new Arithmetics();
-                arithmetics.Sum = spy(arithmetics.Sum);
-
-                const client = new IpcClient('foobar', IAlgebra, x => {
-                    x.callbackService = arithmetics;
-                });
-                const result = await client.proxy.Multiply(3, 6, new Message<void>());
-
-                expect(result).to.equal(18);
-                expect(arithmetics.Sum).to.have.been.called.exactly(3);
-            } finally {
-                await dotNetScript.disposeAsync();
-            }
-        });
-    });
-
     context(`ctor`, () => {
         it(`should throw provided a falsy pipeName`, () => {
             (() => new IpcClient(null as any, Object)).should.throw(ArgumentNullError).with.property('paramName', 'pipeName');
