@@ -53,6 +53,7 @@ namespace UiPath.CoreIpc.Tests
             ((IDisposable)_computingClient).Dispose();
             ((IDisposable)_systemClient).Dispose();
             _host.Dispose();
+            Thread.Sleep(1);
         }
         [Fact]
         public Task CallbackConcurrently() => Task.WhenAll(Enumerable.Range(1, 50).Select(_ => CallbackCore()));
