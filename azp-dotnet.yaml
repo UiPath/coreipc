@@ -26,5 +26,5 @@ steps:
     displayName: '$(Label_DotNet) Publish the $(DotNet_ArtifactName) to the pipeline instance'
     inputs:
       ArtifactName: '$(DotNet_ArtifactName)'
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)/$(DotNet_MainProjectName).$(FullVersion).snupkg'
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
       ArtifactType: 'Container'
