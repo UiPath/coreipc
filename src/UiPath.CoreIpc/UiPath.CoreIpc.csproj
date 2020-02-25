@@ -4,13 +4,13 @@
     <TargetFrameworks>net461;netstandard2.0</TargetFrameworks>
     <RootNamespace>UiPath.CoreIpc</RootNamespace>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Authors>UiPath</Authors>
     <Version>2.0.0</Version>
     <RepositoryUrl>https://github.com/UiPath/CoreIpc/</RepositoryUrl>
     <PackageProjectUrl>https://github.com/UiPath/CoreIpc/</PackageProjectUrl>
     <PackageTags>json-rpc rpc ipc netcore wcf</PackageTags>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
     <Description>WCF-like service model API for communication over named pipes.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
