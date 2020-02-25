@@ -18,7 +18,7 @@ steps:
     displayName: '$(Label_DotNet) Copy nupkg to $(Build.ArtifactStagingDirectory)'
     inputs:
       SourceFolder: 'src\UiPath.CoreIpc\bin\$(DotNet_BuildConfiguration)\'
-      Contents: '*.?nupkg'
+      Contents: '*.*nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
       CleanTargetFolder: true
 
