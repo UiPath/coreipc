@@ -8,6 +8,7 @@ using System.IO;
 using System.IO.Pipes;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
@@ -160,9 +161,15 @@ namespace UiPath.CoreIpc
 
         public static bool PipeExists(string pipeName)
         {
-            Thread.Sleep(1); // checking pipe consumes a connection; don't check too frequently
-            return File.Exists(@"\\.\pipe\" + pipeName);
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                throw new NotImplementedException();
+            }
+            return WaitNamedPipe(@"\\.\pipe\" + pipeName, timeoutMilliseconds: 1); // 0 is NMPWAIT_USE_DEFAULT_WAIT
         }
+
+        [DllImport("kernel32", CharSet = CharSet.Unicode)]
+        private static extern bool WaitNamedPipe(string pipeName, int timeoutMilliseconds);
 
         internal static async Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
         {
