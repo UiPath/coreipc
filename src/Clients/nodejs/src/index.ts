@@ -9,10 +9,15 @@ import {
 } from './foundation/threading';
 
 import {
-    __hasCancellationToken__, __returns__, __endpoint__,
-    RemoteError,
     IpcClient,
-    Message
+    IIpcClientConfig,
+    BeforeCallDelegate,
+    ConnectionFactoryDelegate,
+    __hasCancellationToken__,
+    __returns__,
+    __endpoint__,
+    Message,
+    RemoteError,
 } from './core/surface';
 
 import { IPipeClientStream } from './foundation/pipes';
@@ -22,21 +27,25 @@ import { Trace } from './foundation/utils';
 import { IDisposable } from './foundation/disposable';
 
 export {
+    IpcClient,
+    IIpcClientConfig,
+    BeforeCallDelegate,
+    ConnectionFactoryDelegate,
+    __hasCancellationToken__,
+    __returns__,
+    __endpoint__,
+    Message,
+    RemoteError,
+
     CancellationToken,
     CancellationTokenSource,
     PromiseCompletionSource,
     IPipeClientStream,
-    IpcClient,
-    Message,
     TimeSpan,
     Timeout,
-    RemoteError,
     IpcError,
     ObjectDisposedError,
     OperationCanceledError,
     IDisposable,
-    __hasCancellationToken__,
-    __returns__,
-    __endpoint__,
-    Trace
+    Trace,
 };
