@@ -87,24 +87,29 @@ public sealed class Algebra : IAlgebra
     }
 }
 
-var services = new ServiceCollection();
+try {
+    Console.WriteLine("###STARTING###");
+    var services = new ServiceCollection();
 
-var sp = services
-    .AddLogging()
-    .AddIpc()
-    .AddSingleton<IAlgebra, Algebra>()
-    .BuildServiceProvider();
+    var sp = services
+        .AddLogging()
+        .AddIpc()
+        .AddSingleton<IAlgebra, Algebra>()
+        .BuildServiceProvider();
 
-var serviceHost = new ServiceHostBuilder(sp)
-    .UseNamedPipes(new NamedPipeSettings("foobar"))
-    .AddEndpoint<IAlgebra, IArithmetics>()
-    .Build();
+    var serviceHost = new ServiceHostBuilder(sp)
+        .UseNamedPipes(new NamedPipeSettings("foobar"))
+        .AddEndpoint<IAlgebra, IArithmetics>()
+        .Build();
 
-var thread = new AsyncContextThread();
-thread.Context.SynchronizationContext.Send(_ => Thread.CurrentThread.Name = "GuiThread", null);
-var sched = thread.Context.Scheduler;
-Console.WriteLine("###DONE###");
-await serviceHost.RunAsync(sched);
+    var thread = new AsyncContextThread();
+    thread.Context.SynchronizationContext.Send(_ => Thread.CurrentThread.Name = "GuiThread", null);
+    var sched = thread.Context.Scheduler;
+    Console.WriteLine("###DONE###");
+    await serviceHost.RunAsync(sched);
+} catch (Exception ex) {
+    Console.WriteLine($"Exception: {ex.GetType().Name}\\r\\nMessage: {ex.Message}\\r\\nStack: {ex.StackTrace}");
+}
 `;
     }
 
