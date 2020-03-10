@@ -68,9 +68,9 @@ public interface IAlgebra
 
 public sealed class Algebra : IAlgebra
 {
-    public async Task<int> MultiplySimple(int x, int y)
+    public Task<int> MultiplySimple(int x, int y)
     {
-        return x * y;
+        return Task.FromResult(x * y);
     }
 
     public async Task<int> Multiply(int x, int y, Message message = default)
