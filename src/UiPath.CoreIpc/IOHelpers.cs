@@ -159,17 +159,22 @@ namespace UiPath.CoreIpc
             }
         }
 
-        public static bool PipeExists(string pipeName)
+        public static bool PipeExists(string pipeName, int timeout = 1)
         {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            try
             {
-                throw new NotImplementedException();
+                using (var client = new NamedPipeClientStream(pipeName))
+                {
+                    client.Connect(timeout);
+                }
+                return true;
             }
-            return WaitNamedPipe(@"\\.\pipe\" + pipeName, timeoutMilliseconds: 1); // 0 is NMPWAIT_USE_DEFAULT_WAIT
+            catch (Exception ex)
+            {
+                Trace.WriteLine(ex.ToString());
+            }
+            return false;
         }
-
-        [DllImport("kernel32", CharSet = CharSet.Unicode)]
-        private static extern bool WaitNamedPipe(string pipeName, int timeoutMilliseconds);
 
         internal static async Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
         {
