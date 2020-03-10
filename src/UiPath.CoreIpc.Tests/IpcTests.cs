@@ -94,9 +94,9 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public void PipeExists()
         {
-            IOHelpers.PipeExists("computing").ShouldBeTrue();
-            IOHelpers.PipeExists("system").ShouldBeTrue();
             IOHelpers.PipeExists(System.Guid.NewGuid().ToString()).ShouldBeFalse();
+            IOHelpers.PipeExists("computing", 10).ShouldBeTrue();
+            IOHelpers.PipeExists("system", 10).ShouldBeTrue();
         }
 
         [Fact]
