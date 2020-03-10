@@ -78,13 +78,13 @@ export class DotNetScript implements IAsyncDisposable {
         });
         this._process.on('close', code => {
             if (this._awaiter) {
-                // this._awaiter(null);
+                this._awaiter(null);
             }
             if (this._process) {
-                // this._process.stdout.destroy();
+                this._process.stdout.destroy();
             }
-            // lineEmitter.emit('eof');
-            // lineEmitter.emit('line', null);
+            lineEmitter.emit('eof');
+            lineEmitter.emit('line', null);
             console.log('######## the child process ended with code', code);
         });
         this._stdin = this._process.stdin.setDefaultEncoding('utf-8');
