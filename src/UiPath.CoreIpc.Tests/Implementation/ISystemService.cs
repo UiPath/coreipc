@@ -7,9 +7,9 @@ namespace UiPath.CoreIpc.Tests
 {
     public interface ISystemService
     {
-        Task DoNothing(CancellationToken cancellationToken = default);
-        Task VoidThreadName(CancellationToken cancellationToken = default);
-        Task VoidSyncThrow(CancellationToken cancellationToken = default);
+        Task<OneWay> DoNothing(CancellationToken cancellationToken = default);
+        Task<OneWay> VoidThreadName(CancellationToken cancellationToken = default);
+        Task<OneWay> VoidSyncThrow(CancellationToken cancellationToken = default);
         Task<string> GetThreadName(CancellationToken cancellationToken = default);
         Task<string> ConvertText(string text, TextStyle style, CancellationToken cancellationToken = default);
         Task<Guid> GetGuid(Guid guid, CancellationToken cancellationToken = default);

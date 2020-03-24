@@ -118,19 +118,23 @@ namespace UiPath.CoreIpc
         }
         private async Task<Response> InvokeMethod(EndpointSettings endpoint, Request request, object service, MethodInfo method, object[] arguments)
         {
-            var hasReturnValue = method.ReturnType != typeof(Task);
+            var isOneWay = method.ReturnType == typeof(Task<OneWay>);
             var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler ?? TaskScheduler.Default);
-            if (hasReturnValue)
-            {
-                var methodResult = await methodCallTask;
-                await methodResult;
-                object returnValue = ((dynamic)methodResult).Result;
-                return Response.Success(request, Serializer.Serialize(returnValue));
-            }
-            else
+            if (isOneWay)
             {
                 methodCallTask.Unwrap().LogException(Logger, method);
                 return Response.Success(request, "");
+            }
+            else
+            {
+                var methodResult = await methodCallTask;
+                await methodResult;
+                if (method.ReturnType == typeof(Task))
+                {
+                    return Response.Success(request, "");
+                }
+                object returnValue = ((dynamic)methodResult).Result;
+                return Response.Success(request, Serializer.Serialize(returnValue));
             }
             Task MethodCall()
             {

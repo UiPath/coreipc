@@ -17,6 +17,13 @@ using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc
 {
+    public class OneWay
+    {
+        public static readonly OneWay Instance = new OneWay();
+        private OneWay()
+        {
+        }
+    }
     public static class IOHelpers
     {
         public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new ReadOnlyDictionary<TKey, TValue>(dictionary);

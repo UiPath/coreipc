@@ -34,7 +34,7 @@ namespace UiPath.CoreIpc.Tests
         Task<ComplexNumber> AddComplexNumbers(IEnumerable<ComplexNumber> numbers, CancellationToken cancellationToken = default);
         Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default);
         Task<bool> Infinite(CancellationToken cancellationToken = default);
-        Task InfiniteVoid(CancellationToken cancellationToken = default);
+        Task<OneWay> InfiniteVoid(CancellationToken cancellationToken = default);
         Task<string> GetCallbackThreadName(Message message = null, CancellationToken cancellationToken = default);
     }
 

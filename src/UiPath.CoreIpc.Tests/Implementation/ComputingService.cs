@@ -46,7 +46,11 @@ namespace UiPath.CoreIpc.Tests
             return true;
         }
 
-        public Task InfiniteVoid(CancellationToken cancellationToken = default) =>Task.Delay(Timeout.Infinite, cancellationToken);
+        public async Task<OneWay> InfiniteVoid(CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return OneWay.Instance;
+        }
 
         public async Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default)
         {

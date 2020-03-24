@@ -44,10 +44,11 @@ namespace UiPath.CoreIpc.Tests
 
         public bool DidNothing { get; set; }
 
-        public async Task DoNothing(CancellationToken cancellationToken = default)
+        public async Task<OneWay> DoNothing(CancellationToken cancellationToken = default)
         {
             await Task.Delay(1);
             DidNothing = true;
+            return OneWay.Instance;
         }
 
         public async Task<Guid> GetGuid(Guid guid, CancellationToken cancellationToken = default)
@@ -114,9 +115,13 @@ namespace UiPath.CoreIpc.Tests
 
         public string ThreadName;
 
-        public Task VoidSyncThrow(CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public Task<OneWay> VoidSyncThrow(CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
-        public async Task VoidThreadName(CancellationToken cancellationToken = default) => ThreadName = Thread.CurrentThread.Name;
+        public async Task<OneWay> VoidThreadName(CancellationToken cancellationToken = default)
+        {
+            ThreadName = Thread.CurrentThread.Name;
+            return OneWay.Instance;
+        }
 
         public async Task<string> GetThreadName(CancellationToken cancellationToken = default) => Thread.CurrentThread.Name;
 
