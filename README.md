@@ -8,7 +8,7 @@ WCF-like service model API for communication over named pipes. .NET Standard (.N
 - cancellation
 - timeouts
 - callbacks
-- one way calls (all methods that return non-generic `Task`)
+- one way calls
 - automatic reconnect
 - interception
 - configurable task scheduler
