@@ -118,9 +118,8 @@ namespace UiPath.CoreIpc
         }
         private async Task<Response> InvokeMethod(EndpointSettings endpoint, Request request, object service, MethodInfo method, object[] arguments)
         {
-            var isOneWay = method.ReturnType == typeof(Task<OneWay>);
             var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler ?? TaskScheduler.Default);
-            if (isOneWay)
+            if (method.ReturnType == typeof(Task<OneWay>))
             {
                 methodCallTask.Unwrap().LogException(Logger, method);
                 return Response.Success(request, "");
