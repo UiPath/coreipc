@@ -40,11 +40,7 @@ namespace UiPath.CoreIpc.Tests
             return x + y;
         }
 
-        public async Task<bool> Infinite(CancellationToken cancellationToken = default)
-        {
-            await Task.Delay(Timeout.Infinite, cancellationToken);
-            return true;
-        }
+        public Task Infinite(CancellationToken cancellationToken = default) => Task.Delay(Timeout.Infinite, cancellationToken);
 
         public async Task<OneWay> InfiniteVoid(CancellationToken cancellationToken = default)
         {

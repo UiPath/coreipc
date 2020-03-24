@@ -13,11 +13,7 @@ namespace UiPath.CoreIpc.Tests
         {
         }
 
-        public async Task<bool> Infinite(CancellationToken cancellationToken = default)
-        {
-            await Task.Delay(Timeout.Infinite, cancellationToken);
-            return true;
-        }
+        public Task Infinite(CancellationToken cancellationToken = default) => Task.Delay(Timeout.Infinite, cancellationToken);
 
         public async Task<string> ConvertText(string text, TextStyle style, CancellationToken cancellationToken = default)
         {
@@ -89,7 +85,7 @@ namespace UiPath.CoreIpc.Tests
             return client.GetUserName() +" " + domainName;
         }
 
-        public async Task<bool> SlowOperation(CancellationToken cancellationToken = default)
+        public async Task SlowOperation(CancellationToken cancellationToken = default)
         {
             Console.WriteLine("SlowOperation " + Thread.CurrentThread.Name);
             try
@@ -101,7 +97,6 @@ namespace UiPath.CoreIpc.Tests
                     if(cancellationToken.IsCancellationRequested)
                     {
                         Console.WriteLine("SlowOperation Cancelled.");
-                        return false;
                     }
                 }
             }
@@ -110,7 +105,6 @@ namespace UiPath.CoreIpc.Tests
                 Console.WriteLine(ex.ToString());
             }
             Console.WriteLine("SlowOperation finished. "+ (cancellationToken.IsCancellationRequested ? "cancelled " : "") + Thread.CurrentThread.Name);
-            return true;
         }
 
         public string ThreadName;
