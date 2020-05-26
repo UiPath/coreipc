@@ -10,7 +10,7 @@ namespace UiPath.CoreIpc
         private readonly List<Listener> _listeners = new List<Listener>();
         public ServiceHostBuilder(IServiceProvider serviceProvider) => ServiceProvider = serviceProvider;
         internal IServiceProvider ServiceProvider { get; }
-        internal IDictionary<string, EndpointSettings> Endpoints { get; } = new Dictionary<string, EndpointSettings>();
+        internal Dictionary<string, EndpointSettings> Endpoints { get; } = new Dictionary<string, EndpointSettings>();
         public ServiceHostBuilder AddEndpoint(EndpointSettings settings)
         {
             settings.ServiceProvider = ServiceProvider;
@@ -55,7 +55,6 @@ namespace UiPath.CoreIpc
             Name = contract.Name;
             ServiceInstance = serviceInstance;
             CallbackContract = callbackContract;
-            IOHelpers.Validate(contract);
         }
         internal string Name { get; }
         internal TaskScheduler Scheduler { get; set; }
@@ -63,6 +62,7 @@ namespace UiPath.CoreIpc
         internal Type Contract { get; }
         internal Type CallbackContract { get; }
         internal IServiceProvider ServiceProvider { get; set; }
+        public void Validate() => IOHelpers.Validate(Contract, CallbackContract);
     }
     public class EndpointSettings<TContract> : EndpointSettings where TContract : class
     {

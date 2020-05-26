@@ -16,7 +16,6 @@ namespace UiPath.CoreIpc
     public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
     {
         protected readonly IServiceProvider _serviceProvider;
-        protected readonly Type _callbackContract;
         protected ISerializer _serializer = new JsonSerializer();
         protected TimeSpan _requestTimeout = Timeout.InfiniteTimeSpan;
         protected ILogger _logger;
@@ -28,10 +27,11 @@ namespace UiPath.CoreIpc
 
         protected ServiceClientBuilder(Type callbackContract, IServiceProvider serviceProvider)
         {
-            IOHelpers.Validate(typeof(TInterface));
-            _callbackContract = callbackContract;
+            CallbackContract = callbackContract;
             _serviceProvider = serviceProvider;
         }
+
+        internal Type CallbackContract { get; }
 
         public TDerived DontReconnect() => ConnectionFactory((connection, _) => Task.FromResult(connection));
 
@@ -77,7 +77,7 @@ namespace UiPath.CoreIpc
 
         public TInterface Build()
         {
-            if (_callbackContract == null)
+            if (CallbackContract == null)
             {
                 return BuildCore(null);
             }
@@ -85,7 +85,7 @@ namespace UiPath.CoreIpc
             {
                 Logger(_serviceProvider);
             }
-            return BuildCore(new EndpointSettings(_callbackContract, _callbackInstance) { Scheduler = _taskScheduler, ServiceProvider = _serviceProvider });
+            return BuildCore(new EndpointSettings(CallbackContract, _callbackInstance) { Scheduler = _taskScheduler, ServiceProvider = _serviceProvider });
         }
     }
 

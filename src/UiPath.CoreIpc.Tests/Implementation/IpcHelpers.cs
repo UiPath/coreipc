@@ -9,6 +9,16 @@ namespace UiPath.CoreIpc
 {
     public static class IpcHelpers
     {
+        public static TInterface ValidateAndBuild<TDerived, TInterface>(this ServiceClientBuilder<TDerived, TInterface> builder) where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
+        {
+            IOHelpers.Validate(builder);
+            return builder.Build();
+        }
+        public static ServiceHost ValidateAndBuild(this ServiceHostBuilder serviceHostBuilder)
+        {
+            IOHelpers.Validate(serviceHostBuilder);
+            return serviceHostBuilder.Build();
+        }
         public static IServiceProvider ConfigureServices() =>
             new ServiceCollection()
                 .AddLogging(b => b.AddTraceSource(new SourceSwitch("", "All")))
