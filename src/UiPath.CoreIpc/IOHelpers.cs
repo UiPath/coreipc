@@ -22,15 +22,31 @@ namespace UiPath.CoreIpc
         public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new ReadOnlyDictionary<TKey, TValue>(dictionary);
 
         [Conditional("DEBUG")]
-        public static void Validate(Type contract)
+        public static void Validate(ServiceHostBuilder serviceHostBuilder)
         {
-            if (!contract.IsInterface)
+            foreach (var endpointSettings in serviceHostBuilder.Endpoints.Values)
             {
-                throw new ArgumentOutOfRangeException(nameof(contract), "The contract must be an interface! " + contract);
+                endpointSettings.Validate();
             }
-            foreach (var method in contract.GetAllMethods())
+        }
+
+        [Conditional("DEBUG")]
+        public static void Validate<TDerived, TInterface>(ServiceClientBuilder<TDerived, TInterface> builder) where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
+            => Validate(typeof(TInterface), builder.CallbackContract);
+
+        [Conditional("DEBUG")]
+        public static void Validate(params Type[] contracts)
+        {
+            foreach (var contract in contracts)
             {
-                Validate(method);
+                if (!contract.IsInterface)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(contract), "The contract must be an interface! " + contract);
+                }
+                foreach (var method in contract.GetAllMethods())
+                {
+                    Validate(method);
+                }
             }
         }
 
