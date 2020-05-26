@@ -42,13 +42,13 @@ namespace UiPath.CoreIpc.Tests
             int count = 0;
             try
             {
-                var computingClient = computingClientBuilder.Build();
+                var computingClient = computingClientBuilder.ValidateAndBuild();
                 var systemClient =
                     new NamedPipeClientBuilder<ISystemService>("test")
                     .RequestTimeout(TimeSpan.FromSeconds(2))
                     .Logger(serviceProvider)
                     .AllowImpersonation()
-                    .Build();
+                    .ValidateAndBuild();
                 while (true)
                 {
                     // test 1: call IPC service method with primitive types

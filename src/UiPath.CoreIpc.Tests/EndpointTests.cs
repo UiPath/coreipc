@@ -34,9 +34,9 @@ namespace UiPath.CoreIpc.Tests
                 .AddEndpoint<IComputingServiceBase>()
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService, ISystemCallback>()
-                .Build();
+                .ValidateAndBuild();
             _host.RunAsync();
-            _computingClient = ComputingClientBuilder().Build();
+            _computingClient = ComputingClientBuilder().ValidateAndBuild();
             _systemClient = CreateSystemService();
         }
         private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
@@ -45,7 +45,7 @@ namespace UiPath.CoreIpc.Tests
                 .RequestTimeout(RequestTimeout)
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);
-        private ISystemService CreateSystemService() => SystemClientBuilder().Build();
+        private ISystemService CreateSystemService() => SystemClientBuilder().ValidateAndBuild();
         private NamedPipeClientBuilder<ISystemService, ISystemCallback> SystemClientBuilder() =>
             new NamedPipeClientBuilder<ISystemService, ISystemCallback>("EndpointTests", _serviceProvider).CallbackInstance(_systemCallback).RequestTimeout(RequestTimeout).AllowImpersonation();
         public void Dispose()
@@ -70,7 +70,7 @@ namespace UiPath.CoreIpc.Tests
 
         private async Task CallbackCore()
         {
-            var proxy = new NamedPipeClientBuilder<IComputingServiceBase>("EndpointTests").RequestTimeout(RequestTimeout).AllowImpersonation().Build();
+            var proxy = new NamedPipeClientBuilder<IComputingServiceBase>("EndpointTests").RequestTimeout(RequestTimeout).AllowImpersonation().ValidateAndBuild();
             var message = new SystemMessage { Text = Guid.NewGuid().ToString() };
             var computingTask = _computingClient.SendMessage(message);
             var systemTask = _systemClient.SendMessage(message);

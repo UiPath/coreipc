@@ -36,7 +36,7 @@ namespace UiPath.CoreIpc.Tests
                 })
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService>()
-                .Build();
+                .ValidateAndBuild();
 
             await await Task.WhenAny(host.RunAsync(), Task.Run(() =>
             {

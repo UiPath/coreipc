@@ -45,7 +45,7 @@ namespace UiPath.CoreIpc.Tests
                     EncryptAndSign = true,
                 })
                 .AddEndpoint<IComputingService, IComputingCallback>()
-                .Build();
+                .ValidateAndBuild();
             _systemHost = new ServiceHostBuilder(_serviceProvider)
                 .UseNamedPipes(new NamedPipeSettings("system")
                 {
@@ -54,12 +54,12 @@ namespace UiPath.CoreIpc.Tests
                     ConcurrentAccepts = 10,
                 })
                 .AddEndpoint<ISystemService>()
-                .Build();
+                .ValidateAndBuild();
 
             var taskScheduler = _guiThread.Scheduler;
             _computingHost.RunAsync(taskScheduler);
             _systemHost.RunAsync(taskScheduler);
-            _computingClient = ComputingClientBuilder(taskScheduler).Build();
+            _computingClient = ComputingClientBuilder(taskScheduler).ValidateAndBuild();
             _systemClient = CreateSystemService();
         }
 
@@ -71,7 +71,7 @@ namespace UiPath.CoreIpc.Tests
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);
 
-        private ISystemService CreateSystemService() => SystemClientBuilder().Build();
+        private ISystemService CreateSystemService() => SystemClientBuilder().ValidateAndBuild();
 
         private NamedPipeClientBuilder<ISystemService> SystemClientBuilder() =>
             new NamedPipeClientBuilder<ISystemService>("system").RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
@@ -103,7 +103,7 @@ namespace UiPath.CoreIpc.Tests
         public async Task BeforeCall()
         {
             bool newConnection = false;
-            var proxy = SystemClientBuilder().BeforeCall(async (c, _) => newConnection = c.NewConnection).Build();
+            var proxy = SystemClientBuilder().BeforeCall(async (c, _) => newConnection = c.NewConnection).ValidateAndBuild();
             newConnection.ShouldBeFalse();
 
             await proxy.DoNothing();
@@ -125,7 +125,7 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task ReconnectWithEncrypt()
         {
-            var proxy = ComputingClientBuilder().Build();
+            var proxy = ComputingClientBuilder().ValidateAndBuild();
             for (int i = 0; i < 50; i++)
             {
                 await proxy.AddFloat(1, 2);
@@ -137,7 +137,7 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task DontReconnect()
         {
-            var proxy = SystemClientBuilder().DontReconnect().Build();
+            var proxy = SystemClientBuilder().DontReconnect().ValidateAndBuild();
             await proxy.GetGuid(System.Guid.Empty);
             ((IpcProxy)proxy).CloseConnection();
             proxy.GetGuid(System.Guid.Empty).ShouldThrow<ObjectDisposedException>();
@@ -205,7 +205,7 @@ namespace UiPath.CoreIpc.Tests
         }
 
         [Fact]
-        public Task ServerName() => SystemClientBuilder().ServerName(Environment.MachineName).Build().GetGuid(System.Guid.Empty);
+        public Task ServerName() => SystemClientBuilder().ServerName(Environment.MachineName).ValidateAndBuild().GetGuid(System.Guid.Empty);
 
         [Fact]
         public async Task ServerTimeout()
@@ -219,7 +219,7 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task ClientTimeout()
         {
-            var proxy = ComputingClientBuilder().RequestTimeout(TimeSpan.FromMilliseconds(10)).Build();
+            var proxy = ComputingClientBuilder().RequestTimeout(TimeSpan.FromMilliseconds(10)).ValidateAndBuild();
             proxy.Infinite().ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.Infinite)} timed out.");
             await proxy.AddFloat(0, 0);
         }

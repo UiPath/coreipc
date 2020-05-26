@@ -37,7 +37,7 @@ namespace UiPath.CoreIpc
         [Conditional("DEBUG")]
         public static void Validate(params Type[] contracts)
         {
-            foreach (var contract in contracts)
+            foreach (var contract in contracts.Where(c => c != null))
             {
                 if (!contract.IsInterface)
                 {
