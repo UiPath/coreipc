@@ -1,29 +1,46 @@
 {
+    "compileOnSave": true,
     "compilerOptions": {
-        "baseUrl": "projects",
+        "rootDir": "./src",
+        "baseUrl": "./",
+        "outDir": "./dist",
+        "sourceMap": true,
         "declaration": true,
         "downlevelIteration": true,
         "emitDecoratorMetadata": true,
         "experimentalDecorators": true,
         "esModuleInterop": true,
         "target": "es6",
-        "lib": [
-            "es6"
-        ],
         "module": "commonjs",
+        "lib": [
+            "ES2018"
+        ],
         "noUnusedLocals": false,
         "skipLibCheck": true,
         "skipDefaultLibCheck": true,
-        "sourceMap": true,
         "paths": {
-            "@uipath/ipc/*": [
-                "@uipath-ipc/src/*"
+            "@foundation": [
+                "src/foundation"
             ],
-            "@uipath/robot-client/*": [
-                "@uipath-robot-client/src/*"
+            "@core": [
+                "src/core"
+            ],
+            "@core-rtti": [
+                "src/core/rtti"
+            ],
+            "@foundation-errors": [
+                "src/foundation/errors"
+            ],
+            "@foundation-threading": [
+                "src/foundation/threading"
+            ],
+            "@foundation-types": [
+                "src/foundation/types"
+            ],
+            "@test-helpers": [
+                "test/helpers"
             ]
         },
-        "outDir": "./dist",
         "strict": true,
         "strictNullChecks": true,
         "stripInternal": true

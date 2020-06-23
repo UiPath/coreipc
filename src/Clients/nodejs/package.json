@@ -1,34 +1,23 @@
 {
     "name": "@uipath/coreipc",
-    "version": "0.0.33",
-    "description": "UiPath Ipc for Nodejs",
-    "main": "dist/index.js",
-    "typings": "dist/index",
+    "version": "1.0.0",
+    "main": "src/index.ts",
     "scripts": {
+        "refreshVSToken": "vsts-npm-auth -config .npmrc",
         "build": "tsc",
-        "build:watch": "tsc --watch",
-        "clean:test": "npm run clean:nyc && npm run clean:reports",
-        "clean:reports": "rimraf ./reports",
+        "clean:test": "rimraf reports",
         "clean:nyc": "rimraf .nyc_output",
-        "pretest": "npm run clean:test",
-        "test": "npm run lint && npm run test:unit && npm run test:report",
-        "posttest": "nyc report --reporter=text-lcov > ./coverage.lcov",
-        "test:unit": "nyc mocha --opts ./test/unit/mocha.opts",
+        "pretest": "npm run clean:test & npm run lint",
+        "test": "run-s test:*",
+        "test:unit": "nyc mocha --opts ./test/mocha.opts",
         "test:report": "nyc report --reporter=html",
-        "lint": "tslint -p tsconfig.json",
-        "refreshVSToken": "vsts-npm-auth -config .npmrc"
+        "posttest": "nyc report --reporter=text-lcov > ./reports/coverage.lcov & nyc report --reporter=text",
+        "lint": "tslint --project ./tsconfig.json",
+        "coverage": "nyc mocha"
     },
-    "author": "Eduard Dumitru",
-    "license": "MIT",
-    "files": [
-        "dist/**/*"
-    ],
-    "publishConfig": {
-        "registry": "https://npm.pkg.github.com/"
-    },
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/UiPath/coreipc.git"
+    "dependencies": {
+        "rxjs": "^6.0.0",
+        "@types/node": "^12.6.8"
     },
     "nyc": {
         "include": [
@@ -39,43 +28,56 @@
             ".tsx"
         ],
         "exclude": [
+            "**/*.spec.ts",
             "**/*.d.ts",
-            "**/index.ts"
+            "**/index.ts",
+            "**/test/**/*",
+            "**/testing/**/*"
+        ],
+        "reporter": [
+            "html",
+            "lcov",
+            "json",
+            "cobertura"
         ],
         "report-dir": "./reports/coverage",
-        "cache": false,
+        "cache": true,
         "all": true
-    },
-    "dependencies": {
-        "rxjs": "^6.0.0",
-        "@types/node": "^12.0.0"
     },
     "devDependencies": {
         "@types/chai": "4.1.7",
         "@types/chai-as-promised": "7.1.0",
         "@types/chai-spies": "1.0.0",
+        "@types/fs-extra": "9.0.1",
         "@types/mocha": "^5.2.6",
         "@types/node": "^12.6.8",
+        "@types/temp": "^0.8.34",
+        "@types/uuid": "8.0.0",
         "chai": "4.2.0",
         "chai-as-promised": "7.1.1",
         "chai-spies": "1.0.0",
         "concurrently": "4.1.0",
+        "fs-extra": "9.0.1",
         "istanbul-instrumenter-loader": "3.0.1",
         "mocha": "6.1.4",
         "mocha-junit-reporter": "1.23.1",
+        "mocha-multi-reporters": "^1.1.7",
         "mocha-loader": "2.0.1",
         "mochawesome": "3.1.2",
-        "nyc": "14.1.0",
+        "npm-run-all": "^4.1.5",
+        "nyc": "^14.1.1",
         "rimraf": "2.6.3",
         "source-map-support": "0.5.12",
+        "temp": "^0.9.1",
         "ts-node": "8.4.1",
+        "ts-mockery": "^1.2.0",
         "tsconfig-paths": "^3.8.0",
         "tslint": "5.16.0",
         "tslint-consistent-codestyle": "1.15.1",
         "tslint-eslint-rules": "5.4.0",
         "typedoc": "^0.15.0",
         "typedoc-plugin-markdown": "1.2.0",
-        "typescript": "~3.5.0"
-    },
-    "gitHead": "edef4e238fde99232400d5270c6f54c3f054cb10"
+        "typescript": "3.9.5",
+        "uuid": "8.0.0"
+    }
 }

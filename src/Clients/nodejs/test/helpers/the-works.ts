@@ -1,0 +1,75 @@
+import { expect, spy, use, assert } from 'chai';
+import 'chai/register-should';
+import spies from 'chai-spies';
+import chaiAsPromised from 'chai-as-promised';
+
+import {
+    TimeSpan,
+} from '@foundation';
+
+use(spies);
+use(chaiAsPromised);
+
+export function calling<TFunction extends (...args: any[]) => any>(f: TFunction, ...args: Parameters<TFunction>): () => ReturnType<TFunction> {
+    return () => f(...args);
+}
+
+export function constructing<TConstructor extends new (...args: any[]) => any>(
+    ctor: TConstructor, ...args: ConstructorParameters<TConstructor>): () => InstanceType<TConstructor> {
+    return () => new ctor(...args);
+}
+
+export function forInstance<TInstance>(obj: TInstance): ForInstance<TInstance> {
+    return new ForInstance(obj);
+}
+
+export class ForInstance<TInstance> {
+    constructor(private readonly _obj: TInstance) { }
+
+    public spyOn<Key extends keyof TInstance>(methodName: Key & string): TInstance[Key] {
+        const bound = (this._obj[methodName] as unknown as (...args: any[]) => any).bind(this._obj);
+        return spy(bound) as any;
+    }
+
+    public calling<Key extends keyof TInstance>(
+        methodName: Key & string,
+        ...args: TInstance[Key] extends (...args: any[]) => any
+            ? Parameters<TInstance[Key]>
+            : never): () => any {
+
+        return () => {
+            const method = this._obj[methodName] as unknown as (...args: any[]) => any;
+            return method.bind(this._obj)(...args);
+        };
+    }
+}
+
+export function toJavaScript(x: unknown): string {
+    switch (typeof x) {
+        case 'undefined': return 'undefined';
+        case 'function': return x.toString();
+        case 'symbol': return x.toString();
+        case 'object':
+            if (x instanceof Error && x.constructor) {
+                return `new ${x.constructor.name}('${x.message}')`;
+            }
+            if (x instanceof TimeSpan && x.isInfinite) {
+                return 'Timeout.infiniteTimeSpan';
+            }
+            if (x instanceof Uint8Array && x.constructor) {
+                return `${x.constructor.name}[byteLength: ${x.byteLength}]`;
+            }
+            if (x && !(x instanceof Array) && x.constructor && x.constructor !== Object) {
+                if (x.toString !== Object.prototype.toString) { return x.toString(); }
+                return `new ${x.constructor.name}(...)`;
+            }
+            break;
+    }
+    return JSON.stringify(x);
+}
+
+export {
+    expect,
+    spy,
+    assert,
+};

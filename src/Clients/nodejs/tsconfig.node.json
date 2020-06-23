@@ -1,0 +1,13 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "module": "commonjs",
+        "types": [
+            "node",
+            "mocha",
+            "chai",
+            "chai-spies",
+            "temp"
+        ]
+    }
+}

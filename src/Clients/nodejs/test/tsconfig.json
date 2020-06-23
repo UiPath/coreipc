@@ -1,44 +1,35 @@
 {
+    "extends": "../tsconfig.node.json",
     "compilerOptions": {
-        "declaration": false,
-        "downlevelIteration": true,
-        "emitDecoratorMetadata": true,
+        "baseUrl": "./",
+        "rootDir": "../",
         "experimentalDecorators": true,
-        "allowSyntheticDefaultImports": true,
-        "noImplicitAny": true,
-        "moduleResolution": "node",
-        "target": "es6",
-        "sourceMap": false,
-        "removeComments": false,
-        "preserveConstEnums": true,
-        "isolatedModules": false,
-        "baseUrl": "../",
         "paths": {
-            "@core/*": [
-                "src/core/*"
+            "@foundation": [
+                "../src/foundation"
             ],
-            "@foundation/*": [
-                "src/foundation/*"
+            "@core": [
+                "../src/core"
             ],
+            "@core-rtti": [
+                "../src/core/rtti"
+            ],
+            "@foundation-errors": [
+                "../src/foundation/errors"
+            ],
+            "@foundation-threading": [
+                "../src/foundation/threading"
+            ],
+            "@foundation-types": [
+                "../src/foundation/types"
+            ],
+            "@test-helpers": [
+                "../test/helpers"
+            ]
         },
-        "typeRoots": [
-            "node_modules/@types",
-            "../node_modules/@types",
-            "declarations",
-            "../declarations"
-        ],
-        "types": [
-            "chai",
-            "mocha",
-            "node"
-        ],
-        "lib": [
-            "es2016",
-            "dom"
-        ]
     },
-    "exclude": [
-        "node_modules",
-        "lib"
+    "include": [
+        "**/*.spec.ts",
+        "**/test/**.ts"
     ]
 }
