@@ -54,7 +54,7 @@ steps:
     inputs:
       testRunner: JUnit
       workingDir: $(NodeJS_ProjectPath)
-      testResultsFiles: './src/Clients/nodejs/test-results.xml'
+      testResultsFiles: './src/Clients/nodejs/reports/test-results.xml'
 
   - task: ArchiveFiles@2
     displayName: '$(Label_NodeJS) Archive project directory'
