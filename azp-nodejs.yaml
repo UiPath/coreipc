@@ -56,6 +56,11 @@ steps:
       workingDir: $(NodeJS_ProjectPath)
       testResultsFiles: './src/Clients/nodejs/reports/test-results.xml'
 
+  - task: PublishCodeCoverageResults@1
+    inputs:
+      codeCoverageTool: 'cobertura'
+      summaryFileLocation: './src/Clients/nodejs/reports/coverage/cobertura-coverage.xml'
+
   - task: ArchiveFiles@2
     displayName: '$(Label_NodeJS) Archive project directory'
     inputs:
