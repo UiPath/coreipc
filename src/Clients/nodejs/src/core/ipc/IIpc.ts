@@ -53,12 +53,12 @@ export module IIpc {
 
     export interface ClassAnnotations {
         (target: PublicCtor): void;
-        hasEndpointName(endpointName: string): (ctor: PublicCtor) => void;
+        (args: { endpoint?: string }): (ctor: PublicCtor) => void;
     }
 
     export interface MethodAnnotations {
-        hasName(name: string): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => void;
-        returnsPromiseOf(returnType?: PublicCtor<unknown> | Primitive): (target: any, propertyKey: string, descriptor: PropertyDescriptor) => void;
+        (target: any, propertyKey: string): void;
+        (args: { name?: string, returnsPromiseOf?: PublicCtor | Primitive }): (target: any, propertyKey: string) => void;
     }
 
     /* @internal */

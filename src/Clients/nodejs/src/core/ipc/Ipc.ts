@@ -1,7 +1,7 @@
 import {
     IIpc,
     ClassAnnotationsWrapper,
-    MethodAnnotations,
+    MethodAnnotationsWrapper,
     ConfigStore,
     ProxySource,
     ContractStore,
@@ -24,8 +24,8 @@ export class Ipc implements IIpc {
         this.contract = contract ?? new ContractStore();
         this.config = config ?? new ConfigStore();
         this.proxy = proxy ?? new ProxySource(this);
-        this.$service = $class ?? new ClassAnnotationsWrapper(this).contract;
-        this.$operation = $operation ?? new MethodAnnotations(this);
+        this.$service = $class ?? new ClassAnnotationsWrapper(this).iface;
+        this.$operation = $operation ?? new MethodAnnotationsWrapper(this).iface;
     }
 
     public readonly contract: IIpc.ContractStore;

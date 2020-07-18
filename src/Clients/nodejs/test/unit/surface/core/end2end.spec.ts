@@ -8,7 +8,7 @@ describe(`surface`, () => {
         it(`should work`, async () => {
             @ipc.$service
             class IAlgebra {
-                @ipc.$operation.hasName('Ping')
+                @ipc.$operation({ name: 'Ping' })
                 public ping(): Promise<string> { throw null; }
             }
 

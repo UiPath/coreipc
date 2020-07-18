@@ -19,17 +19,21 @@ describe(`surface`, () => {
                         public readonly y: number) { }
                 }
 
-                @_ipc.$service.hasEndpointName('IMath')
+                @_ipc.$service({ endpoint: 'IMath' })
                 class Math {
-                    @_ipc.$operation.hasName('Sum')
-                    @_ipc.$operation.returnsPromiseOf(Primitive.number)
+                    @_ipc.$operation({
+                        name: 'Sum',
+                        returnsPromiseOf: Primitive.number,
+                    })
                     public sum(x: number, y: number): Promise<number> { throw null; }
 
-                    @_ipc.$operation.hasName('Multiply')
-                    @_ipc.$operation.returnsPromiseOf(Complex)
+                    @_ipc.$operation({
+                        name: 'Multiply',
+                        returnsPromiseOf: Complex,
+                    })
                     public multiply(x: Complex, y: Complex, ct?: CancellationToken): Promise<Complex> { throw null; }
 
-                    @_ipc.$operation.returnsPromiseOf(Complex)
+                    @_ipc.$operation
                     public SumComplex(x: Complex, y: Complex, ct?: CancellationToken): Promise<Complex> { throw null; }
                 }
 
@@ -65,8 +69,8 @@ describe(`surface`, () => {
                         hasEndingCancellationToken: true,
                         returnType: Promise,
                         parameterTypes: [Complex, Complex, CancellationToken as any],
-                        returnsPromiseOf: Complex,
                     }));
+                expect(actual).to.not.haveOwnProperty('returnsPromiseOf');
             });
         });
     });
