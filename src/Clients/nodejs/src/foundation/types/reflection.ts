@@ -12,3 +12,21 @@ export enum Primitive {
     boolean = 'boolean',
     void = 'undefined',
 }
+
+declare global {
+    interface Object {
+        become<T>(this: any, type: new (...args: any[]) => T): T;
+    }
+}
+
+interface MutableInstanceOf<T> {
+    __proto__: any;
+    constructor: new (...args: any[]) => T;
+}
+
+Object.prototype.become = function <T>(this: any, type: new (...args: any[]) => T): T {
+    const me = this as MutableInstanceOf<T>;
+    me.__proto__ = type.prototype;
+    me.constructor = type;
+    return this;
+};

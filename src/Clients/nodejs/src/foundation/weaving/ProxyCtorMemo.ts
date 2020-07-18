@@ -1,12 +1,11 @@
 import { PublicCtor } from '@foundation';
-import { ProxyCtor } from '.';
-import { ProxyWeaver } from './ProxyWeaver';
+import { ProxyCtor, ProxyWeaver } from '.';
 
 /* @internal */
 export class ProxyCtorMemo {
     private readonly _symbolOfProxyCtor = Symbol('proxyCtor');
 
-    public getOrCreate<TContract = unknown>(contract: PublicCtor<TContract>): ProxyCtor<TContract> {
+    public get<TContract>(contract: PublicCtor<TContract>): ProxyCtor<TContract> {
         const container = new ProxyCtorContainer(this._symbolOfProxyCtor, contract);
 
         if (!container.proxyCtor) {
@@ -17,7 +16,7 @@ export class ProxyCtorMemo {
     }
 }
 
-class ProxyCtorContainer<TContract = unknown> {
+class ProxyCtorContainer<TContract> {
     constructor(
         private readonly _symbol: symbol,
         private readonly _contract: PublicCtor<TContract>,

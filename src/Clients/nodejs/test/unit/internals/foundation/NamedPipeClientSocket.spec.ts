@@ -31,8 +31,8 @@ describe(`internals`, () => {
         context(`the connect method`, () => {
             context(`should not throw when called with valid args`, () => {
                 for (const args of [
-                    ['some path', Timeout.infiniteTimeSpan, CancellationToken.none, AutoConnectMockSocket],
-                    ['some path', TimeSpan.fromMinutes(1), new CancellationTokenSource().token, AutoConnectMockSocket],
+                    ['some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, AutoConnectMockSocket],
+                    ['some pipe name', TimeSpan.fromMinutes(1), new CancellationTokenSource().token, AutoConnectMockSocket],
                 ] as Array<[string, TimeSpan, CancellationToken, (new () => SocketLike) | undefined]>) {
                     const strArgs = args.map(toJavaScript).join(', ');
 
@@ -45,16 +45,16 @@ describe(`internals`, () => {
 
             context(`should throw when called with invalid args`, () => {
                 function makeArgs(
-                    path?: any,
+                    pipeName?: any,
                     timeout?: any,
                     ct?: any,
                     socketLikeCtor?: any,
                 ): [string, TimeSpan, CancellationToken, (new () => SocketLike) | undefined] {
-                    return [path, timeout, ct, socketLikeCtor] as any;
+                    return [pipeName, timeout, ct, socketLikeCtor] as any;
                 }
 
                 class Case {
-                    private static readonly _paramNames = ['path', 'timeout', 'ct', 'socketLikeCtor'];
+                    private static readonly _paramNames = ['pipeName', 'timeout', 'ct', 'socketLikeCtor'];
 
                     constructor(
                         public readonly args: [string, TimeSpan, CancellationToken, (new () => SocketLike) | undefined],
@@ -74,20 +74,20 @@ describe(`internals`, () => {
                     yield new Case(
                         makeArgs(undefined, Timeout.infiniteTimeSpan, CancellationToken.none, AutoConnectMockSocket),
                         ArgumentNullError,
-                        'path');
+                        'pipeName');
 
                     yield new Case(
                         makeArgs(null, Timeout.infiniteTimeSpan, CancellationToken.none, AutoConnectMockSocket),
                         ArgumentNullError,
-                        'path');
+                        'pipeName');
 
                     yield new Case(
-                        makeArgs('some path', undefined, CancellationToken.none, AutoConnectMockSocket),
+                        makeArgs('some pipe name', undefined, CancellationToken.none, AutoConnectMockSocket),
                         ArgumentNullError,
                         'timeout');
 
                     yield new Case(
-                        makeArgs('some path', null, CancellationToken.none, AutoConnectMockSocket),
+                        makeArgs('some pipe name', null, CancellationToken.none, AutoConnectMockSocket),
                         ArgumentNullError,
                         'timeout');
 
@@ -95,20 +95,20 @@ describe(`internals`, () => {
                         yield new Case(
                             makeArgs(invalidValue, Timeout.infiniteTimeSpan, CancellationToken.none, AutoConnectMockSocket),
                             ArgumentOutOfRangeError,
-                            'path');
+                            'pipeName');
 
                         yield new Case(
-                            makeArgs('some path', invalidValue, CancellationToken.none, AutoConnectMockSocket),
+                            makeArgs('some pipe name', invalidValue, CancellationToken.none, AutoConnectMockSocket),
                             ArgumentOutOfRangeError,
                             'timeout');
 
                         yield new Case(
-                            makeArgs('some path', Timeout.infiniteTimeSpan, invalidValue, AutoConnectMockSocket),
+                            makeArgs('some pipe name', Timeout.infiniteTimeSpan, invalidValue, AutoConnectMockSocket),
                             ArgumentOutOfRangeError,
                             'ct');
 
                         yield new Case(
-                            makeArgs('some path', Timeout.infiniteTimeSpan, CancellationToken.none, invalidValue),
+                            makeArgs('some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, invalidValue),
                             ArgumentOutOfRangeError,
                             'socketLikeCtor');
                     }
@@ -129,7 +129,7 @@ describe(`internals`, () => {
                 class FailConnectMockSocket extends MockSocketBase {
                     private _errorListener: ((error: Error) => void) | null = null;
 
-                    public connect(path: string, connectionListener?: (() => void) | undefined): this {
+                    public connect(pipeName: string, connectionListener?: (() => void) | undefined): this {
                         if (this._errorListener) { this._errorListener(error); }
                         return this;
                     }
@@ -146,7 +146,7 @@ describe(`internals`, () => {
                 FailConnectMockSocket.prototype.destroy = spy((_error?: Error) => { });
 
                 await NamedPipeClientSocket.connect(
-                    'some path',
+                    'some pipe name',
                     Timeout.infiniteTimeSpan,
                     CancellationToken.none,
                     FailConnectMockSocket,
@@ -170,7 +170,7 @@ describe(`internals`, () => {
 
                 const cts = new CancellationTokenSource();
                 const promise = NamedPipeClientSocket.connect(
-                    'some path',
+                    'some pipe name',
                     Timeout.infiniteTimeSpan,
                     cts.token,
                     NeverConnectMockSocket,
@@ -204,7 +204,7 @@ describe(`internals`, () => {
                 NeverConnectMockSocket.prototype.destroy = spy((_error?: Error) => { });
 
                 const promise = NamedPipeClientSocket.connect(
-                    'some path',
+                    'some pipe name',
                     TimeSpan.fromMilliseconds(100),
                     CancellationToken.none,
                     NeverConnectMockSocket,
@@ -233,7 +233,7 @@ describe(`internals`, () => {
 
         context(`the dispose method`, () => {
             it(`should not throw even if called twice`, async () => {
-                const npcs = await NamedPipeClientSocket.connect('some path', Timeout.infiniteTimeSpan, CancellationToken.none, AutoConnectMockSocket);
+                const npcs = await NamedPipeClientSocket.connect('some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, AutoConnectMockSocket);
                 forInstance(npcs).calling('dispose').should.not.throw();
                 forInstance(npcs).calling('dispose').should.not.throw();
             });
@@ -244,7 +244,7 @@ describe(`internals`, () => {
                 SpyMockSocket.prototype.unref = spy(() => { });
                 SpyMockSocket.prototype.destroy = spy(() => { });
 
-                const npcs = await NamedPipeClientSocket.connect('some path', Timeout.infiniteTimeSpan, CancellationToken.none, SpyMockSocket);
+                const npcs = await NamedPipeClientSocket.connect('some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, SpyMockSocket);
                 forInstance(npcs).calling('dispose').should.not.throw();
 
                 SpyMockSocket.prototype.removeAllListeners.should.have.been.called();
@@ -257,7 +257,7 @@ describe(`internals`, () => {
             it(`should not throw`, async () => {
                 let npcs: NamedPipeClientSocket | null = null;
                 try {
-                    npcs = await NamedPipeClientSocket.connect('some path', Timeout.infiniteTimeSpan, CancellationToken.none, AutoConnectMockSocket);
+                    npcs = await NamedPipeClientSocket.connect('some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, AutoConnectMockSocket);
                     (() => {
                         const _ = npcs?.$data;
                     }).should.not.throw();
@@ -269,7 +269,7 @@ describe(`internals`, () => {
             it(`should return an object`, async () => {
                 let npcs: NamedPipeClientSocket | null = null;
                 try {
-                    npcs = await NamedPipeClientSocket.connect('some path', Timeout.infiniteTimeSpan, CancellationToken.none, AutoConnectMockSocket);
+                    npcs = await NamedPipeClientSocket.connect('some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, AutoConnectMockSocket);
                     expect(npcs.$data).to.be.instanceOf(Object);
                 } finally {
                     npcs?.dispose();
@@ -383,7 +383,7 @@ describe(`internals`, () => {
             it(`should not throw when called with valid args`, async () => {
                 let npcs: NamedPipeClientSocket | null = null;
                 try {
-                    npcs = await NamedPipeClientSocket.connect('some path', Timeout.infiniteTimeSpan, CancellationToken.none, AutoWriteMockSocket);
+                    npcs = await NamedPipeClientSocket.connect('some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, AutoWriteMockSocket);
                     await npcs.write(Buffer.alloc(10), CancellationToken.none)
                         .should.eventually.be.fulfilled;
                 } finally {
@@ -417,7 +417,7 @@ describe(`internals`, () => {
                     it(_case.testTitle, async () => {
                         let npcs: NamedPipeClientSocket | null = null;
                         try {
-                            npcs = await NamedPipeClientSocket.connect('some path', Timeout.infiniteTimeSpan, CancellationToken.none, AutoWriteMockSocket);
+                            npcs = await NamedPipeClientSocket.connect('some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, AutoWriteMockSocket);
                             await npcs.write(..._case.args)
                                 .should.eventually.be.rejectedWith(_case.error)
                                 .with.property('paramName', _case.paramName);
@@ -429,7 +429,7 @@ describe(`internals`, () => {
             });
 
             it(`should throw when called on a disposed NamedPipeClientSocket instance`, async () => {
-                const npcs = await NamedPipeClientSocket.connect('some path', Timeout.infiniteTimeSpan, CancellationToken.none, AutoWriteMockSocket);
+                const npcs = await NamedPipeClientSocket.connect('some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, AutoWriteMockSocket);
                 npcs.dispose();
 
                 await npcs.write(Buffer.alloc(10), CancellationToken.none)
@@ -443,7 +443,7 @@ describe(`internals`, () => {
 
                 let npcs: NamedPipeClientSocket | null = null;
                 try {
-                    npcs = await NamedPipeClientSocket.connect('some path', Timeout.infiniteTimeSpan, CancellationToken.none, SpyMockSocket);
+                    npcs = await NamedPipeClientSocket.connect('some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, SpyMockSocket);
                     const promise = npcs.write(Buffer.alloc(10), CancellationToken.none);
                     await Promise.yield();
                     SpyMockSocket.prototype.write.should.have.been.called();
@@ -459,7 +459,7 @@ describe(`internals`, () => {
 
                 let npcs: NamedPipeClientSocket | null = null;
                 try {
-                    npcs = await NamedPipeClientSocket.connect('some path', Timeout.infiniteTimeSpan, CancellationToken.none, SpyMockSocket);
+                    npcs = await NamedPipeClientSocket.connect('some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, SpyMockSocket);
                     await npcs.write(Buffer.alloc(0), CancellationToken.none)
                         .should.eventually.be.fulfilled;
                     SpyMockSocket.prototype.write.should.not.have.been.called();
@@ -480,7 +480,7 @@ describe(`internals`, () => {
 
                 let npcs: NamedPipeClientSocket | null = null;
                 try {
-                    npcs = await NamedPipeClientSocket.connect('some path', Timeout.infiniteTimeSpan, CancellationToken.none, SpyMockSocket);
+                    npcs = await NamedPipeClientSocket.connect('some pipe name', Timeout.infiniteTimeSpan, CancellationToken.none, SpyMockSocket);
                     await npcs.write(Buffer.alloc(10), CancellationToken.none)
                         .should.eventually.be.rejectedWith(error);
                 } finally {

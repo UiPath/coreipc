@@ -4,6 +4,7 @@
         "baseUrl": "./",
         "rootDir": "../",
         "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
         "paths": {
             "@foundation": [
                 "../src/foundation"

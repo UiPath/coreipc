@@ -1,5 +1,5 @@
 {
-    "coverage-gutters.coverageFileNames": [    
+    "coverage-gutters.coverageFileNames": [
         "lcov.info",
         "cov.xml",
         "coverage.xml",
@@ -13,12 +13,16 @@
     "coverage-gutters.highlightlight": "rgba(166, 220, 142, 0.15)",
     "coverage-gutters.noHighlightDark": "rgba(121, 31, 10, 0.15)",
     "coverage-gutters.noHighlightLight": "rgba(220, 143, 143, 0.15)",
-
     "testExplorer.mergeSuites": true,
     "mochaExplorer.autoload": true,
     "mochaExplorer.optsFile": "test/mocha.opts",
     "testExplorer.codeLens": true,
     "testExplorer.gutterDecoration": true,
     "testExplorer.sort": "byLabel",
-    "typescript.tsdk": "node_modules\\typescript\\lib"
+    "typescript.tsdk": "node_modules\\typescript\\lib",
+    "prettier.singleQuote": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": false,
+        "source.fixAll": true,
+    },
 }

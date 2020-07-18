@@ -4,6 +4,7 @@ import {
     ArgumentOutOfRangeError,
     CancellationToken,
     PromiseCompletionSource,
+    Trace,
 } from '@foundation';
 
 import { OperationCanceledError } from '@foundation-errors';
@@ -25,6 +26,7 @@ declare global {
 
     interface Promise<T> {
         observe(): Promise<T>;
+        traceError(): void;
     }
 }
 
@@ -46,6 +48,9 @@ const promiseNever: Promise<never> = {
         return promiseNever;
     },
     observe(): Promise<never> {
+        return promiseNever;
+    },
+    traceError(): Promise<never> {
         return promiseNever;
     },
 };

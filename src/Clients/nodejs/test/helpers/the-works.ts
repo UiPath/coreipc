@@ -1,16 +1,15 @@
-import { expect, spy, use, assert } from 'chai';
-import 'chai/register-should';
-import spies from 'chai-spies';
+import { TimeSpan, JsonConvert } from '@foundation';
+import { assert, expect, spy, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-
-import {
-    TimeSpan,
-} from '@foundation';
+import spies from 'chai-spies';
+import 'chai/register-should';
 
 use(spies);
 use(chaiAsPromised);
 
-export function calling<TFunction extends (...args: any[]) => any>(f: TFunction, ...args: Parameters<TFunction>): () => ReturnType<TFunction> {
+export function calling<TFunction extends (...args: any[]) => any>(
+    f: TFunction,
+    ...args: Parameters<TFunction>): () => ReturnType<TFunction> {
     return () => f(...args);
 }
 
@@ -65,7 +64,11 @@ export function toJavaScript(x: unknown): string {
             }
             break;
     }
-    return JSON.stringify(x);
+    return JsonConvert.serializeObject(x);
+}
+
+export function asParamsOf<T extends (...args: any[]) => any>(_func: T): (...args: Parameters<T>) => Parameters<T> {
+    return (...args) => args;
 }
 
 export {

@@ -4,6 +4,7 @@
 // tslint:disable: no-namespace
 // tslint:disable: no-internal-module
 
+import 'reflect-metadata';
 import { PublicCtor, Primitive } from '@foundation';
 export { Primitive };
 
@@ -17,7 +18,7 @@ export function __hasCancellationToken__(target: any, propertyKey: string, descr
     rtti.ClassInfo.get(target.constructor)[$classGetOrCreateMethod](propertyKey)[$hasCancellationToken] = true;
 }
 
-export function __returns__(ctorOrPrimitive: PublicCtor | Primitive) {
+export function __returns__(ctorOrPrimitive: PublicCtor<object> | Primitive) {
     return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
         rtti.ClassInfo.get(target.constructor)[$classGetOrCreateMethod](propertyKey)[$returnValueCtor] = ctorOrPrimitive;
     };
@@ -25,8 +26,37 @@ export function __returns__(ctorOrPrimitive: PublicCtor | Primitive) {
 
 export function __hasName__(operationName: string) {
     return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const keys = Reflect.getMetadataKeys(target);
+        const ownKeys = Reflect.getOwnMetadataKeys(target);
         rtti.ClassInfo.get(target.constructor)[$classGetOrCreateMethod](propertyKey)[$operationNameOverride] = operationName;
     };
+}
+
+export function coreIpcContract(target: any) {
+    const keys = Reflect.getMetadataKeys(target);
+    const ownKeys = Reflect.getOwnMetadataKeys(target);
+
+    const members = Object
+        .getOwnPropertyNames(target.prototype)
+        .filter(name => name !== 'constructor')
+        .map(name => {
+            return {
+                name,
+                paramTypes: Reflect.getMetadata('design:paramtypes', target.prototype, name),
+                returnType: Reflect.getMetadata('design:returntype', target.prototype, name),
+                type: Reflect.getMetadata('design:type', target.prototype, name),
+            };
+        });
+    console.log(members);
+}
+
+export function __test__(target: any, key: string) {
+    const keys = Reflect.getMetadataKeys(target, key);
+    const ownKeys = Reflect.getOwnMetadataKeys(target, key);
+
+    const paramTypes = Reflect.getMetadata('design:paramtypes', target, key);
+    const returnType = Reflect.getMetadata('design:returntype', target, key);
+    const type = Reflect.getMetadata('design:type', target, key);
 }
 
 export function __endpoint__(name: string) {
@@ -59,11 +89,11 @@ export module rtti {
 
     export class MethodInfo<TDeclaringClass = any> {
         private [$hasCancellationToken]: boolean = false;
-        private [$returnValueCtor]: PublicCtor | Primitive | null = null;
+        private [$returnValueCtor]: PublicCtor<object> | Primitive | null = null;
         private [$operationNameOverride]: string | null = null;
 
         public get hasCancellationToken(): boolean { return this[$hasCancellationToken]; }
-        public get returnValueCtor(): PublicCtor | Primitive | null { return this[$returnValueCtor]; }
+        public get returnValueCtor(): PublicCtor<object> | Primitive | null { return this[$returnValueCtor]; }
         public get operationNameOverride(): string | null { return this[$operationNameOverride]; }
 
         constructor(

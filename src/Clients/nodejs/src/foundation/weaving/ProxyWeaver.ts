@@ -1,9 +1,9 @@
 import { PublicCtor } from '@foundation';
-import { ICallInterceptor, ProxyBase, MethodNameEnumerator, ProxyCtor, symbolOfCallInterceptor } from '.';
+import { ICallInterceptor, ICallInterceptorContainer, MethodNameEnumerator, ProxyCtor, symbolOfCallInterceptor } from '.';
 
 /* @internal */
 export class ProxyWeaver<TContract = unknown> {
-    public static weave<T>(contract: PublicCtor<T>): ProxyCtor<T> {
+    public static weave<T = unknown>(contract: PublicCtor<T>): ProxyCtor<T> {
         const instance = new ProxyWeaver<T>(contract);
         return instance.run();
     }
@@ -11,18 +11,22 @@ export class ProxyWeaver<TContract = unknown> {
     constructor(private readonly _contract: PublicCtor<TContract>) { }
 
     private run(): ProxyCtor<TContract> {
-        class Proxy extends ProxyBase<TContract>  {
-            constructor(callInterceptor: ICallInterceptor<TContract>) { super(callInterceptor); }
+        function proxy(this: ICallInterceptorContainer<TContract>, callInterceptor: ICallInterceptor<TContract>) {
+            this[symbolOfCallInterceptor] = callInterceptor;
         }
-        const proxyCtor = Proxy as ProxyCtor<TContract>;
+        proxy.constructor = this._contract;
+        proxy.__proto__ = this._contract;
+        proxy.prototype = new this._contract();
+
+        const proxyCtor = proxy as unknown as ProxyCtor<TContract>;
         const methodNames = MethodNameEnumerator.enumerate(this._contract);
 
         for (const methodName of methodNames) {
-            proxyCtor.prototype[methodName] = function (this: Proxy) {
+            proxyCtor.prototype[methodName] = function (this: ICallInterceptorContainer<TContract>) {
                 return this[symbolOfCallInterceptor].invokeMethod(methodName, [...arguments]);
             };
         }
 
-        return Proxy as ProxyCtor<TContract>;
+        return proxyCtor;
     }
 }
