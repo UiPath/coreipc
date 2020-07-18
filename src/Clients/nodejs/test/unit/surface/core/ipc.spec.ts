@@ -1,11 +1,6 @@
-// tslint:disable: no-unused-expression
-
-import { expect, constructing, toJavaScript } from '@test-helpers';
-
-import { ipc, Primitive, IIpc } from '@core';
-import { Ipc } from '../../../../src/core/ipc/Ipc';
-import { PublicCtor } from '../../../../src/foundation/types/reflection';
-import { CancellationToken } from '../../../../src/foundation/threading/cancellation-token';
+import { expect } from '@test-helpers';
+import { Primitive, CancellationToken } from '@foundation';
+import { IIpc, Ipc } from '@core';
 
 describe(`surface`, () => {
     describe(`ipc`, () => {
@@ -20,7 +15,7 @@ describe(`surface`, () => {
                 }
 
                 @_ipc.$service({ endpoint: 'IMath' })
-                class Math {
+                class IMath {
                     @_ipc.$operation({
                         name: 'Sum',
                         returnsPromiseOf: Primitive.number,
@@ -37,11 +32,11 @@ describe(`surface`, () => {
                     public SumComplex(x: Complex, y: Complex, ct?: CancellationToken): Promise<Complex> { throw null; }
                 }
 
-                expect(_ipc.contract.get(Math)?.endpoint).to.be.eq('IMath');
+                expect(_ipc.contract.get(IMath)?.endpoint).to.be.eq('IMath');
 
                 function make(operationInfo: IIpc.OperationInfo): IIpc.OperationInfo { return operationInfo; }
 
-                expect(_ipc.contract.get(Math)?.operations.get('sum')).to.deep.include(
+                expect(_ipc.contract.get(IMath)?.operations.get('sum')).to.deep.include(
                     make({
                         methodName: 'sum',
                         operationName: 'Sum',
@@ -51,7 +46,7 @@ describe(`surface`, () => {
                         returnsPromiseOf: Primitive.number,
                     }));
 
-                expect(_ipc.contract.get(Math)?.operations.get('multiply')).to.deep.include(
+                expect(_ipc.contract.get(IMath)?.operations.get('multiply')).to.deep.include(
                     make({
                         methodName: 'multiply',
                         operationName: 'Multiply',
@@ -61,7 +56,7 @@ describe(`surface`, () => {
                         returnsPromiseOf: Complex,
                     }));
 
-                const actual = _ipc.contract.get(Math)?.operations.get('SumComplex');
+                const actual = _ipc.contract.get(IMath)?.operations.get('SumComplex');
                 expect(actual).to.deep.include(
                     make({
                         methodName: 'SumComplex',

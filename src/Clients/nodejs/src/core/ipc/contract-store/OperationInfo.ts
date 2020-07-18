@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { PublicCtor, Primitive, CancellationToken } from '@foundation';
 import { IIpc } from '../IIpc';
 

@@ -1,6 +1,5 @@
 import { expect, calling } from '@test-helpers';
 import { MethodNameEnumerator, ArgumentNullError, ArgumentOutOfRangeError } from '@foundation';
-import { __returns__, __hasName__, __hasCancellationToken__ } from '@core-rtti';
 
 describe(`internals`, () => {
     describe(`MethodNameEnumerator`, () => {

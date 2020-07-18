@@ -10,6 +10,7 @@ import {
 import {
     PipeManagerRegistry,
 } from '../proxy-registry/PipeManagerRegistry';
+
 import { ProxyCtorMemo } from '@foundation';
 
 /* @internal */
