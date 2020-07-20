@@ -16,7 +16,6 @@
         "coverage": "nyc mocha"
     },
     "dependencies": {
-        "rxjs": "^6.0.0",
         "@types/node": "^12.6.8",
         "reflect-metadata": "^0.1.13"
     },

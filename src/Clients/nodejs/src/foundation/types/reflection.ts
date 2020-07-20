@@ -19,13 +19,13 @@ declare global {
     }
 }
 
-interface MutableInstanceOf<T> {
+interface Becomable<T> {
     __proto__: any;
     constructor: new (...args: any[]) => T;
 }
 
 Object.prototype.become = function <T>(this: any, type: new (...args: any[]) => T): T {
-    const me = this as MutableInstanceOf<T>;
+    const me = this as Becomable<T>;
     me.__proto__ = type.prototype;
     me.constructor = type;
     return this;

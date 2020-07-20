@@ -4,7 +4,6 @@ import {
     ArgumentOutOfRangeError,
     CancellationToken,
     PromiseCompletionSource,
-    Trace,
 } from '@foundation';
 
 import { OperationCanceledError } from '@foundation-errors';
@@ -27,6 +26,7 @@ declare global {
     interface Promise<T> {
         observe(): Promise<T>;
         traceError(): void;
+        spy(): PromiseSpy<T>;
     }
 }
 
@@ -34,6 +34,45 @@ Promise.prototype.observe = function <T>(this: Promise<T>): Promise<T> {
     this.then(emptyOnFulfilled, emptyOnRejected);
     return this;
 };
+
+Promise.prototype.spy = function <T>(this: Promise<T>): PromiseSpy<T> {
+    return new PromiseSpyImpl<T>(this);
+};
+
+class PromiseSpyImpl<T> implements PromiseSpy<T> {
+    constructor(public readonly promise: Promise<T>) { promise.then(this.then, this.catch).observe(); }
+
+    public status: PromiseStatus = PromiseStatus.Running;
+    public result: T | undefined;
+    public error: Error | undefined;
+
+    private readonly then = (result: T): void => {
+        this.status = PromiseStatus.Succeeded;
+        this.result = result;
+    }
+    private readonly catch = (error: Error): void => {
+        if (error instanceof OperationCanceledError) {
+            this.status = PromiseStatus.Canceled;
+        } else {
+            this.status = PromiseStatus.Faulted;
+        }
+        this.error = error;
+    }
+}
+
+export interface PromiseSpy<T> {
+    readonly promise: Promise<T>;
+    readonly status: PromiseStatus;
+    readonly result: T | undefined;
+    readonly error: Error | undefined;
+}
+
+export enum PromiseStatus {
+    Running,
+    Succeeded,
+    Faulted,
+    Canceled,
+}
 
 const promiseNever: Promise<never> = {
     [Symbol.toStringTag]: 'promiseNever',
@@ -52,6 +91,14 @@ const promiseNever: Promise<never> = {
     },
     traceError(): Promise<never> {
         return promiseNever;
+    },
+    spy(): PromiseSpy<never> {
+        return {
+            promise: promiseNever,
+            status: PromiseStatus.Running,
+            result: undefined,
+            error: undefined,
+        };
     },
 };
 

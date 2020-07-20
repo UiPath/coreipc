@@ -1,5 +1,5 @@
 import { RpcMessage, RpcError } from './rpc-channels';
-import { TimeSpan, CoreIpcError } from '@foundation';
+import { TimeSpan, CoreIpcError, argumentIs } from '@foundation';
 import { RemoteError, Exception } from './RemoteError';
 
 /* @internal */
@@ -35,6 +35,16 @@ export class Converter {
                 stackTrace: x.StackTrace,
                 innerException: x.InnerError ? createException(x.InnerError) : undefined,
             };
+        }
+    }
+
+    public static toRpcError(err: any): RpcError {
+        argumentIs(err, 'err', 'string', Object);
+
+        if (err instanceof Error) {
+            return new RpcError(err.message, err.stack ?? '', err.name, null);
+        } else {
+            return new RpcError(`${err}`, '', '', null);
         }
     }
 }

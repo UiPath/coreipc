@@ -22,12 +22,8 @@ export class MethodNameEnumerator<T = void> {
     }
 
     private readonly refersToANamedMethod = (key: string | number | symbol): key is string & keyof T => {
-        try {
-            return typeof key === 'string' &&
-                typeof this._ctor.prototype[key] === 'function' &&
-                this._ctor !== this._ctor.prototype[key];
-        } catch (error) {
-            return false;
-        }
+        return typeof key === 'string' &&
+            typeof this._ctor.prototype[key] === 'function' &&
+            this._ctor !== this._ctor.prototype[key];
     }
 }

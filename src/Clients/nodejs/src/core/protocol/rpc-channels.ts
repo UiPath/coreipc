@@ -1,14 +1,209 @@
 // tslint:disable: no-namespace no-internal-module variable-name no-shadowed-variable
 
-import { Observable, Subject } from 'rxjs';
-import { CancellationToken, IAsyncDisposable, argumentIs, PromiseCompletionSource, JsonConvert, TimeSpan, NamedPipeClientSocket, SocketStream, ConnectHelper } from '@foundation';
-import { MessageStream, MessageEmitter, Network } from '.';
+import { Observer } from 'rxjs';
+
+import {
+    PromiseCompletionSource,
+    CancellationToken,
+    NamedPipeClientSocket,
+    SocketStream,
+    ConnectHelper,
+    TimeSpan,
+    JsonConvert,
+    Trace,
+    ArgumentOutOfRangeError,
+    IAsyncDisposable,
+} from '@foundation';
+
+import {
+    MessageStreamFactory,
+    IMessageStreamFactory,
+    IMessageStream,
+    Network,
+} from '.';
 
 /* @internal */
-export interface RpcChannel extends IAsyncDisposable {
+export interface IRpcChannel extends IAsyncDisposable {
+    readonly isDisposed: boolean;
     call(request: RpcMessage.Request, ct: CancellationToken): Promise<RpcMessage.Response>;
-    $incommingCall: Observable<RpcCallContext.Incomming>;
 }
+
+/* @internal */
+export interface IRpcChannelFactory {
+    create(
+        pipeName: string,
+        connectHelper: ConnectHelper,
+        connectTimeout: TimeSpan,
+        ct: CancellationToken,
+        observer: Observer<RpcCallContext.Incomming>,
+        messageStreamFactory?: IMessageStreamFactory,
+    ): IRpcChannel;
+}
+
+/* @internal */
+export class RpcChannel implements IRpcChannel {
+    public static create(
+        pipeName: string,
+        connectHelper: ConnectHelper,
+        connectTimeout: TimeSpan,
+        ct: CancellationToken,
+        observer: Observer<RpcCallContext.Incomming>,
+        messageStreamFactory?: IMessageStreamFactory,
+    ): IRpcChannel {
+        return new RpcChannel(
+            pipeName,
+            connectHelper,
+            connectTimeout,
+            ct,
+            observer,
+            messageStreamFactory,
+        );
+    }
+
+    constructor(
+        pipeName: string,
+        connectHelper: ConnectHelper,
+        connectTimeout: TimeSpan,
+        ct: CancellationToken,
+        private readonly _observer: Observer<RpcCallContext.Incomming>,
+
+        messageStreamFactory?: IMessageStreamFactory,
+    ) {
+        this._$messageStream = RpcChannel.createMessageStream(
+            pipeName,
+            connectHelper,
+            connectTimeout,
+            ct,
+            this._networkObserver,
+            MessageStreamFactory.orDefault(messageStreamFactory));
+    }
+
+    public async disposeAsync(): Promise<void> {
+        if (!this._isDisposed) {
+            this._isDisposed = true;
+            await (await this._$messageStream).disposeAsync();
+        }
+    }
+
+    public async call(request: RpcMessage.Request, ct: CancellationToken): Promise<RpcMessage.Response> {
+        const promise = this._outgoingCalls.register(request, ct);
+        await (await this._$messageStream).writeMessageAsync(request.toNetwork(), ct);
+        return await promise;
+    }
+
+    public get isDisposed(): boolean { return this._isDisposed; }
+
+    private _isDisposed = false;
+
+    private static async createMessageStream(
+        pipeName: string,
+        connectHelper: ConnectHelper,
+        connectTimeout: TimeSpan,
+        ct: CancellationToken,
+        networkObserver: Observer<Network.Message>,
+        messageStreamFactory: IMessageStreamFactory): Promise<IMessageStream> {
+
+        const socket = await NamedPipeClientSocket.connectWithHelper(connectHelper, pipeName, connectTimeout, ct);
+        try {
+            const stream = new SocketStream(socket);
+            try {
+                return messageStreamFactory.create(stream, networkObserver);
+            } catch (error) {
+                stream.dispose();
+                throw error;
+            }
+        } catch (error) {
+            socket.dispose();
+            throw error;
+        }
+    }
+
+    private readonly _$messageStream: Promise<IMessageStream>;
+    private readonly _outgoingCalls = new RpcChannel.OutgoingCallTable();
+
+    private readonly _networkObserver = new class implements Observer<Network.Message> {
+        constructor(private readonly _owner: RpcChannel) { }
+
+        public closed?: boolean;
+        public next(value: Network.Message): void { this._owner.dispatchNetworkUnit(value); }
+        public error(err: any): void { this._owner.dispatchNetworkError(err); }
+        public complete(): void { this._owner.dispatchNetworkComplete(); }
+    }(this);
+
+    private dispatchNetworkUnit(message: Network.Message): void {
+        switch (message.type) {
+            case Network.Message.Type.Response:
+                this.processIncommingResponse(message);
+                break;
+            case Network.Message.Type.Request:
+                this.processIncommingRequest(message);
+                break;
+            case Network.Message.Type.Cancel:
+                this.processIncommingCancellationRequest(message);
+                break;
+            default:
+                this._observer.error(
+                    new ArgumentOutOfRangeError(
+                        'message',
+                        `Expecting either one of Network.Message.Type.Request, Network.Message.Type.Response, Network.Message.Type.Cancel but got ${message.type}.`));
+                break;
+        }
+    }
+    private dispatchNetworkError(err: any): void { this._observer.error(err); }
+    private dispatchNetworkComplete(): void { this.disposeAsync().traceError(); }
+
+    private processIncommingResponse(message: Network.Message): void {
+        this._outgoingCalls.tryComplete(RpcMessage.Response.fromNetwork(message));
+    }
+
+    private processIncommingRequest(message: Network.Message): void {
+        const request = RpcMessage.Request.fromNetwork(message);
+        const context = new RpcCallContext.Incomming(
+            request,
+            async response => {
+                response.RequestId = request.Id;
+                await (await this._$messageStream).writeMessageAsync(
+                    response.toNetwork(),
+                    CancellationToken.none);
+            },
+        );
+        try {
+            this._observer.next(context);
+        } catch (err) {
+            Trace.log(err);
+        }
+    }
+
+    private processIncommingCancellationRequest(message: Network.Message): void {
+        throw new Error('Method not implemented.');
+    }
+
+    private static readonly OutgoingCallTable = class {
+        private _sequence = 0;
+        private readonly _map = new Map<string, RpcCallContext.Outgoing>();
+
+        public async register(request: RpcMessage.Request, ct: CancellationToken): Promise<RpcMessage.Response> {
+            request.Id = this.generateId();
+            const context = new RpcCallContext.Outgoing();
+            this._map.set(request.Id, context);
+
+            const reg = ct.register(() => { context.tryCancel(); });
+
+            try {
+                return await context.promise;
+            } finally {
+                reg.dispose();
+            }
+        }
+
+        public tryComplete(response: RpcMessage.Response) { this._map.get(response.RequestId)?.complete(response); }
+
+        private generateId(): string { return `${this._sequence++}`; }
+    };
+}
+
+/* @internal */
+export const defaultRpcChannelFactory: IRpcChannelFactory = RpcChannel;
 
 /* @internal */
 export abstract class RpcCallContextBase {
@@ -20,6 +215,12 @@ export type RpcCallContext = RpcCallContext.Incomming | RpcCallContext.Outgoing;
 /* @internal */
 export module RpcCallContext {
     export class Incomming extends RpcCallContextBase {
+        constructor(
+            public readonly request: RpcMessage.Request,
+            public readonly respond: (response: RpcMessage.Response) => Promise<void>,
+        ) {
+            super();
+        }
     }
 
     export class Outgoing extends RpcCallContextBase {
@@ -73,6 +274,10 @@ export module RpcMessage {
                 data: Buffer.from(JsonConvert.serializeObject(this)),
             };
         }
+
+        public static fromNetwork(message: Network.Message): Request {
+            return JsonConvert.deserializeObject(message.data.toString(), Request);
+        }
     }
 
     export class Response extends RpcMessageBase {
@@ -81,7 +286,7 @@ export module RpcMessage {
         }
 
         public constructor(
-            public readonly RequestId: string,
+            public RequestId: string,
             public readonly Data: string | null,
             public readonly Error: RpcError | null,
         ) { super(); }
@@ -120,131 +325,5 @@ export class RpcError {
         public readonly Type: string,
         public readonly InnerError: RpcError | null,
     ) {
-    }
-}
-
-/* @internal */
-export module RpcChannel {
-    export class Impl implements RpcChannel {
-        public static async create(messageStream: MessageStream, messageEmitter?: MessageEmitter): Promise<Impl> {
-            argumentIs(messageStream, 'messageStream', Object);
-            argumentIs(messageEmitter, 'messageEmitter', 'undefined', Object);
-
-            let createdEmitter: MessageEmitter | null = null;
-            try {
-                if (!messageEmitter) {
-                    messageEmitter = createdEmitter = MessageEmitter.Impl.create(messageStream);
-                }
-
-                return new Impl(messageStream, messageEmitter);
-            } catch (error) {
-                if (createdEmitter) {
-                    await createdEmitter.disposeAsync();
-                }
-                throw error;
-            }
-        }
-
-        public static async connect(pipeName: string, connectHelper: ConnectHelper, connectTimeout: TimeSpan, ct: CancellationToken): Promise<Impl> {
-            const socket = await NamedPipeClientSocket.connectWithHelper(connectHelper, pipeName, connectTimeout, ct);
-            try {
-                const stream = new SocketStream(socket);
-                try {
-                    const network = new Network.Impl(stream);
-                    try {
-                        return await RpcChannel.Impl.create(network);
-                    } catch (error) {
-                        network.dispose();
-                        throw error;
-                    }
-                } catch (error) {
-                    stream.dispose();
-                    throw error;
-                }
-            } catch (error) {
-                socket.dispose();
-                throw error;
-            }
-        }
-
-        public disposeAsync(): Promise<void> {
-            throw new Error('Method not implemented.');
-        }
-
-        public call(request: RpcMessage.Request, ct: CancellationToken): Promise<RpcMessage.Response> {
-            const promise = this._outgoingCalls.register(request, ct);
-            this._messageStream.write(request.toNetwork(), ct);
-            return promise;
-        }
-        public get $incommingCall(): Observable<RpcCallContext.Incomming> { return this._$incommingCall; }
-
-        public get isAlive(): boolean { throw null; }
-
-        private constructor(
-            private readonly _messageStream: MessageStream,
-            private readonly _messageEmitter: MessageEmitter,
-        ) {
-            this._messageEmitter.$incommingMessage.subscribe(
-                this.dispatchIncommingMessage,
-                undefined,
-                this.observeIncommingMessageCompletion,
-            );
-        }
-
-        private readonly _outgoingCalls = new OutgoingCallTable();
-        private readonly _$incommingCall = new Subject<RpcCallContext.Incomming>();
-
-        private readonly dispatchIncommingMessage = (message: Network.Message): void => {
-            switch (message.type) {
-                case Network.Message.Type.Response:
-                    this.processIncommingResponse(message);
-                    break;
-                case Network.Message.Type.Request:
-                    this.processIncommingRequest(message);
-                    break;
-                case Network.Message.Type.Cancel:
-                    this.processIncommingCancellationRequest(message);
-                    break;
-                default:
-                    break;
-            }
-        }
-        private readonly observeIncommingMessageCompletion = (): void => {
-        }
-
-        private processIncommingResponse(message: Network.Message): void {
-            this._outgoingCalls.tryComplete(RpcMessage.Response.fromNetwork(message));
-        }
-
-        private processIncommingRequest(message: Network.Message): void {
-            throw new Error('Method not implemented.');
-        }
-
-        private processIncommingCancellationRequest(message: Network.Message): void {
-            throw new Error('Method not implemented.');
-        }
-    }
-
-    class OutgoingCallTable {
-        private _sequence = 0;
-        private readonly _map = new Map<string, RpcCallContext.Outgoing>();
-
-        public async register(request: RpcMessage.Request, ct: CancellationToken): Promise<RpcMessage.Response> {
-            request.Id = this.generateId();
-            const context = new RpcCallContext.Outgoing();
-            this._map.set(request.Id, context);
-
-            const reg = ct.register(() => { context.tryCancel(); });
-
-            try {
-                return await context.promise;
-            } finally {
-                reg.dispose();
-            }
-        }
-
-        public tryComplete(response: RpcMessage.Response) { this._map.get(response.RequestId)?.complete(response); }
-
-        private generateId(): string { return `${this._sequence++}`; }
     }
 }

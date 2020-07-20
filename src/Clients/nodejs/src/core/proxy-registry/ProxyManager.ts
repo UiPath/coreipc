@@ -1,11 +1,11 @@
 import { PublicCtor, ICallInterceptor } from '@foundation';
-import { Ipc } from '..';
+import { IIpcInternal } from '..';
 import { PipeManager } from './PipeManager';
 
 /* @internal */
 export class ProxyManager<TService = unknown> {
     constructor(
-        owner: Ipc,
+        owner: IIpcInternal,
         pipeManager: PipeManager,
         service: PublicCtor<TService>,
     ) {

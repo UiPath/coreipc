@@ -1,33 +1,54 @@
-import { CancellationToken, PromiseCompletionSource } from '@foundation';
+import {
+    argumentIs,
+    PromiseCompletionSource,
+    CancellationToken,
+    CancellationTokenRegistration,
+} from '@foundation';
 
 /* @internal */
 export class AutoResetEvent {
     private _signalled = false;
-    private _pcs: PromiseCompletionSource<void> | null = null;
+    private _awaiters = new Array<Awaiter>();
 
     constructor(initialState: boolean = false) {
+        argumentIs(initialState, 'initialState', 'boolean');
         this._signalled = initialState;
     }
 
     public set(): void {
-        if (this._pcs) {
-            this._pcs.setResult();
-            this._pcs = null;
-        } else {
-            this._signalled = true;
-        }
+        const _ = this._awaiters.pop()?.signal() ?? (this._signalled = true);
     }
 
-    public reset(): void {
-        this._signalled = false;
-    }
-
-    public waitOne(ct: CancellationToken = CancellationToken.none): Promise<void> {
+    public async waitOne(ct: CancellationToken = CancellationToken.none): Promise<void> {
         if (this._signalled) {
             this._signalled = false;
-            return Promise.completedPromise;
+            return;
         } else {
-            return (this._pcs = this._pcs ?? new PromiseCompletionSource<void>()).promise;
+            const awaiter = new Awaiter(ct);
+            this._awaiters.splice(0, 0, awaiter);
+            return awaiter.promise;
         }
     }
+}
+
+class Awaiter {
+    constructor(ct: CancellationToken) {
+        if (ct.canBeCanceled) {
+            this._ctreg = ct.register(this.cancel);
+        }
+    }
+
+    public get promise(): Promise<void> { return this._pcs.promise; }
+
+    public signal(): Awaiter {
+        this._pcs.trySetResult();
+        if (this._ctreg) { this._ctreg.dispose(); }
+        return this;
+    }
+
+    private cancel = () => this._pcs.trySetCanceled();
+
+    private readonly _pcs = new PromiseCompletionSource<void>();
+
+    private readonly _ctreg: CancellationTokenRegistration | undefined;
 }

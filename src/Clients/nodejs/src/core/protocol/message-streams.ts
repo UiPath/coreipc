@@ -1,62 +1,104 @@
 // tslint:disable: no-namespace no-internal-module variable-name no-shadowed-variable
 
-import { Observable, Subject } from 'rxjs';
+import { Observer } from 'rxjs';
 
 import {
     BitConverter,
     CancellationToken,
-    IDisposable,
     IAsyncDisposable,
     Stream,
     CancellationTokenSource,
+    OperationCanceledError,
+    Trace,
 } from '@foundation';
 
 /* @internal */
-export interface MessageStream extends IDisposable {
-    write(message: Network.Message, ct: CancellationToken): Promise<void>;
-    read(ct: CancellationToken): Promise<Network.Message>;
+export interface IMessageStreamFactory {
+    create(stream: Stream, observer: Observer<Network.Message>): IMessageStream;
 }
 
 /* @internal */
-export interface MessageEmitter extends IAsyncDisposable {
-    readonly $incommingMessage: Observable<Network.Message>;
+export interface IMessageStream extends IMessageWriter, IAsyncDisposable { }
+
+/* @internal */
+export class MessageStreamFactory implements IMessageStreamFactory {
+    public static orDefault(factory: IMessageStreamFactory | undefined): IMessageStreamFactory {
+        return factory ?? new MessageStreamFactory();
+    }
+
+    public create(stream: Stream, observer: Observer<Network.Message>): IMessageStream {
+        return new MessageStream(stream, observer);
+    }
 }
 
 /* @internal */
-export module MessageEmitter {
-    export class Impl implements MessageEmitter {
-        public static create(messageStream: MessageStream): Impl {
-            return new Impl(messageStream);
+export class MessageStream implements IMessageStream {
+    constructor(stream: Stream, observer: Observer<Network.Message>);
+    constructor(
+        private readonly _stream: Stream,
+        private readonly _observer: Observer<Network.Message>,
+    ) { }
+
+    public async writeMessageAsync(message: Network.Message, ct: CancellationToken): Promise<void> {
+        await this._stream.write(BitConverter.getBytes(message.type, 'uint8'), ct);
+        await this._stream.write(BitConverter.getBytes(message.data.byteLength, 'int32le'), ct);
+        await this._stream.write(message.data, ct);
+    }
+    public async disposeAsync(): Promise<void> {
+        this._ctsLoop.cancel();
+        await this._loop;
+
+        this._stream.dispose();
+    }
+
+    private static async readFully(stream: Stream, length: number, ct: CancellationToken): Promise<Buffer> {
+        const buffer = Buffer.alloc(length);
+        let soFar = 0;
+        while (soFar < length) {
+            soFar += await stream.read(buffer, soFar, length - soFar, ct);
         }
+        return buffer;
+    }
 
-        private constructor(private readonly _messageStream: MessageStream) {
-            this._loop = this.loop();
-        }
+    private async readMessageAsync(ct: CancellationToken): Promise<Network.Message> {
+        const type: Network.Message.Type = BitConverter.getNumber(await MessageStream.readFully(this._stream, 1, ct), 'uint8');
+        const length = BitConverter.getNumber(await MessageStream.readFully(this._stream, 4, ct), 'int32le');
+        const data = await MessageStream.readFully(this._stream, length, ct);
 
-        public get $incommingMessage(): Observable<Network.Message> { return this._$message; }
+        return { type, data };
+    }
 
-        public async disposeAsync(): Promise<void> {
-            try {
-                await this._loop;
-            } catch (error) {
-            }
-        }
+    private readonly _ctsLoop = new CancellationTokenSource();
+    private get ctLoop(): CancellationToken { return this._ctsLoop.token; }
+    private readonly _loop: Promise<void> = this.loop();
 
-        private readonly _cts = new CancellationTokenSource();
-        private readonly _loop: Promise<void>;
-        private readonly _$message = new Subject<Network.Message>();
-
-        private async loop(): Promise<void> {
-            try {
-                while (!this._cts.token.isCancellationRequested) {
-                    const message = await this._messageStream.read(this._cts.token);
-                    this._$message.next(message);
+    private async loop(): Promise<void> {
+        try {
+            while (!this.ctLoop.isCancellationRequested) {
+                try {
+                    const message = await this.readMessageAsync(this.ctLoop);
+                    try {
+                        this._observer.next(message);
+                    } catch (error) {
+                        Trace.log(error);
+                    }
+                } catch (error) {
+                    if (!(error instanceof OperationCanceledError)) {
+                        this._observer.error(error);
+                    }
+                    throw error;
                 }
-            } finally {
-                this._$message.complete();
+
             }
+        } finally {
+            this._observer.complete();
         }
     }
+}
+
+/* @internal */
+export interface IMessageWriter {
+    writeMessageAsync(message: Network.Message, ct: CancellationToken): Promise<void>;
 }
 
 export module Network {
@@ -70,35 +112,6 @@ export module Network {
             Request = 0,
             Response = 1,
             Cancel = 2,
-        }
-    }
-
-    export class Impl implements MessageStream {
-        constructor(private readonly _stream: Stream) { }
-
-        public async write(message: Message, ct: CancellationToken): Promise<void> {
-            await this._stream.write(BitConverter.getBytes(message.type, 'uint8'), ct);
-            await this._stream.write(BitConverter.getBytes(message.data.byteLength, 'int32le'), ct);
-            await this._stream.write(message.data, ct);
-        }
-
-        public async read(ct: CancellationToken): Promise<Message> {
-            const type: Network.Message.Type = BitConverter.getNumber(await Impl.readFully(this._stream, 1, ct), 'uint8');
-            const length = BitConverter.getNumber(await Impl.readFully(this._stream, 4, ct), 'int32le');
-            const data = await Impl.readFully(this._stream, length, ct);
-
-            return { type, data };
-        }
-
-        public dispose(): void { this._stream.dispose(); }
-
-        private static async readFully(stream: Stream, length: number, ct: CancellationToken): Promise<Buffer> {
-            const buffer = Buffer.alloc(length);
-            let soFar = 0;
-            while (soFar < length) {
-                soFar += await stream.read(buffer, soFar, length - soFar, ct);
-            }
-            return buffer;
         }
     }
 }

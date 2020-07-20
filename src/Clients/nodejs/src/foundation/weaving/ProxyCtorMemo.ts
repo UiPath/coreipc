@@ -1,11 +1,14 @@
 import { PublicCtor } from '@foundation';
 import { ProxyCtor, ProxyWeaver } from '.';
+import { argumentIs } from '../helpers';
 
 /* @internal */
 export class ProxyCtorMemo {
     private readonly _symbolOfProxyCtor = Symbol('proxyCtor');
 
     public get<TContract>(contract: PublicCtor<TContract>): ProxyCtor<TContract> {
+        argumentIs(contract, 'contract', 'function');
+
         const container = new ProxyCtorContainer(this._symbolOfProxyCtor, contract);
 
         if (!container.proxyCtor) {

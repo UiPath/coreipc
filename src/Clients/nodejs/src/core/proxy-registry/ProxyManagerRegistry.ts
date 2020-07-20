@@ -1,12 +1,12 @@
 import { PublicCtor } from '@foundation';
 import { ProxyManager } from '.';
-import { Ipc } from '../ipc';
+import { IIpcInternal } from '../ipc';
 import { PipeManager } from './PipeManager';
 
 /* @internal */
 export class ProxyManagerRegistry {
     constructor(
-        private readonly _owner: Ipc,
+        private readonly _owner: IIpcInternal,
         private readonly _pipeManager: PipeManager,
     ) { }
 

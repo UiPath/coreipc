@@ -1,4 +1,4 @@
-import { TimeSpan, JsonConvert } from '@foundation';
+import { TimeSpan, JsonConvert, OperationCanceledError } from '@foundation';
 import { assert, expect, spy, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import spies from 'chai-spies';
@@ -41,6 +41,16 @@ export class ForInstance<TInstance> {
             return method.bind(this._obj)(...args);
         };
     }
+
+    public callingWrong<Key extends keyof TInstance>(
+        methodName: Key & string,
+        ...args: never[]): () => any {
+
+        return () => {
+            const method = this._obj[methodName] as unknown as (...args: any[]) => any;
+            return method.bind(this._obj)(...args);
+        };
+    }
 }
 
 export function toJavaScript(x: unknown): string {
@@ -65,6 +75,10 @@ export function toJavaScript(x: unknown): string {
             break;
     }
     return JsonConvert.serializeObject(x);
+}
+
+export function concatArgs(args: readonly unknown[]): string {
+    return args.map(toJavaScript).join(', ');
 }
 
 export function asParamsOf<T extends (...args: any[]) => any>(_func: T): (...args: Parameters<T>) => Parameters<T> {

@@ -1,14 +1,19 @@
 import { PublicCtor, TimeSpan, Timeout, CancellationToken, defaultConnectHelper } from '@foundation';
-import { Ipc, Message } from '../ipc';
-import { RpcChannel, Converter } from '../protocol';
+import { IIpcInternal, Message } from '../ipc';
+import { IRpcChannel, Converter, IRpcChannelFactory, IMessageStreamFactory, defaultRpcChannelFactory, RpcCallContext, RpcMessage, RpcError } from '../protocol';
 import { ProxyManagerRegistry } from './ProxyManagerRegistry';
+import { Observer } from 'rxjs';
 
 /* @internal */
 export class PipeManager {
     constructor(
-        private readonly _owner: Ipc,
+        private readonly _owner: IIpcInternal,
         public readonly pipeName: string,
-    ) { }
+        rpcChannelFactory?: IRpcChannelFactory,
+        private readonly _messageStreamFactory?: IMessageStreamFactory,
+    ) {
+        this._rpcChannelFactory = rpcChannelFactory ?? defaultRpcChannelFactory;
+    }
 
     public readonly proxyManagerRegistry = new ProxyManagerRegistry(this._owner, this);
 
@@ -62,15 +67,61 @@ export class PipeManager {
         return result;
     }
 
-    private async ensureConnection(timeout: TimeSpan, ct: CancellationToken): Promise<RpcChannel.Impl> {
-        if (this._channel?.isAlive !== true) {
-            await this._channel?.disposeAsync();
+    private readonly _rpcChannelFactory: IRpcChannelFactory;
+    private _channel: IRpcChannel | undefined;
+
+    private async ensureConnection(timeout: TimeSpan, ct: CancellationToken): Promise<IRpcChannel> {
+        if (!this._channel || this._channel.isDisposed) {
             const connectHelper = this._owner.config.read('connectHelper', this.pipeName) ?? defaultConnectHelper;
-            this._channel = await RpcChannel.Impl.connect(this.pipeName, connectHelper, timeout, ct);
+
+            this._channel = this._rpcChannelFactory.create(
+                this.pipeName,
+                connectHelper,
+                timeout,
+                ct,
+                this._incommingCallObserver,
+                this._messageStreamFactory,
+            );
+            const x = this._channel;
         }
 
         return this._channel;
     }
 
-    private _channel: RpcChannel.Impl | undefined;
+    private _incommingCallObserver = new (class implements Observer<RpcCallContext.Incomming> {
+        constructor(private readonly _owner: PipeManager) { }
+
+        public closed?: boolean;
+        public async next(value: RpcCallContext.Incomming): Promise<void> {
+            value.respond(await this._owner.invokeCallback(value.request));
+        }
+        public error(err: any): void { }
+        public complete(): void { }
+    })(this);
+
+    private async invokeCallback(request: RpcMessage.Request): Promise<RpcMessage.Response> {
+        const callback = this._owner.callback.get(request.Endpoint, this.pipeName) as any;
+
+        if (!callback) {
+            throw new Error(`A callback is not defined for endpoint "${request.Endpoint}".`);
+        }
+
+        const method = callback[request.MethodName] as (...args: any[]) => Promise<unknown>;
+        if (!(typeof method === 'function')) {
+            throw new Error(`The callback defined for endpoint "${request.Endpoint}" does not expose a method named "${request.MethodName}".`);
+        }
+
+        const args = request.Parameters.map(jsonArg => JSON.parse(jsonArg));
+        let data: string | null = null;
+        let error: RpcError | null = null;
+
+        try {
+            const result = await method.apply(callback, args);
+            data = JSON.stringify(result);
+        } catch (err) {
+            error = Converter.toRpcError(err);
+        }
+
+        return new RpcMessage.Response(request.Id, data, error);
+    }
 }

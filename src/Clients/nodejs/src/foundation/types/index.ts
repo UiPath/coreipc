@@ -1,5 +1,6 @@
 export * from './reflection';
 export * from './disposables';
-export * from './memoizer';
-export * from './memory-pals';
+export * from './BitConverter';
+export * from './Marshal';
+export * from './SupportedConversion';
 import './reflection';

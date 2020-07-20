@@ -1,5 +1,5 @@
 import { spy, constructing, forInstance } from '@test-helpers';
-import { AggregateDisposable, ArgumentOutOfRangeError, AggregateError, ArgumentError } from '@foundation';
+import { AggregateDisposable, AggregateError, ArgumentError } from '@foundation';
 
 describe(`internals`, () => {
     describe(`AggregateDisposable`, () => {

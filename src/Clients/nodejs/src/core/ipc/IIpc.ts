@@ -1,16 +1,21 @@
 // tslint:disable: no-namespace no-internal-module
 
-import { PublicCtor, Primitive } from '@foundation';
+import { PublicCtor, Primitive, ProxyCtorMemo } from '@foundation';
 import { ConfigAction, ConfigBuilder, ConfigNode } from '.';
 
-export interface IIpc {
+export interface IIpc<TCallbackStore = IIpc.CallbackStore> {
     readonly contract: IIpc.ContractStore;
     readonly config: IIpc.ConfigStore;
     readonly proxy: IIpc.ProxySource;
+    readonly callback: TCallbackStore;
 
     readonly $service: IIpc.ClassAnnotations;
     readonly $operation: IIpc.MethodAnnotations;
+}
 
+/* @internal */
+export interface IIpcInternal extends IIpc<IIpc.CallbackStoreInternal> {
+    readonly proxyCtorMemo: ProxyCtorMemo;
 }
 
 export module IIpc {
@@ -92,10 +97,18 @@ export module IIpc {
     export interface ProxySource {
         get<
             TService,
-            TPipeName extends string = string,
-            TCallback = void>(
+            TPipeName extends string = string>(
                 pipeName: TPipeName,
-                service: PublicCtor<TService>,
-                callback?: TCallback): TService;
+                service: PublicCtor<TService>): TService;
+    }
+
+    export interface CallbackStore {
+        set<TCallback>(callbackType: PublicCtor<TCallback>, pipeName: string, callback: TCallback): void;
+        set<TCallback>(callbackEndpointName: string, pipeName: string, callback: TCallback): void;
+    }
+
+    /* @internal */
+    export interface CallbackStoreInternal extends CallbackStore {
+        get<TCallback = unknown>(callbackEndpointName: string, pipeName: string): TCallback | undefined;
     }
 }

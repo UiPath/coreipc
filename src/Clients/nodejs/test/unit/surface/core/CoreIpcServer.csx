@@ -79,11 +79,13 @@ public sealed class Algebra : IAlgebra
 
     public Task<int> MultiplySimple(int x, int y)
     {
+        Console.WriteLine($"{nameof(MultiplySimple)}({x}, {y})");
         return Task.FromResult(x * y);
     }
 
     public async Task<int> Multiply(int x, int y, Message message = default)
     {
+        // Debugger.Launch();
         var arithmetics = message.GetCallback<IArithmetics>();
 
         int result = 0;

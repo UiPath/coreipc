@@ -1,10 +1,10 @@
 import { PipeManager } from '.';
-import { Ipc } from '../ipc';
+import { IIpcInternal } from '../ipc';
 
 /* @internal */
 export class PipeManagerRegistry {
     constructor(
-        private readonly _owner: Ipc,
+        private readonly _owner: IIpcInternal,
     ) { }
 
     public get(pipeName: string): PipeManager {
