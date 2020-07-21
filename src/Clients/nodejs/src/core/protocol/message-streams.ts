@@ -40,9 +40,12 @@ export class MessageStream implements IMessageStream {
     ) { }
 
     public async writeMessageAsync(message: Network.Message, ct: CancellationToken): Promise<void> {
-        await this._stream.write(BitConverter.getBytes(message.type, 'uint8'), ct);
-        await this._stream.write(BitConverter.getBytes(message.data.byteLength, 'int32le'), ct);
-        await this._stream.write(message.data, ct);
+        const bytes = Buffer.from([
+            ...BitConverter.getBytes(message.type, 'uint8'),
+            ...BitConverter.getBytes(message.data.byteLength, 'int32le'),
+            ...message.data,
+        ]);
+        await this._stream.write(bytes, ct);
     }
     public async disposeAsync(): Promise<void> {
         this._ctsLoop.cancel();

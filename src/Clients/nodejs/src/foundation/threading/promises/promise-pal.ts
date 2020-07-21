@@ -4,6 +4,7 @@ import {
     ArgumentOutOfRangeError,
     CancellationToken,
     PromiseCompletionSource,
+    IDebugCategory,
 } from '@foundation';
 
 import { OperationCanceledError } from '@foundation-errors';

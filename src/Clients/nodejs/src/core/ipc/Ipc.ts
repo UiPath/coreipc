@@ -2,7 +2,7 @@ import {
     IIpc,
     ClassAnnotationsWrapper,
     MethodAnnotationsWrapper,
-    ConfigStore,
+    ConfigStoreWrapper,
     ProxySource,
     ContractStore,
 } from '.';
@@ -25,7 +25,7 @@ export class Ipc implements IIpc {
         $operation?: IIpc.MethodAnnotations,
     ) {
         this.contract = contract ?? new ContractStore();
-        this.config = config ?? new ConfigStore();
+        this.config = config ?? new ConfigStoreWrapper().iface;
         this.proxy = proxy ?? new ProxySource(this);
         this.callback = callback ?? new CallbackStore();
 

@@ -5,6 +5,7 @@ export class RemoteError extends Error {
         public readonly exception: Exception,
     ) {
         super(`A call to ${endpoint}.${methodName} threw ${exception.type}. Message: "${exception.message}".`);
+        this.name = 'RemoteError';
     }
 }
 

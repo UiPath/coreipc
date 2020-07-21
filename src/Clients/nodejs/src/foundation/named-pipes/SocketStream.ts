@@ -1,8 +1,20 @@
-import { argumentIs, CancellationToken, AutoResetEvent, ArgumentError, EndOfStreamError, InvalidOperationError } from '@foundation';
+import {
+    argumentIs,
+    Debug,
+    CancellationToken,
+    AutoResetEvent,
+    ArgumentError,
+    EndOfStreamError,
+    InvalidOperationError,
+} from '@foundation';
+
 import { Stream, Socket } from '.';
 
 /* @internal */
 export class SocketStream implements Stream {
+    private static readonly _debugKey = Symbol();
+    public static get $DEBUG() { return Debug.category(SocketStream._debugKey); }
+
     private readonly _signal = new AutoResetEvent();
     private _buffers = new Array<Buffer>();
     private _oldestBufferCursor = 0;

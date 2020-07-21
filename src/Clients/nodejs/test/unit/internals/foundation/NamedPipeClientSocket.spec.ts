@@ -19,6 +19,7 @@ import {
     OperationCanceledError,
     TimeoutError,
     ObjectDisposedError,
+    PromiseStatus,
 } from '@foundation';
 
 describe(`internals`, () => {
@@ -203,27 +204,20 @@ describe(`internals`, () => {
                 NeverConnectMockSocket.prototype.unref = spy(() => { });
                 NeverConnectMockSocket.prototype.destroy = spy((_error?: Error) => { });
 
-                const promise = NamedPipeClientSocket.connect(
+                const spiedPromise = NamedPipeClientSocket.connect(
                     'some pipe name',
                     TimeSpan.fromMilliseconds(100),
                     CancellationToken.none,
                     NeverConnectMockSocket,
-                );
-                const spyThen = spy((npcs: NamedPipeClientSocket) => {
-                    console.log();
-                });
-                const spyCatch = spy((error: Error) => { });
-                promise.then(spyThen);
-                promise.catch(spyCatch);
+                ).spy();
 
                 await Promise.yield();
-                spyThen.should.not.have.been.called();
-                spyCatch.should.not.have.been.called();
+                spiedPromise.status.should.be.eq(PromiseStatus.Running);
 
                 await Promise.delay(TimeSpan.fromMilliseconds(100));
 
-                spyCatch.should.have.been.called();
-                await promise.should.eventually.be.rejectedWith(TimeoutError);
+                spiedPromise.status.should.be.eq(PromiseStatus.Faulted);
+                await spiedPromise.should.eventually.be.rejectedWith(TimeoutError);
 
                 NeverConnectMockSocket.prototype.removeAllListeners.should.have.been.called();
                 NeverConnectMockSocket.prototype.unref.should.have.been.called();

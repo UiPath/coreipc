@@ -1,11 +1,19 @@
 import * as net from 'net';
 import { Observable, Subject } from 'rxjs';
-import { argumentIs, CancellationToken, TimeSpan, PromiseCompletionSource, ObjectDisposedError, TimeoutError } from '@foundation';
+import {
+    argumentIs,
+    TimeSpan,
+    PromiseCompletionSource,
+    CancellationToken,
+    ObjectDisposedError,
+    InvalidOperationError,
+    TimeoutError,
+} from '@foundation';
 import { SocketLike, Socket } from '.';
 import { ConnectHelper } from './ConnectHelper';
 import { Trace } from '../helpers';
 import { AggregateError } from '../errors/AggregateError';
-import { InvalidOperationError } from '../errors/InvalidOperationError';
+import { } from '@foundation';
 
 /* @internal */
 export class NamedPipeClientSocket extends Socket {
@@ -100,7 +108,13 @@ export class NamedPipeClientSocket extends Socket {
         if (this._disposed) { throw new ObjectDisposedError('NamedPipeClientSocket'); }
         if (buffer.byteLength === 0) { return; }
 
-        return await new Promise<void>((resolve, reject) => this._socketLike.write(buffer, error => error ? reject(error) : resolve()));
+        return await new Promise<void>((resolve, reject) => {
+            this._socketLike.write(
+                buffer,
+                error => error
+                    ? reject(error)
+                    : resolve());
+        });
     }
 
     public dispose(): void {

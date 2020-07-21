@@ -1,5 +1,5 @@
 import { RpcMessage, RpcError } from './rpc-channels';
-import { TimeSpan, CoreIpcError, argumentIs } from '@foundation';
+import { TimeSpan, argumentIs, TimeoutError } from '@foundation';
 import { RemoteError, Exception } from './RemoteError';
 
 /* @internal */
@@ -21,7 +21,11 @@ export class Converter {
         }
     }
 
-    public static createRemoteError(request: RpcMessage.Request, error: RpcError): RemoteError {
+    public static createRemoteError(request: RpcMessage.Request, error: RpcError): Error {
+        if (error.Type === 'System.TimeoutException') {
+            return new TimeoutError({ reportedByServer: true });
+        }
+
         return new RemoteError(
             request.Endpoint,
             request.MethodName,

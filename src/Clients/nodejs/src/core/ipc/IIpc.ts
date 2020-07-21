@@ -25,26 +25,19 @@ export module IIpc {
 
     export module ConfigStore {
         export interface Writer {
-            write(
-                action: ConfigAction<ConfigBuilder>): this;
+            (action: ConfigAction<ConfigBuilder>): this;
 
-            write<PipeName extends string = string>(
-                pipeName: PipeName,
-                action: ConfigAction<ConfigBuilder>): this;
+            <PipeName extends string = string>
+                (pipeName: PipeName, action: ConfigAction<ConfigBuilder>): this;
 
-            write<Service>(
-                service: PublicCtor<Service>,
-                action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
+            <Service>
+                (service: PublicCtor<Service>, action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
 
-            write<Service, PipeName extends string = string>(
-                pipeName: PipeName,
-                service: PublicCtor<Service>,
-                action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
+            <Service, PipeName extends string = string>
+                (pipeName: PipeName, service: PublicCtor<Service>, action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
 
-            write<Service, PipeName extends string = string>(
-                service: PublicCtor<Service>,
-                pipeName: PipeName,
-                action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
+            <Service, PipeName extends string = string>
+                (service: PublicCtor<Service>, pipeName: PipeName, action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
         }
 
         /* @internal */

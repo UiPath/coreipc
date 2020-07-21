@@ -22,6 +22,8 @@ using UiPath.CoreIpc.NamedPipe;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
+// Debugger.Launch();
+
 #region " Signalling "
 
 [JsonConverter(typeof(StringEnumConverter))]
@@ -71,11 +73,21 @@ public interface IAlgebra
     Task<string> Ping();
     Task<int> MultiplySimple(int x, int y);
     Task<int> Multiply(int x, int y, Message message = default);
+    Task<bool> Sleep(int milliseconds, Message message = default, CancellationToken ct = default);
+    Task<bool> Timeout();
+}
+
+public interface ICalculus
+{
+    Task<string> Ping();
 }
 
 public sealed class Algebra : IAlgebra
 {
-    public Task<string> Ping() => Task.FromResult("Pong");
+    public async Task<string> Ping()
+    {
+        return "Pong";
+    }
 
     public Task<int> MultiplySimple(int x, int y)
     {
@@ -85,7 +97,6 @@ public sealed class Algebra : IAlgebra
 
     public async Task<int> Multiply(int x, int y, Message message = default)
     {
-        // Debugger.Launch();
         var arithmetics = message.GetCallback<IArithmetics>();
 
         int result = 0;
@@ -95,6 +106,27 @@ public sealed class Algebra : IAlgebra
         }
 
         return result;
+    }
+
+    public async Task<bool> Sleep(int milliseconds, Message message = default, CancellationToken ct = default)
+    {
+        throw new System.TimeoutException();
+
+        await Task.Delay(milliseconds, ct);
+        return true;
+    }
+
+    public async Task<bool> Timeout()
+    {
+        throw new TimeoutException();
+    }
+}
+
+public class Calculus : ICalculus
+{
+    public async Task<string> Ping()
+    {
+        return "Pong";
     }
 }
 
@@ -131,11 +163,13 @@ static async Task MainCore(IList<string> args)
             .AddLogging()
             .AddIpc()
             .AddSingleton<IAlgebra, Algebra>()
+            .AddSingleton<ICalculus, Calculus>()
             .BuildServiceProvider();
 
         var serviceHost = new ServiceHostBuilder(sp)
             .UseNamedPipes(new NamedPipeSettings(pipeName))
             .AddEndpoint<IAlgebra, IArithmetics>()
+            .AddEndpoint<ICalculus>()
             .Build();
 
         var thread = new AsyncContextThread();
@@ -144,10 +178,17 @@ static async Task MainCore(IList<string> args)
 
         _ = Task.Run(async () =>
         {
-            await new NamedPipeClientBuilder<IAlgebra>(pipeName)
-                .RequestTimeout(TimeSpan.FromSeconds(2))
-                .Build()
-                .Ping();
+            try
+            {
+                await new NamedPipeClientBuilder<IAlgebra>(pipeName)
+                    .RequestTimeout(TimeSpan.FromSeconds(2))
+                    .Build()
+                    .Ping();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
             Send(SignalKind.ReadyToConnect);
         });
 

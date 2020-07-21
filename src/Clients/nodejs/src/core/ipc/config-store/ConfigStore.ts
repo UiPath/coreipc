@@ -14,36 +14,47 @@ import {
     ConfigNode,
     configNodeDefaults,
 } from '.';
+
 import { IIpc } from '../IIpc';
 
 /* @internal */
-export class ConfigStore implements IIpc.ConfigStore {
+export class ConfigStoreWrapper {
     public constructor(store?: ConfigStore.IStore) {
         this._store = store ?? new ConfigStore.Store();
+
+        const boundConfig = ConfigStoreWrapper.prototype.config.bind(this);
+        const boundRead = ConfigStoreWrapper.prototype.read.bind(this);
+
+        (this as any).config = boundConfig;
+        (boundConfig as any).read = boundRead;
+
+        this.iface = boundConfig as any;
     }
 
-    public write(
+    public readonly iface: IIpc.ConfigStore;
+
+    public config(
         action: ConfigAction<ConfigBuilder>): this;
 
-    public write<PipeName extends string = string>(
+    public config<PipeName extends string = string>(
         pipeName: PipeName,
         action: ConfigAction<ConfigBuilder>): this;
 
-    public write<Service>(
+    public config<Service>(
         service: PublicCtor<Service>,
         action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
 
-    public write<Service, PipeName extends string = string>(
+    public config<Service, PipeName extends string = string>(
         pipeName: PipeName,
         service: PublicCtor<Service>,
         action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
 
-    public write<Service, PipeName extends string = string>(
+    public config<Service, PipeName extends string = string>(
         service: PublicCtor<Service>,
         pipeName: PipeName,
         action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
 
-    public write<Service, PipeName extends string = string>(
+    public config<Service, PipeName extends string = string>(
         arg0: PipeName | PublicCtor<Service> | ConfigAction<ConfigBuilder>,
         arg1?: PipeName | PublicCtor<Service> | ConfigAction<ConfigBuilder> | ConfigAction<ConfigBuilder.SetRequestTimeout>,
         arg2?: ConfigAction<ConfigBuilder.SetRequestTimeout>): this {
@@ -95,6 +106,86 @@ export class ConfigStore implements IIpc.ConfigStore {
 
     private readonly _store: ConfigStore.IStore;
 }
+
+// /* @internal */
+// export class ConfigStore implements IIpc.ConfigStore {
+//     public constructor(store?: ConfigStore.IStore) {
+//         this._store = store ?? new ConfigStore.Store();
+//     }
+
+//     public write(
+//         action: ConfigAction<ConfigBuilder>): this;
+
+//     public write<PipeName extends string = string>(
+//         pipeName: PipeName,
+//         action: ConfigAction<ConfigBuilder>): this;
+
+//     public write<Service>(
+//         service: PublicCtor<Service>,
+//         action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
+
+//     public write<Service, PipeName extends string = string>(
+//         pipeName: PipeName,
+//         service: PublicCtor<Service>,
+//         action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
+
+//     public write<Service, PipeName extends string = string>(
+//         service: PublicCtor<Service>,
+//         pipeName: PipeName,
+//         action: ConfigAction<ConfigBuilder.SetRequestTimeout>): this;
+
+//     public write<Service, PipeName extends string = string>(
+//         arg0: PipeName | PublicCtor<Service> | ConfigAction<ConfigBuilder>,
+//         arg1?: PipeName | PublicCtor<Service> | ConfigAction<ConfigBuilder> | ConfigAction<ConfigBuilder.SetRequestTimeout>,
+//         arg2?: ConfigAction<ConfigBuilder.SetRequestTimeout>): this {
+
+//         argumentIs(arg0, 'arg0', 'string', 'function');
+//         argumentIs(arg1, 'arg1', 'undefined', 'string', 'function');
+//         argumentIs(arg2, 'arg2', 'undefined', 'function');
+
+//         if (typeof arg0 === 'function' && typeof arg1 === 'undefined' && typeof arg2 === 'undefined') {
+//             const action = arg0 as ConfigAction<ConfigBuilder>;
+
+//             action(this._store.getBuilder());
+//         } else if (typeof arg0 === 'string' && typeof arg1 === 'function' && typeof arg2 === 'undefined') {
+//             const pipeName = arg0 as PipeName;
+//             const action = arg1 as ConfigAction<ConfigBuilder>;
+
+//             action(this._store.getBuilder(pipeName));
+//         } else if (typeof arg0 === 'function' && typeof arg1 === 'function' && typeof arg2 === 'undefined') {
+//             const service = arg0 as PublicCtor<Service>;
+//             const action = arg1 as ConfigAction<ConfigBuilder.SetRequestTimeout>;
+
+//             action(this._store.getBuilder(service));
+//         } else if (typeof arg0 === 'string' && typeof arg1 === 'function' && typeof arg2 === 'function') {
+//             const pipeName = arg0 as PipeName;
+//             const service = arg1 as PublicCtor<Service>;
+//             const action = arg2 as ConfigAction<ConfigBuilder.SetRequestTimeout>;
+
+//             action(this._store.getBuilder(pipeName, service));
+//         } else if (typeof arg0 === 'function' && typeof arg1 === 'string' && typeof arg2 === 'function') {
+//             const service = arg0 as PublicCtor<Service>;
+//             const pipeName = arg1 as PipeName;
+//             const action = arg2 as ConfigAction<ConfigBuilder.SetRequestTimeout>;
+
+//             action(this._store.getBuilder(pipeName, service));
+//         } else {
+//             throw new ArgumentError('Invalid arguments.');
+//         }
+
+//         return this;
+//     }
+
+//     public read<Key extends keyof ConfigNode, PipeName extends string = string, Service = unknown>(
+//         key: Key,
+//         pipeName?: PipeName,
+//         service?: PublicCtor<Service>): ConfigNode[Key] {
+
+//         return this._store.readConfig(key, pipeName, service);
+//     }
+
+//     private readonly _store: ConfigStore.IStore;
+// }
 
 /* @internal */
 export module ConfigStore {

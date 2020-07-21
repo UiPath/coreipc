@@ -4,11 +4,6 @@ import { IIpc } from '../IIpc';
 
 /* @internal */
 export class OperationInfo implements IIpc.OperationInfo {
-    // metadataKeys:
-    // - 'design:paramtypes',
-    // - 'design:returntype',
-    // - 'design:type',
-
     constructor(
         private readonly _declaringClass: PublicCtor,
         public readonly methodName: string,
