@@ -1,4 +1,4 @@
-import { argumentIs } from '@foundation';
+import { argumentIs } from '../../foundation';
 import { CoreIpcError } from '.';
 import { ArgumentOutOfRangeError } from './ArgumentOutOfRangeError';
 

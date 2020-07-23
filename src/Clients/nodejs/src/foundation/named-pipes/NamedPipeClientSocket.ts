@@ -1,19 +1,26 @@
 import * as net from 'net';
-import { Observable, Subject } from 'rxjs';
+
 import {
-    argumentIs,
-    TimeSpan,
+    Observable,
+    Subject,
+} from 'rxjs';
+
+import { Socket } from './Socket';
+import { ConnectHelper, SocketLike } from '.';
+import { Trace, argumentIs } from '../helpers';
+
+import {
     PromiseCompletionSource,
     CancellationToken,
-    ObjectDisposedError,
+    TimeSpan,
+} from '../threading';
+
+import {
     InvalidOperationError,
+    AggregateError,
+    ObjectDisposedError,
     TimeoutError,
-} from '@foundation';
-import { SocketLike, Socket } from '.';
-import { ConnectHelper } from './ConnectHelper';
-import { Trace } from '../helpers';
-import { AggregateError } from '../errors/AggregateError';
-import { } from '@foundation';
+} from '../errors';
 
 /* @internal */
 export class NamedPipeClientSocket extends Socket {
@@ -28,18 +35,23 @@ export class NamedPipeClientSocket extends Socket {
         const errors = new Array<Error>();
         let tryConnectCalled = false;
 
-        await connectHelper(async () => {
-            tryConnectCalled = true;
-            if (socket) { return true; }
+        await connectHelper({
+            pipeName,
+            timeout,
+            ct,
+            async tryConnect() {
+                tryConnectCalled = true;
+                if (socket) { return true; }
 
-            try {
-                socket = await NamedPipeClientSocket.connect(pipeName, timeout, ct, socketLikeCtor);
-                return true;
-            } catch (error) {
-                errors.push(error);
-                return false;
-            }
-        }, pipeName, timeout, ct);
+                try {
+                    socket = await NamedPipeClientSocket.connect(pipeName, timeout, ct, socketLikeCtor);
+                    return true;
+                } catch (error) {
+                    errors.push(error);
+                    return false;
+                }
+            },
+        });
 
         let error: Error | undefined;
         switch (errors.length) {

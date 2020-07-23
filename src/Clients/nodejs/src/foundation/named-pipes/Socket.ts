@@ -1,5 +1,5 @@
 import { Observable } from 'rxjs';
-import { CancellationToken, IDisposable } from '@foundation';
+import { CancellationToken, IDisposable } from '../../foundation';
 
 /* @internal */
 export abstract class Socket implements IDisposable {

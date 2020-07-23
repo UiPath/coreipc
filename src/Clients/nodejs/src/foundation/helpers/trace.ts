@@ -1,4 +1,4 @@
-import { IDisposable, ArgumentNullError } from '@foundation';
+import { IDisposable, ArgumentNullError } from '../../foundation';
 
 export class Trace {
     private static readonly _listeners = new Array<(errorOrText: Error | string, category?: string) => void>();

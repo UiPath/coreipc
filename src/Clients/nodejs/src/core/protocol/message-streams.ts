@@ -10,7 +10,7 @@ import {
     CancellationTokenSource,
     OperationCanceledError,
     Trace,
-} from '@foundation';
+} from '../../foundation';
 
 /* @internal */
 export interface IMessageStreamFactory {

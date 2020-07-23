@@ -3,7 +3,7 @@ import {
     PromiseCompletionSource,
     CancellationToken,
     CancellationTokenRegistration,
-} from '@foundation';
+} from '../../../foundation';
 
 /* @internal */
 export class AutoResetEvent {

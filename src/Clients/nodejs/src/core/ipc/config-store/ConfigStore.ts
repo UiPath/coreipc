@@ -6,7 +6,7 @@ import {
     TimeSpan,
     ArgumentError,
     ConnectHelper,
-} from '@foundation';
+} from '../../../foundation';
 
 import {
     ConfigAction,

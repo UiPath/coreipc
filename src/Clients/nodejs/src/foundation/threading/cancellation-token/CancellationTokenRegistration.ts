@@ -1,4 +1,4 @@
-import { IDisposable, argumentIs } from '@foundation';
+import { IDisposable, argumentIs } from '../../../foundation';
 import { CancellationTokenSource } from '.';
 
 export abstract class CancellationTokenRegistration implements IDisposable {

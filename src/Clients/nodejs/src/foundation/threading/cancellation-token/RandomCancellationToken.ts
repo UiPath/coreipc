@@ -7,7 +7,7 @@ import {
     IDisposable,
     argumentIs,
     OperationCanceledError,
-} from '@foundation';
+} from '../../../foundation';
 
 /* @internal */
 export class RandomCancellationToken extends CancellationToken {

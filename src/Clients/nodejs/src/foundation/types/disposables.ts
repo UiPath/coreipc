@@ -1,4 +1,4 @@
-import { argumentIs, AggregateError, ArgumentError } from '@foundation';
+import { argumentIs, AggregateError, ArgumentError } from '../../foundation';
 
 export interface IDisposable {
     dispose(): void;

@@ -1,4 +1,4 @@
-import { PublicCtor, Primitive, InvalidOperationError } from '@foundation';
+import { PublicCtor, Primitive, InvalidOperationError } from '../../../foundation';
 import { IIpc } from '..';
 import { Ipc } from '../Ipc';
 

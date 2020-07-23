@@ -1,6 +1,6 @@
 import { CoreIpcServerRunner } from '@test-helpers';
-import { ipc, Message } from '@core';
 import { CancellationToken, TimeSpan, TimeoutError, SocketStream } from '@foundation';
+import { ipc, Message } from '@core';
 
 describe(`surface`, () => {
     describe(`end-to-end`, () => {
@@ -41,7 +41,7 @@ describe(`surface`, () => {
                 await CoreIpcServerRunner.host(pipeName, async () => {
                     await proxy.Sleep(
                         1000,
-                        new Message(undefined, TimeSpan.fromMilliseconds(1)),
+                        new Message({ requestTimeout: TimeSpan.fromMilliseconds(1) }),
                         CancellationToken.none,
                     )
                         .should.eventually.be.rejectedWith(TimeoutError);

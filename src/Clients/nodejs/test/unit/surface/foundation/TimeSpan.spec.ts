@@ -14,14 +14,14 @@ describe(`surface:foundation`, () => {
             { arg: -3 },
             { arg: -4 },
             { arg: null, isInvalid: true },
-            { arg: undefined, isInvalid: true }
+            { arg: undefined, isInvalid: true },
         ];
         const _contexts: Array<{ name: string }> = [
             { name: 'Milliseconds' },
             { name: 'Seconds' },
             { name: 'Minutes' },
             { name: 'Hours' },
-            { name: 'Days' }
+            { name: 'Days' },
         ];
         for (const _context of _contexts) {
             context(`method:from${_context.name}`, () => {

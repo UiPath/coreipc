@@ -1,4 +1,4 @@
-import { PublicCtor, argumentIs } from '@foundation';
+import { PublicCtor, argumentIs } from '../../foundation';
 
 /* @internal */
 export class MethodNameEnumerator<T = void> {

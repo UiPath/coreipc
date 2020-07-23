@@ -1,5 +1,5 @@
 import { IIpc } from '../IIpc';
-import { PublicCtor, argumentIs } from '@foundation';
+import { PublicCtor, argumentIs } from '../../../foundation';
 
 /* @internal */
 export class CallbackStore implements IIpc.CallbackStoreInternal {

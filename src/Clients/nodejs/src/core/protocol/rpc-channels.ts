@@ -13,7 +13,7 @@ import {
     Trace,
     ArgumentOutOfRangeError,
     IAsyncDisposable,
-} from '@foundation';
+} from '../../foundation';
 
 import {
     MessageStreamFactory,
@@ -288,7 +288,7 @@ export module RpcMessage {
         public constructor(
             public RequestId: string,
             public readonly Data: string | null,
-            public readonly Error: RpcError | null,
+            public readonly Error: IpcError | null,
         ) { super(); }
 
         public toNetwork(): Network.Message {
@@ -317,13 +317,12 @@ export module RpcMessage {
     }
 }
 
-/* @internal */
-export class RpcError {
+export class IpcError {
     public constructor(
         public readonly Message: string,
         public readonly StackTrace: string,
         public readonly Type: string,
-        public readonly InnerError: RpcError | null,
+        public readonly InnerError: IpcError | null,
     ) {
     }
 }

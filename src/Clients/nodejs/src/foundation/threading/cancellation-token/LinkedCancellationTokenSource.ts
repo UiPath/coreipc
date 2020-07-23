@@ -1,4 +1,4 @@
-import { IDisposable } from '@foundation';
+import { IDisposable } from '../../../foundation';
 import { CancellationTokenSource } from '.';
 
 /* @internal */

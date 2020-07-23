@@ -1,6 +1,6 @@
 // tslint:disable: no-namespace no-internal-module
 
-import { TimeSpan, ConnectHelper } from '@foundation';
+import { TimeSpan, ConnectHelper } from '../../../foundation';
 
 export type ConfigBuilder =
     ConfigBuilder.SetRequestTimeout &

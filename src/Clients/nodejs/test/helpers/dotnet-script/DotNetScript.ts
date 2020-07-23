@@ -5,7 +5,12 @@ import * as path from 'path';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { Readable, Writable } from 'stream';
 
-import { PromiseCompletionSource, ObjectDisposedError, InvalidOperationError, IDisposable } from '@foundation';
+import {
+    PromiseCompletionSource,
+    ObjectDisposedError,
+    InvalidOperationError,
+    IDisposable,
+} from '@foundation';
 
 export interface IAsyncDisposable {
     disposeAsync(): Promise<void>;

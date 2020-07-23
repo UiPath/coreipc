@@ -1,6 +1,6 @@
 /* istanbul ignore file */
 
-import { ArgumentNullError, ArgumentOutOfRangeError } from '@foundation';
+import { ArgumentNullError, ArgumentOutOfRangeError } from '../../foundation';
 import { ArgumentError } from '../errors/ArgumentError';
 
 /* @internal */

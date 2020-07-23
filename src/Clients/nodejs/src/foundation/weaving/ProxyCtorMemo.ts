@@ -1,4 +1,4 @@
-import { PublicCtor } from '@foundation';
+import { PublicCtor } from '../../foundation';
 import { ProxyCtor, ProxyWeaver } from '.';
 import { argumentIs } from '../helpers';
 

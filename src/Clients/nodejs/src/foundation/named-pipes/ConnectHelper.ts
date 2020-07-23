@@ -1,13 +1,9 @@
-import { CancellationToken, TimeSpan } from '@foundation';
+import { ConnectContext } from '.';
 
-export type ConnectHelper = (tryConnect: () => Promise<boolean>, pipeName: string, timeout: TimeSpan, ct: CancellationToken) => Promise<void>;
+export type ConnectHelper = (context: ConnectContext) => Promise<void>;
 
 /* @internal */
-export const defaultConnectHelper: ConnectHelper = async (
-    tryConnect: () => Promise<boolean>,
-    _pipeName: string,
-    _timeout: TimeSpan,
-    _ct: CancellationToken,
-): Promise<void> => {
-    await tryConnect();
-};
+export const defaultConnectHelper: ConnectHelper =
+    async (context: ConnectContext): Promise<void> => {
+        await context.tryConnect();
+    };

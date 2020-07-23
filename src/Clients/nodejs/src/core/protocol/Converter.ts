@@ -1,5 +1,5 @@
-import { RpcMessage, RpcError } from './rpc-channels';
-import { TimeSpan, argumentIs, TimeoutError } from '@foundation';
+import { RpcMessage, IpcError } from './rpc-channels';
+import { TimeSpan, argumentIs, TimeoutError } from '../../foundation';
 import { RemoteError, Exception } from './RemoteError';
 
 /* @internal */
@@ -21,7 +21,7 @@ export class Converter {
         }
     }
 
-    public static createRemoteError(request: RpcMessage.Request, error: RpcError): Error {
+    public static createRemoteError(request: RpcMessage.Request, error: IpcError): Error {
         if (error.Type === 'System.TimeoutException') {
             return new TimeoutError({ reportedByServer: true });
         }
@@ -32,7 +32,7 @@ export class Converter {
             createException(error),
         );
 
-        function createException(x: RpcError): Exception {
+        function createException(x: IpcError): Exception {
             return {
                 type: x.Type,
                 message: x.Message,
@@ -42,13 +42,13 @@ export class Converter {
         }
     }
 
-    public static toRpcError(err: any): RpcError {
+    public static toRpcError(err: any): IpcError {
         argumentIs(err, 'err', 'string', Object);
 
         if (err instanceof Error) {
-            return new RpcError(err.message, err.stack ?? '', err.name, null);
+            return new IpcError(err.message, err.stack ?? '', err.name, null);
         } else {
-            return new RpcError(`${err}`, '', '', null);
+            return new IpcError(`${err}`, '', '', null);
         }
     }
 }

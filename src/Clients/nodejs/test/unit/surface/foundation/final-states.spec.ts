@@ -1,5 +1,5 @@
-import { expect, constructing, toJavaScript, calling } from '@test-helpers';
-import { FinalState, AggregateError, ArgumentOutOfRangeError, ArgumentError, InvalidOperationError, FinalStateKind, FinalStateBase } from '@foundation';
+import { expect, toJavaScript, calling } from '@test-helpers';
+import { FinalState, FinalStateBase } from '@foundation';
 
 describe(`surface:foundation`, () => {
     describe(`FinalState`, () => {

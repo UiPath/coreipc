@@ -5,7 +5,7 @@ import {
     ArgumentError,
     EndOfStreamError,
     InvalidOperationError,
-} from '@foundation';
+} from '../../foundation';
 
 import { Stream, Socket } from '.';
 

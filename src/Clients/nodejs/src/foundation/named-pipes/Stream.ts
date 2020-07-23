@@ -1,4 +1,4 @@
-import { CancellationToken, IDisposable } from '@foundation';
+import { CancellationToken, IDisposable } from '../../foundation';
 
 /* @internal */
 export abstract class Stream implements IDisposable {

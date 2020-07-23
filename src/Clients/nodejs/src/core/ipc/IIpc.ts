@@ -1,6 +1,6 @@
 // tslint:disable: no-namespace no-internal-module
 
-import { PublicCtor, Primitive, ProxyCtorMemo } from '@foundation';
+import { PublicCtor, Primitive, ProxyCtorMemo } from '../../foundation';
 import { ConfigAction, ConfigBuilder, ConfigNode } from '.';
 
 export interface IIpc<TCallbackStore = IIpc.CallbackStore> {
@@ -50,8 +50,8 @@ export module IIpc {
     }
 
     export interface ClassAnnotations {
-        (target: PublicCtor): void;
-        (args: { endpoint?: string }): (ctor: PublicCtor) => void;
+        (target: PublicCtor): any;
+        (args: { endpoint?: string }): any;
     }
 
     export interface MethodAnnotations {

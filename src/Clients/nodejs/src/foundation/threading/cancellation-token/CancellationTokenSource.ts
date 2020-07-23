@@ -6,7 +6,9 @@ import {
     IDisposable,
     AggregateDisposable,
     TimeSpan,
-} from '@foundation';
+    ArgumentError,
+} from '../../../foundation';
+
 import {
     CancellationToken,
     CancellationTokenRegistration,
@@ -14,7 +16,6 @@ import {
     ProperCancellationTokenRegistration,
     LinkedCancellationTokenSource,
 } from '.';
-import { ArgumentError } from '@foundation-errors';
 
 export class CancellationTokenSource implements IDisposable {
     public static createLinkedTokenSource(...tokens: CancellationToken[]): CancellationTokenSource {

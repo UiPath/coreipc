@@ -7,11 +7,8 @@ import {
     ContractStore,
 } from '.';
 
-import {
-    PipeManagerRegistry,
-} from '../proxy-registry/PipeManagerRegistry';
-
-import { ProxyCtorMemo } from '@foundation';
+import { PipeManagerRegistry } from '../proxy-registry';
+import { ProxyCtorMemo } from '../../foundation';
 import { CallbackStore } from './callback-store/CallbackStore';
 
 /* @internal */

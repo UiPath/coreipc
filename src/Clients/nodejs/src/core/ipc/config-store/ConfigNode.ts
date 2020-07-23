@@ -1,4 +1,4 @@
-import { TimeSpan, Timeout, ConnectHelper } from '@foundation';
+import { TimeSpan, Timeout, ConnectHelper } from '../../../foundation';
 
 /* @internal */
 export interface ConfigNode {

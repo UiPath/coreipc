@@ -1,4 +1,4 @@
-import { TimeSpan, JsonConvert, OperationCanceledError } from '@foundation';
+import { TimeSpan, JsonConvert } from '@foundation';
 import { assert, expect, spy, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import spies from 'chai-spies';

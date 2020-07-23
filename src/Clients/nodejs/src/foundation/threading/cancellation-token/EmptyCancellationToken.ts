@@ -3,7 +3,8 @@ import {
     CancellationTokenRegistration,
     EmptyCancellationTokenRegistration,
 } from '.';
-import { argumentIs } from '@foundation';
+
+import { argumentIs } from '../../../foundation';
 
 /* @internal */
 export class EmptyCancellationToken extends CancellationToken {

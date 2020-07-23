@@ -4,9 +4,8 @@ import {
     ArgumentOutOfRangeError,
     CancellationToken,
     PromiseCompletionSource,
-} from '@foundation';
-
-import { OperationCanceledError } from '@foundation-errors';
+    OperationCanceledError,
+} from '../../../foundation';
 
 declare global {
     interface PromiseConstructor {

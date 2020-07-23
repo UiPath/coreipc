@@ -1,4 +1,4 @@
-import { PublicCtor } from '@foundation';
+import { PublicCtor } from '../../../foundation';
 import { IIpc } from '../IIpc';
 import { OperationInfo } from '.';
 

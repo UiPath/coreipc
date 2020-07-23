@@ -1,4 +1,4 @@
-import { PublicCtor } from '@foundation';
+import { PublicCtor } from '../../foundation';
 import { ICallInterceptor, ICallInterceptorContainer, MethodNameEnumerator, ProxyCtor, symbolOfCallInterceptor } from '.';
 
 /* @internal */

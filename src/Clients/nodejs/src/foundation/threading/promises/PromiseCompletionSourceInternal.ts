@@ -1,5 +1,4 @@
-import { argumentIs, InvalidOperationError } from '@foundation';
-import { OperationCanceledError } from '@foundation-errors';
+import { argumentIs, InvalidOperationError, OperationCanceledError } from '../../../foundation';
 import {
     FinalState,
     FinalStateRanToCompletion,

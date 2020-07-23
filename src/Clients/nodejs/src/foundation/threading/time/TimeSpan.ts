@@ -1,4 +1,4 @@
-import { ArgumentNullError, argumentIs } from '@foundation';
+import { ArgumentNullError, argumentIs } from '../../../foundation';
 
 // tslint:disable-next-line: no-namespace
 namespace MillisecondsInA {
