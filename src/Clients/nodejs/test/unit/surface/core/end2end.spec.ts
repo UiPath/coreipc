@@ -8,14 +8,11 @@ describe(`surface`, () => {
         class IAlgebra {
             @ipc.$operation({ name: 'Ping' })
             public ping(): Promise<string> { throw null; }
-
             public MultiplySimple(x: number, y: number): Promise<number> { throw null; }
-
             public Multiply(x: number, y: number): Promise<number> { throw null; }
-
             public Sleep(milliseconds: number, message: Message, ct: CancellationToken): Promise<boolean> { throw null; }
-
             public Timeout(): Promise<boolean> { throw null; }
+            public Echo(x: number): Promise<number> { throw null; }
         }
 
         @ipc.$service
@@ -59,6 +56,25 @@ describe(`surface`, () => {
                         .should.eventually.be.rejectedWith(TimeoutError);
                 });
             });
+        });
+
+        context(`concurrent calls`, () => {
+            it(`should work`, async () => {
+                const proxy = ipc.proxy.get(pipeName, IAlgebra);
+                const concurrencyLevel = 50;
+
+                await CoreIpcServerRunner.host(pipeName, async () => {
+                    const infos = Array.from(Array(concurrencyLevel).keys())
+                        .map(input => ({
+                            input,
+                            output: proxy.Echo(input),
+                        }));
+
+                    for (const info of infos) {
+                        await info.output.should.eventually.be.fulfilled.and.be.eq(info.input);
+                    }
+                });
+            }).timeout(30 * 1000);
         });
 
         context(`multiple endpoints`, () => {

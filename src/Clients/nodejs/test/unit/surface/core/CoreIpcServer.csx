@@ -75,6 +75,7 @@ public interface IAlgebra
     Task<int> Multiply(int x, int y, Message message = default);
     Task<bool> Sleep(int milliseconds, Message message = default, CancellationToken ct = default);
     Task<bool> Timeout();
+    Task<int> Echo(int x);
 }
 
 public interface ICalculus
@@ -119,6 +120,11 @@ public sealed class Algebra : IAlgebra
     public async Task<bool> Timeout()
     {
         throw new TimeoutException();
+    }
+
+    public async Task<int> Echo(int x)
+    {
+        return x;
     }
 }
 
