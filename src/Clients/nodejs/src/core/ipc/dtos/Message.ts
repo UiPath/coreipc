@@ -12,5 +12,5 @@ export class Message<T = void> {
     }
 
     public readonly Payload?: T;
-    public RequestTimeout: TimeSpan;
+    public RequestTimeout: TimeSpan | null;
 }

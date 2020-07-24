@@ -76,9 +76,9 @@ export class Converter {
         function createException(x: IpcError): Exception {
             return {
                 type: x.Type,
-                message: x.Message,
+                message: `${x.Type}: "${x.Message}"`,
                 stackTrace: x.StackTrace,
-                innerException: x.InnerError ? createException(x.InnerError) : undefined,
+                inner: x.InnerError ? createException(x.InnerError) : undefined,
             };
         }
     }
