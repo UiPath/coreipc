@@ -2,14 +2,27 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 import { DotNetScript, SignalKind } from './DotNetScript';
+import { AggregateError } from '../../../src/foundation/errors/AggregateError';
 
 export class CoreIpcServerRunner {
     public static async host(pipeName: string, action: () => Promise<void>): Promise<void> {
         const runner = await CoreIpcServerRunner.start(pipeName);
         try {
-            await action();
-        } finally {
+            let error: Error | undefined;
+            try {
+                await action();
+            } catch (err) {
+                error = err;
+            }
+
             await runner.disposeAsync();
+            if (runner.processExitError && error) {
+                error = new AggregateError(undefined, runner.processExitError, error);
+            }
+
+            error = error ?? (runner.processExitCode ? runner.processExitError : undefined);
+            if (error) { throw error; }
+        } finally {
         }
     }
 
@@ -21,6 +34,9 @@ export class CoreIpcServerRunner {
     }
 
     private constructor(private readonly _dotNetScript: DotNetScript) { }
+
+    public get processExitCode(): number | undefined { return this._dotNetScript.processExitCode; }
+    public get processExitError(): Error | undefined { return this._dotNetScript.processExitError; }
 
     private disposeAsync(): Promise<void> { return this._dotNetScript.disposeAsync(); }
 

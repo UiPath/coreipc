@@ -1,6 +1,8 @@
+import * as util from 'util';
 import { CoreIpcServerRunner } from '@test-helpers';
-import { CancellationToken, TimeSpan, TimeoutError, SocketStream } from '@foundation';
+import { CancellationToken, TimeSpan, TimeoutError, SocketStream, Trace } from '@foundation';
 import { ipc, Message } from '@core';
+import { performance } from 'perf_hooks';
 
 describe(`surface`, () => {
     describe(`end-to-end`, () => {
@@ -27,24 +29,42 @@ describe(`surface`, () => {
         }
 
         const pipeName = 'some-pipe-name';
-
-        ipc.config(pipeName, builder => builder
-            .allowImpersonation()
-            .setRequestTimeout(TimeSpan.fromHours(10)));
-
+        ipc.config(pipeName, builder => builder.setRequestTimeout(TimeSpan.fromHours(10)));
         ipc.callback.set(IArithmetics, pipeName, new IArithmetics());
 
         context(`the timeout`, () => {
-            it(`should work`, async () => {
+            it(`should be configurable via config`, async () => {
+                const proxy = ipc.proxy.get(pipeName, IAlgebra);
+                ipc.config(pipeName, builder => builder.setRequestTimeout(TimeSpan.fromMilliseconds(1)));
+
+                try {
+
+                    await CoreIpcServerRunner.host(pipeName, async () => {
+                        const start = performance.now();
+                        await proxy.Sleep(10 * 1000, new Message(), CancellationToken.none)
+                            .should.eventually.be.rejectedWith(TimeoutError);
+                        const end = performance.now();
+                        (end - start).should.be.lessThan(2000);
+                    });
+
+                } finally {
+                    ipc.config(pipeName, builder => builder.setRequestTimeout(TimeSpan.fromHours(10)));
+                }
+            });
+
+            it(`should be configurable via Message`, async () => {
                 const proxy = ipc.proxy.get(pipeName, IAlgebra);
 
                 await CoreIpcServerRunner.host(pipeName, async () => {
+                    const start = performance.now();
                     await proxy.Sleep(
-                        1000,
+                        10 * 1000,
                         new Message({ requestTimeout: TimeSpan.fromMilliseconds(1) }),
                         CancellationToken.none,
                     )
                         .should.eventually.be.rejectedWith(TimeoutError);
+                    const end = performance.now();
+                    (end - start).should.be.lessThan(2000);
                 });
             });
 
@@ -61,17 +81,26 @@ describe(`surface`, () => {
         context(`concurrent calls`, () => {
             it(`should work`, async () => {
                 const proxy = ipc.proxy.get(pipeName, IAlgebra);
-                const concurrencyLevel = 50;
+                const concurrencyLevel = 3;
 
                 await CoreIpcServerRunner.host(pipeName, async () => {
-                    const infos = Array.from(Array(concurrencyLevel).keys())
-                        .map(input => ({
-                            input,
-                            output: proxy.Echo(input),
-                        }));
+                    const subscription = Trace.addListener(unit => console.log(util.inspect(unit, {
+                        colors: true,
+                        depth: null,
+                        maxArrayLength: null,
+                    })));
+                    try {
+                        const infos = Array.from(Array(concurrencyLevel).keys())
+                            .map(input => ({
+                                input,
+                                output: proxy.Echo(input),
+                            }));
 
-                    for (const info of infos) {
-                        await info.output.should.eventually.be.fulfilled.and.be.eq(info.input);
+                        for (const info of infos) {
+                            await info.output.should.eventually.be.fulfilled.and.be.eq(info.input);
+                        }
+                    } finally {
+                        subscription.dispose();
                     }
                 });
             }).timeout(30 * 1000);
@@ -91,7 +120,7 @@ describe(`surface`, () => {
                         promise2.should.eventually.be.fulfilled.and.be.eq('Pong'),
                     ]);
                 });
-            }).timeout(10 * 1000);
+            }).timeout(30 * 1000);
         });
 
         it(`should work`, async () => {

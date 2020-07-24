@@ -42,6 +42,7 @@ export class DotNetScriptError extends Error {
 
 export class DotNetScript implements IAsyncDisposable {
     private _process: ChildProcessWithoutNullStreams | null = null;
+    private _processExitCode: number | undefined;
     private _processExitError: Error | undefined;
     private _stdin: Writable | null = null;
 
@@ -53,6 +54,9 @@ export class DotNetScript implements IAsyncDisposable {
     private _error?: Error;
     private readonly _path: string;
     private static readonly _tempFileName = 'temp.csx';
+
+    public get processExitCode(): number | undefined { return this._processExitCode; }
+    public get processExitError(): Error | undefined { return this._processExitError; }
 
     constructor(
         private readonly _cwd: string,
@@ -87,6 +91,8 @@ export class DotNetScript implements IAsyncDisposable {
         });
 
         this._process.once('close', code => {
+            this._processExitCode = code;
+
             this._processExitError = new InvalidOperationError(
                 `Process ${this._process?.pid} exited with code ${code}\r\n\r\n` +
                 `$STDERR:\r\n\r\n${this._stderrLog.join('\r\n')}\r\n\r\n` +
