@@ -1,22 +1,63 @@
 import { RpcMessage, IpcError } from './rpc-channels';
-import { TimeSpan, argumentIs, TimeoutError } from '../../foundation';
+import { TimeSpan, argumentIs, TimeoutError, InvalidOperationError, Trace } from '../../foundation';
 import { RemoteError, Exception } from './RemoteError';
 
 /* @internal */
 export class Converter {
+    private static readonly _trace = Trace.category('Converter');
+
     public static toRpcRequest(endpoint: string, methodName: string, args: unknown[], timeout: TimeSpan): RpcMessage.Request {
-        const serializedArgs = args.map(arg => JSON.stringify(arg));
-        return new RpcMessage.Request(timeout.totalSeconds, endpoint, methodName, serializedArgs);
+        let serializedArgs: string[] | undefined;
+        let result: RpcMessage.Request | undefined;
+        let error: Error | undefined;
+
+        try {
+            serializedArgs = args.map(arg => JSON.stringify(arg));
+            result = new RpcMessage.Request(timeout.totalSeconds, endpoint, methodName, serializedArgs);
+            trace();
+            return result;
+        } catch (err) {
+            error = err;
+            trace();
+            throw err;
+        }
+
+        function trace(): void {
+            Converter._trace.log({
+                $type: 'Converter',
+                $operation: 'toRpcRequest',
+                $details: {
+                    input: {
+                        endpoint,
+                        methodName,
+                        args,
+                        timeout,
+                    },
+                    middle: {
+                        serializedArgs,
+                    },
+                    output: {
+                        result,
+                        error,
+                    },
+                },
+            });
+        }
     }
 
     public static fromRpcResponse(response: RpcMessage.Response, request: RpcMessage.Request): unknown {
         if (response.Error) {
             throw Converter.createRemoteError(request, response.Error);
         } else {
-            if (response.Data == null) {
+            if (!response.Data) {
                 return undefined;
             } else {
-                return JSON.parse(response.Data);
+                try {
+                    return JSON.parse(response.Data);
+                } catch (err) {
+                    const ioe = new InvalidOperationError(`Failed to parse JSON data for response of request ${request.MethodName}. Data was:\r\n${response.Data}`);
+                    throw ioe;
+                }
             }
         }
     }

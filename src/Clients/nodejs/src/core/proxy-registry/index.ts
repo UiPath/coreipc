@@ -1,4 +1,4 @@
-import { Observer } from 'rxjs';
+import { Observer, pipe } from 'rxjs';
 
 import {
     PublicCtor,
@@ -7,6 +7,8 @@ import {
     CancellationToken,
     defaultConnectHelper,
     ICallInterceptor,
+    Trace,
+    ITraceCategory,
 } from '../../foundation';
 
 import {
@@ -62,7 +64,7 @@ export class PipeManager {
         ct = ct ?? CancellationToken.none;
 
         const timeout =
-            message?.requestTimeout ??
+            message?.RequestTimeout ??
             this._owner.config.read('requestTimeout', this.pipeName, service) ??
             Timeout.infiniteTimeSpan;
 
@@ -168,6 +170,8 @@ export class PipeManagerRegistry {
 
 /* @internal */
 export class ProxyManager<TService = unknown> {
+    private static readonly _trace = Trace.category('ProxyManager');
+
     constructor(
         owner: IIpcInternal,
         pipeManager: PipeManager,
@@ -176,6 +180,16 @@ export class ProxyManager<TService = unknown> {
         const classOfProxy = owner.proxyCtorMemo.get(service);
         const classOfcallInterceptor = class implements ICallInterceptor<TService> {
             public invokeMethod(methodName: never, args: unknown[]): Promise<unknown> {
+                ProxyManager._trace.log({
+                    $type: `ICallInterceptor<${service.name}>`,
+                    $operation: 'invokeMethod(methodName, args)',
+                    $details: {
+                        pipe: pipeManager.pipeName,
+                        service: service.name,
+                        method: methodName,
+                        args,
+                    },
+                });
                 return pipeManager.invokeMethod(service, methodName, args);
             }
         };

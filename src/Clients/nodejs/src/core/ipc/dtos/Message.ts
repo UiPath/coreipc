@@ -7,16 +7,10 @@ export class Message<T = void> {
         payload?: T,
         requestTimeout?: TimeSpan,
     }) {
-        this.payload = args?.payload;
-        this.requestTimeout = args?.requestTimeout ?? TimeSpan.zero;
+        this.Payload = args?.payload;
+        this.RequestTimeout = args?.requestTimeout ?? TimeSpan.zero;
     }
 
-    public readonly payload?: T;
-    public requestTimeout: TimeSpan;
-
-    public toJSON(): unknown {
-        return this.payload !== undefined
-            ? { Payload: this.payload }
-            : {};
-    }
+    public readonly Payload?: T;
+    public RequestTimeout: TimeSpan;
 }

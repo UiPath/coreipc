@@ -1,8 +1,8 @@
 import { IDisposable, ArgumentNullError } from '../../foundation';
 
 export class Trace {
-    private static readonly _listeners = new Array<(errorOrText: Error | string, category?: string) => void>();
-    public static addListener(listener: (errorOrText: Error | string, category?: string) => void): IDisposable {
+    private static readonly _listeners = new Array<(unit: Error | string | object, category?: string) => void>();
+    public static addListener(listener: (errorOrText: Error | string | object, category?: string) => void): IDisposable {
         if (!listener) { throw new ArgumentNullError('listener'); }
 
         Trace._listeners.push(listener);
@@ -18,10 +18,11 @@ export class Trace {
 
     public static log(error: Error): void;
     public static log(text: string): void;
-    public static log(errorOrText: Error | string): void {
+    public static log(obj: object): void;
+    public static log(arg0: Error | string | object): void {
         for (const listener of Trace._listeners) {
             try {
-                listener(errorOrText);
+                listener(arg0);
             } catch (_) {
             }
         }
@@ -32,10 +33,11 @@ export class Trace {
 
         public log(error: Error): void;
         public log(text: string): void;
-        public log(errorOrText: Error | string): void {
+        public log(obj: object): void;
+        public log(arg0: Error | string | object): void {
             for (const listener of Trace._listeners) {
                 try {
-                    listener(errorOrText, this._category);
+                    listener(arg0, this._category);
                 } catch (_) {
                 }
             }
@@ -62,14 +64,11 @@ const promiseTrace = Trace.category('promise.traceError');
 Promise.prototype.traceError = function (): void {
     this.then(_ => { }, (reason: any) => {
         promiseTrace.log(`\r\n\tpromise: ${this}\r\n\treason: ${reason}`);
-        // if (reason instanceof Error) {
-        // } else {
-        //     promiseTrace.log(`${reason}`);
-        // }
     });
 };
 
 export interface ITraceCategory {
     log(error: Error): void;
     log(text: string): void;
+    log(obj: object): void;
 }

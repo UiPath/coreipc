@@ -33,6 +33,8 @@ export class MessageStreamFactory implements IMessageStreamFactory {
 
 /* @internal */
 export class MessageStream implements IMessageStream {
+    private static readonly _trace = Trace.category('network');
+
     constructor(stream: Stream, observer: Observer<Network.Message>);
     constructor(
         private readonly _stream: Stream,
@@ -45,6 +47,7 @@ export class MessageStream implements IMessageStream {
             ...BitConverter.getBytes(message.data.byteLength, 'int32le'),
             ...message.data,
         ]);
+        MessageStream._trace.log(`Writing ${MessageStream.toMessageTypeString(message.type)} with data: ${message.data.toString()}`);
         await this._stream.write(bytes, ct);
     }
     public async disposeAsync(): Promise<void> {
@@ -52,6 +55,15 @@ export class MessageStream implements IMessageStream {
         await this._loop;
 
         this._stream.dispose();
+    }
+
+    private static toMessageTypeString(messageType: Network.Message.Type): string {
+        switch (messageType) {
+            case Network.Message.Type.Request: return 'Request';
+            case Network.Message.Type.Response: return 'Response';
+            case Network.Message.Type.Cancel: return 'Cancel';
+            default: return 'Unknown';
+        }
     }
 
     private static async readFully(stream: Stream, length: number, ct: CancellationToken): Promise<Buffer> {
