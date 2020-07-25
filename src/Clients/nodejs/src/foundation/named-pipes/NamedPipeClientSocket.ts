@@ -88,14 +88,14 @@ export class NamedPipeClientSocket extends Socket {
         const pcs = new PromiseCompletionSource<void>();
 
         socketLike
-            .once('error', error => pcs.setFaulted(error))
-            .connect(path, () => pcs.setResult());
-
+            .once('error', error => {
+                pcs.setFaulted(error);
+            })
+            .connect(path, () => {
+                pcs.setResult();
+            });
         const ctReg = ct.register(() => pcs.setCanceled());
-        const timeoutReg = timeout.isInfinite
-            ? null
-            : setTimeout(() => pcs.setFaulted(new TimeoutError()), timeout.totalMilliseconds)
-            ;
+        timeout.bind(pcs);
 
         try {
             await pcs.promise;
@@ -108,7 +108,6 @@ export class NamedPipeClientSocket extends Socket {
             throw error;
         } finally {
             ctReg.dispose();
-            if (timeoutReg) { clearTimeout(timeoutReg); }
         }
     }
 

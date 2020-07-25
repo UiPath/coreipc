@@ -3,6 +3,7 @@ import { assert, expect, spy, use } from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import spies from 'chai-spies';
 import 'chai/register-should';
+import * as util from 'util';
 
 use(spies);
 use(chaiAsPromised);
@@ -83,6 +84,24 @@ export function concatArgs(args: readonly unknown[]): string {
 
 export function asParamsOf<T extends (...args: any[]) => any>(_func: T): (...args: Parameters<T>) => Parameters<T> {
     return (...args) => args;
+}
+
+export async function waitAllAndPrintAnyErrors(...promises: Array<Promise<unknown>>): Promise<void> {
+    try {
+        await Promise.all(promises);
+    } catch { }
+
+    for (const promise of promises) {
+        try {
+            await promise;
+        } catch (err) {
+            console.error('>>>> Caught error: ', util.inspect(err, {
+                colors: true,
+                depth: null,
+                maxArrayLength: null,
+            }), '\r\n');
+        }
+    }
 }
 
 export {

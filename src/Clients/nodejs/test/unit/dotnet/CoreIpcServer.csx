@@ -22,8 +22,6 @@ using UiPath.CoreIpc.NamedPipe;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
-// Debugger.Launch();
-
 #region " Signalling "
 
 [JsonConverter(typeof(StringEnumConverter))]

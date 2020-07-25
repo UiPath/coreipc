@@ -1,7 +1,7 @@
 // tslint:disable: no-namespace no-internal-module variable-name no-shadowed-variable
 
 import { Observer } from 'rxjs';
-
+import * as util from 'util';
 import {
     PromiseCompletionSource,
     CancellationToken,
@@ -25,7 +25,7 @@ import {
 /* @internal */
 export interface IRpcChannel extends IAsyncDisposable {
     readonly isDisposed: boolean;
-    call(request: RpcMessage.Request, ct: CancellationToken): Promise<RpcMessage.Response>;
+    call(request: RpcMessage.Request, timeout: TimeSpan, ct: CancellationToken): Promise<RpcMessage.Response>;
 }
 
 /* @internal */
@@ -85,8 +85,8 @@ export class RpcChannel implements IRpcChannel {
         }
     }
 
-    public async call(request: RpcMessage.Request, ct: CancellationToken): Promise<RpcMessage.Response> {
-        const promise = this._outgoingCalls.register(request, ct);
+    public async call(request: RpcMessage.Request, timeout: TimeSpan, ct: CancellationToken): Promise<RpcMessage.Response> {
+        const promise = this._outgoingCalls.register(request, timeout, ct);
         await (await this._$messageStream).writeMessageAsync(request.toNetwork(), ct);
         return await promise;
     }
@@ -182,17 +182,16 @@ export class RpcChannel implements IRpcChannel {
         private _sequence = 0;
         private readonly _map = new Map<string, RpcCallContext.Outgoing>();
 
-        public async register(request: RpcMessage.Request, ct: CancellationToken): Promise<RpcMessage.Response> {
+        public async register(request: RpcMessage.Request, timeout: TimeSpan, ct: CancellationToken): Promise<RpcMessage.Response> {
             request.Id = this.generateId();
-            const context = new RpcCallContext.Outgoing();
-            this._map.set(request.Id, context);
 
-            const reg = ct.register(() => { context.tryCancel(); });
+            const context = new RpcCallContext.Outgoing(timeout, ct);
+            this._map.set(request.Id, context);
 
             try {
                 return await context.promise;
             } finally {
-                reg.dispose();
+                this._map.delete(request.Id);
             }
         }
 
@@ -226,14 +225,16 @@ export module RpcCallContext {
     export class Outgoing extends RpcCallContextBase {
         private readonly _pcs = new PromiseCompletionSource<RpcMessage.Response>();
 
+        constructor(timeout: TimeSpan, ct: CancellationToken) {
+            super();
+            timeout.bind(this._pcs);
+            ct.bind(this._pcs);
+        }
+
         public get promise(): Promise<RpcMessage.Response> { return this._pcs.promise; }
 
         public complete(response: RpcMessage.Response): void {
             const _ = this._pcs.trySetResult(response);
-        }
-
-        public tryCancel(): void {
-            const _ = this._pcs.trySetCanceled();
         }
     }
 }
