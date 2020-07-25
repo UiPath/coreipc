@@ -10,7 +10,7 @@ export class CoreIpcServerRunner {
         try {
             let error: Error | undefined;
             try {
-                await action();
+                await Promise.race([action(), runner._dotNetScript.signalExit]);
             } catch (err) {
                 error = err;
             }
@@ -48,7 +48,7 @@ export class CoreIpcServerRunner {
     }
 
     private static getCSharpCode(): string {
-        const filePath = path.join(process.cwd(), 'test', 'unit', 'surface', 'core', 'CoreIpcServer.csx');
+        const filePath = path.join(process.cwd(), 'test', 'unit', 'dotnet', 'CoreIpcServer.csx');
         return fs.readFileSync(filePath).toString();
     }
 }

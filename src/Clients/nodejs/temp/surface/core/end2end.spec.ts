@@ -1,5 +1,5 @@
 import * as util from 'util';
-import { CoreIpcServerRunner, waitAllAndPrintAnyErrors as waitAllAndPrintAnyErrors } from '@test-helpers';
+import { CoreIpcServerRunner, awaitAllAndPrintAnyErrors as waitAllAndPrintAnyErrors } from '@test-helpers';
 import { CancellationToken, TimeSpan, TimeoutError, SocketStream, Trace } from '@foundation';
 import { ipc, Message, RemoteError } from '@core';
 import { performance } from 'perf_hooks';

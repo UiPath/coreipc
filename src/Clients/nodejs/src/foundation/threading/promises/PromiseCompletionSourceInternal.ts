@@ -5,6 +5,7 @@ import {
     FinalStateFaulted,
     FinalStateCanceled,
 } from '.';
+import { TimeoutError } from '@foundation-errors';
 
 /* @internal */
 export interface IPromiseCompletionSourceInternal<T = unknown> {

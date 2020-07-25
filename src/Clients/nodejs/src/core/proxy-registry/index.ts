@@ -1,4 +1,4 @@
-import { Observer, pipe } from 'rxjs';
+import { Observer } from 'rxjs';
 
 import {
     PublicCtor,
@@ -8,7 +8,7 @@ import {
     defaultConnectHelper,
     ICallInterceptor,
     Trace,
-    ITraceCategory,
+    TimeoutError,
 } from '../../foundation';
 
 import {
@@ -26,6 +26,7 @@ import {
     IIpcInternal,
     Message,
 } from '../ipc';
+import { performance } from 'perf_hooks';
 
 /* @internal */
 export class PipeManager {
@@ -79,8 +80,9 @@ export class PipeManager {
             timeout,
         );
 
-        const channel = await this.ensureConnection(timeout, ct);
-        const rpcResponse = await channel.call(rpcRequest, CancellationToken.none);
+        const channel = await this.ensureConnection(Timeout.infiniteTimeSpan, ct);
+
+        const rpcResponse = await channel.call(rpcRequest, timeout, ct);
 
         const result = Converter.fromRpcResponse(rpcResponse, rpcRequest) as any;
         if (returnsPromiseOf instanceof Function) {
@@ -105,7 +107,6 @@ export class PipeManager {
                 this._incommingCallObserver,
                 this._messageStreamFactory,
             );
-            const x = this._channel;
         }
 
         return this._channel;

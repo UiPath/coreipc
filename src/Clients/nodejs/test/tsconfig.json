@@ -31,6 +31,6 @@
     },
     "include": [
         "**/*.spec.ts",
-        "**/test/**.ts"
+        "**/test/**.ts",
     ]
 }

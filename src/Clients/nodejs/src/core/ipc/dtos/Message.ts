@@ -1,6 +1,6 @@
 // tslint:disable: variable-name
 
-import { TimeSpan } from '../../../foundation';
+import { TimeSpan, Timeout } from '../../../foundation';
 
 export class Message<T = void> {
     constructor(args?: {
@@ -8,7 +8,7 @@ export class Message<T = void> {
         requestTimeout?: TimeSpan,
     }) {
         this.Payload = args?.payload;
-        this.RequestTimeout = args?.requestTimeout ?? TimeSpan.zero;
+        this.RequestTimeout = args?.requestTimeout ?? null;
     }
 
     public readonly Payload?: T;

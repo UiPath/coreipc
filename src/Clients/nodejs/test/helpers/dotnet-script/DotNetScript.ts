@@ -11,6 +11,7 @@ import {
     InvalidOperationError,
     IDisposable,
 } from '@foundation';
+import { runInThisContext } from 'vm';
 
 export interface IAsyncDisposable {
     disposeAsync(): Promise<void>;
@@ -55,6 +56,9 @@ export class DotNetScript implements IAsyncDisposable {
     private readonly _path: string;
     private static readonly _tempFileName = 'temp.csx';
 
+    private readonly _pcsExit = new PromiseCompletionSource<void>();
+    public get signalExit(): Promise<void> { return this._pcsExit.promise; }
+
     public get processExitCode(): number | undefined { return this._processExitCode; }
     public get processExitError(): Error | undefined { return this._processExitError; }
 
@@ -73,7 +77,6 @@ export class DotNetScript implements IAsyncDisposable {
         fs.writeFileSync(this._path, this._code);
 
         const pathDotNet = path.join(process.env['ProgramFiles'] as any, 'dotnet', 'dotnet.exe');
-        const dotNetExists = fs.existsSync(pathDotNet);
         if (!fs.existsSync(pathDotNet)) {
             throw new Error(`"dotnet.exe" not found. Probed path is "${pathDotNet}".`);
         }
@@ -97,6 +100,12 @@ export class DotNetScript implements IAsyncDisposable {
                 `Process ${this._process?.pid} exited with code ${code}\r\n\r\n` +
                 `$STDERR:\r\n\r\n${this._stderrLog.join('\r\n')}\r\n\r\n` +
                 `$STDOUT:\r\n\r\n${this._stdoutLog.join('\r\n')}`);
+
+            if (code) {
+                this._pcsExit.trySetFaulted(this._processExitError);
+            } else {
+                this._pcsExit.trySetResult();
+            }
 
             for (const awaiter of this._awaiterMap.values()) {
                 awaiter.trySetFaulted(this._processExitError);

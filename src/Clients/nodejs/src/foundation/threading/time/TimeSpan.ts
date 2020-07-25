@@ -1,4 +1,7 @@
-import { ArgumentNullError, argumentIs } from '../../../foundation';
+import { ArgumentNullError, TimeoutError, argumentIs } from '../../../foundation';
+import { PromiseCompletionSource } from '../promises';
+import * as util from 'util';
+import { performance } from 'perf_hooks';
 
 // tslint:disable-next-line: no-namespace
 namespace MillisecondsInA {
@@ -89,4 +92,31 @@ export class TimeSpan {
     }
     public toString(): string { return this._maybeToString || (this._maybeToString = this.computeToString()); }
     public toJSON(): any { return this.toString(); }
+
+    public bind<T>(pcs: PromiseCompletionSource<T>): void {
+        if (this.isNegative) { return; }
+
+        const inspect = (what: any) => util.inspect(what, { colors: true, compact: true, depth: null, maxArrayLength: null });
+
+        const start = performance.now();
+        const trySetFaulted = () => {
+            const stop = performance.now();
+            const took = new TimeSpan(stop - start);
+            pcs.trySetFaulted(new TimeoutError());
+        };
+
+        if (this.isZero) { trySetFaulted(); }
+
+        const _ = (async () => {
+            const reg = setTimeout(() => {
+                trySetFaulted();
+
+            }, this.totalMilliseconds);
+            try {
+                await pcs.promise;
+            } finally {
+                clearTimeout(reg);
+            }
+        })().observe();
+    }
 }
