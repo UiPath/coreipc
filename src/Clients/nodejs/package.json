@@ -1,8 +1,21 @@
 {
     "name": "@uipath/coreipc",
     "version": "1.0.0",
+    "description": "UiPath CoreIpc for Nodejs",
     "main": "dist/index.js",
     "typings": "dist/index",
+    "author": "Eduard Dumitru",
+    "license": "MIT",
+    "files": [
+        "dist/**/*"
+    ],
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com/"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/UiPath/coreipc.git"
+    },
     "scripts": {
         "refreshVSToken": "vsts-npm-auth -config .npmrc",
         "build": "tsc",
