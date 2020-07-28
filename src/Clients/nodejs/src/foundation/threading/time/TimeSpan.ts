@@ -12,7 +12,8 @@ namespace MillisecondsInA {
 }
 
 export class TimeSpan {
-    /* @internal */
+    // public static toTimeSpan(milliseconds: number): TimeSpan;
+    // public static toTimeSpan(timespan: TimeSpan): TimeSpan;
     public static toTimeSpan(arg0: number | TimeSpan): TimeSpan {
         argumentIs(arg0, 'arg0', 'number', TimeSpan);
 

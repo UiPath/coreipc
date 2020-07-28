@@ -110,7 +110,6 @@ export class CancellationTokenSource implements IDisposable {
 
     private cancelAfterUnchecked(delay: TimeSpan): void {
         this.ensureTimeoutCleared();
-        this._isCancellationRequested = true;
         this._nodeJsTimeout = setTimeout(this.onTimeout, delay.totalMilliseconds);
     }
 
