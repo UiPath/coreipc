@@ -277,5 +277,69 @@ describe(`surface:foundation`, () => {
                 });
             });
         });
+
+        context(`the isCancellationRequested property`, () => {
+            it(`should be false in the beginning`, () => {
+                const cts = new CancellationTokenSource();
+                try {
+                    expect(cts.isCancellationRequested).to.be.eq(false);
+                } finally {
+                    cts.dispose();
+                }
+            });
+
+            it(`should be false before an otherwise scheduled cancellation occurs`, () => {
+                const cts = new CancellationTokenSource();
+                try {
+                    cts.cancelAfter(TimeSpan.fromMilliseconds(100));
+                    expect(cts.isCancellationRequested).to.be.eq(false);
+                } finally {
+                    cts.dispose();
+                }
+            });
+
+            it(`should be false before an otherwise scheduled cancellation occurs 2`, () => {
+                const cts = new CancellationTokenSource(TimeSpan.fromMilliseconds(100));
+                try {
+                    cts.cancelAfter(TimeSpan.fromMilliseconds(100));
+                    expect(cts.isCancellationRequested).to.be.eq(false);
+                } finally {
+                    cts.dispose();
+                }
+            });
+
+            it(`should be true after cancellation`, () => {
+                const cts = new CancellationTokenSource();
+                try {
+                    cts.cancel();
+                    expect(cts.isCancellationRequested).to.be.eq(true);
+                } finally {
+                    cts.dispose();
+                }
+            });
+
+            it(`should be true after cancellation 2`, async () => {
+                const cts = new CancellationTokenSource();
+                try {
+                    cts.cancelAfter(1);
+                    expect(cts.isCancellationRequested).to.be.eq(false);
+                    await Promise.delay(100);
+                    expect(cts.isCancellationRequested).to.be.eq(true);
+                } finally {
+                    cts.dispose();
+                }
+            });
+
+            it(`should be true after cancellation 3`, async () => {
+                const cts = new CancellationTokenSource(1);
+                try {
+                    expect(cts.isCancellationRequested).to.be.eq(false);
+                    await Promise.delay(100);
+                    expect(cts.isCancellationRequested).to.be.eq(true);
+                } finally {
+                    cts.dispose();
+                }
+            });
+        });
     });
 });
