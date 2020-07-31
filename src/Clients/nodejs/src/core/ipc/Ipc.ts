@@ -15,7 +15,7 @@ import { CallbackStore } from './callback-store/CallbackStore';
 export class Ipc implements IIpc {
     public constructor(
         contract?: IIpc.ContractStore,
-        config?: IIpc.ConfigStore,
+        config?: IIpc.ConfigStoreInternal,
         proxy?: IIpc.ProxySource,
         callback?: IIpc.CallbackStoreInternal,
         $class?: IIpc.ClassAnnotations,
@@ -31,7 +31,7 @@ export class Ipc implements IIpc {
     }
 
     public readonly contract: IIpc.ContractStore;
-    public readonly config: IIpc.ConfigStore;
+    public readonly config: IIpc.ConfigStoreInternal;
     public readonly proxy: IIpc.ProxySource;
     public readonly callback: IIpc.CallbackStoreInternal;
     public readonly $service: IIpc.ClassAnnotations;

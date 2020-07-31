@@ -31,7 +31,7 @@ export class ConfigStoreWrapper {
         this.iface = boundConfig as any;
     }
 
-    public readonly iface: IIpc.ConfigStore;
+    public readonly iface: IIpc.ConfigStoreInternal;
 
     public config(
         action: ConfigAction<ConfigBuilder>): this;

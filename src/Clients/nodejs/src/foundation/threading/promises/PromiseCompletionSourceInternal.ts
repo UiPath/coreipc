@@ -4,16 +4,8 @@ import {
     FinalStateRanToCompletion,
     FinalStateFaulted,
     FinalStateCanceled,
+    IPromiseCompletionSourceInternal,
 } from '.';
-import { TimeoutError } from '@foundation-errors';
-
-/* @internal */
-export interface IPromiseCompletionSourceInternal<T = unknown> {
-    readonly promise: Promise<T>;
-
-    setFinalState(finalState: FinalState<T>): void | never;
-    trySetFinalState(finalState: FinalState<T>): boolean;
-}
 
 /* @internal */
 export class PromiseCompletionSourceInternal<T = unknown> implements IPromiseCompletionSourceInternal<T> {

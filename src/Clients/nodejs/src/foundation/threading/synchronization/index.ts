@@ -1,1 +1,1 @@
-export * from './AutoResetEvent';
+export * from './AsyncAutoResetEvent';

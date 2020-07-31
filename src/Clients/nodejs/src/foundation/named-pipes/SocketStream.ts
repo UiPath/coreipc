@@ -1,7 +1,7 @@
 import {
     argumentIs,
     CancellationToken,
-    AutoResetEvent,
+    AsyncAutoResetEvent,
     ArgumentError,
     EndOfStreamError,
     InvalidOperationError,
@@ -11,7 +11,7 @@ import { Stream, Socket } from '.';
 
 /* @internal */
 export class SocketStream implements Stream {
-    private readonly _signal = new AutoResetEvent();
+    private readonly _signal = new AsyncAutoResetEvent();
     private _buffers = new Array<Buffer>();
     private _oldestBufferCursor = 0;
     private _completed = false;

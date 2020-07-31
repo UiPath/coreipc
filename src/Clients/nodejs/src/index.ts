@@ -31,7 +31,7 @@ import {
     InvalidOperationError,
     EndOfStreamError,
     CancellationToken, CancellationTokenSource, CancellationTokenRegistration,
-    AutoResetEvent,
+    AsyncAutoResetEvent,
 } from './foundation';
 
 export {
@@ -74,5 +74,5 @@ export {
     FinalStateKind,
     PromiseSpy,
     PromiseStatus,
-    AutoResetEvent,
+    AsyncAutoResetEvent,
 };
