@@ -1,6 +1,5 @@
 import { CoreIpcError } from '.';
 
-/* @internal */
 export abstract class ArgumentErrorBase extends CoreIpcError {
     protected constructor(
         fallbackMessage: string,

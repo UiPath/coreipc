@@ -12,6 +12,7 @@ export type PrimitiveDefinedType = PrimitiveNonObjectType | 'object';
 /* @internal */
 export type PrimitiveType = PrimitiveDefinedType | 'undefined';
 
+/* @internal */
 // tslint:disable-next-line: ban-types
 export type ExtendedType = PrimitiveType | Function;
 

@@ -3,17 +3,8 @@ import {
     IPromiseCompletionSourceInternal,
     PromiseCompletionSourceInternal,
     FinalState,
+    IPromiseCompletionSource,
 } from '.';
-
-export interface IPromiseCompletionSource<T = unknown> extends IPromiseCompletionSourceInternal<T> {
-    setResult(result: T): void | never;
-    setFaulted(error: Error): void | never;
-    setCanceled(): void | never;
-
-    trySetResult(result: T): boolean;
-    trySetFaulted(error: Error): boolean;
-    trySetCanceled(): boolean;
-}
 
 export class PromiseCompletionSource<T = unknown> implements IPromiseCompletionSource<T> {
     private readonly _internal: IPromiseCompletionSourceInternal<T>;

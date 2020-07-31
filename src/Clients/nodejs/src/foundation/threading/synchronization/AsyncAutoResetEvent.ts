@@ -3,10 +3,9 @@ import {
     PromiseCompletionSource,
     CancellationToken,
     CancellationTokenRegistration,
-} from '../../../foundation';
+} from '../..';
 
-/* @internal */
-export class AutoResetEvent {
+export class AsyncAutoResetEvent {
     private _signalled = false;
     private _awaiters = new Array<Awaiter>();
 
