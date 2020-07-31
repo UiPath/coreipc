@@ -1,6 +1,7 @@
 import { expect } from '@test-helpers';
 import { Primitive, CancellationToken } from '@foundation';
-import { IIpc, Ipc } from '@core';
+import { IIpc } from '@core';
+import { Ipc } from '../../../../src/core/ipc/Ipc';
 
 describe(`surface`, () => {
     describe(`ipc`, () => {
