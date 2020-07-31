@@ -1,15 +1,15 @@
 import {
     IIpc,
-    ClassAnnotationsWrapper,
-    MethodAnnotationsWrapper,
-    ConfigStoreWrapper,
-    ProxySource,
-    ContractStore,
 } from '.';
 
 import { PipeManagerRegistry } from '../proxy-registry';
 import { ProxyCtorMemo } from '../../foundation';
 import { CallbackStore } from './callback-store/CallbackStore';
+import { ContractStore } from './contract-store/ContractStore';
+import { ConfigStoreWrapper } from './config-store/ConfigStoreWrapper';
+import { ProxySource } from './proxy-source/ProxySource';
+import { ClassAnnotationsWrapper } from './annotations/ClassAnnotationsWrapper';
+import { MethodAnnotationsWrapper } from './annotations/MethodAnnotationsWrapper';
 
 /* @internal */
 export class Ipc implements IIpc {

@@ -1,10 +1,8 @@
 import { argumentIs } from '../../../foundation';
-import {
-    IPromiseCompletionSourceInternal,
-    PromiseCompletionSourceInternal,
-    FinalState,
-    IPromiseCompletionSource,
-} from '.';
+import { FinalState, IPromiseCompletionSource } from '.';
+
+import { IPromiseCompletionSourceInternal } from './IPromiseCompletionSourceInternal';
+import { PromiseCompletionSourceInternal } from './PromiseCompletionSourceInternal';
 
 export class PromiseCompletionSource<T = unknown> implements IPromiseCompletionSource<T> {
     private readonly _internal: IPromiseCompletionSourceInternal<T>;
