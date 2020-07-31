@@ -4,7 +4,6 @@ import { PublicCtor, Primitive, ProxyCtorMemo } from '../../foundation';
 import { ConfigAction, ConfigBuilder, ConfigNode } from '.';
 
 export interface IIpc<TCallbackStore = IIpc.CallbackStore, TConfigStore = IIpc.ConfigStore.Writer> {
-    readonly contract: IIpc.ContractStore;
     readonly config: TConfigStore;
     readonly proxy: IIpc.ProxySource;
     readonly callback: TCallbackStore;
@@ -15,6 +14,7 @@ export interface IIpc<TCallbackStore = IIpc.CallbackStore, TConfigStore = IIpc.C
 
 /* @internal */
 export interface IIpcInternal extends IIpc<IIpc.CallbackStoreInternal, IIpc.ConfigStoreInternal> {
+    readonly contract: IIpc.ContractStore;
     readonly proxyCtorMemo: ProxyCtorMemo;
 }
 
