@@ -7,7 +7,7 @@ import { PromiseCompletionSourceInternal } from './PromiseCompletionSourceIntern
 export class PromiseCompletionSource<T = unknown> implements IPromiseCompletionSource<T> {
     private readonly _internal: IPromiseCompletionSourceInternal<T>;
 
-    constructor(internal?: IPromiseCompletionSourceInternal<T>) {
+    public constructor(internal?: any) {
         argumentIs(internal, 'internal', 'undefined', 'object');
 
         this._internal = internal ?? new PromiseCompletionSourceInternal<T>();

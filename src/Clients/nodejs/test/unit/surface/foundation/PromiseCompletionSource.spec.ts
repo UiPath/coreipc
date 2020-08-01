@@ -5,6 +5,7 @@ import {
     FinalState,
     ArgumentOutOfRangeError,
     PromiseCompletionSourceInternal,
+    IPromiseCompletionSourceInternal,
 } from '@foundation';
 
 describe(`surface:foundation`, () => {
@@ -13,11 +14,13 @@ describe(`surface:foundation`, () => {
             it(`should not throw`, () => {
                 constructing(PromiseCompletionSource).should.not.throw();
 
-                constructing(PromiseCompletionSource, {
+                constructing(PromiseCompletionSource, as<IPromiseCompletionSourceInternal>({
                     promise: Promise.never,
                     setFinalState: _state => { },
                     trySetFinalState: _state => false,
-                }).should.not.throw();
+                })).should.not.throw();
+
+                function as<T>(x: T): T { return x; }
             });
 
             it(`should throw when called with something which isn't an object`, () => {
