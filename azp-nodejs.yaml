@@ -4,7 +4,7 @@ steps:
     inputs:
       command: 'custom'
       custom: 'tool'
-      arguments: 'install -g dotnet-script --version 0.50.1'
+      arguments: 'install -g dotnet-script --version 0.53.0'
 
   - task: DotNetCoreCLI@2
     displayName: '$(Label_NodeJS) Check dotnet-script'
