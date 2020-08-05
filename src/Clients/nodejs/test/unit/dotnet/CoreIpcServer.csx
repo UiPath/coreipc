@@ -1,8 +1,8 @@
-#r "nuget: Microsoft.Extensions.DependencyInjection.Abstractions, 3.0.0"
-#r "nuget: Microsoft.Extensions.Logging.Abstractions, 3.0.0"
+#r "nuget: Microsoft.Extensions.DependencyInjection.Abstractions, 3.1.6"
+#r "nuget: Microsoft.Extensions.Logging.Abstractions, 3.1.6"
 
-#r "nuget: Microsoft.Extensions.DependencyInjection, 3.0.0"
-#r "nuget: Microsoft.Extensions.Logging, 3.0.0"
+#r "nuget: Microsoft.Extensions.DependencyInjection, 3.1.6"
+#r "nuget: Microsoft.Extensions.Logging, 3.1.6"
 
 #r "nuget: Nito.AsyncEx.Context, 5.0.0"
 #r "nuget: Nito.AsyncEx.Tasks, 5.0.0"
