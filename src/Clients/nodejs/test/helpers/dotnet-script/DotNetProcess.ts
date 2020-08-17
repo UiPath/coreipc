@@ -1,7 +1,6 @@
 // tslint:disable: no-conditional-assignment no-namespace
 
 import * as fs from 'fs';
-import * as path from 'path';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { Readable, Writable } from 'stream';
 
@@ -11,7 +10,6 @@ import {
     InvalidOperationError,
     IDisposable,
 } from '@foundation';
-import { runInThisContext } from 'vm';
 
 export interface IAsyncDisposable {
     disposeAsync(): Promise<void>;
@@ -41,7 +39,7 @@ export class DotNetScriptError extends Error {
     }
 }
 
-export class DotNetScript implements IAsyncDisposable {
+export class DotNetProcess implements IAsyncDisposable {
     private _process: ChildProcessWithoutNullStreams | null = null;
     private _processExitCode: number | undefined;
     private _processExitError: Error | undefined;
@@ -53,8 +51,6 @@ export class DotNetScript implements IAsyncDisposable {
     private _awaiterMap = new Map<SignalKind, PromiseCompletionSource<unknown>>();
     private _disposed = false;
     private _error?: Error;
-    private readonly _path: string;
-    private static readonly _tempFileName = 'temp.csx';
 
     private readonly _pcsExit = new PromiseCompletionSource<void>();
     public get signalExit(): Promise<void> { return this._pcsExit.promise; }
@@ -64,30 +60,18 @@ export class DotNetScript implements IAsyncDisposable {
 
     constructor(
         private readonly _cwd: string,
-        private readonly _code: string,
+        private readonly _exePath: string,
         private readonly _args: string,
     ) {
-
-        this._path = path.join(_cwd, DotNetScript._tempFileName);
-
         this.init();
     }
 
     private init(): void {
-        fs.writeFileSync(this._path, this._code);
-
-        const pathDotNet = path.join(process.env['ProgramFiles'] as any, 'dotnet', 'dotnet.exe');
-        if (!fs.existsSync(pathDotNet)) {
-            throw new Error(`"dotnet.exe" not found. Probed path is "${pathDotNet}".`);
+        if (!fs.existsSync(this._exePath)) {
+            throw new Error(`Executable file "${this._exePath}" not found.`);
         }
 
-        if (!fs.existsSync(this._path)) {
-            throw new Error(`"${DotNetScript._tempFileName}" not found. Probed path is "${this._path}".`);
-        }
-
-        // this._stdoutLog.push(`Starting:\r\n\tcommand: dotnet\r\n\targs: dotnet script temp.csx ${this._args}\r\n\tcwd: ${this._cwd}`);
-
-        this._process = spawn('dotnet', ['script', 'temp.csx', this._args], {
+        this._process = spawn(this._exePath, [this._args], {
             shell: false,
             cwd: this._cwd,
             stdio: 'pipe',
@@ -144,7 +128,7 @@ export class DotNetScript implements IAsyncDisposable {
             this.maybeThrow();
 
             if (this._disposed) {
-                reject(new Error(`Cannot access a disposed object.\r\nObject name: ${DotNetScript.name}.`));
+                reject(new Error(`Cannot access a disposed object.\r\nObject name: ${DotNetProcess.name}.`));
                 return;
             }
 
@@ -188,13 +172,6 @@ export class DotNetScript implements IAsyncDisposable {
                 (this._process as ChildProcessWithoutNullStreams).once('exit', resolve);
             });
         }
-        await new Promise<void>((resolve, reject) => fs.unlink(this._path, error => {
-            if (!error) {
-                resolve();
-            } else {
-                reject(error);
-            }
-        }));
     }
 }
 

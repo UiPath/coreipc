@@ -14,11 +14,11 @@ variables:
   DotNet_MainProjectPath: '.\src\UiPath.CoreIpc\UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
   
-
   NodeJS_ProjectPath: 'src/clients/nodejs'
   NodeJS_ArchivePath: 'src/clients/nodejs.zip'
   NodeJS_ArtifactName: 'NPM package'
-  NodeJS_NetStandardTargetDir_RelativePath: '..\..\UiPath.CoreIpc\bin\Release\netstandard2.0'
+  NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet\UiPath.CoreIpc.NodeInterop\bin\Release\netcoreapp3.1'
+  NodeJS_DotNetNodeInteropSolution: 'src/clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop.sln'
 
 jobs:
   # The following 2 jobs will run in parallel:

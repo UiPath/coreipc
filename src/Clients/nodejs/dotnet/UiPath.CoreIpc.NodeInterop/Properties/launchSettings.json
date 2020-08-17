@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "UiPath.CoreIpc.NodeInterop": {
+      "commandName": "Project",
+      "commandLineArgs": "foobar"
+    }
+  }
+}
