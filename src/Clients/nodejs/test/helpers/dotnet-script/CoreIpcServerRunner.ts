@@ -1,7 +1,6 @@
 import * as path from 'path';
-import * as fs from 'fs';
 
-import { DotNetScript, SignalKind } from './DotNetScript';
+import { DotNetProcess, SignalKind } from './DotNetProcess';
 import { AggregateError } from '../../../src/foundation/errors/AggregateError';
 
 export class CoreIpcServerRunner {
@@ -27,28 +26,34 @@ export class CoreIpcServerRunner {
     }
 
     private static async start(pipeName: string): Promise<CoreIpcServerRunner> {
-        const dotNetScript = new DotNetScript(this.getDotNetOutputPath(), this.getCSharpCode(), pipeName);
+        const dotNetScript = new DotNetProcess(
+            CoreIpcServerRunner.getDirectoryPath(),
+            CoreIpcServerRunner.getExeFilePath(),
+            pipeName);
         await dotNetScript.waitForSignal(SignalKind.ReadyToConnect);
 
         return new CoreIpcServerRunner(dotNetScript);
     }
 
-    private constructor(private readonly _dotNetScript: DotNetScript) { }
+    private constructor(private readonly _dotNetScript: DotNetProcess) { }
 
     public get processExitCode(): number | undefined { return this._dotNetScript.processExitCode; }
     public get processExitError(): Error | undefined { return this._dotNetScript.processExitError; }
 
     private disposeAsync(): Promise<void> { return this._dotNetScript.disposeAsync(); }
 
-    private static getDotNetOutputPath(): string {
+    private static getDirectoryPath(): string {
         const relativePathTargetDir =
-            process.env['NodeJS_NetStandardTargetDir_RelativePath']
-            ?? '..\\..\\UiPath.CoreIpc\\bin\\Debug\\netstandard2.0';
+            process.env['NodeJS_NetCoreAppTargetDir_RelativePath']
+            ?? 'dotnet\\UiPath.CoreIpc.NodeInterop\\bin\\Debug\\netcoreapp3.1';
         return path.join(process.cwd(), relativePathTargetDir);
     }
 
-    private static getCSharpCode(): string {
-        const filePath = path.join(process.cwd(), 'test', 'unit', 'dotnet', 'CoreIpcServer.csx');
-        return fs.readFileSync(filePath).toString();
+    private static getExeFileName(): string {
+        return 'UiPath.CoreIpc.NodeInterop.exe';
+    }
+
+    private static getExeFilePath(): string {
+        return path.join(CoreIpcServerRunner.getDirectoryPath(), CoreIpcServerRunner.getExeFileName());
     }
 }

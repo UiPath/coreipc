@@ -74,7 +74,16 @@ describe(`surface`, () => {
                 const proxy = ipc.proxy.get(pipeName, IAlgebra);
 
                 await CoreIpcServerRunner.host(pipeName, async () => {
-                    // ipc.config(pipeName, builder => builder.setRequestTimeout(BIG));
+                    await proxy.Timeout()
+                        .should.eventually.be.rejectedWith(TimeoutError)
+                        .which.has.property('reportedByServer', true);
+                });
+            });
+
+            it(`should work with infinite timeout`, async () => {
+                const proxy = ipc.proxy.get(pipeName, IAlgebra);
+
+                await CoreIpcServerRunner.host(pipeName, async () => {
                     await proxy.Timeout()
                         .should.eventually.be.rejectedWith(TimeoutError)
                         .which.has.property('reportedByServer', true);
