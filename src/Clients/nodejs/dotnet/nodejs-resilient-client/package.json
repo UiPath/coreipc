@@ -1,0 +1,20 @@
+{
+    "name": "nodejs-resilient-client",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "build": "tsc",
+        "start": "node ./dist/index.js"
+    },
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@uipath/core-ipc": "file:../../",
+        "uuid": "8.3.0"
+    },
+    "devDependencies": {
+        "typescript": "3.4.3"
+    }
+}
