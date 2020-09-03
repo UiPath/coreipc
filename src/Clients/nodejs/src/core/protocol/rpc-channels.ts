@@ -1,7 +1,6 @@
 // tslint:disable: no-namespace no-internal-module variable-name no-shadowed-variable
 
 import { Observer } from 'rxjs';
-import * as util from 'util';
 import {
     PromiseCompletionSource,
     CancellationToken,
@@ -76,12 +75,20 @@ export class RpcChannel implements IRpcChannel {
             ct,
             this._networkObserver,
             MessageStreamFactory.orDefault(messageStreamFactory));
+
+        this._$messageStream.catch(_ => {
+            const __ = this.disposeAsync();
+        });
     }
 
     public async disposeAsync(): Promise<void> {
         if (!this._isDisposed) {
             this._isDisposed = true;
-            await (await this._$messageStream).disposeAsync();
+            try {
+                const messageStream = await this._$messageStream;
+                await messageStream.disposeAsync();
+            } catch (_) {
+            }
         }
     }
 

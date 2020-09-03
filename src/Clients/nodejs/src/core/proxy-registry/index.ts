@@ -26,7 +26,6 @@ import {
     IIpcInternal,
     Message,
 } from '../ipc';
-import { performance } from 'perf_hooks';
 
 /* @internal */
 export class PipeManager {
