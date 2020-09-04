@@ -58,11 +58,14 @@ export class DotNetProcess implements IAsyncDisposable {
     public get processExitCode(): number | undefined { return this._processExitCode; }
     public get processExitError(): Error | undefined { return this._processExitError; }
 
+    private readonly _args: string[]
+
     constructor(
         private readonly _cwd: string,
         private readonly _exePath: string,
-        private readonly _args: string,
-    ) {
+        ...args: string[]) {
+
+        this._args = args;
         this.init();
     }
 
@@ -71,7 +74,7 @@ export class DotNetProcess implements IAsyncDisposable {
             throw new Error(`Executable file "${this._exePath}" not found.`);
         }
 
-        this._process = spawn(this._exePath, [this._args], {
+        this._process = spawn(this._exePath, this._args, {
             shell: false,
             cwd: this._cwd,
             stdio: 'pipe',

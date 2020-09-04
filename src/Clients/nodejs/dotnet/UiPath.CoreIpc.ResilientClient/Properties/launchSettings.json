@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "UiPath.CoreIpc.ResilientClient": {
-      "commandName": "Project",
-      "nativeDebugging": true
-    }
-  }
-}

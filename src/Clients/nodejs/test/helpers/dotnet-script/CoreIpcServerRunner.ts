@@ -29,7 +29,9 @@ export class CoreIpcServerRunner {
         const dotNetScript = new DotNetProcess(
             CoreIpcServerRunner.getDirectoryPath(),
             CoreIpcServerRunner.getExeFilePath(),
-            pipeName);
+
+            '--pipe', pipeName,
+        );
         await dotNetScript.waitForSignal(SignalKind.ReadyToConnect);
 
         return new CoreIpcServerRunner(dotNetScript);

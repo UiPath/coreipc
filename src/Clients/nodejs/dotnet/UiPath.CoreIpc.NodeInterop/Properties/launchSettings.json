@@ -2,7 +2,7 @@
   "profiles": {
     "UiPath.CoreIpc.NodeInterop": {
       "commandName": "Project",
-      "commandLineArgs": "foobar"
+      "commandLineArgs": "--pipe b87d1d64-0d84-4678-81a0-594028662385"
     }
   }
 }

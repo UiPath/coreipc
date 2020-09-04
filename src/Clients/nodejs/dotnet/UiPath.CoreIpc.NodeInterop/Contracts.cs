@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using System.Threading;
+using System;
 
 namespace UiPath.CoreIpc.NodeInterop
 {
@@ -23,6 +24,13 @@ namespace UiPath.CoreIpc.NodeInterop
         public interface ICalculus
         {
             Task<string> Ping();
+        }
+
+        public interface IBrittleService
+        {
+            Task<int> Sum(int x, int y, TimeSpan delay, DateTime? crashBeforeUtc);
+
+            Task Kill();
         }
     }
 }
