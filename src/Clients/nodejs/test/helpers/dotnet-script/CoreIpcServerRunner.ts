@@ -2,6 +2,7 @@ import * as path from 'path';
 
 import { DotNetProcess, SignalKind } from './DotNetProcess';
 import { AggregateError } from '../../../src/foundation/errors/AggregateError';
+import { NodeInteropPaths } from '.';
 
 export class CoreIpcServerRunner {
     public static async host(pipeName: string, action: () => Promise<void>): Promise<void> {
@@ -27,8 +28,8 @@ export class CoreIpcServerRunner {
 
     private static async start(pipeName: string): Promise<CoreIpcServerRunner> {
         const dotNetScript = new DotNetProcess(
-            CoreIpcServerRunner.getDirectoryPath(),
-            CoreIpcServerRunner.getExeFilePath(),
+            NodeInteropPaths.getDirectoryPath(),
+            NodeInteropPaths.getExeFilePath(),
 
             '--pipe', pipeName,
         );
@@ -43,19 +44,4 @@ export class CoreIpcServerRunner {
     public get processExitError(): Error | undefined { return this._dotNetScript.processExitError; }
 
     private disposeAsync(): Promise<void> { return this._dotNetScript.disposeAsync(); }
-
-    private static getDirectoryPath(): string {
-        const relativePathTargetDir =
-            process.env['NodeJS_NetCoreAppTargetDir_RelativePath']
-            ?? 'dotnet\\UiPath.CoreIpc.NodeInterop\\bin\\Debug\\netcoreapp3.1';
-        return path.join(process.cwd(), relativePathTargetDir);
-    }
-
-    private static getExeFileName(): string {
-        return 'UiPath.CoreIpc.NodeInterop.exe';
-    }
-
-    private static getExeFilePath(): string {
-        return path.join(CoreIpcServerRunner.getDirectoryPath(), CoreIpcServerRunner.getExeFileName());
-    }
 }

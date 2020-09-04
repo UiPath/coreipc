@@ -8,7 +8,8 @@ import { v4 as newGuid } from 'uuid';
 import { ipc } from '@core';
 import { TimeSpan, TimeoutError } from '@foundation';
 
-import { expect } from '@test-helpers';
+import { expect, NodeInteropPaths } from '@test-helpers';
+import { SSL_OP_TLS_ROLLBACK_BUG } from 'constants';
 
 describe(`surface`, () => {
     context(`end-to-end-resilience`, () => {
@@ -21,16 +22,6 @@ describe(`surface`, () => {
             public Kill(): Promise<void> { throw null; }
         }
 
-        const pathServer = path.join(
-            process.cwd(),
-            'dotnet',
-            'UiPath.CoreIpc.NodeInterop',
-            'bin',
-            'Debug',
-            'netcoreapp3.1',
-            'UiPath.CoreIpc.NodeInterop.exe',
-        );
-
         it(`should eventually connect to delayed powered on servers`, async () => {
             const pipeName = newGuid();
             const mutualExclusionId = newGuid();
@@ -39,11 +30,14 @@ describe(`surface`, () => {
             ipc.config(pipeName, builder => builder
                 .setRequestTimeout(TimeSpan.fromSeconds(20))
                 .setConnectHelper(async context => {
-                    lastProcess = spawn(pathServer, [
+                    lastProcess = spawn(
+                        NodeInteropPaths.getExeFilePath(), [
                         '--pipe', `${pipeName}`,
                         '--delay', '1',
                         '--mutex', mutualExclusionId,
-                    ]);
+                    ], {
+                        cwd: NodeInteropPaths.getDirectoryPath(),
+                    });
 
                     await context.tryConnect();
                 }));
@@ -59,12 +53,13 @@ describe(`surface`, () => {
                     actual = await brittleService.Sum(10, 20, TimeSpan.zero, null);
                     break;
                 } catch (error) {
-                    // console.error(error);
                 }
 
                 if (performance.now() - start > msAlloted) {
                     throw new TimeoutError({ reportedByServer: false });
                 }
+
+                await Promise.delay(300);
             }
 
             expect(actual).to.be.eq(30);
@@ -86,10 +81,12 @@ describe(`surface`, () => {
                 .setRequestTimeout(TimeSpan.fromSeconds(20))
                 .setConnectHelper(async context => {
                     if (!IOHelpers.pipeExists(pipeName)) {
-                        lastProcess = spawn(pathServer, [
+                        lastProcess = spawn(NodeInteropPaths.getExeFilePath(), [
                             '--pipe', `${pipeName}`,
                             '--mutex', mutualExclusionId,
-                        ]);
+                        ], {
+                            cwd: NodeInteropPaths.getDirectoryPath(),
+                        });
                     }
                     await context.tryConnect();
                 }));
@@ -109,12 +106,13 @@ describe(`surface`, () => {
                     actual = await brittleService.Sum(10, 20, TimeSpan.zero, utcNowPlus3seconds);
                     break;
                 } catch (error) {
-                    // console.error(error);
                 }
 
                 if (performance.now() - start > msAlloted) {
                     throw new TimeoutError({ reportedByServer: false });
                 }
+
+                await Promise.delay(300);
             }
 
             expect(actual).to.be.eq(30);
