@@ -14,27 +14,51 @@ namespace UiPath.CoreIpc.NodeInterop
 
     class Program
     {
-        static async Task Main(string[] args)
+        /// <summary>
+        /// .NET - Nodejs Interop Helper
+        /// </summary>
+        /// <param name="pipe">The pipe name on which the CoreIpc endpoints will be hosted at.</param>
+        /// <param name="mutex">Optional process mutual exclusion name.</param>
+        /// <param name="delay">Optional number of seconds that the process will wait before it exposes the CoreIpc endpoints.</param>
+        static async Task<int> Main(
+            string pipe,
+            string? mutex = null,
+            int? delay = null)
         {
+            if (pipe is null)
+            {
+                Console.Error.WriteLine($"Expecting a non-null pipe-name.");
+                return 1;
+            }
+
             try
             {
-                await MainCore(args);
+                if (mutex is { })
+                {
+                    using var _ = new Mutex(initiallyOwned: false, mutex, out bool createdNew);
+                    if (!createdNew) { return 2; }
+                    await MainCore(pipe, delay);
+                }
+                else
+                {
+                    await MainCore(pipe, delay);
+                }
             }
             catch (Exception ex)
             {
                 Throw(ex);
                 throw;
             }
+
+            return 0;
         }
 
-        static async Task MainCore(string[] args)
+        static async Task MainCore(string pipeName, int? maybeSecondsPowerOnDelay)
         {
-            if (args.Length == 0)
+            if (maybeSecondsPowerOnDelay is { } secondsPowerOnDelay)
             {
-                throw new Exception("Expecting a pipe name as the 1st command line argument.");
+                await Task.Delay(TimeSpan.FromSeconds(secondsPowerOnDelay));
             }
-
-            string pipeName = args[0];
 
             Send(SignalKind.PoweringOn);
             var services = new ServiceCollection();
@@ -44,12 +68,14 @@ namespace UiPath.CoreIpc.NodeInterop
                 .AddIpc()
                 .AddSingleton<IAlgebra, Algebra>()
                 .AddSingleton<ICalculus, Calculus>()
+                .AddSingleton<IBrittleService, BrittleService>()
                 .BuildServiceProvider();
 
             var serviceHost = new ServiceHostBuilder(sp)
                 .UseNamedPipes(new NamedPipeSettings(pipeName))
                 .AddEndpoint<IAlgebra, IArithmetics>()
                 .AddEndpoint<ICalculus>()
+                .AddEndpoint<IBrittleService>()
                 .Build();
 
             var thread = new AsyncContextThread();
@@ -74,6 +100,5 @@ namespace UiPath.CoreIpc.NodeInterop
 
             await serviceHost.RunAsync(sched);
         }
-
     }
 }

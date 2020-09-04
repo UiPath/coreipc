@@ -7,10 +7,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc", "..\..\..\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.NodeInterop", "UiPath.CoreIpc.NodeInterop\UiPath.CoreIpc.NodeInterop.csproj", "{B514D2A2-B8ED-4A2A-BDE7-42F74A316FBE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.BrittleServer", "UiPath.CoreIpc.BrittleServer\UiPath.CoreIpc.BrittleServer.csproj", "{36622EB4-4C03-421D-A4AF-231720EA34C7}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UiPath.CoreIpc.ResilientClient", "UiPath.CoreIpc.ResilientClient\UiPath.CoreIpc.ResilientClient.csproj", "{09CF1728-9FDC-48BC-A9F7-DED44C50B201}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,14 +21,6 @@ Global
 		{B514D2A2-B8ED-4A2A-BDE7-42F74A316FBE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B514D2A2-B8ED-4A2A-BDE7-42F74A316FBE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B514D2A2-B8ED-4A2A-BDE7-42F74A316FBE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{36622EB4-4C03-421D-A4AF-231720EA34C7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{36622EB4-4C03-421D-A4AF-231720EA34C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{36622EB4-4C03-421D-A4AF-231720EA34C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{36622EB4-4C03-421D-A4AF-231720EA34C7}.Release|Any CPU.Build.0 = Release|Any CPU
-		{09CF1728-9FDC-48BC-A9F7-DED44C50B201}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{09CF1728-9FDC-48BC-A9F7-DED44C50B201}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{09CF1728-9FDC-48BC-A9F7-DED44C50B201}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{09CF1728-9FDC-48BC-A9F7-DED44C50B201}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

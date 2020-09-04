@@ -23,7 +23,7 @@
         "clean:nyc": "rimraf .nyc_output",
         "pretest": "npm run clean:test & npm run lint",
         "test": "run-s test:*",
-        "test:unit": "nyc mocha --opts ./test/mocha.opts",
+        "test:unit": "nyc mocha --opts ./test/mocha.opts --exit",
         "test:report": "nyc report --reporter=html",
         "posttest": "nyc report --reporter=text-lcov > ./reports/coverage.lcov & nyc report --reporter=text",
         "lint": "tslint --project ./tsconfig.json",

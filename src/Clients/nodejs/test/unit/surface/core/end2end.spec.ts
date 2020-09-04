@@ -1,7 +1,7 @@
 import * as util from 'util';
 import { CoreIpcServerRunner, waitAllAndPrintAnyErrors as waitAllAndPrintAnyErrors } from '@test-helpers';
 import { CancellationToken, TimeSpan, TimeoutError, SocketStream, Trace } from '@foundation';
-import { ipc, Message, RemoteError } from '@core';
+import { ipc, Message } from '@core';
 import { performance } from 'perf_hooks';
 
 describe(`surface`, () => {
@@ -30,7 +30,7 @@ describe(`surface`, () => {
             }
         }
 
-        const pipeName = 'some-pipe-name';
+        const pipeName = 'b87d1d64-0d84-4678-81a0-594028662385';
         ipc.config(pipeName, builder => builder.setRequestTimeout(BIG));
         ipc.callback.set(IArithmetics, pipeName, new IArithmetics());
 
