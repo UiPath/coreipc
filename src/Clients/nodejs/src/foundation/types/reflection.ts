@@ -13,20 +13,29 @@ export enum Primitive {
     void = 'undefined',
 }
 
-declare global {
-    interface Object {
-        become<T>(this: any, type: new (...args: any[]) => T): T;
-    }
-}
+// declare global {
+//     interface Object {
+//         become<T>(this: any, type: new (...args: any[]) => T): T;
+//     }
+// }
 
 interface Becomable<T> {
     __proto__: any;
     constructor: new (...args: any[]) => T;
 }
 
-Object.prototype.become = function <T>(this: any, type: new (...args: any[]) => T): T {
-    const me = this as Becomable<T>;
-    me.__proto__ = type.prototype;
-    me.constructor = type;
-    return this;
-};
+// Object.prototype.become = function <T>(this: any, type: new (...args: any[]) => T): T {
+//     const me = this as Becomable<T>;
+//     me.__proto__ = type.prototype;
+//     me.constructor = type;
+//     return this;
+// };
+
+export class ObjectPal {
+    public static become<T>(obj: any, type: new (...args: any[]) => T): T {
+        const me = obj as Becomable<T>;
+        me.__proto__ = type.prototype;
+        me.constructor = type;
+        return obj;
+    }
+}
