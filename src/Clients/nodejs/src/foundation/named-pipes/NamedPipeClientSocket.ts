@@ -22,6 +22,8 @@ import {
     TimeoutError,
 } from '../errors';
 
+import { PipeNameConvention } from './PipeNameConvention';
+
 /* @internal */
 export class NamedPipeClientSocket extends Socket {
     public static async connectWithHelper(
@@ -81,11 +83,13 @@ export class NamedPipeClientSocket extends Socket {
         argumentIs(ct, 'ct', CancellationToken);
         argumentIs(socketLikeCtor, 'socketLikeCtor', 'undefined', Function);
 
-        const path = `\\\\.\\pipe\\${pipeName}`;
+        const path = PipeNameConvention.current.getFullName(pipeName);
 
         /* istanbul ignore next */
         const socketLike = new (socketLikeCtor ?? net.Socket)();
         const pcs = new PromiseCompletionSource<void>();
+
+        console.log(`connecting to ${path}`);
 
         socketLike
             .once('error', error => {

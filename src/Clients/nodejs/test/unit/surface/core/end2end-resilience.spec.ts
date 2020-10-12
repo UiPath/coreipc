@@ -1,4 +1,3 @@
-import * as path from 'path';
 import * as fs from 'fs';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { performance } from 'perf_hooks';
@@ -7,9 +6,9 @@ import { v4 as newGuid } from 'uuid';
 
 import { ipc } from '@core';
 import { TimeSpan, TimeoutError } from '@foundation';
+import { PipeNameConvention } from '../../../../src/foundation/named-pipes/PipeNameConvention';
 
 import { expect, NodeInteropPaths } from '@test-helpers';
-import { SSL_OP_TLS_ROLLBACK_BUG } from 'constants';
 
 describe(`surface`, () => {
     context(`end-to-end-resilience`, () => {
@@ -127,7 +126,7 @@ describe(`surface`, () => {
 
 class IOHelpers {
     public static pipeExists(pipeName: string): boolean {
-        const fullPipeName = `\\\\.\\pipe\\${pipeName}`;
+        const fullPipeName = PipeNameConvention.current.getFullName(pipeName);
         const result = fs.existsSync(fullPipeName);
 
         return result;

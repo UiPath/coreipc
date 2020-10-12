@@ -1,0 +1,33 @@
+{
+    "name": "nodejs-playground",
+    "version": "1.0.0",
+    "description": "UiPath CoreIpc for Nodejs Playground",
+    "main": "dist/index.js",
+    "typings": "dist/index",
+    "author": "Eduard Dumitru",
+    "license": "MIT",
+    "dependencies": {
+        "@types/node": "^12.6.8",
+        "@uipath/coreipc": "2.0.2-20200909-02"
+    },
+    "devDependencies": {
+        "@types/node": "^12.6.8",
+        "ts-node": "8.4.1",
+        "tslint": "5.16.0",
+        "tslint-consistent-codestyle": "1.15.1",
+        "tslint-eslint-rules": "5.4.0",
+        "typescript": "3.9.7"
+    },
+    "scripts": {
+        "refreshVSToken": "vsts-npm-auth -config .npmrc",
+        "build": "tsc",
+        "start": "node ./dist/index.js"
+    },
+    "files": [
+        "dist/**/*"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/UiPath/coreipc.git"
+    }
+}
