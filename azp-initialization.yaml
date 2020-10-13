@@ -7,7 +7,10 @@ steps:
       $version = $version.Trim()
       
       Write-Host "##vso[task.setvariable variable=Version;]$version"
+
     displayName: '$(Label_Initialization) Read $[Version] from the csproj'
+    env:
+      DotNet_MainProjectPath: $(DotNet_MainProjectPath)
 
   # If $(PublishRelease) != "true" then compute $(FullVersion) as $(Version)-$(Build.BuildNumber)
   - task: VariableTransformTask@1

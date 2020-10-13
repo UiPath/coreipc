@@ -3,7 +3,7 @@ steps:
     displayName: '$(Label_NodeJS) Restore and build "UiPath.CoreIpc.NodeInterop.sln"'
     inputs:
       projects: '$(NodeJS_DotNetNodeInteropSolution)'
-      arguments: '--configuration $(DotNet_BuildConfiguration) -p:Version="$(FullVersion)"'
+      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) -p:Version="$(FullVersion)"'
 
   - task: Npm@1
     displayName: '$(Label_NodeJS) Write $[FullVersion] to package.json'
@@ -27,6 +27,12 @@ steps:
         workingDir: $(NodeJS_ProjectPath)
         customCommand: 'run build'
     
+  - task: UseDotNet@2
+    displayName: '$(Label_NodeJS) UseDotNet@2'
+    inputs:
+      packageType: 'runtime'
+      version: '3.1.x'
+    
   - task: Npm@1
     displayName: '$(Label_NodeJS) Run unit tests'
     inputs:
@@ -47,18 +53,3 @@ steps:
     inputs:
       codeCoverageTool: 'cobertura'
       summaryFileLocation: './src/Clients/nodejs/reports/coverage/cobertura-coverage.xml'
-
-  - task: ArchiveFiles@2
-    displayName: '$(Label_NodeJS) Archive project directory'
-    inputs:
-      archiveType: 'zip'
-      includeRootFolder: false
-      rootFolderOrFile: '$(NodeJS_ProjectPath)'
-      archiveFile: '$(NodeJS_ArchivePath)'
-
-  - task: PublishBuildArtifacts@1
-    displayName: '$(Label_NodeJS) Publish the $(NodeJS_ArtifactName) to the pipeline instance'
-    inputs:
-      ArtifactName: '$(NodeJS_ArtifactName)'
-      PathtoPublish: '$(NodeJS_ArchivePath)'
-      ArtifactType: 'Container'

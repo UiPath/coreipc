@@ -13,18 +13,3 @@ steps:
       publishTestResults: true
       testRunTitle: '.NET tests'
       arguments: '--no-build --configuration $(DotNet_BuildConfiguration)'
-
-  - task: CopyFiles@2
-    displayName: '$(Label_DotNet) Copy nupkg to $(Build.ArtifactStagingDirectory)'
-    inputs:
-      SourceFolder: 'src\UiPath.CoreIpc\bin\$(DotNet_BuildConfiguration)\'
-      Contents: '*.*nupkg'
-      TargetFolder: '$(Build.ArtifactStagingDirectory)'
-      CleanTargetFolder: true
-
-  - task: PublishBuildArtifacts@1
-    displayName: '$(Label_DotNet) Publish the $(DotNet_ArtifactName) to the pipeline instance'
-    inputs:
-      ArtifactName: '$(DotNet_ArtifactName)'
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      ArtifactType: 'Container'

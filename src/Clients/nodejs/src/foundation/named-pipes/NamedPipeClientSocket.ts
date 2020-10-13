@@ -22,7 +22,7 @@ import {
     TimeoutError,
 } from '../errors';
 
-import { PipeNameConvention } from './PipeNameConvention';
+import { CoreIpcPlatform } from './CoreIpcPlatform';
 
 /* @internal */
 export class NamedPipeClientSocket extends Socket {
@@ -77,19 +77,19 @@ export class NamedPipeClientSocket extends Socket {
         timeout: TimeSpan,
         ct: CancellationToken,
         socketLikeCtor?: new () => SocketLike,
+        pipeTools?: CoreIpcPlatform,
     ): Promise<NamedPipeClientSocket> {
         argumentIs(pipeName, 'pipeName', 'string');
         argumentIs(timeout, 'timeout', TimeSpan);
         argumentIs(ct, 'ct', CancellationToken);
         argumentIs(socketLikeCtor, 'socketLikeCtor', 'undefined', Function);
+        argumentIs(pipeTools, 'pipeTools', 'undefined', CoreIpcPlatform);
 
-        const path = PipeNameConvention.current.getFullName(pipeName);
+        const path = (pipeTools ?? CoreIpcPlatform.current).getFullName(pipeName);
 
         /* istanbul ignore next */
         const socketLike = new (socketLikeCtor ?? net.Socket)();
         const pcs = new PromiseCompletionSource<void>();
-
-        console.log(`connecting to ${path}`);
 
         socketLike
             .once('error', error => {

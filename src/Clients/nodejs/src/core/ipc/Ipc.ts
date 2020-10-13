@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+
 import {
     IIpc,
 } from '.';
@@ -10,6 +12,7 @@ import { ConfigStoreWrapper } from './config-store/ConfigStoreWrapper';
 import { ProxySource } from './proxy-source/ProxySource';
 import { ClassAnnotationsWrapper } from './annotations/ClassAnnotationsWrapper';
 import { MethodAnnotationsWrapper } from './annotations/MethodAnnotationsWrapper';
+import { CoreIpcPlatform } from '../../foundation/named-pipes/CoreIpcPlatform';
 
 /* @internal */
 export class Ipc implements IIpc {
@@ -39,4 +42,6 @@ export class Ipc implements IIpc {
 
     public readonly pipeManagerRegistry = new PipeManagerRegistry(this);
     public readonly proxyCtorMemo = new ProxyCtorMemo();
+
+    public pipeExists(shortName: string): Promise<boolean> { return CoreIpcPlatform.current.pipeExists(shortName); }
 }

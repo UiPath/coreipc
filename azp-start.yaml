@@ -1,8 +1,5 @@
 name: $(Date:yyyyMMdd)$(Rev:-rr)
 
-pool:
-  vmImage: 'windows-2019'
-
 variables:
   Label_Initialization: 'Initialization:'
   Label_DotNet: '.NET:'
@@ -11,26 +8,42 @@ variables:
   DotNet_BuildConfiguration: 'Release'
   DotNet_SessionSolution: 'CoreIpc.sln'
   DotNet_MainProjectName: 'UiPath.CoreIpc'
-  DotNet_MainProjectPath: '.\src\UiPath.CoreIpc\UiPath.CoreIpc.csproj'
+  DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
   
-  NodeJS_ProjectPath: 'src/clients/nodejs'
-  NodeJS_ArchivePath: 'src/clients/nodejs.zip'
+  NodeJS_DotNet_BuildConfiguration: 'Debug'
+  NodeJS_ProjectPath: './src/Clients/nodejs'
+  NodeJS_ArchivePath: './src/Clients/nodejs.zip'
   NodeJS_ArtifactName: 'NPM package'
-  NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet\UiPath.CoreIpc.NodeInterop\bin\Release\netcoreapp3.1'
-  NodeJS_DotNetNodeInteropSolution: 'src/clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop.sln'
+  NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.CoreIpc.NodeInterop/bin/Debug/netcoreapp3.1'
+  NodeJS_DotNetNodeInteropSolution: './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop.sln'
 
 jobs:
-  # The following 2 jobs will run in parallel:
-
+  # The following 3 jobs will run in parallel:
+            
   - job:
-    displayName: '.NET'
+    displayName: '.NET on Windows'
+    pool:
+      vmImage: 'windows-2019'
     steps:
       - template: azp-initialization.yaml
       - template: azp-dotnet.yaml
+      - template: azp-dotnet-dist.yaml
 
   - job:
-    displayName: 'node.js'
+    displayName: 'node.js on Windows'
+    pool:
+      vmImage: 'windows-2019'
     steps:
       - template: azp-initialization.yaml
       - template: azp-nodejs.yaml
+      - template: azp-nodejs-dist.yaml
+
+  - job:
+    displayName: 'node.js on Ubuntu'
+    pool:
+      vmImage: 'ubuntu-18.04'
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-nodejs.yaml
+

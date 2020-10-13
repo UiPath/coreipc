@@ -10,6 +10,8 @@ export interface IIpc<TCallbackStore = IIpc.CallbackStore, TConfigStore = IIpc.C
 
     readonly $service: IIpc.ClassAnnotations;
     readonly $operation: IIpc.MethodAnnotations;
+
+    pipeExists(shortName: string): Promise<boolean>;
 }
 
 /* @internal */
