@@ -10,6 +10,7 @@ import {
     InvalidOperationError,
     IDisposable,
 } from '@foundation';
+import { CoreIpcPlatform } from '../../../src/foundation/named-pipes/CoreIpcPlatform';
 
 export interface IAsyncDisposable {
     disposeAsync(): Promise<void>;
@@ -58,11 +59,11 @@ export class DotNetProcess implements IAsyncDisposable {
     public get processExitCode(): number | undefined { return this._processExitCode; }
     public get processExitError(): Error | undefined { return this._processExitError; }
 
-    private readonly _args: string[]
+    private readonly _args: string[];
 
     constructor(
         private readonly _cwd: string,
-        private readonly _exePath: string,
+        private readonly _entryPath: string,
         ...args: string[]) {
 
         this._args = args;
@@ -70,12 +71,12 @@ export class DotNetProcess implements IAsyncDisposable {
     }
 
     private init(): void {
-        if (!fs.existsSync(this._exePath)) {
-            throw new Error(`Executable file "${this._exePath}" not found.`);
+        if (!fs.existsSync(this._entryPath)) {
+            throw new Error(`Executable file "${this._entryPath}" not found.`);
         }
 
-        this._process = spawn(this._exePath, this._args, {
-            shell: false,
+        this._process = spawn(CoreIpcPlatform.current.getDefaultDotNet(), [this._entryPath, ...this._args], {
+            shell: true,
             cwd: this._cwd,
             stdio: 'pipe',
         });

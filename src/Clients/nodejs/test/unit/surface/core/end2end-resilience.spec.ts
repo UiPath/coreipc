@@ -6,7 +6,7 @@ import { v4 as newGuid } from 'uuid';
 
 import { ipc } from '@core';
 import { TimeSpan, TimeoutError } from '@foundation';
-import { PipeNameConvention } from '../../../../src/foundation/named-pipes/PipeNameConvention';
+import { CoreIpcPlatform } from '../../../../src/foundation/named-pipes/CoreIpcPlatform';
 
 import { expect, NodeInteropPaths } from '@test-helpers';
 
@@ -30,12 +30,15 @@ describe(`surface`, () => {
                 .setRequestTimeout(TimeSpan.fromSeconds(20))
                 .setConnectHelper(async context => {
                     lastProcess = spawn(
-                        NodeInteropPaths.getExeFilePath(), [
-                        '--pipe', `${pipeName}`,
-                        '--delay', '1',
-                        '--mutex', mutualExclusionId,
-                    ], {
+                        CoreIpcPlatform.current.getDefaultDotNet(),
+                        [
+                            NodeInteropPaths.getEntryPointFilePath(),
+                            '--pipe', `${pipeName}`,
+                            '--delay', '1',
+                            '--mutex', mutualExclusionId,
+                        ], {
                         cwd: NodeInteropPaths.getDirectoryPath(),
+                        shell: CoreIpcPlatform.current.useShellInUnitTests(),
                     });
 
                     await context.tryConnect();
@@ -79,12 +82,16 @@ describe(`surface`, () => {
             ipc.config(pipeName, builder => builder
                 .setRequestTimeout(TimeSpan.fromSeconds(20))
                 .setConnectHelper(async context => {
-                    if (!IOHelpers.pipeExists(pipeName)) {
-                        lastProcess = spawn(NodeInteropPaths.getExeFilePath(), [
-                            '--pipe', `${pipeName}`,
-                            '--mutex', mutualExclusionId,
-                        ], {
+                    if (!(await CoreIpcPlatform.current.pipeExists(pipeName))) {
+                        lastProcess = spawn(
+                            CoreIpcPlatform.current.getDefaultDotNet(),
+                            [
+                                NodeInteropPaths.getEntryPointFilePath(),
+                                '--pipe', `${pipeName}`,
+                                '--mutex', mutualExclusionId,
+                            ], {
                             cwd: NodeInteropPaths.getDirectoryPath(),
+                            shell: CoreIpcPlatform.current.useShellInUnitTests(),
                         });
                     }
                     await context.tryConnect();
@@ -126,7 +133,7 @@ describe(`surface`, () => {
 
 class IOHelpers {
     public static pipeExists(pipeName: string): boolean {
-        const fullPipeName = PipeNameConvention.current.getFullName(pipeName);
+        const fullPipeName = CoreIpcPlatform.current.getFullName(pipeName);
         const result = fs.existsSync(fullPipeName);
 
         return result;

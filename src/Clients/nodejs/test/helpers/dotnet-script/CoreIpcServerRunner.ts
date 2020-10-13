@@ -29,7 +29,7 @@ export class CoreIpcServerRunner {
     private static async start(pipeName: string): Promise<CoreIpcServerRunner> {
         const dotNetScript = new DotNetProcess(
             NodeInteropPaths.getDirectoryPath(),
-            NodeInteropPaths.getExeFilePath(),
+            NodeInteropPaths.getEntryPointFilePath(),
 
             '--pipe', pipeName,
         );
