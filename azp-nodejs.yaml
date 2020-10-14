@@ -1,9 +1,15 @@
 steps:
   - task: DotNetCoreCLI@2
-    displayName: '$(Label_NodeJS) Restore and build "UiPath.CoreIpc.NodeInterop.sln"'
+    displayName: '$(Label_NodeJS) Restore and build "UiPath.CoreIpc.csproj"'
     inputs:
-      projects: '$(NodeJS_DotNetNodeInteropSolution)'
-      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) -p:Version="$(FullVersion)"'
+      projects: '$(DotNet_MainProjectPath)'
+      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework netstandard2.0 -p:Version="$(FullVersion)"'
+
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_NodeJS) Restore and build "UiPath.CoreIpc.NodeInterop.csproj"'
+    inputs:
+      projects: '$(NodeJS_DotNetNodeInteropProject)'
+      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework netcoreapp3.1 -p:Version="$(FullVersion)"'
 
   - task: Npm@1
     displayName: '$(Label_NodeJS) Write $[FullVersion] to package.json'

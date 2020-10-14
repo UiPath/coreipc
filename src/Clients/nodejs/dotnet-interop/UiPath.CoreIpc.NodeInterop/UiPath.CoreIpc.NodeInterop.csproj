@@ -1,13 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
-        <TargetFramework>netcoreapp3.1</TargetFramework>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
-        <TargetFrameworks>net461;netcoreapp3.1</TargetFrameworks>
-    </PropertyGroup>
-
     <PropertyGroup>
+        <TargetFrameworks>net461;netcoreapp3.1</TargetFrameworks>
         <OutputType>Exe</OutputType>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>

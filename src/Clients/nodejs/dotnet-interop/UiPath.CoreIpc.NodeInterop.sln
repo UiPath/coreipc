@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30320.27
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc", "..\..\..\UiPath.CoreIpc\UiPath.CoreIpc.csproj", "{643FAD40-A949-42A4-A91F-4219C4C29058}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.NodeInterop", "UiPath.CoreIpc.NodeInterop\UiPath.CoreIpc.NodeInterop.csproj", "{B514D2A2-B8ED-4A2A-BDE7-42F74A316FBE}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc", "..\..\..\UiPath.CoreIpc\UiPath.CoreIpc.csproj", "{B53F7E57-886D-4E0F-A5CB-2B66746B021A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,14 +13,14 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{643FAD40-A949-42A4-A91F-4219C4C29058}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{643FAD40-A949-42A4-A91F-4219C4C29058}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{643FAD40-A949-42A4-A91F-4219C4C29058}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{643FAD40-A949-42A4-A91F-4219C4C29058}.Release|Any CPU.Build.0 = Release|Any CPU
 		{B514D2A2-B8ED-4A2A-BDE7-42F74A316FBE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B514D2A2-B8ED-4A2A-BDE7-42F74A316FBE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B514D2A2-B8ED-4A2A-BDE7-42F74A316FBE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B514D2A2-B8ED-4A2A-BDE7-42F74A316FBE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B53F7E57-886D-4E0F-A5CB-2B66746B021A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B53F7E57-886D-4E0F-A5CB-2B66746B021A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B53F7E57-886D-4E0F-A5CB-2B66746B021A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B53F7E57-886D-4E0F-A5CB-2B66746B021A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
