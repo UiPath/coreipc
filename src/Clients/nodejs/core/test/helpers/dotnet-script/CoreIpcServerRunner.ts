@@ -1,5 +1,3 @@
-import * as path from 'path';
-
 import { DotNetProcess, SignalKind } from './DotNetProcess';
 import { AggregateError } from '../../../src/foundation/errors/AggregateError';
 import { NodeInteropPaths } from '.';

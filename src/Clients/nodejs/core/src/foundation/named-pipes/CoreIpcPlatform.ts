@@ -2,7 +2,7 @@
 
 import * as fs from 'fs';
 import { NamedPipeClientSocket } from './NamedPipeClientSocket';
-import { TimeSpan, Timeout, CancellationToken } from '../threading';
+import { Timeout, CancellationToken } from '../threading';
 
 /* @internal */
 export abstract class CoreIpcPlatform {
