@@ -216,7 +216,9 @@ describe(`internals`, () => {
 
                 await Promise.delay(TimeSpan.fromMilliseconds(100));
 
-                spiedPromise.status.should.be.eq(PromiseStatus.Faulted);
+                spiedPromise.status.should.be.eq(
+                    PromiseStatus.Faulted,
+                    `Expected spiedPromise.status to be PromiseStatus.Faulted but it is <PromiseStatus>(${spiedPromise.status})`);
                 await spiedPromise.promise.should.eventually.be.rejectedWith(TimeoutError);
 
                 NeverConnectMockSocket.prototype.removeAllListeners.should.have.been.called();

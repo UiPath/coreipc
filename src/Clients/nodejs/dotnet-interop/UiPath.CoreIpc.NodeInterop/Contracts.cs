@@ -32,5 +32,10 @@ namespace UiPath.CoreIpc.NodeInterop
 
             Task Kill();
         }
+
+        public interface IEnvironmentVariableGetter
+        {
+            Task<string?> Get(string variable);
+        }
     }
 }

@@ -64,5 +64,10 @@ namespace UiPath.CoreIpc.NodeInterop
                 throw null!; // making the compiler happy
             }
         }
+
+        public sealed class EnvironmentVariableGetter : IEnvironmentVariableGetter
+        {
+            public Task<string?> Get(string variable) => Task.FromResult<string?>(Environment.GetEnvironmentVariable(variable));
+        }
     }
 }
