@@ -133,7 +133,7 @@ describe(`surface`, () => {
 
 class IOHelpers {
     public static pipeExists(pipeName: string): boolean {
-        const fullPipeName = CoreIpcPlatform.current.getFullName(pipeName);
+        const fullPipeName = CoreIpcPlatform.current.getFullPipeName(pipeName);
         const result = fs.existsSync(fullPipeName);
 
         return result;

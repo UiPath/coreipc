@@ -69,6 +69,7 @@ namespace UiPath.CoreIpc.NodeInterop
                 .AddSingleton<IAlgebra, Algebra>()
                 .AddSingleton<ICalculus, Calculus>()
                 .AddSingleton<IBrittleService, BrittleService>()
+                .AddSingleton<IEnvironmentVariableGetter, EnvironmentVariableGetter>()
                 .BuildServiceProvider();
 
             var serviceHost = new ServiceHostBuilder(sp)
@@ -76,6 +77,7 @@ namespace UiPath.CoreIpc.NodeInterop
                 .AddEndpoint<IAlgebra, IArithmetics>()
                 .AddEndpoint<ICalculus>()
                 .AddEndpoint<IBrittleService>()
+                .AddEndpoint<IEnvironmentVariableGetter>()
                 .Build();
 
             var thread = new AsyncContextThread();

@@ -19,7 +19,6 @@ import {
     InvalidOperationError,
     AggregateError,
     ObjectDisposedError,
-    TimeoutError,
 } from '../errors';
 
 import { CoreIpcPlatform } from './CoreIpcPlatform';
@@ -85,7 +84,7 @@ export class NamedPipeClientSocket extends Socket {
         argumentIs(socketLikeCtor, 'socketLikeCtor', 'undefined', Function);
         argumentIs(pipeTools, 'pipeTools', 'undefined', CoreIpcPlatform);
 
-        const path = (pipeTools ?? CoreIpcPlatform.current).getFullName(pipeName);
+        const path = (pipeTools ?? CoreIpcPlatform.current).getFullPipeName(pipeName);
 
         /* istanbul ignore next */
         const socketLike = new (socketLikeCtor ?? net.Socket)();
