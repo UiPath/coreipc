@@ -88,7 +88,7 @@ namespace UiPath.CoreIpc
         {
 #if NET461
             return new NamedPipeServerStream(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options, inBufferSize: 0, outBufferSize: 0, pipeSecurity);
-#elif NET5WINDOWS
+#elif NET5_0_WINDOWS
             return NamedPipeServerStreamAcl.Create(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options, inBufferSize: 0, outBufferSize: 0, pipeSecurity);
 #else
             return new NamedPipeServerStream(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options);
