@@ -84,7 +84,7 @@ namespace UiPath.CoreIpc
             return parameter.DefaultValue;
         }
 
-        public static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, PipeSecurity pipeSecurity)
+        internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, PipeSecurity pipeSecurity)
         {
 #if NET461
             return new NamedPipeServerStream(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options, inBufferSize: 0, outBufferSize: 0, pipeSecurity);
