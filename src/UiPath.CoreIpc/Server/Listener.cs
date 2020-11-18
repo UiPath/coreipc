@@ -13,10 +13,20 @@ namespace UiPath.CoreIpc
 {
     public class ListenerSettings
     {
+        private bool _encryptAndSign;
+
         public ListenerSettings(string name) => Name = name;
         public byte ConcurrentAccepts { get; set; } = 5;
         public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
-        public bool EncryptAndSign { get; set; }
+        public bool EncryptAndSign
+        {
+            get => _encryptAndSign;
+#if WINDOWS
+            set => _encryptAndSign = value;
+#else
+            set { }
+#endif
+        }
         public string Name { get; }
         public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
         internal IServiceProvider ServiceProvider { get; set; }

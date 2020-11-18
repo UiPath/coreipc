@@ -1,0 +1,7 @@
+<Project>
+    <PropertyGroup>
+        <LangVersion>latest</LangVersion>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net461'">$(DefineConstants);WINDOWS</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == 'net5.0-windows'">$(DefineConstants);NET5_0_WINDOWS</DefineConstants>
+    </PropertyGroup>
+</Project>

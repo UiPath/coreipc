@@ -18,11 +18,8 @@ namespace UiPath.CoreIpc.NamedPipe
         public new NamedPipeSettings Settings => (NamedPipeSettings)base.Settings;
         protected override async Task AcceptConnection(CancellationToken token)
         {
-            var server = new NamedPipeServerStream(Settings.Name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous
-#if NET461
-                , inBufferSize: 0, outBufferSize: 0, GetPipeSecurity()
-#endif
-                );
+            var server = IOHelpers.NewNamedPipeServerStream(Settings.Name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+                PipeTransmissionMode.Byte, PipeOptions.Asynchronous, GetPipeSecurity);
             try
             {
                 // on linux WaitForConnectionAsync has to be cancelled with Dispose

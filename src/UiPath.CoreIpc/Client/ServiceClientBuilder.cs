@@ -43,7 +43,9 @@ namespace UiPath.CoreIpc
 
         public TDerived EncryptAndSign()
         {
+#if WINDOWS
             _encryptAndSign = true;
+#endif
             return (TDerived)this;
         }
 

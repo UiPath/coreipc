@@ -31,3 +31,8 @@ steps:
       IsSecret: false
       transformAction: 'none'
     condition: eq(variables['PublishRelease'], 'true')
+
+  - task: UseDotNet@2
+    displayName: 'Use .NET Core sdk 5.0.100'
+    inputs:
+      version: 5.0.100
