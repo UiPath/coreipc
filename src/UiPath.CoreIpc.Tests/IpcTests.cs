@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
+using System.Security.Principal;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -358,6 +359,28 @@ namespace UiPath.CoreIpc.Tests
             error.InnerError.Type.ShouldBe(typeof(InvalidDataException).FullName);
             error.InnerError.Message.ShouldBe("invalid");
         }
+
+#if WINDOWS
+        [Fact]
+        public async Task PipeSecurityForWindows()
+        {
+            using var protectedService = new ServiceHostBuilder(_serviceProvider)
+                .UseNamedPipes(new NamedPipeSettings("protected")
+                {
+                    RequestTimeout = RequestTimeout,
+                    AccessControl = pipeSecurity => pipeSecurity.Deny(WellKnownSidType.WorldSid, PipeAccessRights.FullControl)
+                })
+                .AddEndpoint<ISystemService>()
+                .ValidateAndBuild();
+            _ = protectedService.RunAsync();
+
+            var client = new NamedPipeClientBuilder<ISystemService>("protected").RequestTimeout(RequestTimeout).Build();
+            using ((IDisposable)client)
+            {
+                await client.DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
+            }
+        }
+#endif
 
         public void Dispose()
         {
