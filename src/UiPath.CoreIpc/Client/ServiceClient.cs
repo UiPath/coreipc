@@ -97,12 +97,13 @@ namespace UiPath.CoreIpc
 
         public async Task<TResult> InvokeAsync<TResult>(string methodName, object[] args)
         {
-            var cancellationToken = args.OfType<CancellationToken>().LastOrDefault();
-            var messageTimeout = (args.OfType<Message>().FirstOrDefault()?.RequestTimeout.TotalSeconds).GetValueOrDefault();
-            var timeout = messageTimeout == 0 ? _requestTimeout : TimeSpan.FromSeconds(messageTimeout);
+            CancellationToken cancellationToken = default;
+            TimeSpan messageTimeout = default;
+            TimeSpan clientTimeout = _requestTimeout;
+            SetWellKnownArguments();
             return await Task.Run(InvokeAsync).ConfigureAwait(false);
             Task<TResult> InvokeAsync() =>
-                cancellationToken.WithTimeout(timeout, async token =>
+                cancellationToken.WithTimeout(clientTimeout, async token =>
                 {
                     bool newConnection;
                     using (await _connectionLock.LockAsync(token))
@@ -112,7 +113,7 @@ namespace UiPath.CoreIpc
                     await _beforeCall(new CallInfo(newConnection), token);
                     var requestId = _connection.NewRequestId();
                     var arguments = args.Select(_serializer.Serialize).ToArray();
-                    var request = new Request(typeof(TInterface).Name, requestId, methodName, arguments, messageTimeout);
+                    var request = new Request(typeof(TInterface).Name, requestId, methodName, arguments, messageTimeout.TotalSeconds);
                     _logger?.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
                     var response = await _connection.Send(request, token);
                     _logger?.LogInformation($"IpcClient called {methodName} {requestId} {Name}.");
@@ -127,6 +128,25 @@ namespace UiPath.CoreIpc
                     ExceptionDispatchInfo.Capture(exception).Throw();
                     return Task.CompletedTask;
                 });
+            void SetWellKnownArguments()
+            {
+                object argument;
+                for(int index = 0; index < args.Length; index++)
+                {
+                    argument = args[index];
+                    switch (argument)
+                    {
+                        case Message { RequestTimeout: var requestTimeout } when requestTimeout != TimeSpan.Zero:
+                            messageTimeout = requestTimeout;
+                            clientTimeout = requestTimeout;
+                            break;
+                        case CancellationToken token:
+                            cancellationToken = token;
+                            args[index] = "";
+                            break;
+                    }
+                }
+            }
         }
 
         protected virtual Task<bool> ConnectToServerAsync(CancellationToken cancellationToken) => throw new NotImplementedException();

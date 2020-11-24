@@ -24,7 +24,7 @@ namespace UiPath.CoreIpc
 #if WINDOWS
             set => _encryptAndSign = value;
 #else
-            set { }
+            set => _encryptAndSign = false;
 #endif
         }
         public string Name { get; }
