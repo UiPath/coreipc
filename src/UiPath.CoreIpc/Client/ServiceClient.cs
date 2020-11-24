@@ -130,11 +130,9 @@ namespace UiPath.CoreIpc
                 });
             void SetWellKnownArguments()
             {
-                object argument;
                 for(int index = 0; index < args.Length; index++)
                 {
-                    argument = args[index];
-                    switch (argument)
+                    switch (args[index])
                     {
                         case Message { RequestTimeout: var requestTimeout } when requestTimeout != TimeSpan.Zero:
                             messageTimeout = requestTimeout;
