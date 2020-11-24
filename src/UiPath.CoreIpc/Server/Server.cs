@@ -148,50 +148,44 @@ namespace UiPath.CoreIpc
             var allArguments = new object[parameters.Length];
             Deserialize();
             SetOptionalArguments();
-            SetWellknownArguments();
             return allArguments;
             void Deserialize()
             {
+                object argument;
                 for (int index = 0; index < request.Parameters.Length; index++)
                 {
-                    allArguments[index] = Serializer.Deserialize(request.Parameters[index], parameters[index].ParameterType);
+                    var parameterType = parameters[index].ParameterType;
+                    if (parameterType == typeof(CancellationToken))
+                    {
+                        argument = cancellationToken;
+                    }
+                    else
+                    {
+                        argument = Serializer.Deserialize(request.Parameters[index], parameterType);
+                        argument = CheckMessage(argument, parameterType);
+                    }
+                    allArguments[index] = argument;
                 }
+            }
+            object CheckMessage(object argument, Type parameterType)
+            {
+                if (parameterType == typeof(Message) && argument == null)
+                {
+                    argument = new Message();
+                }
+                if (argument is Message message)
+                {
+                    message.Endpoint = endpoint;
+                    message.Client = _client.Value;
+                }
+                return argument;
             }
             void SetOptionalArguments()
             {
                 for (int index = request.Parameters.Length; index < parameters.Length; index++)
                 {
-                    allArguments[index] = parameters[index].GetDefaultValue();
-                }
-            }
-            void SetWellknownArguments()
-            {
-                if (parameters.Length == 0)
-                {
-                    return;
-                }
-                int messageIndex;
-                if (parameters[parameters.Length - 1].ParameterType == typeof(CancellationToken))
-                {
-                    allArguments[parameters.Length - 1] = cancellationToken;
-                    messageIndex = parameters.Length - 2;
-                    if (messageIndex < 0)
-                    {
-                        return;
-                    }
-                }
-                else
-                {
-                    messageIndex = parameters.Length - 1;
-                }
-                if (allArguments[messageIndex] == null && parameters[messageIndex].ParameterType == typeof(Message))
-                {
-                    allArguments[messageIndex] = new Message();
-                }
-                if (allArguments[messageIndex] is Message message)
-                {
-                    message.Endpoint = endpoint;
-                    message.Client = _client.Value;
+                    var parameter = parameters[index];
+                    allArguments[index] = CheckMessage(parameter.GetDefaultValue(), parameter.ParameterType);
                 }
             }
         }
