@@ -162,24 +162,30 @@ namespace UiPath.CoreIpc
                     else
                     {
                         argument = Serializer.Deserialize(request.Parameters[index], parameterType);
-                        if (parameterType == typeof(Message) && argument == null)
-                        {
-                            argument = new Message();
-                        }
-                        if (argument is Message message)
-                        {
-                            message.Endpoint = endpoint;
-                            message.Client = _client.Value;
-                        }
+                        argument = CheckMessage(argument, parameterType);
                     }
                     allArguments[index] = argument;
                 }
+            }
+            object CheckMessage(object argument, Type parameterType)
+            {
+                if (parameterType == typeof(Message) && argument == null)
+                {
+                    argument = new Message();
+                }
+                if (argument is Message message)
+                {
+                    message.Endpoint = endpoint;
+                    message.Client = _client.Value;
+                }
+                return argument;
             }
             void SetOptionalArguments()
             {
                 for (int index = request.Parameters.Length; index < parameters.Length; index++)
                 {
-                    allArguments[index] = parameters[index].GetDefaultValue();
+                    var parameter = parameters[index];
+                    allArguments[index] = CheckMessage(parameter.GetDefaultValue(), parameter.ParameterType);
                 }
             }
         }
