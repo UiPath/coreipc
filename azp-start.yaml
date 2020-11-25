@@ -43,7 +43,7 @@ jobs:
   - job:
     displayName: 'node.js on Ubuntu'
     pool:
-      vmImage: 'ubuntu-18.04'
+      vmImage: 'ubuntu-20.04'
     steps:
       - template: azp-initialization.yaml
       - template: azp-nodejs.yaml
