@@ -65,7 +65,7 @@ export module CoreIpcPlatform {
             if (socket) { socket.dispose(); }
             return result;
         }
-        public getDefaultDotNet(): string { return '/usr/bin/dotnet'; }
+        public getDefaultDotNet(): string { return 'dotnet'; }
         public useShellInUnitTests(): boolean { return true; }
 
         private getTempPath(): string {
