@@ -1,6 +1,6 @@
 steps:
-  - task: '$(Label_NodeJS) UseDotNet@2'
-    displayName: 'Use .NET Core sdk 5.0.100'
+  - task: UseDotNet@2
+    displayName: '$(Label_NodeJS) Use .NET Core sdk 5.0.100'
     inputs:
       version: 5.0.100
       
