@@ -1,9 +1,4 @@
 steps:
-  - task: UseDotNet@2
-    displayName: 'Use .NET Core sdk 5.0.100'
-    inputs:
-      version: 5.0.100
-      
   - task: DotNetCoreCLI@2
     displayName: '$(Label_NodeJS) Restore and build "UiPath.CoreIpc.csproj"'
     inputs:
@@ -14,7 +9,7 @@ steps:
     displayName: '$(Label_NodeJS) Restore and build "UiPath.CoreIpc.NodeInterop.csproj"'
     inputs:
       projects: '$(NodeJS_DotNetNodeInteropProject)'
-      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework netcoreapp3.1 -p:Version="$(FullVersion)"'
+      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net5.0 -p:Version="$(FullVersion)"'
 
   - task: Npm@1
     displayName: '$(Label_NodeJS) Write $[FullVersion] to package.json'
@@ -37,12 +32,6 @@ steps:
         command: 'custom'
         workingDir: $(NodeJS_ProjectPath)
         customCommand: 'run build'
-    
-  - task: UseDotNet@2
-    displayName: '$(Label_NodeJS) UseDotNet@2'
-    inputs:
-      packageType: 'runtime'
-      version: '3.1.x'
     
   - task: Npm@1
     displayName: '$(Label_NodeJS) Run unit tests'
