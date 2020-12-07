@@ -46,5 +46,6 @@ jobs:
       vmImage: 'ubuntu-20.04'
     steps:
       - template: azp-initialization.yaml
+      - template: azp-nodejs-linux.yaml
       - template: azp-nodejs.yaml
 

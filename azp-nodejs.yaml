@@ -1,9 +1,3 @@
-steps:
-  - task: UseDotNet@2
-    displayName: '$(Label_NodeJS) Use .NET Core sdk 5.0.100'
-    inputs:
-      version: 5.0.100
-      
   - task: DotNetCoreCLI@2
     displayName: '$(Label_NodeJS) Restore and build "UiPath.CoreIpc.csproj"'
     inputs:
