@@ -18,7 +18,7 @@ async function main() {
         'UiPath.CoreIpc.BrittleServer',
         'bin',
         'Debug',
-        'netcoreapp3.1',
+        'net5.0',
         'UiPath.CoreIpc.BrittleServer.exe',
     );
     const pipeName = uuid();
