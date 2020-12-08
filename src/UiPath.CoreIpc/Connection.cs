@@ -105,32 +105,23 @@ namespace UiPath.CoreIpc
             {
                 while (!(message = await Network.ReadMessage(_maxMessageSize)).Empty)
                 {
-                    Action callback = null;
                     var data = message.Data;
-                    switch (message.MessageType)
+                    Action callback = message.MessageType switch
                     {
-                        case MessageType.Request:
-                            if (RequestReceived != null)
-                            {
-                                callback = () => RequestReceived.Invoke(this, new RequestReceivedEventsArgs(Deserialize<Request>(data)));
-                            }
-                            break;
-                        case MessageType.Response:
-                            callback = () => OnResponseReceived(data);
-                            break;
-                        case MessageType.CancellationRequest:
-                            if (CancellationRequestReceived != null)
-                            {
-                                callback = () => CancellationRequestReceived.Invoke(this, new CancellationRequestReceivedEventsArgs(Deserialize<CancellationRequest>(data)));
-                            }
-                            break;
-                        default:
-                            Logger?.LogInformation("Unknown message type " + message.MessageType);
-                            break;
-                    }
+                        MessageType.Request when RequestReceived != null =>
+                            () => RequestReceived.Invoke(this, new RequestReceivedEventsArgs(Deserialize<Request>(data))),
+                        MessageType.Response => () => OnResponseReceived(data),
+                        MessageType.CancellationRequest when CancellationRequestReceived != null =>
+                            () => CancellationRequestReceived.Invoke(this, new CancellationRequestReceivedEventsArgs(Deserialize<CancellationRequest>(data))),
+                        _ => null
+                    };
                     if (callback != null)
                     {
                         Task.Run(callback).LogException(Logger, this);
+                    }
+                    else
+                    {
+                        Logger?.LogInformation("Unknown message type " + message.MessageType);
                     }
                 }
             }
