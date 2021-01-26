@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -114,6 +113,11 @@ namespace UiPath.CoreIpc
                 return Response.Fail(request, "Generic methods are not supported " + method);
             }
             var arguments = GetArguments(endpoint, method, request, cancellationToken);
+            var beforeCall = endpoint.BeforeCall;
+            if (beforeCall != null)
+            {
+                await beforeCall(new CallInfo(default, request.MethodName, arguments), cancellationToken);
+            }
             return await InvokeMethod(endpoint, request, service, method, arguments);
         }
         private async Task<Response> InvokeMethod(EndpointSettings endpoint, Request request, object service, MethodInfo method, object[] arguments)
