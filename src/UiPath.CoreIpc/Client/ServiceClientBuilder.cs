@@ -93,7 +93,14 @@ namespace UiPath.CoreIpc
 
     public readonly struct CallInfo
     {
-        public CallInfo(bool newConnection) => NewConnection = newConnection;
+        public CallInfo(bool newConnection, string methodName, object[] arguments)
+        {
+            NewConnection = newConnection;
+            MethodName = methodName;
+            Arguments = arguments;
+        }
         public bool NewConnection { get; }
+        public string MethodName { get; }
+        public object[] Arguments { get; }
     }
 }

@@ -110,7 +110,7 @@ namespace UiPath.CoreIpc
                     {
                         newConnection = await EnsureConnection(token);
                     }
-                    await _beforeCall(new CallInfo(newConnection), token);
+                    await _beforeCall(new CallInfo(newConnection, methodName, args), token);
                     var requestId = _connection.NewRequestId();
                     var arguments = args.Select(_serializer.Serialize).ToArray();
                     var request = new Request(typeof(TInterface).Name, requestId, methodName, arguments, messageTimeout.TotalSeconds);

@@ -104,7 +104,12 @@ namespace UiPath.CoreIpc.Tests
         public async Task BeforeCall()
         {
             bool newConnection = false;
-            var proxy = SystemClientBuilder().BeforeCall(async (c, _) => newConnection = c.NewConnection).ValidateAndBuild();
+            var proxy = SystemClientBuilder().BeforeCall(async (c, _) =>
+            {
+                newConnection = c.NewConnection;
+                c.MethodName.ShouldBe(nameof(ISystemService.DoNothing));
+                c.Arguments.Single().ShouldBe(""); // cancellation token
+            }).ValidateAndBuild();
             newConnection.ShouldBeFalse();
 
             await proxy.DoNothing();
