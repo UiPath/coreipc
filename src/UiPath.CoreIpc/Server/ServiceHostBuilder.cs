@@ -1,10 +1,12 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc
 {
+    using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
     public class ServiceHostBuilder
     {
         private readonly List<Listener> _listeners = new List<Listener>();
@@ -62,6 +64,7 @@ namespace UiPath.CoreIpc
         internal Type Contract { get; }
         internal Type CallbackContract { get; }
         internal IServiceProvider ServiceProvider { get; set; }
+        public BeforeCallHandler BeforeCall { get; set; }
         public void Validate() => IOHelpers.Validate(Contract, CallbackContract);
     }
     public class EndpointSettings<TContract> : EndpointSettings where TContract : class

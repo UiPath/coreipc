@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
@@ -8,7 +7,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using Shouldly;
 using UiPath.CoreIpc.NamedPipe;
@@ -72,10 +70,10 @@ namespace UiPath.CoreIpc.Tests
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);
 
-        private ISystemService CreateSystemService() => SystemClientBuilder().ValidateAndBuild();
+        private ISystemService CreateSystemService(string pipeName = "system") => SystemClientBuilder(pipeName).ValidateAndBuild();
 
-        private NamedPipeClientBuilder<ISystemService> SystemClientBuilder() =>
-            new NamedPipeClientBuilder<ISystemService>("system").RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
+        private NamedPipeClientBuilder<ISystemService> SystemClientBuilder(string pipeName = "system") =>
+            new NamedPipeClientBuilder<ISystemService>(pipeName).RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
 
 #if DEBUG
         [Fact]
@@ -104,7 +102,12 @@ namespace UiPath.CoreIpc.Tests
         public async Task BeforeCall()
         {
             bool newConnection = false;
-            var proxy = SystemClientBuilder().BeforeCall(async (c, _) => newConnection = c.NewConnection).ValidateAndBuild();
+            var proxy = SystemClientBuilder().BeforeCall(async (c, _) =>
+            {
+                newConnection = c.NewConnection;
+                c.MethodName.ShouldBe(nameof(ISystemService.DoNothing));
+                c.Arguments.Single().ShouldBe(""); // cancellation token
+            }).ValidateAndBuild();
             newConnection.ShouldBeFalse();
 
             await proxy.DoNothing();
@@ -360,6 +363,27 @@ namespace UiPath.CoreIpc.Tests
             error.InnerError.Message.ShouldBe("invalid");
         }
 
+        [Fact]
+        public async void BeforeCallServerSide()
+        {
+            var newGuid = System.Guid.NewGuid();
+            var methodName = "";
+            using var protectedService = new ServiceHostBuilder(_serviceProvider)
+                .UseNamedPipes(new NamedPipeSettings("beforeCall") { RequestTimeout = RequestTimeout })
+                .AddEndpoint(new EndpointSettings<ISystemService>
+                {
+                    BeforeCall = async (call, ct) =>
+                    {
+                        methodName = call.MethodName;
+                        call.Arguments[0].ShouldBe(newGuid);
+                    }
+                })
+                .ValidateAndBuild();
+            _ = protectedService.RunAsync();
+            await CreateSystemService("beforeCall").GetGuid(newGuid);
+            methodName.ShouldBe("GetGuid");
+        }
+
 #if WINDOWS
         [Fact]
         public async Task PipeSecurityForWindows()
@@ -373,12 +397,7 @@ namespace UiPath.CoreIpc.Tests
                 .AddEndpoint<ISystemService>()
                 .ValidateAndBuild();
             _ = protectedService.RunAsync();
-
-            var client = new NamedPipeClientBuilder<ISystemService>("protected").RequestTimeout(RequestTimeout).Build();
-            using ((IDisposable)client)
-            {
-                await client.DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
-            }
+            await CreateSystemService("protected").DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
         }
 #endif
 
