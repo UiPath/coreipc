@@ -67,7 +67,10 @@ namespace UiPath.CoreIpc.Tests
         {
             try
             {
-                await Task.Delay(message.Delay, cancellationToken);
+                if (message.Delay > 0)
+                {
+                    await Task.Delay(message.Delay, cancellationToken);
+                }
             }
             catch (OperationCanceledException)
             {
