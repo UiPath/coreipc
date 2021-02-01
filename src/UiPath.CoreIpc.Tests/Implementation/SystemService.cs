@@ -67,7 +67,7 @@ namespace UiPath.CoreIpc.Tests
         {
             try
             {
-                if (message.Delay > 0)
+                if (message.Delay != 0)
                 {
                     await Task.Delay(message.Delay, cancellationToken);
                 }
