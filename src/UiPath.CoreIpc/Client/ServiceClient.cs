@@ -187,12 +187,12 @@ namespace UiPath.CoreIpc
             }
         }
 
-        private protected async Task CreateClientConnection(ClientConnection clientConnection, Stream network, string name)
+        private protected async Task CreateClientConnection(ClientConnection clientConnection, Stream network, object state, string name)
         {
             await CreateConnection(network, name);
             _connection.Listen().LogException(_logger, name);
             clientConnection.Connection = _connection;
-            clientConnection.Network = network;
+            clientConnection.State = state;
             clientConnection.Server = _server;
         }
 
