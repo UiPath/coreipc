@@ -11,7 +11,7 @@ namespace UiPath.CoreIpc.Tcp
     {
         IPEndPoint EndPoint { get; }
     }
-    public class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterface : class
+    class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterface : class
     {
         private TcpClient _tcpClient;
         public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger)
