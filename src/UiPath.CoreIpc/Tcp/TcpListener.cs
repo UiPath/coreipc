@@ -23,9 +23,9 @@ namespace UiPath.CoreIpc.Tcp
         protected async override Task AcceptConnection(CancellationToken token)
         {
             var server = new TcpServer(Settings.EndPoint);
-            using var closeToken = token.Register(Dispose);
             try
             {
+                using var closeToken = token.Register(Dispose);
                 var tcpClient = await server.AcceptTcpClientAsync();
                 // pass the ownership of the connection
                 HandleConnection(tcpClient.GetStream(), callbackFactory => new Client(action => action(), callbackFactory), token);
