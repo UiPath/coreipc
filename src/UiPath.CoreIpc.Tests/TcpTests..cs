@@ -2,6 +2,7 @@
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
+using System.Net;
 using System.Security.Principal;
 using System.Text;
 using System.Threading;
@@ -16,6 +17,7 @@ namespace UiPath.CoreIpc.Tests
 {
     public class TcpTests : IDisposable
     {
+        static IPEndPoint Any = new IPEndPoint(IPAddress.Any, 0);
         private const int MaxReceivedMessageSizeInMegabytes = 1;
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
         private readonly ServiceHost _computingHost;
@@ -63,40 +65,30 @@ namespace UiPath.CoreIpc.Tests
         }
 
         private TcpClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
-            new TcpClientBuilder<IComputingService, IComputingCallback>("computing", _serviceProvider)
-                .AllowImpersonation()
-                .EncryptAndSign()
+            new TcpClientBuilder<IComputingService, IComputingCallback>(new IPEndPoint(IPAddress.Loopback, 2121), _serviceProvider)
                 .RequestTimeout(RequestTimeout)
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);
 
-        private ISystemService CreateSystemService(string pipeName = "system") => SystemClientBuilder(pipeName).ValidateAndBuild();
+        private ISystemService CreateSystemService(int port = 3131) => SystemClientBuilder(port).ValidateAndBuild();
 
-        private TcpClientBuilder<ISystemService> SystemClientBuilder(string pipeName = "system") =>
-            new TcpClientBuilder<ISystemService>(pipeName).RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
+        private TcpClientBuilder<ISystemService> SystemClientBuilder(int port = 3131) =>
+            new TcpClientBuilder<ISystemService>(new IPEndPoint(IPAddress.Loopback, port)).RequestTimeout(RequestTimeout).Logger(_serviceProvider);
 
 #if DEBUG
         [Fact]
-        public void MethodsMustReturnTask() => new Action(() => new TcpClientBuilder<IInvalid>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Method does not return Task!");
+        public void MethodsMustReturnTask() => new Action(() => new TcpClientBuilder<IInvalid>(Any).ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Method does not return Task!");
         [Fact]
-        public void DuplicateMessageParameters() => new Action(() => new TcpClientBuilder<IDuplicateMessage>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
+        public void DuplicateMessageParameters() => new Action(() => new TcpClientBuilder<IDuplicateMessage>(Any).ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
         [Fact]
-        public void TheMessageMustBeTheLastBeforeTheToken() => new Action(() => new TcpClientBuilder<IMessageFirst>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
+        public void TheMessageMustBeTheLastBeforeTheToken() => new Action(() => new TcpClientBuilder<IMessageFirst>(Any).ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
         [Fact]
-        public void CancellationTokenMustBeLast() => new Action(() => new TcpClientBuilder<IInvalidCancellationToken>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The CancellationToken parameter must be the last!");
+        public void CancellationTokenMustBeLast() => new Action(() => new TcpClientBuilder<IInvalidCancellationToken>(Any).ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The CancellationToken parameter must be the last!");
         [Fact]
-        public void TheCallbackContractMustBeAnInterface() => new Action(() => new TcpClientBuilder<ISystemService, TcpTests>("", _serviceProvider).ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
+        public void TheCallbackContractMustBeAnInterface() => new Action(() => new TcpClientBuilder<ISystemService, TcpTests>(Any, _serviceProvider).ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
         [Fact]
         public void TheServiceContractMustBeAnInterface() => new Action(() => new ServiceHostBuilder(_serviceProvider).AddEndpoint<TcpTests>().ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
 #endif
-
-        [Fact]
-        public void PipeExists()
-        {
-            IOHelpers.PipeExists(System.Guid.NewGuid().ToString()).ShouldBeFalse();
-            IOHelpers.PipeExists("computing", 10).ShouldBeTrue();
-            IOHelpers.PipeExists("system", 10).ShouldBeTrue();
-        }
 
         [Fact]
         public async Task BeforeCall()
@@ -207,9 +199,6 @@ namespace UiPath.CoreIpc.Tests
             var returnValue = await _systemClient.ImpersonateCaller();
             returnValue.ShouldBe(Environment.UserName);
         }
-
-        [Fact]
-        public Task ServerName() => SystemClientBuilder().ServerName(Environment.MachineName).ValidateAndBuild().GetGuid(System.Guid.Empty);
 
         [Fact]
         public async Task ServerTimeout()
@@ -380,7 +369,7 @@ namespace UiPath.CoreIpc.Tests
                 })
                 .ValidateAndBuild();
             _ = protectedService.RunAsync();
-            await CreateSystemService("beforeCall").GetGuid(newGuid);
+            await CreateSystemService(3232).GetGuid(newGuid);
             methodName.ShouldBe("GetGuid");
         }
 
@@ -397,7 +386,7 @@ namespace UiPath.CoreIpc.Tests
                 .AddEndpoint<ISystemService>()
                 .ValidateAndBuild();
             _ = protectedService.RunAsync();
-            await CreateSystemService("protected").DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
+            await CreateSystemService(3333).DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
         }
 #endif
 
