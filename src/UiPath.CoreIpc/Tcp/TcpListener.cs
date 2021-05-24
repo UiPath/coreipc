@@ -25,6 +25,7 @@ namespace UiPath.CoreIpc.Tcp
             var server = new TcpServer(Settings.EndPoint);
             try
             {
+                server.Start(Settings.ConcurrentAccepts);
                 using var closeToken = token.Register(Dispose);
                 var tcpClient = await server.AcceptTcpClientAsync();
                 // pass the ownership of the connection
