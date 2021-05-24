@@ -13,7 +13,6 @@ namespace UiPath.CoreIpc.Tests
 {
     class TcpClient
     {
-        static readonly IPEndPoint ComputingEndPoint = new(IPAddress.Loopback, 2121);
         static readonly IPEndPoint SystemEndPoint = new(IPAddress.Loopback, 3131);
         static async Task Main(string[] args)
         {
@@ -40,7 +39,7 @@ namespace UiPath.CoreIpc.Tests
         {
             var serviceProvider = ConfigureServices();
             var callback = new ComputingCallback { Id = "custom made" };
-            var computingClientBuilder = new TcpClientBuilder<IComputingService, IComputingCallback>(ComputingEndPoint, serviceProvider).CallbackInstance(callback).RequestTimeout(TimeSpan.FromSeconds(2));
+            var computingClientBuilder = new TcpClientBuilder<IComputingService, IComputingCallback>(SystemEndPoint, serviceProvider).CallbackInstance(callback).RequestTimeout(TimeSpan.FromSeconds(2));
             var stopwatch = Stopwatch.StartNew();
             int count = 0;
             try
