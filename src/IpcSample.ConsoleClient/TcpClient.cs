@@ -3,16 +3,19 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
-using UiPath.CoreIpc.NamedPipe;
+using UiPath.CoreIpc.Tcp;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Linq;
+using System.Net;
 
 namespace UiPath.CoreIpc.Tests
 {
-    class Client
+    class TcpClient
     {
-        static async Task _Main(string[] args)
+        static readonly IPEndPoint ComputingEndPoint = new(IPAddress.Loopback, 2121);
+        static readonly IPEndPoint SystemEndPoint = new(IPAddress.Loopback, 3131);
+        static async Task Main(string[] args)
         {
             Console.WriteLine(typeof(int).Assembly);
             Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
@@ -37,17 +40,16 @@ namespace UiPath.CoreIpc.Tests
         {
             var serviceProvider = ConfigureServices();
             var callback = new ComputingCallback { Id = "custom made" };
-            var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>("test", serviceProvider).CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
+            var computingClientBuilder = new TcpClientBuilder<IComputingService, IComputingCallback>(ComputingEndPoint, serviceProvider).CallbackInstance(callback).RequestTimeout(TimeSpan.FromSeconds(2));
             var stopwatch = Stopwatch.StartNew();
             int count = 0;
             try
             {
                 var computingClient = computingClientBuilder.ValidateAndBuild();
                 var systemClient =
-                    new NamedPipeClientBuilder<ISystemService>("test")
+                    new TcpClientBuilder<ISystemService>(SystemEndPoint)
                     .RequestTimeout(TimeSpan.FromSeconds(2))
                     .Logger(serviceProvider)
-                    .AllowImpersonation()
                     .ValidateAndBuild();
                 while (true)
                 {
