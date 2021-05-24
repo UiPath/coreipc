@@ -108,6 +108,7 @@ namespace UiPath.CoreIpc.Tests
                 callbackProxy.Dispose();
                 callbackProxy.Dispose();
                 callbackProxy.Dispose();
+                //((IpcProxy)callbackProxy).CloseConnection();
             }
             finally
             {
