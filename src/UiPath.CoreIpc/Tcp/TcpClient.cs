@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc.Tcp
 {
+    using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
+    using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
     interface ITcpKey : IConnectionKey
     {
         IPEndPoint EndPoint { get; }
@@ -14,11 +16,11 @@ namespace UiPath.CoreIpc.Tcp
     class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterface : class
     {
         private TcpClient _tcpClient;
-        public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger)
-            : base(serializer, requestTimeout, logger, null)
+        public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, encryptAndSign, beforeCall, serviceEndpoint)
         {
             EndPoint = endPoint;
         }
+
         public IPEndPoint EndPoint { get; }
         public override int GetHashCode() => EndPoint.GetHashCode();
         bool IEquatable<IConnectionKey>.Equals(IConnectionKey other) => other == this || (other is ITcpKey otherClient && EndPoint.Equals(otherClient.EndPoint));

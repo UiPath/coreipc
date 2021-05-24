@@ -62,8 +62,8 @@ namespace UiPath.CoreIpc.Tests
             _systemClient = CreateSystemService();
         }
 
-        private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
-            new NamedPipeClientBuilder<IComputingService, IComputingCallback>("computing", _serviceProvider)
+        private TcpClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
+            new TcpClientBuilder<IComputingService, IComputingCallback>("computing", _serviceProvider)
                 .AllowImpersonation()
                 .EncryptAndSign()
                 .RequestTimeout(RequestTimeout)
@@ -72,20 +72,20 @@ namespace UiPath.CoreIpc.Tests
 
         private ISystemService CreateSystemService(string pipeName = "system") => SystemClientBuilder(pipeName).ValidateAndBuild();
 
-        private NamedPipeClientBuilder<ISystemService> SystemClientBuilder(string pipeName = "system") =>
-            new NamedPipeClientBuilder<ISystemService>(pipeName).RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
+        private TcpClientBuilder<ISystemService> SystemClientBuilder(string pipeName = "system") =>
+            new TcpClientBuilder<ISystemService>(pipeName).RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
 
 #if DEBUG
         [Fact]
-        public void MethodsMustReturnTask() => new Action(() => new NamedPipeClientBuilder<IInvalid>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Method does not return Task!");
+        public void MethodsMustReturnTask() => new Action(() => new TcpClientBuilder<IInvalid>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Method does not return Task!");
         [Fact]
-        public void DuplicateMessageParameters() => new Action(() => new NamedPipeClientBuilder<IDuplicateMessage>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
+        public void DuplicateMessageParameters() => new Action(() => new TcpClientBuilder<IDuplicateMessage>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
         [Fact]
-        public void TheMessageMustBeTheLastBeforeTheToken() => new Action(() => new NamedPipeClientBuilder<IMessageFirst>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
+        public void TheMessageMustBeTheLastBeforeTheToken() => new Action(() => new TcpClientBuilder<IMessageFirst>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The message must be the last parameter before the cancellation token!");
         [Fact]
-        public void CancellationTokenMustBeLast() => new Action(() => new NamedPipeClientBuilder<IInvalidCancellationToken>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The CancellationToken parameter must be the last!");
+        public void CancellationTokenMustBeLast() => new Action(() => new TcpClientBuilder<IInvalidCancellationToken>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("The CancellationToken parameter must be the last!");
         [Fact]
-        public void TheCallbackContractMustBeAnInterface() => new Action(() => new NamedPipeClientBuilder<ISystemService, TcpTests>("", _serviceProvider).ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
+        public void TheCallbackContractMustBeAnInterface() => new Action(() => new TcpClientBuilder<ISystemService, TcpTests>("", _serviceProvider).ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
         [Fact]
         public void TheServiceContractMustBeAnInterface() => new Action(() => new ServiceHostBuilder(_serviceProvider).AddEndpoint<TcpTests>().ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
 #endif
