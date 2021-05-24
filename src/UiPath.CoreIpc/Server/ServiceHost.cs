@@ -10,7 +10,7 @@ namespace UiPath.CoreIpc
 {
     public class ServiceHost : IDisposable
     {
-        private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+        private readonly CancellationTokenSource _cancellationTokenSource = new();
         private readonly IDictionary<string, EndpointSettings> _endpoints;
         private readonly IReadOnlyCollection<Listener> _listeners;
         private readonly ILogger<ServiceHost> _logger;
@@ -31,6 +31,10 @@ namespace UiPath.CoreIpc
                 return;
             }
             _cancellationTokenSource.Cancel();
+            foreach (var listener in _listeners)
+            {
+                listener.Dispose();
+            }
             _cancellationTokenSource.Dispose();
         }
 

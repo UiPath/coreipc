@@ -32,8 +32,9 @@ namespace UiPath.CoreIpc
         internal IServiceProvider ServiceProvider { get; set; }
         internal IDictionary<string, EndpointSettings> Endpoints { get; set; }
     }
-    abstract class Listener
+    abstract class Listener : IDisposable
     {
+        protected bool _disposed;
         protected Listener(ListenerSettings settings)
         {
             Settings = settings;
@@ -112,5 +113,16 @@ namespace UiPath.CoreIpc
             }
         }
         protected void HandleConnection(Stream network, Func<ICreateCallback, IClient> clientFactory, CancellationToken cancellationToken) => new ServerConnection(this, network, clientFactory, cancellationToken);
+
+        protected virtual void Dispose(bool disposing)
+        {
+            _disposed = true;
+        }
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
     }
 }

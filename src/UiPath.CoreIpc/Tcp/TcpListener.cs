@@ -40,7 +40,11 @@ namespace UiPath.CoreIpc.Tcp
                 }
             }
         }
-        void Dispose() => _tcpServer.Server?.Dispose();
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            _tcpServer.Server?.Dispose();
+        }
     }
     public static class TcpServiceExtensions
     {
