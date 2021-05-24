@@ -39,7 +39,7 @@ namespace UiPath.CoreIpc
         {
             Settings = settings;
             MaxMessageSize = settings.MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
-            Logger = ServiceProvider.GetRequiredService<ILogger<Listener>>();
+            Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
         }
         public string Name => Settings.Name;
         protected ILogger Logger { get; }
