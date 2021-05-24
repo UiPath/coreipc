@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using TcpServer = System.Net.Sockets.TcpListener;
 namespace UiPath.CoreIpc.Tcp
 {
     public class TcpSettings : ListenerSettings
@@ -18,10 +14,10 @@ namespace UiPath.CoreIpc.Tcp
     }
     class TcpListener : Listener
     {
-        readonly TcpServer _tcpServer;
+        readonly System.Net.Sockets.TcpListener _tcpServer;
         public TcpListener(ListenerSettings settings) : base(settings)
         {
-            _tcpServer = new TcpServer(Settings.EndPoint);
+            _tcpServer = new(Settings.EndPoint);
             _tcpServer.Start(backlog: Settings.ConcurrentAccepts);
         }
         public new TcpSettings Settings => (TcpSettings)base.Settings;
