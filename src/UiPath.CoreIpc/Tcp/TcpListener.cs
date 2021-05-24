@@ -42,4 +42,14 @@ namespace UiPath.CoreIpc.Tcp
             void Dispose() => server.Server?.Dispose();
         }
     }
+    public static class TcpServiceExtensions
+    {
+        public static ServiceHostBuilder UseNamedPipes(this ServiceHostBuilder builder, TcpSettings settings)
+        {
+            settings.ServiceProvider = builder.ServiceProvider;
+            settings.Endpoints = builder.Endpoints;
+            builder.AddListener(new TcpListener(settings));
+            return builder;
+        }
+    }
 }
