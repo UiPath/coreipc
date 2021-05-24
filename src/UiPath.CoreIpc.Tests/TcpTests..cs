@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.IO.Pipes;
 using System.Linq;
 using System.Net;
 using System.Security.Principal;
@@ -10,14 +9,16 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Nito.AsyncEx;
 using Shouldly;
-using UiPath.CoreIpc.NamedPipe;
+using UiPath.CoreIpc.Tcp;
 using Xunit;
 
 namespace UiPath.CoreIpc.Tests
 {
     public class TcpTests : IDisposable
     {
-        static IPEndPoint Any = new IPEndPoint(IPAddress.Any, 0);
+        static readonly IPEndPoint Any = new(IPAddress.Any, 0);
+        static readonly IPEndPoint ComputingEndPoint = new(IPAddress.Loopback, 2121);
+        static readonly IPEndPoint SystemEndPoint = new(IPAddress.Loopback, 3131);
         private const int MaxReceivedMessageSizeInMegabytes = 1;
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
         private readonly ServiceHost _computingHost;
@@ -28,7 +29,6 @@ namespace UiPath.CoreIpc.Tests
         private readonly SystemService _systemService;
         private readonly ComputingCallback _computingCallback;
         private readonly IServiceProvider _serviceProvider;
-        private PipeSecurity _pipeSecurity;
         private readonly AsyncContext _guiThread = new AsyncContextThread().Context;
 
         public TcpTests()
@@ -39,16 +39,14 @@ namespace UiPath.CoreIpc.Tests
             _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
             _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
             _computingHost = new ServiceHostBuilder(_serviceProvider)
-                .UseNamedPipes(new NamedPipeSettings("computing")
+                .UseTcp(new TcpSettings(ComputingEndPoint)
                 {
                     RequestTimeout = RequestTimeout,
-                    AccessControl = security => _pipeSecurity = security.LocalOnly(),
-                    EncryptAndSign = true,
                 })
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .ValidateAndBuild();
             _systemHost = new ServiceHostBuilder(_serviceProvider)
-                .UseNamedPipes(new NamedPipeSettings("system")
+                .UseTcp(new TcpSettings(SystemEndPoint)
                 {
                     RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1)),
                     MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,
@@ -65,7 +63,7 @@ namespace UiPath.CoreIpc.Tests
         }
 
         private TcpClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
-            new TcpClientBuilder<IComputingService, IComputingCallback>(new IPEndPoint(IPAddress.Loopback, 2121), _serviceProvider)
+            new TcpClientBuilder<IComputingService, IComputingCallback>(ComputingEndPoint, _serviceProvider)
                 .RequestTimeout(RequestTimeout)
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);
@@ -143,9 +141,6 @@ namespace UiPath.CoreIpc.Tests
         public async Task AddFloat()
         {
             var result = await _computingClient.AddFloat(1.23f, 4.56f);
-#if NET461
-            _pipeSecurity.ShouldNotBeNull();
-#endif
             result.ShouldBe(5.79f);
         }
 
@@ -358,7 +353,7 @@ namespace UiPath.CoreIpc.Tests
             var newGuid = System.Guid.NewGuid();
             var methodName = "";
             using var protectedService = new ServiceHostBuilder(_serviceProvider)
-                .UseNamedPipes(new NamedPipeSettings("beforeCall") { RequestTimeout = RequestTimeout })
+                .UseTcp(new TcpSettings(new IPEndPoint(IPAddress.Loopback, 3232)) { RequestTimeout = RequestTimeout })
                 .AddEndpoint(new EndpointSettings<ISystemService>
                 {
                     BeforeCall = async (call, ct) =>
@@ -372,24 +367,6 @@ namespace UiPath.CoreIpc.Tests
             await CreateSystemService(3232).GetGuid(newGuid);
             methodName.ShouldBe("GetGuid");
         }
-
-#if WINDOWS
-        [Fact]
-        public async Task PipeSecurityForWindows()
-        {
-            using var protectedService = new ServiceHostBuilder(_serviceProvider)
-                .UseNamedPipes(new NamedPipeSettings("protected")
-                {
-                    RequestTimeout = RequestTimeout,
-                    AccessControl = pipeSecurity => pipeSecurity.Deny(WellKnownSidType.WorldSid, PipeAccessRights.FullControl)
-                })
-                .AddEndpoint<ISystemService>()
-                .ValidateAndBuild();
-            _ = protectedService.RunAsync();
-            await CreateSystemService(3333).DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
-        }
-#endif
-
         public void Dispose()
         {
             ((IDisposable)_computingClient).Dispose();

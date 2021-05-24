@@ -44,7 +44,7 @@ namespace UiPath.CoreIpc.Tcp
     }
     public static class TcpServiceExtensions
     {
-        public static ServiceHostBuilder UseNamedPipes(this ServiceHostBuilder builder, TcpSettings settings)
+        public static ServiceHostBuilder UseTcp(this ServiceHostBuilder builder, TcpSettings settings)
         {
             settings.ServiceProvider = builder.ServiceProvider;
             settings.Endpoints = builder.Endpoints;

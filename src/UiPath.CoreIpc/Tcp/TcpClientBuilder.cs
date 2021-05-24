@@ -4,7 +4,7 @@ using System.Net;
 using System.Threading.Tasks;
 using UiPath.CoreIpc.Tcp;
 
-namespace UiPath.CoreIpc.NamedPipe
+namespace UiPath.CoreIpc.Tcp
 {
     public abstract class TcpClientBuilderBase<TDerived, TInterface> : ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
     {
