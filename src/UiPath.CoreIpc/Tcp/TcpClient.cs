@@ -24,7 +24,7 @@ namespace UiPath.CoreIpc.Tcp
         bool IEquatable<IConnectionKey>.Equals(IConnectionKey other) => other == this || (other is ITcpKey otherClient && EndPoint.Equals(otherClient.EndPoint));
         protected async override Task<bool> ConnectToServerAsync(CancellationToken cancellationToken)
         {
-            if (_tcpClient.Connected == true)
+            if (_tcpClient?.Connected == true)
             {
                 return false;
             }
