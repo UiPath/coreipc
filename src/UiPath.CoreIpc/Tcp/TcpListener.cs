@@ -18,30 +18,33 @@ namespace UiPath.CoreIpc.Tcp
     }
     class TcpListener : Listener
     {
-        public TcpListener(ListenerSettings settings) : base(settings){}
+        readonly TcpServer _tcpServer;
+        public TcpListener(ListenerSettings settings) : base(settings)
+        {
+            _tcpServer = new TcpServer(Settings.EndPoint);
+            _tcpServer.Start(backlog: Settings.ConcurrentAccepts);
+        }
         public new TcpSettings Settings => (TcpSettings)base.Settings;
         protected async override Task AcceptConnection(CancellationToken token)
         {
-            var server = new TcpServer(Settings.EndPoint);
+            System.Net.Sockets.TcpClient tcpClient = null;
             try
             {
-                server.Start(Settings.ConcurrentAccepts);
                 using var closeToken = token.Register(Dispose);
-                var tcpClient = await server.AcceptTcpClientAsync();
+                tcpClient = await _tcpServer.AcceptTcpClientAsync();
                 // pass the ownership of the connection
                 HandleConnection(tcpClient.GetStream(), callbackFactory => new Client(action => action(), callbackFactory), token);
             }
             catch (Exception ex)
             {
-                Dispose();
+                tcpClient?.Dispose();
                 if (!token.IsCancellationRequested)
                 {
                     Logger.LogException(ex, Settings.Name);
                 }
             }
-            return;
-            void Dispose() => server.Server?.Dispose();
         }
+        void Dispose() => _tcpServer.Server?.Dispose();
     }
     public static class TcpServiceExtensions
     {
