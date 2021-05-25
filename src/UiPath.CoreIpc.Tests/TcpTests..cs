@@ -216,7 +216,7 @@ namespace UiPath.CoreIpc.Tests
         {
             for (int i = 0; i < 20; i++)
             {
-                var request = new SystemMessage { RequestTimeout = TimeSpan.FromMilliseconds(1), Delay = 10 };
+                var request = new SystemMessage { RequestTimeout = TimeSpan.FromMilliseconds(1), Delay = 100 };
                 _computingClient.SendMessage(request).ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.SendMessage)} timed out.");
                 await AddFloat();
             }
