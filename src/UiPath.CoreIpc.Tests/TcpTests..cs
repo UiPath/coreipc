@@ -253,7 +253,7 @@ namespace UiPath.CoreIpc.Tests
             _systemService.DidNothing.ShouldBeFalse();
             while (!_systemService.DidNothing)
             {
-                await Task.Yield();
+                await Task.Delay(1);
             }
         }
 
