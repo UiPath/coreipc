@@ -46,7 +46,7 @@ namespace UiPath.CoreIpc.Tests
 
         public async Task DoNothing(CancellationToken cancellationToken = default)
         {
-            await Task.Delay(1);
+            await Task.Delay(30);
             DidNothing = true;
         }
 

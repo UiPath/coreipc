@@ -41,34 +41,32 @@ namespace UiPath.CoreIpc.NamedPipe
             {
                 return false;
             }
-            using (var connectionHandle = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken))
+            using var connectionHandle = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
+            var clientConnection = connectionHandle.ClientConnection;
+            var pipe = (NamedPipeClientStream)clientConnection.State;
+            if (pipe != null)
             {
-                var clientConnection = connectionHandle.ClientConnection;
-                var pipe = (NamedPipeClientStream)clientConnection.Network;
-                if (pipe != null)
+                if (pipe.IsConnected)
                 {
-                    if (pipe.IsConnected)
-                    {
-                        ReuseClientConnection(clientConnection);
-                        _pipe = pipe;
-                        return false;
-                    }
-                    pipe.Dispose();
+                    ReuseClientConnection(clientConnection);
+                    _pipe = pipe;
+                    return false;
                 }
-                pipe = new NamedPipeClientStream(ServerName, PipeName, PipeDirection.InOut, PipeOptions.Asynchronous, AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
-                try
-                {
-                    await pipe.ConnectAsync(cancellationToken);
-                }
-                catch
-                {
-                    pipe.Dispose();
-                    throw;
-                }
-                await CreateClientConnection(clientConnection, pipe, PipeName);
-                _pipe = pipe;
-                return true;
+                pipe.Dispose();
             }
+            pipe = new NamedPipeClientStream(ServerName, PipeName, PipeDirection.InOut, PipeOptions.Asynchronous, AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
+            try
+            {
+                await pipe.ConnectAsync(cancellationToken);
+            }
+            catch
+            {
+                pipe.Dispose();
+                throw;
+            }
+            await CreateClientConnection(clientConnection, pipe, pipe, PipeName);
+            _pipe = pipe;
+            return true;
         }
     }
 }

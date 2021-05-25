@@ -3,16 +3,18 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
 using System.IO.Pipes;
+using System.Net;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
-using UiPath.CoreIpc.NamedPipe;
+using UiPath.CoreIpc.Tcp;
 
 namespace UiPath.CoreIpc.Tests
 {
-    class Server
+    class TcpServer
     {
+        static readonly IPEndPoint SystemEndPoint = new(IPAddress.Loopback, 3131);
         //private static readonly Timer _timer = new Timer(_ =>
         //{
         //    Console.WriteLine("GC.Collect");
@@ -21,7 +23,7 @@ namespace UiPath.CoreIpc.Tests
         //    GC.Collect();
         //}, null, 0, 3000);
 
-        static async Task _Main()
+        static async Task Main()
         {
             Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
             //GuiLikeSyncContext.Install();
@@ -29,10 +31,9 @@ namespace UiPath.CoreIpc.Tests
             var serviceProvider = ConfigureServices();
             // build and run service host
             var host = new ServiceHostBuilder(serviceProvider)
-                .UseNamedPipes(new NamedPipeSettings("test")
+                .UseTcp(new TcpSettings(SystemEndPoint)
                 {
                     RequestTimeout = TimeSpan.FromSeconds(2),
-                    AccessControl = security => security.AllowCurrentUser(),
                 })
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService>()

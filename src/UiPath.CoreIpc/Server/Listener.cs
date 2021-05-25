@@ -32,13 +32,14 @@ namespace UiPath.CoreIpc
         internal IServiceProvider ServiceProvider { get; set; }
         internal IDictionary<string, EndpointSettings> Endpoints { get; set; }
     }
-    abstract class Listener
+    abstract class Listener : IDisposable
     {
+        protected bool _disposed;
         protected Listener(ListenerSettings settings)
         {
             Settings = settings;
             MaxMessageSize = settings.MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
-            Logger = ServiceProvider.GetRequiredService<ILogger<Listener>>();
+            Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
         }
         public string Name => Settings.Name;
         protected ILogger Logger { get; }
@@ -112,5 +113,15 @@ namespace UiPath.CoreIpc
             }
         }
         protected void HandleConnection(Stream network, Func<ICreateCallback, IClient> clientFactory, CancellationToken cancellationToken) => new ServerConnection(this, network, clientFactory, cancellationToken);
+
+        protected virtual void Dispose(bool disposing)
+        {
+            _disposed = true;
+        }
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
     }
 }

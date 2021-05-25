@@ -77,7 +77,7 @@ namespace UiPath.CoreIpc
         readonly AsyncLock _lock = new AsyncLock();
         Connection _connection;
         public ClientConnection(IConnectionKey connectionKey) => ConnectionKey = connectionKey;
-        public Stream Network { get; set; }
+        public object State { get; set; }
         public Connection Connection
         {
             get => _connection;
