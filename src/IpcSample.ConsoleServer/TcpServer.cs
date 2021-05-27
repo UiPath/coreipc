@@ -14,7 +14,7 @@ namespace UiPath.CoreIpc.Tests
 {
     class TcpServer
     {
-        static readonly IPEndPoint SystemEndPoint = new(IPAddress.Loopback, 3131);
+        static readonly IPEndPoint SystemEndPoint = new(IPAddress.Any, 3131);
         //private static readonly Timer _timer = new Timer(_ =>
         //{
         //    Console.WriteLine("GC.Collect");
