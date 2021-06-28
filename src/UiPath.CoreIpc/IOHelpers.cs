@@ -3,10 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
+using System.Net;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
@@ -204,18 +207,9 @@ namespace UiPath.CoreIpc
         internal static async Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
         {
             await stream.WriteAsync(new[] { (byte)message.MessageType }, 0, 1, cancellationToken);
-            var lengthBuffer = BitConverter.GetBytes(message.Data.Length);
-            await stream.WriteBuffer(lengthBuffer.CheckEndianness(), cancellationToken);
+            var lengthBuffer = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(message.Data.Length));
+            await stream.WriteBuffer(lengthBuffer, cancellationToken);
             await stream.WriteBuffer(message.Data, cancellationToken);
-        }
-
-        public static byte[] CheckEndianness(this byte[] data)
-        {
-            if (BitConverter.IsLittleEndian)
-            {
-                Array.Reverse(data);
-            }
-            return data;
         }
 
         private static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
@@ -234,7 +228,7 @@ namespace UiPath.CoreIpc
             {
                 return new WireMessage(messageType, lengthBuffer);
             }
-            var length = BitConverter.ToInt32(lengthBuffer.CheckEndianness(), 0);
+            var length = IPAddress.NetworkToHostOrder(BitConverter.ToInt32(lengthBuffer, 0));
             if(length > maxMessageSize)
             {
                 throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize/(1024*1024)} megabytes.");
