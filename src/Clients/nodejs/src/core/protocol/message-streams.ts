@@ -44,7 +44,7 @@ export class MessageStream implements IMessageStream {
     public async writeMessageAsync(message: Network.Message, ct: CancellationToken): Promise<void> {
         const bytes = Buffer.from([
             ...BitConverter.getBytes(message.type, 'uint8'),
-            ...BitConverter.getBytes(message.data.byteLength, 'int32le'),
+            ...BitConverter.getBytes(message.data.byteLength, 'int32be'),
             ...message.data,
         ]);
         MessageStream._trace.log(`Writing ${MessageStream.toMessageTypeString(message.type)} with data: ${message.data.toString()}`);
@@ -77,7 +77,7 @@ export class MessageStream implements IMessageStream {
 
     private async readMessageAsync(ct: CancellationToken): Promise<Network.Message> {
         const type: Network.Message.Type = BitConverter.getNumber(await MessageStream.readFully(this._stream, 1, ct), 'uint8');
-        const length = BitConverter.getNumber(await MessageStream.readFully(this._stream, 4, ct), 'int32le');
+        const length = BitConverter.getNumber(await MessageStream.readFully(this._stream, 4, ct), 'int32be');
         const data = await MessageStream.readFully(this._stream, length, ct);
 
         return { type, data };

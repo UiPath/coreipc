@@ -1,4 +1,4 @@
 /* @internal */
 export type SupportedConversion =
-    'int32le' |
+    'int32be' |
     'uint8';

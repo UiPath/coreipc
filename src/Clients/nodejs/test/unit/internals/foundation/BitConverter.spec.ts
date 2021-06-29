@@ -4,7 +4,7 @@ import { BitConverter, ArgumentOutOfRangeError } from '@foundation';
 describe(`internals`, () => {
     describe(`BitConverter`, () => {
         context(`the getBytes method`, () => {
-            it(`should throw for anything other than 'int32le' or 'uint8'`, () => {
+            it(`should throw for anything other than 'int32be' or 'uint8'`, () => {
                 calling(BitConverter.getBytes, 123, 'foobar' as any).should.throw(ArgumentOutOfRangeError);
             });
 
@@ -18,13 +18,13 @@ describe(`internals`, () => {
                 { input: makeArgs(129, 'uint8'), expected: [129] },
                 { input: makeArgs(255, 'uint8'), expected: [255] },
 
-                { input: makeArgs(-2, 'int32le'), expected: [254, 255, 255, 255] },
-                { input: makeArgs(-1, 'int32le'), expected: [255, 255, 255, 255] },
-                { input: makeArgs(0, 'int32le'), expected: [0, 0, 0, 0] },
-                { input: makeArgs(1, 'int32le'), expected: [1, 0, 0, 0] },
-                { input: makeArgs(256, 'int32le'), expected: [0, 1, 0, 0] },
-                { input: makeArgs(65536, 'int32le'), expected: [0, 0, 1, 0] },
-                { input: makeArgs(67305985, 'int32le'), expected: [1, 2, 3, 4] },
+                { input: makeArgs(-2, 'int32be'), expected: [254, 255, 255, 255] },
+                { input: makeArgs(-1, 'int32be'), expected: [255, 255, 255, 255] },
+                { input: makeArgs(0, 'int32be'), expected: [0, 0, 0, 0] },
+                { input: makeArgs(1, 'int32be'), expected: [0, 0, 0, 1] },
+                { input: makeArgs(256, 'int32be'), expected: [0, 0, 1, 0] },
+                { input: makeArgs(65536, 'int32be'), expected: [0, 1, 0, 0] },
+                { input: makeArgs(67305985, 'int32be'), expected: [4, 3, 2, 1] },
             ]) {
                 it(`(${concatArgs(_case.input)}) should return [ ${concatArgs(_case.expected)} ]`, () => {
                     expect((BitConverter.getBytes as any)(..._case.input)).to.be.deep.eq(Buffer.from(_case.expected));
@@ -33,7 +33,7 @@ describe(`internals`, () => {
         });
 
         context(`the getNumber method`, () => {
-            it(`should throw for anything other than 'int32le' or 'uint8'`, () => {
+            it(`should throw for anything other than 'int32be' or 'uint8'`, () => {
                 calling(BitConverter.getNumber, Buffer.alloc(4), 'foobar' as any).should.throw(ArgumentOutOfRangeError);
             });
 
@@ -47,13 +47,13 @@ describe(`internals`, () => {
                 { input: makeArgs(129, 'uint8'), expected: [129] },
                 { input: makeArgs(255, 'uint8'), expected: [255] },
 
-                { input: makeArgs(-2, 'int32le'), expected: [254, 255, 255, 255] },
-                { input: makeArgs(-1, 'int32le'), expected: [255, 255, 255, 255] },
-                { input: makeArgs(0, 'int32le'), expected: [0, 0, 0, 0] },
-                { input: makeArgs(1, 'int32le'), expected: [1, 0, 0, 0] },
-                { input: makeArgs(256, 'int32le'), expected: [0, 1, 0, 0] },
-                { input: makeArgs(65536, 'int32le'), expected: [0, 0, 1, 0] },
-                { input: makeArgs(67305985, 'int32le'), expected: [1, 2, 3, 4] },
+                { input: makeArgs(-2, 'int32be'), expected: [254, 255, 255, 255] },
+                { input: makeArgs(-1, 'int32be'), expected: [255, 255, 255, 255] },
+                { input: makeArgs(0, 'int32be'), expected: [0, 0, 0, 0] },
+                { input: makeArgs(1, 'int32be'), expected: [1, 0, 0, 0] },
+                { input: makeArgs(256, 'int32be'), expected: [0, 1, 0, 0] },
+                { input: makeArgs(65536, 'int32be'), expected: [0, 0, 1, 0] },
+                { input: makeArgs(67305985, 'int32be'), expected: [1, 2, 3, 4] },
             ]) {
                 it(`(${concatArgs(_case.input)}) should return [ ${concatArgs(_case.expected)} ]`, () => {
                     expect((BitConverter.getBytes as any)(..._case.input)).to.be.deep.eq(Buffer.from(_case.expected));
