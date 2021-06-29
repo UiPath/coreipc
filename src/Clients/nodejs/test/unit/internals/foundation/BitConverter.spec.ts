@@ -18,7 +18,7 @@ describe(`internals`, () => {
                 { input: makeArgs(129, 'uint8'), expected: [129] },
                 { input: makeArgs(255, 'uint8'), expected: [255] },
 
-                { input: makeArgs(-2, 'int32be'), expected: [254, 255, 255, 255] },
+                { input: makeArgs(-2, 'int32be'), expected: [255, 255, 255, 254] },
                 { input: makeArgs(-1, 'int32be'), expected: [255, 255, 255, 255] },
                 { input: makeArgs(0, 'int32be'), expected: [0, 0, 0, 0] },
                 { input: makeArgs(1, 'int32be'), expected: [0, 0, 0, 1] },
@@ -47,7 +47,7 @@ describe(`internals`, () => {
                 { input: makeArgs(129, 'uint8'), expected: [129] },
                 { input: makeArgs(255, 'uint8'), expected: [255] },
 
-                { input: makeArgs(-2, 'int32be'), expected: [254, 255, 255, 255] },
+                { input: makeArgs(-2, 'int32be'), expected: [255, 255, 255, 254] },
                 { input: makeArgs(-1, 'int32be'), expected: [255, 255, 255, 255] },
                 { input: makeArgs(0, 'int32be'), expected: [0, 0, 0, 0] },
                 { input: makeArgs(1, 'int32be'), expected: [0, 0, 0, 1] },
