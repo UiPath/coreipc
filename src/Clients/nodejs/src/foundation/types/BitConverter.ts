@@ -11,7 +11,7 @@ export class BitConverter {
 
         switch (type) {
             case 'int32le':
-                buffer.writeInt32LE(value as number, 0);
+                buffer.writeInt32BE(value as number, 0);
                 break;
             default:
                 buffer.writeUInt8(value as number, 0);
@@ -26,7 +26,7 @@ export class BitConverter {
 
     public static getNumber(buffer: Buffer, type: SupportedConversion): number {
         switch (type) {
-            case 'int32le': return buffer.readInt32LE(0);
+            case 'int32le': return buffer.readInt32BE(0);
             case 'uint8': return buffer.readUInt8(0);
 
             default:
