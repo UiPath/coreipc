@@ -65,8 +65,8 @@ namespace UiPath.CoreIpc
                 _listener = listener;
                 var stream = Settings.EncryptAndSign ? new NegotiateStream(network) : network;
                 var serializer = Settings.ServiceProvider.GetRequiredService<ISerializer>();
-                _connection = new Connection(stream, serializer, Logger, _listener.Name, _listener.MaxMessageSize);
-                _server = new Server(Logger, Settings, _connection, cancellationToken, new Lazy<IClient>(() => clientFactory(this)));
+                _connection = new(stream, serializer, Logger, _listener.Name, _listener.MaxMessageSize);
+                _server = new(Logger, Settings, _connection, cancellationToken, new(() => clientFactory(this)));
                 Listen().LogException(Logger, _listener.Name);
                 return;
                 async Task Listen()

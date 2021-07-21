@@ -11,7 +11,6 @@ using Microsoft.Extensions.Logging;
 using System.Runtime.ExceptionServices;
 using System.Net.Security;
 using System.Security.Principal;
-using System.Net;
 using System.Diagnostics;
 
 namespace UiPath.CoreIpc
@@ -33,7 +32,7 @@ namespace UiPath.CoreIpc
         protected readonly ConnectionFactory _connectionFactory;
         protected readonly BeforeCallHandler _beforeCall;
         protected readonly EndpointSettings _serviceEndpoint;
-        private readonly AsyncLock _connectionLock = new AsyncLock();
+        private readonly AsyncLock _connectionLock = new();
         protected Connection _connection;
         private Server _server;
 
@@ -62,7 +61,7 @@ namespace UiPath.CoreIpc
         protected async Task CreateConnection(Stream network, string name)
         {
             var stream = EncryptAndSign ? await AuthenticateAsClient() : network;
-            OnNewConnection(new Connection(stream, _serializer, _logger, name));
+            OnNewConnection(new(stream, _serializer, _logger, name));
             _logger?.LogInformation($"CreateConnection {Name}.");
             return;
             async Task<Stream> AuthenticateAsClient()
@@ -70,7 +69,7 @@ namespace UiPath.CoreIpc
                 var negotiateStream = new NegotiateStream(network);
                 try
                 {
-                    await negotiateStream.AuthenticateAsClientAsync(new NetworkCredential(), "", ProtectionLevel.EncryptAndSign, TokenImpersonationLevel.Identification);
+                    await negotiateStream.AuthenticateAsClientAsync(new(), "", ProtectionLevel.EncryptAndSign, TokenImpersonationLevel.Identification);
                 }
                 catch
                 {
@@ -92,7 +91,7 @@ namespace UiPath.CoreIpc
             }
             var endpoints = new ConcurrentDictionary<string, EndpointSettings> { [_serviceEndpoint.Name] = _serviceEndpoint };
             var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
-            _server = new Server(_logger, listenerSettings, connection);
+            _server = new(_logger, listenerSettings, connection);
         }
 
         public async Task<TResult> InvokeAsync<TResult>(string methodName, object[] args)
@@ -110,7 +109,7 @@ namespace UiPath.CoreIpc
                     {
                         newConnection = await EnsureConnection(token);
                     }
-                    await _beforeCall(new CallInfo(newConnection, methodName, args), token);
+                    await _beforeCall(new(newConnection, methodName, args), token);
                     var requestId = _connection.NewRequestId();
                     var arguments = args.Select(_serializer.Serialize).ToArray();
                     var request = new Request(typeof(TInterface).Name, requestId, methodName, arguments, messageTimeout.TotalSeconds);
@@ -215,7 +214,7 @@ namespace UiPath.CoreIpc
     public class IpcProxy : DispatchProxy, IDisposable
     {
         private static readonly MethodInfo InvokeAsyncMethod = typeof(IServiceClient).GetMethod(nameof(IServiceClient.InvokeAsync));
-        private static readonly ConcurrentDictionary<Type, InvokeAsyncDelegate> _invokeAsyncByType = new ConcurrentDictionary<Type, InvokeAsyncDelegate>();
+        private static readonly ConcurrentDictionary<Type, InvokeAsyncDelegate> _invokeAsyncByType = new();
 
         internal IServiceClient ServiceClient { get; set; }
 

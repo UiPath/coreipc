@@ -12,12 +12,12 @@ namespace UiPath.CoreIpc
 
     public sealed class Connection : IDisposable
     {
-        private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new ConcurrentDictionary<string, RequestCompletionSource>();
+        private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new();
         private readonly ISerializer _serializer;
         private long _requestCounter = -1;
         private readonly int _maxMessageSize;
         private readonly Lazy<Task> _receiveLoop;
-        private readonly AsyncLock _sendLock = new AsyncLock();
+        private readonly AsyncLock _sendLock = new();
 
         public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
         {
@@ -26,7 +26,7 @@ namespace UiPath.CoreIpc
             Logger = logger;
             Name = $"{name} {GetHashCode()}";
             _maxMessageSize = maxMessageSize;
-            _receiveLoop = new Lazy<Task>(ReceiveLoop);
+            _receiveLoop = new(ReceiveLoop);
         }
         public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
         public Task Listen() => _receiveLoop.Value;
@@ -66,7 +66,7 @@ namespace UiPath.CoreIpc
 
         public override string ToString() => Name;
 
-        private Task SendMessage(MessageType messageType, byte[] data, CancellationToken cancellationToken) => SendMessage(new WireMessage(messageType, data)).WaitAsync(cancellationToken);
+        private Task SendMessage(MessageType messageType, byte[] data, CancellationToken cancellationToken) => SendMessage(new(messageType, data)).WaitAsync(cancellationToken);
 
         private async Task SendMessage(WireMessage wireMessage)
         {
@@ -109,10 +109,10 @@ namespace UiPath.CoreIpc
                     Action callback = message.MessageType switch
                     {
                         MessageType.Request when RequestReceived != null =>
-                            () => RequestReceived.Invoke(this, new RequestReceivedEventsArgs(Deserialize<Request>(data))),
+                            () => RequestReceived.Invoke(this, new(Deserialize<Request>(data))),
                         MessageType.Response => () => OnResponseReceived(data),
                         MessageType.CancellationRequest when CancellationRequestReceived != null =>
-                            () => CancellationRequestReceived.Invoke(this, new CancellationRequestReceivedEventsArgs(Deserialize<CancellationRequest>(data))),
+                            () => CancellationRequestReceived.Invoke(this, new(Deserialize<CancellationRequest>(data))),
                         _ => null
                     };
                     if (callback != null)

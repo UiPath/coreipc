@@ -13,14 +13,14 @@ namespace UiPath.CoreIpc
     {
         private readonly Connection _connection;
         private readonly Lazy<IClient> _client;
-        private readonly CancellationTokenSource _connectionClosed = new CancellationTokenSource();
-        private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new ConcurrentDictionary<string, CancellationTokenSource>();
+        private readonly CancellationTokenSource _connectionClosed = new();
+        private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new();
 
         public Server(ILogger logger, ListenerSettings settings, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
         {
             Settings = settings;
             _connection = connection;
-            _client = client ?? new Lazy<IClient>(()=>null);
+            _client = client ?? new(()=>null);
             Serializer = ServiceProvider.GetRequiredService<ISerializer>();
             Logger = logger;
             connection.RequestReceived += (sender, args) => OnRequestReceived(sender, args).LogException(Logger, nameof(OnRequestReceived));
@@ -116,7 +116,7 @@ namespace UiPath.CoreIpc
             var beforeCall = endpoint.BeforeCall;
             if (beforeCall != null)
             {
-                await beforeCall(new CallInfo(default, request.MethodName, arguments), cancellationToken);
+                await beforeCall(new(default, request.MethodName, arguments), cancellationToken);
             }
             return await InvokeMethod(endpoint, request, service, method, arguments);
         }

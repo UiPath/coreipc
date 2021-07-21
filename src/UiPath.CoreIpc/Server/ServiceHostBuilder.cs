@@ -9,10 +9,10 @@ namespace UiPath.CoreIpc
     using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
     public class ServiceHostBuilder
     {
-        private readonly List<Listener> _listeners = new List<Listener>();
+        private readonly List<Listener> _listeners = new();
         public ServiceHostBuilder(IServiceProvider serviceProvider) => ServiceProvider = serviceProvider;
         internal IServiceProvider ServiceProvider { get; }
-        internal Dictionary<string, EndpointSettings> Endpoints { get; } = new Dictionary<string, EndpointSettings>();
+        internal Dictionary<string, EndpointSettings> Endpoints { get; } = new();
         public ServiceHostBuilder AddEndpoint(EndpointSettings settings)
         {
             settings.ServiceProvider = ServiceProvider;
@@ -24,7 +24,7 @@ namespace UiPath.CoreIpc
             _listeners.Add(listener);
             return this;
         }
-        public ServiceHost Build() => new ServiceHost(_listeners, Endpoints, ServiceProvider);
+        public ServiceHost Build() => new(_listeners, Endpoints, ServiceProvider);
     }
     public static class ServiceHostBuilderExtensions
     {

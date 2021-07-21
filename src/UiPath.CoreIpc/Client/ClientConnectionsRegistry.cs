@@ -2,9 +2,7 @@
 using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,7 +10,7 @@ namespace UiPath.CoreIpc
 {
     static class ClientConnectionsRegistry
     {
-        private static readonly ConcurrentDictionary<IConnectionKey, ClientConnection> _connections = new ConcurrentDictionary<IConnectionKey, ClientConnection>();
+        private static readonly ConcurrentDictionary<IConnectionKey, ClientConnection> _connections = new();
         public static async Task<ClientConnectionHandle> GetOrCreate(IConnectionKey key, CancellationToken cancellationToken)
         {
             var clientConnection = GetOrAdd(key);
@@ -33,9 +31,9 @@ namespace UiPath.CoreIpc
                 asyncLock.Dispose();
                 throw;
             }
-            return new ClientConnectionHandle(clientConnection, asyncLock);
+            return new(clientConnection, asyncLock);
         }
-        private static ClientConnection GetOrAdd(IConnectionKey key)=>_connections.GetOrAdd(key, localKey => new ClientConnection(localKey));
+        private static ClientConnection GetOrAdd(IConnectionKey key)=>_connections.GetOrAdd(key, localKey => new(localKey));
         public static bool TryGet(IConnectionKey key, out ClientConnection connection) => _connections.TryGetValue(key, out connection);
         public static void Clear()
         {
@@ -74,7 +72,7 @@ namespace UiPath.CoreIpc
     }
     class ClientConnection
     {
-        readonly AsyncLock _lock = new AsyncLock();
+        readonly AsyncLock _lock = new();
         Connection _connection;
         public ClientConnection(IConnectionKey connectionKey) => ConnectionKey = connectionKey;
         public object State { get; set; }

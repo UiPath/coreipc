@@ -1,12 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Linq;
-using System.Diagnostics;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Net.Security;
 
 namespace UiPath.CoreIpc
 {
@@ -87,7 +83,7 @@ namespace UiPath.CoreIpc
             {
                 Logger(_serviceProvider);
             }
-            return BuildCore(new EndpointSettings(CallbackContract, _callbackInstance) { Scheduler = _taskScheduler, ServiceProvider = _serviceProvider });
+            return BuildCore(new(CallbackContract, _callbackInstance) { Scheduler = _taskScheduler, ServiceProvider = _serviceProvider });
         }
     }
 
