@@ -40,8 +40,8 @@ namespace UiPath.CoreIpc
         public string Data { get; }
         public Error Error { get; }
         public static Response Fail(Request request, string message) => Fail(request, new Exception(message));
-        public static Response Fail(Request request, Exception ex) => new Response(request.Id, null, new Error(ex));
-        public static Response Success(Request request, string data) => new Response(request.Id, data, null);
+        public static Response Fail(Request request, Exception ex) => new(request.Id, null, new(ex));
+        public static Response Success(Request request, string data) => new(request.Id, data, null);
         public Response CheckError() => Error == null ? this : throw new RemoteException(Error);
     }
     [Serializable]
@@ -56,7 +56,7 @@ namespace UiPath.CoreIpc
             InnerError = innerError;
         }
         public Error(Exception ex) : this(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace, GetExceptionType(ex),
-            ex.InnerException == null ? null : new Error(ex.InnerException))
+            ex.InnerException == null ? null : new(ex.InnerException))
         {
         }
         public string Message { get; }
