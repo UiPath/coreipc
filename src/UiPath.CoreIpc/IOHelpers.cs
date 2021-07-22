@@ -17,7 +17,7 @@ namespace UiPath.CoreIpc
 {
     public static class IOHelpers
     {
-        public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new ReadOnlyDictionary<TKey, TValue>(dictionary);
+        public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
 
         [Conditional("DEBUG")]
         public static void Validate(ServiceHostBuilder serviceHostBuilder)
@@ -85,11 +85,11 @@ namespace UiPath.CoreIpc
         internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity> pipeSecurity)
         {
 #if NET461
-            return new NamedPipeServerStream(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options, inBufferSize: 0, outBufferSize: 0, pipeSecurity());
+            return new(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options, inBufferSize: 0, outBufferSize: 0, pipeSecurity());
 #elif NET5_0_WINDOWS
             return NamedPipeServerStreamAcl.Create(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options, inBufferSize: 0, outBufferSize: 0, pipeSecurity());
 #else
-            return new NamedPipeServerStream(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options);
+            return new(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options);
 #endif
         }
 
@@ -100,7 +100,7 @@ namespace UiPath.CoreIpc
 
         public static PipeSecurity Deny(this PipeSecurity pipeSecurity, IdentityReference sid, PipeAccessRights pipeAccessRights)
         {
-            pipeSecurity.SetAccessRule(new PipeAccessRule(sid, pipeAccessRights, AccessControlType.Deny));
+            pipeSecurity.SetAccessRule(new(sid, pipeAccessRights, AccessControlType.Deny));
             return pipeSecurity;
         }
 
@@ -109,7 +109,7 @@ namespace UiPath.CoreIpc
 
         public static PipeSecurity Allow(this PipeSecurity pipeSecurity, IdentityReference sid, PipeAccessRights pipeAccessRights)
         {
-            pipeSecurity.SetAccessRule(new PipeAccessRule(sid, pipeAccessRights, AccessControlType.Allow));
+            pipeSecurity.SetAccessRule(new(sid, pipeAccessRights, AccessControlType.Allow));
             return pipeSecurity;
         }
 
@@ -162,26 +162,24 @@ namespace UiPath.CoreIpc
         public static async Task<TResult> WithTimeout<TResult>(this IEnumerable<CancellationToken> cancellationTokens, 
             TimeSpan timeout, Func<CancellationToken, Task<TResult>> func, string message, Func<Exception, Task> exceptionHandler)
         {
-            using(var timeoutCancellationSource = new CancellationTokenSource(timeout))
-            using(var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokens.Concat(new[] { timeoutCancellationSource.Token }).ToArray()))
+            using var timeoutCancellationSource = new CancellationTokenSource(timeout);
+            using var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokens.Concat(new[] { timeoutCancellationSource.Token }).ToArray());
+            try
             {
-                try
-                {
-                    return await func(linkedCancellationSource.Token);
-                }
-                catch(Exception ex) 
-                {
-                    var exception = ex;
-                    if(timeoutCancellationSource.IsCancellationRequested)
-                    {
-                        exception = new TimeoutException(message + " timed out.", ex);
-                    }
-                    timeoutCancellationSource.Dispose();
-                    linkedCancellationSource.Dispose();
-                    await exceptionHandler(exception);
-                }
-                return default;
+                return await func(linkedCancellationSource.Token);
             }
+            catch (Exception ex)
+            {
+                var exception = ex;
+                if (timeoutCancellationSource.IsCancellationRequested)
+                {
+                    exception = new TimeoutException(message + " timed out.", ex);
+                }
+                timeoutCancellationSource.Dispose();
+                linkedCancellationSource.Dispose();
+                await exceptionHandler(exception);
+            }
+            return default;
         }
 
         public static bool PipeExists(string pipeName, int timeout = 1)
@@ -217,13 +215,13 @@ namespace UiPath.CoreIpc
             var messageTypeBuffer = await stream.ReadBuffer(1, cancellationToken);
             if (messageTypeBuffer.Length == 0)
             {
-                return new WireMessage(default, messageTypeBuffer);
+                return new(default, messageTypeBuffer);
             }
             var messageType = (MessageType)messageTypeBuffer[0];
             var lengthBuffer = await stream.ReadBuffer(sizeof(int), cancellationToken);
             if (lengthBuffer.Length == 0)
             {
-                return new WireMessage(messageType, lengthBuffer);
+                return new(messageType, lengthBuffer);
             }
             var length = BitConverter.ToInt32(lengthBuffer, 0);
             if(length > maxMessageSize)
@@ -235,7 +233,7 @@ namespace UiPath.CoreIpc
             {
                 throw new IOException("Connection closed.");
             }
-            return new WireMessage(messageType, messageData);
+            return new(messageType, messageData);
         }
 
         private static async Task<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
