@@ -76,7 +76,8 @@ namespace UiPath.CoreIpc
                     {
                         await Network.WriteMessage(new(MessageType.Upload, requestBytes), cancellationToken);
                         await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
-                        await userStream.CopyToAsync(Network);
+                        const int DefaultCopyBufferSize = 81920;
+                        await userStream.CopyToAsync(Network, DefaultCopyBufferSize, cancellationToken);
                     }
                 }
             }
