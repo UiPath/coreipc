@@ -42,7 +42,7 @@ namespace UiPath.CoreIpc
             try
             {
                 await SendRequest(userStream, requestBytes, token);
-                using (userStream == null ? token.Register(CancelRequest) : token.Register(Dispose))
+                using (token.Register(CancelRequest))
                 {
                     return await requestCompletion.Task;
                 }
@@ -54,9 +54,16 @@ namespace UiPath.CoreIpc
             void CancelRequest()
             {
                 requestCompletion.TrySetCanceled();
-                CancelServerCall(request.Id).LogException(Logger, this);
+                if (userStream == null)
+                {
+                    CancelServerCall(request.Id).LogException(Logger, this);
+                }
+                else
+                {
+                    Dispose();
+                }
             }
-            Task CancelServerCall(string requestId) => SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId)), CancellationToken.None);
+            Task CancelServerCall(string requestId) => SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId)), default);
         }
         internal Task Send(Response response, CancellationToken token) => SendResponse(Serialize(response), token);
         private async Task SendRequest(Stream userStream, byte[] requestBytes, CancellationToken cancellationToken)
