@@ -207,7 +207,7 @@ namespace UiPath.CoreIpc
             await stream.WriteBuffer(message.Data, cancellationToken);
         }
 
-        private static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
+        internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
 
         internal static async Task<WireMessage> ReadMessage(this Stream stream, int maxMessageSize = int.MaxValue, CancellationToken cancellationToken = default)
@@ -236,7 +236,7 @@ namespace UiPath.CoreIpc
             return new(messageType, messageData);
         }
 
-        private static async Task<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
+        internal static async Task<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
         {
             var bytes = new byte[length];
             int offset = 0;

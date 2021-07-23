@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Nerdbank.Streams;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
@@ -30,17 +31,17 @@ namespace UiPath.CoreIpc
         }
         public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
         public Task Listen() => _receiveLoop.Value;
-        internal event EventHandler<RequestReceivedEventsArgs> RequestReceived;
-        internal event EventHandler<CancellationRequestReceivedEventsArgs> CancellationRequestReceived;
+        internal event Func<Request, Stream, Task> RequestReceived;
+        internal event Action<string> CancellationRequestReceived;
         public event EventHandler<EventArgs> Closed;
-        internal async Task<Response> Send(Request request, CancellationToken token)
+        internal async Task<Response> Send(Request request, Stream userStream, CancellationToken token)
         {
             var requestBytes = Serialize(request);
             var requestCompletion = new RequestCompletionSource();
             _requests[request.Id] = requestCompletion;
             try
             {
-                await SendRequest(requestBytes, token);
+                await SendRequest(userStream, requestBytes, token);
                 using (token.Register(CancelRequest))
                 {
                     return await requestCompletion.Task;
@@ -58,7 +59,28 @@ namespace UiPath.CoreIpc
             Task CancelServerCall(string requestId) => SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId)), CancellationToken.None);
         }
         internal Task Send(Response response, CancellationToken token) => SendResponse(Serialize(response), token);
-        private Task SendRequest(byte[] requestBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Request, requestBytes, cancellationToken);
+        private async Task SendRequest(Stream userStream, byte[] requestBytes, CancellationToken cancellationToken)
+        {
+            if (userStream == null)
+            {
+                await SendMessage(MessageType.Request, requestBytes, cancellationToken);
+                return;
+            }
+            await SendMessage(MessageType.Upload, requestBytes, cancellationToken);
+            await SendStream(userStream, cancellationToken).WaitAsync(cancellationToken);
+            return;
+            async Task SendStream(Stream userStream, CancellationToken cancellationToken)
+            {
+                using (await _sendLock.LockAsync())
+                {
+                    using (cancellationToken.Register(Dispose))
+                    {
+                        await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
+                        await userStream.CopyToAsync(Network);
+                    }
+                }
+            }
+        }
         private Task SendResponse(byte[] responseBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Response, responseBytes, cancellationToken);
         public Stream Network { get; }
         public ILogger Logger { get; }
@@ -106,13 +128,19 @@ namespace UiPath.CoreIpc
                 while (!(message = await Network.ReadMessage(_maxMessageSize)).Empty)
                 {
                     var data = message.Data;
+                    if (message.MessageType == MessageType.Upload)
+                    {
+                        var lengthBytes = await Network.ReadBuffer(sizeof(long), default);
+                        var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
+                        var userStream = Network.ReadSlice(userStreamLength);
+                        await OnRequestReceived(data, userStream);
+                    }
                     Action callback = message.MessageType switch
                     {
-                        MessageType.Request when RequestReceived != null =>
-                            () => RequestReceived.Invoke(this, new(Deserialize<Request>(data))),
+                        MessageType.Request when RequestReceived != null => () => OnRequestReceived(data),
                         MessageType.Response => () => OnResponseReceived(data),
                         MessageType.CancellationRequest when CancellationRequestReceived != null =>
-                            () => CancellationRequestReceived.Invoke(this, new(Deserialize<CancellationRequest>(data))),
+                            () => CancellationRequestReceived(Deserialize<CancellationRequest>(data).RequestId),
                         _ => null
                     };
                     if (callback != null)
@@ -134,6 +162,7 @@ namespace UiPath.CoreIpc
         }
         private byte[] Serialize(object value) => _serializer.SerializeToBytes(value);
         private T Deserialize<T>(byte[] data) => _serializer.Deserialize<T>(data);
+        private Task OnRequestReceived(byte[] data, Stream userStream = null) => RequestReceived(Deserialize<Request>(data), userStream);
         private void OnResponseReceived(byte[] data)
         {
             var response = Deserialize<Response>(data);
@@ -143,15 +172,5 @@ namespace UiPath.CoreIpc
                 completionSource.TrySetResult(response);
             }
         }
-    }
-    readonly struct RequestReceivedEventsArgs
-    {
-        public RequestReceivedEventsArgs(Request request) => Request = request;
-        public Request Request { get; }
-    }
-    readonly struct CancellationRequestReceivedEventsArgs
-    {
-        public CancellationRequestReceivedEventsArgs(CancellationRequest cancellationRequest) => RequestId = cancellationRequest.RequestId;
-        public string RequestId { get; }
     }
 }

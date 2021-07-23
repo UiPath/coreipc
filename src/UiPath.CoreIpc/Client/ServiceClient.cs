@@ -99,6 +99,7 @@ namespace UiPath.CoreIpc
             CancellationToken cancellationToken = default;
             TimeSpan messageTimeout = default;
             TimeSpan clientTimeout = _requestTimeout;
+            Stream userStream = null;
             SetWellKnownArguments();
             return await Task.Run(InvokeAsync).ConfigureAwait(false);
             Task<TResult> InvokeAsync() =>
@@ -114,7 +115,7 @@ namespace UiPath.CoreIpc
                     var arguments = args.Select(_serializer.Serialize).ToArray();
                     var request = new Request(typeof(TInterface).Name, requestId, methodName, arguments, messageTimeout.TotalSeconds);
                     _logger?.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
-                    var response = await _connection.Send(request, token);
+                    var response = await _connection.Send(request, userStream, token);
                     _logger?.LogInformation($"IpcClient called {methodName} {requestId} {Name}.");
                     return _serializer.Deserialize<TResult>(response.CheckError().Data ?? "");
                 }, methodName, ex =>
@@ -139,6 +140,10 @@ namespace UiPath.CoreIpc
                             break;
                         case CancellationToken token:
                             cancellationToken = token;
+                            args[index] = "";
+                            break;
+                        case Stream stream:
+                            userStream = stream;
                             args[index] = "";
                             break;
                     }

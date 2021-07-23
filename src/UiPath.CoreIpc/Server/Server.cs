@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Reflection;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,10 +23,10 @@ namespace UiPath.CoreIpc
             _client = client ?? new(()=>null);
             Serializer = ServiceProvider.GetRequiredService<ISerializer>();
             Logger = logger;
-            connection.RequestReceived += (sender, args) => OnRequestReceived(sender, args).LogException(Logger, nameof(OnRequestReceived));
-            connection.CancellationRequestReceived += (sender, args) =>
+            connection.RequestReceived += OnRequestReceived;
+            connection.CancellationRequestReceived += requestId =>
             {
-                if (_requests.TryGetValue(args.RequestId, out var cancellation))
+                if (_requests.TryGetValue(requestId, out var cancellation))
                 {
                     cancellation.Cancel();
                 }
@@ -37,9 +37,8 @@ namespace UiPath.CoreIpc
                 _connectionClosed.Cancel();
             };
             return;
-            async Task OnRequestReceived(object sender, RequestReceivedEventsArgs requestReceivedEventsArgs)
+            async Task OnRequestReceived(Request request, Stream userStream)
             {
-                var request = requestReceivedEventsArgs.Request;
                 try
                 {
                     Logger.LogInformation($"{Name} received request {request}...");
@@ -51,11 +50,12 @@ namespace UiPath.CoreIpc
                     Response response;
                     var requestCancellation = new CancellationTokenSource();
                     _requests[request.Id] = requestCancellation;
-                    await new[] { cancellationToken, requestCancellation.Token, _connectionClosed.Token }.WithTimeout(request.GetTimeout(Settings.RequestTimeout), async token =>
+                    var timeout = request.GetTimeout(Settings.RequestTimeout);
+                    await new[] { cancellationToken, requestCancellation.Token, _connectionClosed.Token }.WithTimeout(timeout, async token =>
                     {
                         using (var scope = ServiceProvider.CreateScope())
                         {
-                            response = await HandleRequest(endpoint, request, scope, token);
+                            response = await HandleRequest(endpoint, scope, token);
                         }
                         Logger.LogInformation($"{Name} sending response for {request}...");
                         await SendResponse(response, token);
@@ -74,6 +74,108 @@ namespace UiPath.CoreIpc
                     _connectionClosed.Dispose();
                 }
                 return;
+                async Task<Response> HandleRequest(EndpointSettings endpoint, IServiceScope scope, CancellationToken cancellationToken)
+                {
+                    var contract = endpoint.Contract;
+                    var service = endpoint.ServiceInstance ?? scope.ServiceProvider.GetService(contract);
+                    if (service == null)
+                    {
+                        return Response.Fail(request, $"No implementation of interface '{contract.FullName}' found.");
+                    }
+                    var method = contract.GetInheritedMethod(request.MethodName);
+                    if (method == null)
+                    {
+                        return Response.Fail(request, $"Method '{request.MethodName}' not found in interface '{contract.FullName}'.");
+                    }
+                    if (method.IsGenericMethod)
+                    {
+                        return Response.Fail(request, "Generic methods are not supported " + method);
+                    }
+                    var arguments = GetArguments(cancellationToken);
+                    var beforeCall = endpoint.BeforeCall;
+                    if (beforeCall != null)
+                    {
+                        await beforeCall(new(default, request.MethodName, arguments), cancellationToken);
+                    }
+                    return await InvokeMethod();
+                    async Task<Response> InvokeMethod()
+                    {
+                        var hasReturnValue = method.ReturnType != typeof(Task);
+                        var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler ?? TaskScheduler.Default);
+                        if (hasReturnValue)
+                        {
+                            var methodResult = await methodCallTask;
+                            await methodResult;
+                            object returnValue = ((dynamic)methodResult).Result;
+                            return Response.Success(request, Serializer.Serialize(returnValue));
+                        }
+                        else
+                        {
+                            methodCallTask.Unwrap().LogException(Logger, method);
+                            return Response.Success(request, "");
+                        }
+                        Task MethodCall()
+                        {
+                            Logger.LogDebug($"Processing {method.Name} on {Thread.CurrentThread.Name}.");
+                            return (Task)method.Invoke(service, arguments);
+                        }
+                    }
+                    object[] GetArguments(CancellationToken cancellationToken)
+                    {
+                        var parameters = method.GetParameters();
+                        if (request.Parameters.Length > parameters.Length)
+                        {
+                            throw new ArgumentException("Too many parameters for " + method);
+                        }
+                        var allArguments = new object[parameters.Length];
+                        Deserialize();
+                        SetOptionalArguments();
+                        return allArguments;
+                        void Deserialize()
+                        {
+                            object argument;
+                            for (int index = 0; index < request.Parameters.Length; index++)
+                            {
+                                var parameterType = parameters[index].ParameterType;
+                                if (parameterType == typeof(CancellationToken))
+                                {
+                                    argument = cancellationToken;
+                                }
+                                else if (parameterType == typeof(Stream))
+                                {
+                                    argument = userStream;
+                                }
+                                else
+                                {
+                                    argument = Serializer.Deserialize(request.Parameters[index], parameterType);
+                                    argument = CheckMessage(argument, parameterType);
+                                }
+                                allArguments[index] = argument;
+                            }
+                        }
+                        object CheckMessage(object argument, Type parameterType)
+                        {
+                            if (parameterType == typeof(Message) && argument == null)
+                            {
+                                argument = new Message();
+                            }
+                            if (argument is Message message)
+                            {
+                                message.Endpoint = endpoint;
+                                message.Client = _client.Value;
+                            }
+                            return argument;
+                        }
+                        void SetOptionalArguments()
+                        {
+                            for (int index = request.Parameters.Length; index < parameters.Length; index++)
+                            {
+                                var parameter = parameters[index];
+                                allArguments[index] = CheckMessage(parameter.GetDefaultValue(), parameter.ParameterType);
+                            }
+                        }
+                    }
+                }
                 Task OnError(Exception ex)
                 {
                     Logger.LogException(ex, $"{Name} {request}");
@@ -94,104 +196,6 @@ namespace UiPath.CoreIpc
                 return;
             }
             await _connection.Send(response, responseCancellation);
-        }
-        private async Task<Response> HandleRequest(EndpointSettings endpoint, Request request, IServiceScope scope, CancellationToken cancellationToken)
-        {
-            var contract = endpoint.Contract;
-            var service = endpoint.ServiceInstance ?? scope.ServiceProvider.GetService(contract);
-            if (service == null)
-            {
-                return Response.Fail(request, $"No implementation of interface '{contract.FullName}' found.");
-            }
-            var method = contract.GetInheritedMethod(request.MethodName);
-            if (method == null)
-            {
-                return Response.Fail(request, $"Method '{request.MethodName}' not found in interface '{contract.FullName}'.");
-            }
-            if (method.IsGenericMethod)
-            {
-                return Response.Fail(request, "Generic methods are not supported " + method);
-            }
-            var arguments = GetArguments(endpoint, method, request, cancellationToken);
-            var beforeCall = endpoint.BeforeCall;
-            if (beforeCall != null)
-            {
-                await beforeCall(new(default, request.MethodName, arguments), cancellationToken);
-            }
-            return await InvokeMethod(endpoint, request, service, method, arguments);
-        }
-        private async Task<Response> InvokeMethod(EndpointSettings endpoint, Request request, object service, MethodInfo method, object[] arguments)
-        {
-            var hasReturnValue = method.ReturnType != typeof(Task);
-            var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler ?? TaskScheduler.Default);
-            if (hasReturnValue)
-            {
-                var methodResult = await methodCallTask;
-                await methodResult;
-                object returnValue = ((dynamic)methodResult).Result;
-                return Response.Success(request, Serializer.Serialize(returnValue));
-            }
-            else
-            {
-                methodCallTask.Unwrap().LogException(Logger, method);
-                return Response.Success(request, "");
-            }
-            Task MethodCall()
-            {
-                Logger.LogDebug($"Processing {method.Name} on {Thread.CurrentThread.Name}.");
-                return (Task)method.Invoke(service, arguments);
-            }
-        }
-        private object[] GetArguments(EndpointSettings endpoint, MethodInfo method, Request request, CancellationToken cancellationToken)
-        {
-            var parameters = method.GetParameters();
-            if (request.Parameters.Length > parameters.Length)
-            {
-                throw new ArgumentException("Too many parameters for "+method);
-            }
-            var allArguments = new object[parameters.Length];
-            Deserialize();
-            SetOptionalArguments();
-            return allArguments;
-            void Deserialize()
-            {
-                object argument;
-                for (int index = 0; index < request.Parameters.Length; index++)
-                {
-                    var parameterType = parameters[index].ParameterType;
-                    if (parameterType == typeof(CancellationToken))
-                    {
-                        argument = cancellationToken;
-                    }
-                    else
-                    {
-                        argument = Serializer.Deserialize(request.Parameters[index], parameterType);
-                        argument = CheckMessage(argument, parameterType);
-                    }
-                    allArguments[index] = argument;
-                }
-            }
-            object CheckMessage(object argument, Type parameterType)
-            {
-                if (parameterType == typeof(Message) && argument == null)
-                {
-                    argument = new Message();
-                }
-                if (argument is Message message)
-                {
-                    message.Endpoint = endpoint;
-                    message.Client = _client.Value;
-                }
-                return argument;
-            }
-            void SetOptionalArguments()
-            {
-                for (int index = request.Parameters.Length; index < parameters.Length; index++)
-                {
-                    var parameter = parameters[index];
-                    allArguments[index] = CheckMessage(parameter.GetDefaultValue(), parameter.ParameterType);
-                }
-            }
         }
     }
 }

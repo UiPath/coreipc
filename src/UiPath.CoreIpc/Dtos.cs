@@ -100,7 +100,7 @@ namespace UiPath.CoreIpc
         }
         public bool Is<TException>() where TException : Exception => Type == typeof(TException).FullName;
     }
-    enum MessageType : byte { Request, Response, CancellationRequest }
+    enum MessageType : byte { Request, Response, CancellationRequest, Upload }
     readonly struct WireMessage
     {
         public WireMessage(MessageType messageType, byte[] data)
