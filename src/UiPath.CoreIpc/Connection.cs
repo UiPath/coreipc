@@ -42,7 +42,7 @@ namespace UiPath.CoreIpc
             try
             {
                 await SendRequest(userStream, requestBytes, token);
-                using (token.Register(CancelRequest))
+                using (userStream == null ? token.Register(CancelRequest) : token.Register(Dispose))
                 {
                     return await requestCompletion.Task;
                 }
