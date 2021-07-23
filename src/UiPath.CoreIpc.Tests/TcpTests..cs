@@ -88,6 +88,9 @@ namespace UiPath.CoreIpc.Tests
 #endif
 
         [Fact]
+        public async Task Upload() => (await _systemClient.Upload(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")))).ShouldBe("Hello world");
+
+        [Fact]
         public async Task BeforeCall()
         {
             bool newConnection = false;

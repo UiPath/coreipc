@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using UiPath.CoreIpc;
@@ -19,6 +20,7 @@ namespace UiPath.CoreIpc.Tests
         Task<bool> Infinite(CancellationToken cancellationToken = default);
         Task<string> ImpersonateCaller(Message message = null, CancellationToken cancellationToken = default);
         Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default);
+        Task<string> Upload(Stream stream, CancellationToken cancellationToken = default);
     }
 
     public class SystemMessage : Message

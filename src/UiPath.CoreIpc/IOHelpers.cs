@@ -228,15 +228,21 @@ namespace UiPath.CoreIpc
             {
                 throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize/(1024*1024)} megabytes.");
             }
+            var messageData = await stream.ReadBufferCheckLength(length, cancellationToken);
+            return new(messageType, messageData);
+        }
+
+        internal static async Task<byte[]> ReadBufferCheckLength(this Stream stream, int length, CancellationToken cancellationToken)
+        {
             var messageData = await stream.ReadBuffer(length, cancellationToken);
             if (messageData.Length == 0)
             {
                 throw new IOException("Connection closed.");
             }
-            return new(messageType, messageData);
+            return messageData;
         }
 
-        internal static async Task<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
+        private static async Task<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
         {
             var bytes = new byte[length];
             int offset = 0;

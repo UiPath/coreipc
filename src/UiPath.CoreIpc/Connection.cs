@@ -130,10 +130,11 @@ namespace UiPath.CoreIpc
                     var data = message.Data;
                     if (message.MessageType == MessageType.Upload)
                     {
-                        var lengthBytes = await Network.ReadBuffer(sizeof(long), default);
+                        var lengthBytes = await Network.ReadBufferCheckLength(sizeof(long), default);
                         var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
-                        var userStream = Network.ReadSlice(userStreamLength);
+                        using var userStream = Network.ReadSlice(userStreamLength);
                         await OnRequestReceived(data, userStream);
+                        continue;
                     }
                     Action callback = message.MessageType switch
                     {
