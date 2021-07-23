@@ -66,7 +66,6 @@ namespace UiPath.CoreIpc
                 await SendMessage(MessageType.Request, requestBytes, cancellationToken);
                 return;
             }
-            await SendMessage(MessageType.Upload, requestBytes, cancellationToken);
             await SendStream(userStream, cancellationToken).WaitAsync(cancellationToken);
             return;
             async Task SendStream(Stream userStream, CancellationToken cancellationToken)
@@ -75,6 +74,7 @@ namespace UiPath.CoreIpc
                 {
                     using (cancellationToken.Register(Dispose))
                     {
+                        await Network.WriteMessage(new(MessageType.Upload, requestBytes), cancellationToken);
                         await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
                         await userStream.CopyToAsync(Network);
                     }
