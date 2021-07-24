@@ -82,7 +82,7 @@ namespace UiPath.CoreIpc
             set
             {
                 _connection = value;
-                _connection.Closed += (_, __) => OnConnectionClosed(_connection).LogException(_connection.Logger, _connection);
+                _connection.Closed += delegate { OnConnectionClosed(_connection).LogException(_connection.Logger, _connection); };
             }
         }
         private async Task OnConnectionClosed(Connection closedConnection)
