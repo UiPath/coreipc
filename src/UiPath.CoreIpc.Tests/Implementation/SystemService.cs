@@ -25,6 +25,8 @@ namespace UiPath.CoreIpc.Tests
         Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default);
         Task<string> Upload(Stream stream, CancellationToken cancellationToken = default);
         Task<Stream> Download(string text, CancellationToken cancellationToken = default);
+
+        Task<Stream> Echo(Stream input, CancellationToken cancellationToken = default);
     }
 
     public class SystemMessage : Message
@@ -159,5 +161,13 @@ namespace UiPath.CoreIpc.Tests
         public async Task<string> Upload(Stream stream, CancellationToken cancellationToken = default) => await new StreamReader(stream).ReadToEndAsync();
 
         public async Task<Stream> Download(string text, CancellationToken cancellationToken = default) => new MemoryStream(Encoding.UTF8.GetBytes(text));
+
+        public async Task<Stream> Echo(Stream input, CancellationToken cancellationToken = default)
+        {
+            var result = new MemoryStream();
+            await input.CopyToAsync(result);
+            result.Position = 0;
+            return result;
+        }
     }
 }

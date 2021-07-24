@@ -99,6 +99,13 @@ namespace UiPath.CoreIpc.Tests
 #endif
 
         [Fact]
+        public async Task Echo()
+        {
+            using var stream = await _systemClient.Echo(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")));
+            (await new StreamReader(stream).ReadToEndAsync()).ShouldBe("Hello world");
+        }
+
+        [Fact]
         public async Task Upload() => (await _systemClient.Upload(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")))).ShouldBe("Hello world");
 
         [Fact]
