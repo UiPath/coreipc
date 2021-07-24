@@ -27,7 +27,7 @@ namespace UiPath.CoreIpc.Tcp
             try
             {
                 using var closeToken = token.Register(Dispose);
-                tcpClient = await _tcpServer.AcceptTcpClientAsync();
+                tcpClient = (await _tcpServer.AcceptTcpClientAsync()).SetTimeouts(Settings.RequestTimeout);
                 // pass the ownership of the connection
                 HandleConnection(tcpClient.GetStream(), callbackFactory => new Client(action => action(), callbackFactory), token);
             }

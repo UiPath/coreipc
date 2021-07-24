@@ -27,7 +27,7 @@ namespace UiPath.CoreIpc
     public class ServiceClient<TInterface> : IServiceClient where TInterface : class
     {
         private readonly ISerializer _serializer;
-        private readonly TimeSpan _requestTimeout;
+        protected readonly TimeSpan _requestTimeout;
         protected readonly ILogger _logger;
         protected readonly ConnectionFactory _connectionFactory;
         protected readonly BeforeCallHandler _beforeCall;

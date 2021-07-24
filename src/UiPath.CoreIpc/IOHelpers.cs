@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -18,6 +19,12 @@ namespace UiPath.CoreIpc
     public static class IOHelpers
     {
         public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
+
+        public static TcpClient SetTimeouts(this TcpClient tcpClient, TimeSpan timeout)
+        {
+            tcpClient.SendTimeout = tcpClient.ReceiveTimeout = (int)timeout.TotalMilliseconds;
+            return tcpClient;
+        }
 
         [Conditional("DEBUG")]
         public static void Validate(ServiceHostBuilder serviceHostBuilder)
