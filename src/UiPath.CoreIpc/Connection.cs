@@ -75,10 +75,10 @@ namespace UiPath.CoreIpc
             await SendStream(MessageType.Upload, requestBytes, userStream, cancellationToken);
         }
         private Task SendStream(MessageType messageType, byte[] data, Stream userStream, CancellationToken cancellationToken) =>
-            SendStream(new(messageType, data), userStream, cancellationToken).WaitAsync(cancellationToken);
+            SendStream(new(messageType, data), userStream, cancellationToken);
         private async Task SendStream(WireMessage message, Stream userStream, CancellationToken cancellationToken)
         {
-            using (await _sendLock.LockAsync())
+            using (await _sendLock.LockAsync(cancellationToken))
             {
                 using (cancellationToken.Register(Dispose))
                 {
@@ -107,13 +107,14 @@ namespace UiPath.CoreIpc
 
         public override string ToString() => Name;
 
-        private Task SendMessage(MessageType messageType, byte[] data, CancellationToken cancellationToken) => SendMessage(new(messageType, data)).WaitAsync(cancellationToken);
+        private Task SendMessage(MessageType messageType, byte[] data, CancellationToken cancellationToken) => 
+            SendMessage(new(messageType, data), cancellationToken).WaitAsync(cancellationToken);
 
-        private async Task SendMessage(WireMessage wireMessage)
+        private async Task SendMessage(WireMessage wireMessage, CancellationToken cancellationToken)
         {
-            using (await _sendLock.LockAsync())
+            using (await _sendLock.LockAsync(cancellationToken))
             {
-                await Network.WriteMessage(wireMessage);
+                await Network.WriteMessage(wireMessage, CancellationToken.None);
             }
         }
 
@@ -147,34 +148,31 @@ namespace UiPath.CoreIpc
                 while (!(message = await Network.ReadMessage(_maxMessageSize)).Empty)
                 {
                     var data = message.Data;
-                    Action callback = message.MessageType switch
+                    Action callback = null;
+                    switch(message.MessageType)
                     {
-                        MessageType.Request when RequestReceived != null => () => OnRequestReceived(data),
-                        MessageType.Response => () => OnResponseReceived(data),
-                        MessageType.CancellationRequest when CancellationRequestReceived != null =>
-                            () => CancellationRequestReceived(Deserialize<CancellationRequest>(data).RequestId),
-                        _ => null
+                        case MessageType.Response:
+                            callback = () => OnResponseReceived(data);
+                            break;
+                        case MessageType.Request when RequestReceived != null:
+                            callback = () => OnRequestReceived(data);
+                            break;
+                        case MessageType.CancellationRequest when CancellationRequestReceived != null:
+                            callback = () => CancellationRequestReceived(Deserialize<CancellationRequest>(data).RequestId);
+                            break;
+                        case MessageType.Upload:
+                            await OnUpload(data);
+                            break;
+                        case MessageType.Download:
+                            await OnDownload(data);
+                            break;
+                        default:
+                            Logger?.LogInformation("Unknown message type " + message.MessageType);
+                            break;
                     };
                     if (callback != null)
                     {
                         Task.Run(callback).LogException(Logger, this);
-                    }
-                    else if (message.MessageType == MessageType.Upload)
-                    {
-                        var userStream = await GetUserStream();
-                        await OnRequestReceived(data, userStream);
-                    }
-                    else if (message.MessageType == MessageType.Download)
-                    {
-                        var userStream = await GetUserStream();
-                        var streamDisposed = new TaskCompletionSource<bool>();
-                        userStream.Disposed += (_, __) => streamDisposed.TrySetResult(true);
-                        OnResponseReceived(data, userStream);
-                        await streamDisposed.Task;
-                    }
-                    else
-                    {
-                        Logger?.LogInformation("Unknown message type " + message.MessageType);
                     }
                 }
             }
@@ -184,6 +182,21 @@ namespace UiPath.CoreIpc
             }
             Logger?.LogInformation($"{nameof(ReceiveLoop)} {Name} finished.");
             Dispose();
+        }
+
+        private async Task OnDownload(byte[] data)
+        {
+            var downloadStream = await GetUserStream();
+            var streamDisposed = new TaskCompletionSource<bool>();
+            downloadStream.Disposed += (_, __) => streamDisposed.TrySetResult(true);
+            OnResponseReceived(data, downloadStream);
+            await streamDisposed.Task;
+        }
+
+        private async Task OnUpload(byte[] data)
+        {
+            var uploadStream = await GetUserStream();
+            await OnRequestReceived(data, uploadStream);
         }
 
         private async Task<NestedStream> GetUserStream()
