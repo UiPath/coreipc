@@ -1,6 +1,7 @@
 import { ipc } from '@core';
 import { v4 as newGuid } from 'uuid';
 import { CoreIpcServerRunner } from '@test-helpers';
+import * as path from 'path';
 
 describe(`surface`, () => {
     describe(`pipe-exists`, () => {
@@ -15,6 +16,19 @@ describe(`surface`, () => {
         it(`should return true for existing pipes`, async () => {
 
             const pipeName = newGuid();
+            await CoreIpcServerRunner.host(pipeName, async () => {
+
+                await ipc.pipeExists(pipeName)
+                    .should.eventually.be.fulfilled
+                    .and.be.true;
+
+            });
+
+        });
+
+        it(`should return true for absolute path`, async () => {
+
+            const pipeName = path.join('/tmp', newGuid());
             await CoreIpcServerRunner.host(pipeName, async () => {
 
                 await ipc.pipeExists(pipeName)
