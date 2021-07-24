@@ -4,6 +4,11 @@ using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc.Tests
 {
+    public interface IComputingCallback
+    {
+        Task<string> GetId(Message message);
+        Task<string> GetThreadName();
+    }
     public class ComputingCallback : IComputingCallback
     {
         public string Id { get; set; }
