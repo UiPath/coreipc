@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using UiPath.CoreIpc;
 
 namespace UiPath.CoreIpc.Tests
 {
@@ -25,7 +24,6 @@ namespace UiPath.CoreIpc.Tests
         Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default);
         Task<string> Upload(Stream stream, CancellationToken cancellationToken = default);
         Task<Stream> Download(string text, CancellationToken cancellationToken = default);
-
         Task<Stream> Echo(Stream input, CancellationToken cancellationToken = default);
     }
 

@@ -147,33 +147,7 @@ namespace UiPath.CoreIpc
             {
                 while (!(message = await Network.ReadMessage(_maxMessageSize)).Empty)
                 {
-                    var data = message.Data;
-                    Action callback = null;
-                    switch(message.MessageType)
-                    {
-                        case MessageType.Response:
-                            callback = () => OnResponseReceived(data);
-                            break;
-                        case MessageType.Request when RequestReceived != null:
-                            callback = () => OnRequestReceived(data);
-                            break;
-                        case MessageType.CancellationRequest when CancellationRequestReceived != null:
-                            callback = () => CancellationRequestReceived(Deserialize<CancellationRequest>(data).RequestId);
-                            break;
-                        case MessageType.Upload:
-                            await OnUpload(data);
-                            break;
-                        case MessageType.Download:
-                            await OnDownload(data);
-                            break;
-                        default:
-                            Logger?.LogInformation("Unknown message type " + message.MessageType);
-                            break;
-                    };
-                    if (callback != null)
-                    {
-                        Task.Run(callback).LogException(Logger, this);
-                    }
+                    await HandleMessage(message);
                 }
             }
             catch (Exception ex)
@@ -182,6 +156,37 @@ namespace UiPath.CoreIpc
             }
             Logger?.LogInformation($"{nameof(ReceiveLoop)} {Name} finished.");
             Dispose();
+            return;
+            async Task HandleMessage(WireMessage message)
+            {
+                var data = message.Data;
+                Action callback = null;
+                switch (message.MessageType)
+                {
+                    case MessageType.Response:
+                        callback = () => OnResponseReceived(data);
+                        break;
+                    case MessageType.Request when RequestReceived != null:
+                        callback = () => OnRequestReceived(data);
+                        break;
+                    case MessageType.CancellationRequest when CancellationRequestReceived != null:
+                        callback = () => CancellationRequestReceived(Deserialize<CancellationRequest>(data).RequestId);
+                        break;
+                    case MessageType.Upload:
+                        await OnUpload(data);
+                        break;
+                    case MessageType.Download:
+                        await OnDownload(data);
+                        break;
+                    default:
+                        Logger?.LogInformation("Unknown message type " + message.MessageType);
+                        break;
+                };
+                if (callback != null)
+                {
+                    Task.Run(callback).LogException(Logger, this);
+                }
+            }
         }
 
         private async Task OnDownload(byte[] data)
