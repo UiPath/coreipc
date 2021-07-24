@@ -51,22 +51,73 @@ namespace UiPath.CoreIpc
 
         private static void Validate(MethodInfo method)
         {
-            if (!typeof(Task).IsAssignableFrom(method.ReturnType))
-            {
-                throw new ArgumentException($"Method does not return Task! {method}");
-            }
+            var returnType = method.ReturnType;
+            CheckMethod();
             var parameters = method.GetParameters();
+            int streamCount = 0;
             for (int index = 0; index < parameters.Length; index++)
             {
                 var parameter = parameters[index];
-                if (typeof(Message).IsAssignableFrom(parameter.ParameterType) && index != parameters.Length - 1 && parameters[parameters.Length - 1].ParameterType != typeof(CancellationToken))
+                CheckMessageParameter(index, parameter);
+                CheckCancellationToken(index, parameter);
+                if (parameter.ParameterType == typeof(Stream))
+                {
+                    CheckStreamParameter();
+                }
+                else
+                {
+                    CheckDerivedStream(method, parameter.ParameterType);
+                }
+            }
+            void CheckStreamParameter()
+            {
+                streamCount++;
+                if (streamCount > 1)
+                {
+                    throw new ArgumentException($"Only one Stream parameter is allowed! {method}");
+                }
+                if (!method.ReturnType.IsGenericType)
+                {
+                    throw new ArgumentException($"Upload methods must return a value! {method}");
+                }
+            }
+            void CheckMethod()
+            {
+                if (!typeof(Task).IsAssignableFrom(returnType))
+                {
+                    throw new ArgumentException($"Method does not return Task! {method}");
+                }
+                if (returnType.IsGenericType)
+                {
+                    var returnValueType = returnType.GenericTypeArguments[0];
+                    if (returnValueType != typeof(Stream))
+                    {
+                        CheckDerivedStream(method, returnValueType);
+                    }
+                }
+            }
+            void CheckMessageParameter(int index, ParameterInfo parameter)
+            {
+                if (typeof(Message).IsAssignableFrom(parameter.ParameterType) && index != parameters.Length - 1 &&
+                    parameters[parameters.Length - 1].ParameterType != typeof(CancellationToken))
                 {
                     throw new ArgumentException($"The message must be the last parameter before the cancellation token! {method}");
                 }
+            }
+            void CheckCancellationToken(int index, ParameterInfo parameter)
+            {
                 if (parameter.ParameterType == typeof(CancellationToken) && index != parameters.Length - 1)
                 {
                     throw new ArgumentException($"The CancellationToken parameter must be the last! {method}");
                 }
+            }
+        }
+
+        private static void CheckDerivedStream(MethodInfo method, Type type)
+        {
+            if (typeof(Stream).IsAssignableFrom(type))
+            {
+                throw new ArgumentException($"Stream parameters must be typed as Stream! {method}");
             }
         }
 

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,6 +14,26 @@ namespace UiPath.CoreIpc.Tests
     public interface IDuplicateMessage
     {
         Task Test(Message message1, Message message2);
+    }
+
+    public interface IUploadNotification
+    {
+        Task Upload(Stream stream);
+    }
+
+    public interface IDerivedStreamDownload
+    {
+        Task<MemoryStream> Download();
+    }
+
+    public interface IDuplicateStreams
+    {
+        Task<bool> Upload(Stream stream, Stream stream2);
+    }
+
+    public interface IDerivedStreamUpload
+    {
+        Task<bool> Upload(MemoryStream stream);
     }
 
     public interface IMessageFirst
