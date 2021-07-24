@@ -22,7 +22,7 @@ namespace UiPath.CoreIpc.Tests
         Task<bool> Infinite(CancellationToken cancellationToken = default);
         Task<string> ImpersonateCaller(Message message = null, CancellationToken cancellationToken = default);
         Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default);
-        Task<string> Upload(Stream stream, CancellationToken cancellationToken = default);
+        Task<string> Upload(Stream stream, int delay = 0, CancellationToken cancellationToken = default);
         Task<Stream> Download(string text, CancellationToken cancellationToken = default);
         Task<Stream> Echo(Stream input, CancellationToken cancellationToken = default);
     }
@@ -156,7 +156,11 @@ namespace UiPath.CoreIpc.Tests
             return returnValue;
         }
 
-        public async Task<string> Upload(Stream stream, CancellationToken cancellationToken = default) => await new StreamReader(stream).ReadToEndAsync();
+        public async Task<string> Upload(Stream stream, int delay = 0, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(delay);
+            return await new StreamReader(stream).ReadToEndAsync();
+        }
 
         public async Task<Stream> Download(string text, CancellationToken cancellationToken = default) => new MemoryStream(Encoding.UTF8.GetBytes(text));
 
