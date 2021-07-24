@@ -86,6 +86,22 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public void TheServiceContractMustBeAnInterface() => new Action(() => new ServiceHostBuilder(_serviceProvider).AddEndpoint<TcpTests>().ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
 #endif
+        [Fact]
+        public async Task Echo()
+        {
+            using var stream = await _systemClient.Echo(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")));
+            (await new StreamReader(stream).ReadToEndAsync()).ShouldBe("Hello world");
+        }
+
+        [Fact]
+        public async Task CancelUpload()
+        {
+            var stream = new MemoryStream(Encoding.UTF8.GetBytes("Hello world"));
+            await _systemClient.GetThreadName();
+            var cancellationSource = new CancellationTokenSource(10);
+            _systemClient.Upload(stream, 20, cancellationSource.Token).ShouldThrow<TaskCanceledException>();
+            await _systemClient.GetThreadName();
+        }
 
         [Fact]
         public async Task Upload() => (await _systemClient.Upload(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")))).ShouldBe("Hello world");
