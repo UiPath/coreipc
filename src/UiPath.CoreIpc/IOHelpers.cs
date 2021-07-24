@@ -20,12 +20,6 @@ namespace UiPath.CoreIpc
     {
         public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
 
-        public static TcpClient SetTimeouts(this TcpClient tcpClient, TimeSpan timeout)
-        {
-            tcpClient.SendTimeout = tcpClient.ReceiveTimeout = (int)timeout.TotalMilliseconds;
-            return tcpClient;
-        }
-
         [Conditional("DEBUG")]
         public static void Validate(ServiceHostBuilder serviceHostBuilder)
         {

@@ -41,7 +41,6 @@ namespace UiPath.CoreIpc.Tcp
                 tcpClient.Dispose();
             }
             tcpClient = new();
-            tcpClient.SetTimeouts(_requestTimeout);
             try
             {
                 using var token = cancellationToken.Register(tcpClient.Dispose);
