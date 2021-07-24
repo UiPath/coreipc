@@ -115,7 +115,7 @@ namespace UiPath.CoreIpc
                     var arguments = args.Select(_serializer.Serialize).ToArray();
                     var request = new Request(typeof(TInterface).Name, requestId, methodName, arguments, messageTimeout.TotalSeconds);
                     _logger?.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
-                    var response = await _connection.Send(request, userStream, token);
+                    var response = await _connection.Call(request, userStream, token);
                     _logger?.LogInformation($"IpcClient called {methodName} {requestId} {Name}.");
                     if (response.UserStream != null)
                     {

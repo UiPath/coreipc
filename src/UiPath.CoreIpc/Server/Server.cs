@@ -16,7 +16,7 @@ namespace UiPath.CoreIpc
         private readonly CancellationTokenSource _connectionClosed = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new();
 
-        public Server(ILogger logger, ListenerSettings settings, Connection connection, CancellationToken cancellationToken = default, Lazy<IClient> client = null)
+        public Server(ILogger logger, ListenerSettings settings, Connection connection, Lazy<IClient> client = null, CancellationToken cancellationToken = default)
         {
             Settings = settings;
             _connection = connection;
@@ -31,7 +31,7 @@ namespace UiPath.CoreIpc
                     cancellation.Cancel();
                 }
             };
-            connection.Closed += (_, __) =>
+            connection.Closed += delegate
             {
                 Logger.LogDebug($"{Name} closed.");
                 _connectionClosed.Cancel();
@@ -41,10 +41,10 @@ namespace UiPath.CoreIpc
             {
                 try
                 {
-                    Logger.LogInformation($"{Name} received request {request}...");
+                    Logger.LogInformation($"{Name} received request {request}");
                     if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
                     {
-                        await OnError(new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}..."));
+                        await OnError(new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
                         return;
                     }
                     Response response;
@@ -57,7 +57,7 @@ namespace UiPath.CoreIpc
                         {
                             response = await HandleRequest(endpoint, scope, token);
                         }
-                        Logger.LogInformation($"{Name} sending response for {request}...");
+                        Logger.LogInformation($"{Name} sending response for {request}");
                         await SendResponse(response, token);
                     }, request.MethodName, OnError);
                 }
@@ -91,7 +91,7 @@ namespace UiPath.CoreIpc
                     {
                         return Response.Fail(request, "Generic methods are not supported " + method);
                     }
-                    var arguments = GetArguments(cancellationToken);
+                    var arguments = GetArguments();
                     var beforeCall = endpoint.BeforeCall;
                     if (beforeCall != null)
                     {
@@ -101,7 +101,7 @@ namespace UiPath.CoreIpc
                     async Task<Response> InvokeMethod()
                     {
                         var hasReturnValue = method.ReturnType != typeof(Task);
-                        var methodCallTask = Task.Factory.StartNew(MethodCall, default, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler ?? TaskScheduler.Default);
+                        var methodCallTask = Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler ?? TaskScheduler.Default);
                         if (hasReturnValue)
                         {
                             var methodResult = await methodCallTask;
@@ -120,7 +120,7 @@ namespace UiPath.CoreIpc
                             return (Task)method.Invoke(service, arguments);
                         }
                     }
-                    object[] GetArguments(CancellationToken cancellationToken)
+                    object[] GetArguments()
                     {
                         var parameters = method.GetParameters();
                         if (request.Parameters.Length > parameters.Length)

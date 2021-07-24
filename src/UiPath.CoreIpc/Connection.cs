@@ -33,14 +33,14 @@ namespace UiPath.CoreIpc
         internal event Func<Request, Stream, Task> RequestReceived;
         internal event Action<string> CancellationRequestReceived;
         public event EventHandler<EventArgs> Closed;
-        internal async Task<Response> Send(Request request, Stream userStream, CancellationToken token)
+        internal async Task<Response> Call(Request request, Stream userStream, CancellationToken token)
         {
             var requestBytes = Serialize(request);
             var requestCompletion = new RequestCompletionSource();
             _requests[request.Id] = requestCompletion;
             try
             {
-                await SendRequest(userStream, requestBytes, token);
+                await SendRequest(requestBytes, userStream, token);
                 using (token.Register(CancelRequest))
                 {
                     return await requestCompletion.Task;
@@ -65,7 +65,7 @@ namespace UiPath.CoreIpc
             Task CancelServerCall(string requestId) => SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId)), default);
         }
         internal Task Send(Response response, CancellationToken token) => SendResponse(Serialize(response), response.UserStream, token);
-        private async Task SendRequest(Stream userStream, byte[] requestBytes, CancellationToken cancellationToken)
+        private async Task SendRequest(byte[] requestBytes, Stream userStream, CancellationToken cancellationToken)
         {
             if (userStream == null)
             {
@@ -188,14 +188,14 @@ namespace UiPath.CoreIpc
         {
             var downloadStream = await GetUserStream();
             var streamDisposed = new TaskCompletionSource<bool>();
-            downloadStream.Disposed += (_, __) => streamDisposed.TrySetResult(true);
+            downloadStream.Disposed += delegate { streamDisposed.TrySetResult(true); };
             OnResponseReceived(data, downloadStream);
             await streamDisposed.Task;
         }
 
         private async Task OnUpload(byte[] data)
         {
-            var uploadStream = await GetUserStream();
+            using var uploadStream = await GetUserStream();
             await OnRequestReceived(data, uploadStream);
         }
 
