@@ -45,7 +45,13 @@ export module CoreIpcPlatform {
     }
 
     export class DotNetCoreLinux extends CoreIpcPlatform {
-        public getFullPipeName(shortName: string): string { return `${this.getTempPath()}CoreFxPipe_${shortName}`; }
+        public getFullPipeName(shortName: string): string {
+            if (path.isAbsolute(shortName)) {
+                // Caller is in full control of file location
+                return shortName;
+            }
+            return `${this.getTempPath()}CoreFxPipe_${shortName}`;
+        }
         public async pipeExists(shortName: string): Promise<boolean> {
             let socket: NamedPipeClientSocket | undefined;
             let result: boolean;
