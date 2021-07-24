@@ -117,6 +117,10 @@ namespace UiPath.CoreIpc
                     _logger?.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
                     var response = await _connection.Send(request, userStream, token);
                     _logger?.LogInformation($"IpcClient called {methodName} {requestId} {Name}.");
+                    if (response.UserStream != null)
+                    {
+                        return (TResult)(object)response.UserStream;
+                    }
                     return _serializer.Deserialize<TResult>(response.CheckError().Data ?? "");
                 }, methodName, ex =>
                 {

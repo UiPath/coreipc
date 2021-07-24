@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using Nerdbank.Streams;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
@@ -65,7 +64,7 @@ namespace UiPath.CoreIpc
             }
             Task CancelServerCall(string requestId) => SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId)), default);
         }
-        internal Task Send(Response response, CancellationToken token) => SendResponse(Serialize(response), token);
+        internal Task Send(Response response, CancellationToken token) => SendResponse(Serialize(response), response.UserStream, token);
         private async Task SendRequest(Stream userStream, byte[] requestBytes, CancellationToken cancellationToken)
         {
             if (userStream == null)
@@ -73,23 +72,35 @@ namespace UiPath.CoreIpc
                 await SendMessage(MessageType.Request, requestBytes, cancellationToken);
                 return;
             }
-            await SendStream(userStream, cancellationToken).WaitAsync(cancellationToken);
-            return;
-            async Task SendStream(Stream userStream, CancellationToken cancellationToken)
+            await SendStream(MessageType.Upload, requestBytes, userStream, cancellationToken);
+        }
+        private Task SendStream(MessageType messageType, byte[] data, Stream userStream, CancellationToken cancellationToken) =>
+            SendStream(new(messageType, data), userStream, cancellationToken).WaitAsync(cancellationToken);
+        private async Task SendStream(WireMessage message, Stream userStream, CancellationToken cancellationToken)
+        {
+            using (await _sendLock.LockAsync())
             {
-                using (await _sendLock.LockAsync())
+                using (cancellationToken.Register(Dispose))
                 {
-                    using (cancellationToken.Register(Dispose))
-                    {
-                        await Network.WriteMessage(new(MessageType.Upload, requestBytes), cancellationToken);
-                        await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
-                        const int DefaultCopyBufferSize = 81920;
-                        await userStream.CopyToAsync(Network, DefaultCopyBufferSize, cancellationToken);
-                    }
+                    await Network.WriteMessage(message, cancellationToken);
+                    await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
+                    const int DefaultCopyBufferSize = 81920;
+                    await userStream.CopyToAsync(Network, DefaultCopyBufferSize, cancellationToken);
                 }
             }
         }
-        private Task SendResponse(byte[] responseBytes, CancellationToken cancellationToken) => SendMessage(MessageType.Response, responseBytes, cancellationToken);
+        private async Task SendResponse(byte[] responseBytes, Stream userStream, CancellationToken cancellationToken)
+        {
+            if (userStream == null)
+            {
+                await SendMessage(MessageType.Response, responseBytes, cancellationToken);
+                return;
+            }
+            using (userStream)
+            {
+                await SendStream(MessageType.Download, responseBytes, userStream, cancellationToken);
+            }
+        }
         public Stream Network { get; }
         public ILogger Logger { get; }
         public string Name { get; }
@@ -136,14 +147,6 @@ namespace UiPath.CoreIpc
                 while (!(message = await Network.ReadMessage(_maxMessageSize)).Empty)
                 {
                     var data = message.Data;
-                    if (message.MessageType == MessageType.Upload)
-                    {
-                        var lengthBytes = await Network.ReadBufferCheckLength(sizeof(long), default);
-                        var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
-                        using var userStream = Network.ReadSlice(userStreamLength);
-                        await OnRequestReceived(data, userStream);
-                        continue;
-                    }
                     Action callback = message.MessageType switch
                     {
                         MessageType.Request when RequestReceived != null => () => OnRequestReceived(data),
@@ -155,6 +158,19 @@ namespace UiPath.CoreIpc
                     if (callback != null)
                     {
                         Task.Run(callback).LogException(Logger, this);
+                    }
+                    else if (message.MessageType == MessageType.Upload)
+                    {
+                        var userStream = await GetUserStream();
+                        await OnRequestReceived(data, userStream);
+                    }
+                    else if (message.MessageType == MessageType.Download)
+                    {
+                        var userStream = await GetUserStream();
+                        var streamDisposed = new TaskCompletionSource<bool>();
+                        userStream.Disposed += (_, __) => streamDisposed.TrySetResult(true);
+                        OnResponseReceived(data, userStream);
+                        await streamDisposed.Task;
                     }
                     else
                     {
@@ -169,12 +185,21 @@ namespace UiPath.CoreIpc
             Logger?.LogInformation($"{nameof(ReceiveLoop)} {Name} finished.");
             Dispose();
         }
+
+        private async Task<NestedStream> GetUserStream()
+        {
+            var lengthBytes = await Network.ReadBufferCheckLength(sizeof(long), default);
+            var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
+            return new NestedStream(Network, userStreamLength);
+        }
+
         private byte[] Serialize(object value) => _serializer.SerializeToBytes(value);
         private T Deserialize<T>(byte[] data) => _serializer.Deserialize<T>(data);
         private Task OnRequestReceived(byte[] data, Stream userStream = null) => RequestReceived(Deserialize<Request>(data), userStream);
-        private void OnResponseReceived(byte[] data)
+        private void OnResponseReceived(byte[] data, Stream userStream = null)
         {
             var response = Deserialize<Response>(data);
+            response.UserStream = userStream;
             Logger?.LogInformation($"Received response for request {response.RequestId} {Name}.");
             if (_requests.TryGetValue(response.RequestId, out var completionSource))
             {

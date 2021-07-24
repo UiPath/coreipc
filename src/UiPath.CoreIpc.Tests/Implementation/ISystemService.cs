@@ -21,6 +21,7 @@ namespace UiPath.CoreIpc.Tests
         Task<string> ImpersonateCaller(Message message = null, CancellationToken cancellationToken = default);
         Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default);
         Task<string> Upload(Stream stream, CancellationToken cancellationToken = default);
+        Task<Stream> Download(string text, CancellationToken cancellationToken = default);
     }
 
     public class SystemMessage : Message

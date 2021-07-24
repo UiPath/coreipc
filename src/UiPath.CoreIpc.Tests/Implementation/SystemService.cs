@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UiPath.CoreIpc;
@@ -132,7 +133,8 @@ namespace UiPath.CoreIpc.Tests
             return returnValue;
         }
 
-        public async Task<string> Upload(Stream stream, CancellationToken cancellationToken = default) =>
-            await new StreamReader(stream).ReadToEndAsync();
+        public async Task<string> Upload(Stream stream, CancellationToken cancellationToken = default) => await new StreamReader(stream).ReadToEndAsync();
+
+        public async Task<Stream> Download(string text, CancellationToken cancellationToken = default) => new MemoryStream(Encoding.UTF8.GetBytes(text));
     }
 }

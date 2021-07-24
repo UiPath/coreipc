@@ -107,8 +107,8 @@ namespace UiPath.CoreIpc
                             var methodResult = await methodCallTask;
                             await methodResult;
                             object returnValue = ((dynamic)methodResult).Result;
-                            return Response.Success(request, Serializer.Serialize(returnValue));
-                        }
+                            return returnValue is Stream userStream ? Response.Success(request, userStream) : Response.Success(request, Serializer.Serialize(returnValue));
+        }
                         else
                         {
                             methodCallTask.Unwrap().LogException(Logger, method);

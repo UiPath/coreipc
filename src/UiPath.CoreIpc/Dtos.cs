@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Text;
 using Newtonsoft.Json;
 
@@ -39,9 +40,12 @@ namespace UiPath.CoreIpc
         public string RequestId { get; }
         public string Data { get; }
         public Error Error { get; }
+        [JsonIgnore]
+        public Stream UserStream { get; set; }
         public static Response Fail(Request request, string message) => Fail(request, new Exception(message));
         public static Response Fail(Request request, Exception ex) => new(request.Id, null, new(ex));
         public static Response Success(Request request, string data) => new(request.Id, data, null);
+        public static Response Success(Request request, Stream userStream) => new(request.Id, null, null) { UserStream = userStream };
         public Response CheckError() => Error == null ? this : throw new RemoteException(Error);
     }
     [Serializable]
@@ -100,7 +104,7 @@ namespace UiPath.CoreIpc
         }
         public bool Is<TException>() where TException : Exception => Type == typeof(TException).FullName;
     }
-    enum MessageType : byte { Request, Response, CancellationRequest, Upload }
+    enum MessageType : byte { Request, Response, CancellationRequest, Upload, Download }
     readonly struct WireMessage
     {
         public WireMessage(MessageType messageType, byte[] data)
