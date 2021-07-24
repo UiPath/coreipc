@@ -13,17 +13,17 @@ namespace UiPath.CoreIpc
         /// <summary>
         /// The stream to read from.
         /// </summary>
-        private readonly Stream underlyingStream;
+        private readonly Stream _underlyingStream;
 
         /// <summary>
         /// The total length of the stream.
         /// </summary>
-        private readonly long length;
+        private readonly long _length;
 
         /// <summary>
         /// The remaining bytes allowed to be read.
         /// </summary>
-        private long remainingBytes;
+        private long _remainingBytes;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="NestedStream"/> class.
@@ -32,9 +32,9 @@ namespace UiPath.CoreIpc
         /// <param name="length">The number of bytes to read from the parent stream.</param>
         public NestedStream(Stream underlyingStream, long length)
         {
-            this.underlyingStream = underlyingStream;
-            this.remainingBytes = length;
-            this.length = length;
+            _underlyingStream = underlyingStream;
+            _remainingBytes = length;
+            _length = length;
         }
 
         public event EventHandler Disposed;
@@ -43,10 +43,10 @@ namespace UiPath.CoreIpc
         public bool IsDisposed { get; private set; }
 
         /// <inheritdoc />
-        public override bool CanRead => !this.IsDisposed;
+        public override bool CanRead => !IsDisposed;
 
         /// <inheritdoc />
-        public override bool CanSeek => !this.IsDisposed && this.underlyingStream.CanSeek;
+        public override bool CanSeek => !IsDisposed && _underlyingStream.CanSeek;
 
         /// <inheritdoc />
         public override bool CanWrite => false;
@@ -56,8 +56,8 @@ namespace UiPath.CoreIpc
         {
             get
             {
-                return this.underlyingStream.CanSeek ?
-                    this.length : throw new NotSupportedException();
+                return _underlyingStream.CanSeek ?
+                    _length : throw new NotSupportedException();
             }
         }
 
@@ -66,12 +66,12 @@ namespace UiPath.CoreIpc
         {
             get
             {
-                return this.length - this.remainingBytes;
+                return _length - _remainingBytes;
             }
 
             set
             {
-                this.Seek(value, SeekOrigin.Begin);
+                Seek(value, SeekOrigin.Begin);
             }
         }
 
@@ -99,15 +99,15 @@ namespace UiPath.CoreIpc
                 throw new ArgumentException();
             }
 
-            count = (int)Math.Min(count, this.remainingBytes);
+            count = (int)Math.Min(count, _remainingBytes);
 
             if (count <= 0)
             {
                 return 0;
             }
 
-            int bytesRead = await this.underlyingStream.ReadAsync(buffer, offset, count).ConfigureAwait(false);
-            this.remainingBytes -= bytesRead;
+            int bytesRead = await _underlyingStream.ReadAsync(buffer, offset, count).ConfigureAwait(false);
+            _remainingBytes -= bytesRead;
             return bytesRead;
         }
 
@@ -129,22 +129,22 @@ namespace UiPath.CoreIpc
                 throw new ArgumentException();
             }
 
-            count = (int)Math.Min(count, this.remainingBytes);
+            count = (int)Math.Min(count, _remainingBytes);
 
             if (count <= 0)
             {
                 return 0;
             }
 
-            int bytesRead = this.underlyingStream.Read(buffer, offset, count);
-            this.remainingBytes -= bytesRead;
+            int bytesRead = _underlyingStream.Read(buffer, offset, count);
+            _remainingBytes -= bytesRead;
             return bytesRead;
         }
 
         /// <inheritdoc />
         public override long Seek(long offset, SeekOrigin origin)
         {
-            if (!this.CanSeek)
+            if (!CanSeek)
             {
                 throw new NotSupportedException();
             }
@@ -153,21 +153,21 @@ namespace UiPath.CoreIpc
             long newOffset = origin switch
             {
                 SeekOrigin.Current => offset,
-                SeekOrigin.End => this.length + offset - this.Position,
-                SeekOrigin.Begin => offset - this.Position,
+                SeekOrigin.End => _length + offset - Position,
+                SeekOrigin.Begin => offset - Position,
                 _ => throw new ArgumentOutOfRangeException(nameof(origin)),
             };
 
             // Determine whether the requested position is within the bounds of the stream
-            if (this.Position + newOffset < 0)
+            if (Position + newOffset < 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(offset));
             }
 
-            long currentPosition = this.underlyingStream.Position;
-            long newPosition = this.underlyingStream.Seek(newOffset, SeekOrigin.Current);
-            this.remainingBytes -= newPosition - currentPosition;
-            return this.Position;
+            long currentPosition = _underlyingStream.Position;
+            long newPosition = _underlyingStream.Seek(newOffset, SeekOrigin.Current);
+            _remainingBytes -= newPosition - currentPosition;
+            return Position;
         }
 
         /// <inheritdoc />
@@ -188,7 +188,7 @@ namespace UiPath.CoreIpc
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            this.IsDisposed = true;
+            IsDisposed = true;
             Disposed?.Invoke(this, EventArgs.Empty);
             base.Dispose(disposing);
         }

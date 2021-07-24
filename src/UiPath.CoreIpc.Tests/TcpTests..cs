@@ -19,7 +19,7 @@ namespace UiPath.CoreIpc.Tests
         static readonly IPEndPoint ComputingEndPoint = new(IPAddress.Loopback, 2121);
         static readonly IPEndPoint SystemEndPoint = new(IPAddress.Loopback, 3131);
         private const int MaxReceivedMessageSizeInMegabytes = 1;
-        private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(200);
+        private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
         private readonly ServiceHost _computingHost;
         private readonly ServiceHost _systemHost;
         private readonly IComputingService _computingClient;
@@ -94,7 +94,7 @@ namespace UiPath.CoreIpc.Tests
         public async Task Download()
         {
             using var stream = await _systemClient.Download("Hello world");
-            (new StreamReader(stream).ReadToEnd()).ShouldBe("Hello world");
+            (await new StreamReader(stream).ReadToEndAsync()).ShouldBe("Hello world");
         }
 
         [Fact]
