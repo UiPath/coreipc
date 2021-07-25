@@ -443,6 +443,8 @@ namespace UiPath.CoreIpc.Tests
             _computingHost.Dispose();
             _systemHost.Dispose();
             _guiThread.Dispose();
+            ((IpcProxy)_computingClient).CloseConnection();
+            ((IpcProxy)_systemClient).CloseConnection();
         }
     }
 }
