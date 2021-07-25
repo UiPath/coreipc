@@ -12,7 +12,7 @@ namespace UiPath.CoreIpc
         /// <summary>
         /// The stream to read from.
         /// </summary>
-        private readonly Stream _underlyingStream;
+        private Stream _underlyingStream;
         /// <summary>
         /// The total length of the stream.
         /// </summary>
@@ -34,7 +34,7 @@ namespace UiPath.CoreIpc
         }
         public event EventHandler Disposed;
         /// <inheritdoc />
-        public bool IsDisposed { get; private set; }
+        public bool IsDisposed => _underlyingStream == null;
         /// <inheritdoc />
         public override bool CanRead => !IsDisposed;
         /// <inheritdoc />
@@ -56,8 +56,7 @@ namespace UiPath.CoreIpc
         /// <inheritdoc />
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            count = BytesToRead(buffer, offset, count);
-            if (count <= 0)
+            if ((count = BytesToRead(buffer, offset, count)) <= 0)
             {
                 return 0;
             }
@@ -68,8 +67,7 @@ namespace UiPath.CoreIpc
         /// <inheritdoc />
         public override int Read(byte[] buffer, int offset, int count)
         {
-            count = BytesToRead(buffer, offset, count);
-            if (count <= 0)
+            if ((count = BytesToRead(buffer, offset, count)) <= 0)
             {
                 return 0;
             }
@@ -91,8 +89,7 @@ namespace UiPath.CoreIpc
             {
                 throw new ArgumentException();
             }
-            count = (int)Math.Min(count, _remainingBytes);
-            return count;
+            return (int)Math.Min(count, _remainingBytes);
         }
         /// <inheritdoc />
         public override long Seek(long offset, SeekOrigin origin)
@@ -128,7 +125,7 @@ namespace UiPath.CoreIpc
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            IsDisposed = true;
+            _underlyingStream = null;
             Disposed?.Invoke(this, EventArgs.Empty);
             base.Dispose(disposing);
         }
