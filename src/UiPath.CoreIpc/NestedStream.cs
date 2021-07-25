@@ -7,7 +7,7 @@ namespace UiPath.CoreIpc
     /// <summary>
     /// A stream that allows for reading from another stream up to a given number of bytes.
     /// </summary>
-    internal class NestedStream : Stream
+    public class NestedStream : Stream
     {
         /// <summary>
         /// The stream to read from.
