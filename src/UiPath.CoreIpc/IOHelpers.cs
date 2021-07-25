@@ -19,7 +19,6 @@ namespace UiPath.CoreIpc
     {
         public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
 
-        [Conditional("DEBUG")]
         public static void Validate(ServiceHostBuilder serviceHostBuilder)
         {
             foreach (var endpointSettings in serviceHostBuilder.Endpoints.Values)
@@ -28,11 +27,9 @@ namespace UiPath.CoreIpc
             }
         }
 
-        [Conditional("DEBUG")]
         public static void Validate<TDerived, TInterface>(ServiceClientBuilder<TDerived, TInterface> builder) where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
             => Validate(typeof(TInterface), builder.CallbackContract);
 
-        [Conditional("DEBUG")]
         public static void Validate(params Type[] contracts)
         {
             foreach (var contract in contracts.Where(c => c != null))
@@ -252,9 +249,8 @@ namespace UiPath.CoreIpc
 
         internal static async Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
         {
-            await stream.WriteAsync(new[] { (byte)message.MessageType }, 0, 1, cancellationToken);
-            var lengthBuffer = BitConverter.GetBytes(message.Data.Length);
-            await stream.WriteBuffer(lengthBuffer, cancellationToken);
+            await stream.WriteBuffer(new[] { (byte)message.MessageType }, cancellationToken);
+            await stream.WriteBuffer(BitConverter.GetBytes(message.Data.Length), cancellationToken);
             await stream.WriteBuffer(message.Data, cancellationToken);
         }
 
@@ -263,13 +259,13 @@ namespace UiPath.CoreIpc
 
         internal static async Task<WireMessage> ReadMessage(this Stream stream, int maxMessageSize = int.MaxValue, CancellationToken cancellationToken = default)
         {
-            var messageTypeBuffer = await stream.ReadBuffer(1, cancellationToken);
+            var messageTypeBuffer = await stream.ReadBufferCore(1, cancellationToken);
             if (messageTypeBuffer.Length == 0)
             {
                 return new(default, messageTypeBuffer);
             }
             var messageType = (MessageType)messageTypeBuffer[0];
-            var lengthBuffer = await stream.ReadBuffer(sizeof(int), cancellationToken);
+            var lengthBuffer = await stream.ReadBufferCore(sizeof(int), cancellationToken);
             if (lengthBuffer.Length == 0)
             {
                 return new(messageType, lengthBuffer);
@@ -279,13 +275,13 @@ namespace UiPath.CoreIpc
             {
                 throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize/(1024*1024)} megabytes.");
             }
-            var messageData = await stream.ReadBufferCheckLength(length, cancellationToken);
+            var messageData = await stream.ReadBuffer(length, cancellationToken);
             return new(messageType, messageData);
         }
 
-        internal static async Task<byte[]> ReadBufferCheckLength(this Stream stream, int length, CancellationToken cancellationToken)
+        internal static async Task<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
         {
-            var messageData = await stream.ReadBuffer(length, cancellationToken);
+            var messageData = await stream.ReadBufferCore(length, cancellationToken);
             if (messageData.Length == 0)
             {
                 throw new IOException("Connection closed.");
@@ -293,7 +289,7 @@ namespace UiPath.CoreIpc
             return messageData;
         }
 
-        private static async Task<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
+        private static async Task<byte[]> ReadBufferCore(this Stream stream, int length, CancellationToken cancellationToken)
         {
             var bytes = new byte[length];
             int offset = 0;

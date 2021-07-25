@@ -206,7 +206,7 @@ namespace UiPath.CoreIpc
 
         private async Task<NestedStream> GetUserStream()
         {
-            var lengthBytes = await Network.ReadBufferCheckLength(sizeof(long), default);
+            var lengthBytes = await Network.ReadBuffer(sizeof(long), default);
             var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
             return new NestedStream(Network, userStreamLength);
         }
