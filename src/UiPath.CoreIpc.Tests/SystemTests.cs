@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -23,6 +24,13 @@ namespace UiPath.CoreIpc.Tests
                 .ValidateAndBuild();
             _systemHost.RunAsync(GuiScheduler);
             _systemClient = CreateSystemService();
+        }
+        protected override TSettings Configure<TSettings>(TSettings listenerSettings)
+        {
+            base.Configure(listenerSettings);
+            listenerSettings.ConcurrentAccepts = 10;
+            listenerSettings.RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1));
+            return listenerSettings;
         }
         public override void Dispose()
         {
@@ -62,6 +70,7 @@ namespace UiPath.CoreIpc.Tests
             while (!_systemService.DidNothing)
             {
                 await Task.Delay(1);
+                Trace.WriteLine(this + " Void");
             }
         }
 
@@ -132,10 +141,12 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task CancelUpload()
         {
-            var stream = new MemoryStream(Encoding.UTF8.GetBytes("Hello world"));
+            var stream = new MemoryStream(Enumerable.Range(1, 50000).Select(i=>(byte)i).ToArray());
             await _systemClient.GetThreadName();
-            var cancellationSource = new CancellationTokenSource(10);
-            _systemClient.Upload(stream, 20, cancellationSource.Token).ShouldThrow<TaskCanceledException>();
+            using (var cancellationSource = new CancellationTokenSource(5))
+            {
+                _systemClient.Upload(stream, 20, cancellationSource.Token).ShouldThrow<TaskCanceledException>();
+            }
             await _systemClient.GetThreadName();
         }
 
@@ -148,7 +159,8 @@ namespace UiPath.CoreIpc.Tests
             using var stream = await _systemClient.Download("Hello world");
             (await new StreamReader(stream).ReadToEndAsync()).ShouldBe("Hello world");
         }
-        protected abstract TBuilder SystemClientBuilder();
+        protected abstract TBuilder CreateSystemClientBuilder();
+        protected TBuilder SystemClientBuilder() => CreateSystemClientBuilder().RequestTimeout(RequestTimeout).Logger(_serviceProvider);
         [Fact]
         public async Task BeforeCall()
         {
@@ -193,20 +205,20 @@ namespace UiPath.CoreIpc.Tests
         {
             for (int i = 0; i < counter; i++)
             {
-                var proxy = CreateSystemService();
                 var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite, Text = System.Guid.NewGuid().ToString() };
-                var sendMessageResult = proxy.MissingCallback(request);
+                var sendMessageResult = _systemClient.MissingCallback(request);
                 var newGuid = System.Guid.NewGuid();
-                (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
+                (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
                 await Task.Delay(1);
-                ((IpcProxy)proxy).CloseConnection();
+                ((IpcProxy)_systemClient).CloseConnection();
                 sendMessageResult.ShouldThrow<Exception>();
                 while (_systemService.MessageText != request.Text)
                 {
+                    Trace.WriteLine(this + " CancelServerCallCore");
                     await Task.Yield();
                 }
                 newGuid = System.Guid.NewGuid();
-                (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
+                (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
             }
         }
         [Fact]

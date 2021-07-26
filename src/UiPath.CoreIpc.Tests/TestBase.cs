@@ -24,11 +24,10 @@ namespace UiPath.CoreIpc.Tests
         {
             _guiThread.Dispose();
         }
-        protected TSettings Configure<TSettings>(TSettings listenerSettings) where TSettings : ListenerSettings
+        protected virtual TSettings Configure<TSettings>(TSettings listenerSettings) where TSettings : ListenerSettings
         {
-            listenerSettings.RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1));
+            listenerSettings.RequestTimeout = RequestTimeout;
             listenerSettings.MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes;
-            listenerSettings.ConcurrentAccepts = 10;
             return listenerSettings;
         }
         protected abstract ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder);

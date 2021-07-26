@@ -12,14 +12,9 @@ namespace UiPath.CoreIpc.Tests
     {
         string _pipeName = "system";
         protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder) =>
-            serviceHostBuilder.UseNamedPipes(new NamedPipeSettings(_pipeName)
-            {
-                RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1)),
-                MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes,
-                ConcurrentAccepts = 10,
-            });
-        protected override NamedPipeClientBuilder<ISystemService> SystemClientBuilder() => 
-            new NamedPipeClientBuilder<ISystemService>(_pipeName).RequestTimeout(RequestTimeout).AllowImpersonation().Logger(_serviceProvider);
+            serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings(_pipeName)));
+        protected override NamedPipeClientBuilder<ISystemService> CreateSystemClientBuilder() => 
+            new NamedPipeClientBuilder<ISystemService>(_pipeName).AllowImpersonation();
         [Fact]
         public void PipeExists()
         {
@@ -39,11 +34,10 @@ namespace UiPath.CoreIpc.Tests
         public async Task PipeSecurityForWindows()
         {
             using var protectedService = new ServiceHostBuilder(_serviceProvider)
-                .UseNamedPipes(new NamedPipeSettings("protected")
+                .UseNamedPipes(Configure(new NamedPipeSettings("protected")
                 {
-                    RequestTimeout = RequestTimeout,
                     AccessControl = pipeSecurity => pipeSecurity.Deny(WellKnownSidType.WorldSid, PipeAccessRights.FullControl)
-                })
+                }))
                 .AddEndpoint<ISystemService>()
                 .ValidateAndBuild();
             _ = protectedService.RunAsync();
@@ -55,11 +49,10 @@ namespace UiPath.CoreIpc.Tests
     public class ComputingNamedPipeTests : ComputingTests<NamedPipeClientBuilder<IComputingService, IComputingCallback>>
     {
         protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder) =>
-            serviceHostBuilder.UseNamedPipes(new NamedPipeSettings("computing")
+            serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings("computing")
             {
-                RequestTimeout = RequestTimeout,
                 EncryptAndSign = true,
-            });
+            }));
         protected override NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
             new NamedPipeClientBuilder<IComputingService, IComputingCallback>("computing", _serviceProvider)
                 .AllowImpersonation()

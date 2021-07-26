@@ -10,8 +10,7 @@ namespace UiPath.CoreIpc.Tests
         int _port = 3131;
         protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder) =>
             serviceHostBuilder.UseTcp(Configure(new TcpSettings(GetEndPoint())));
-        protected override TcpClientBuilder<ISystemService> SystemClientBuilder() =>
-            new TcpClientBuilder<ISystemService>(GetEndPoint()).RequestTimeout(RequestTimeout).Logger(_serviceProvider);
+        protected override TcpClientBuilder<ISystemService> CreateSystemClientBuilder() => new(GetEndPoint());
         [Fact]
         public override  async void BeforeCallServerSide()
         {

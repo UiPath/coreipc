@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -97,8 +98,9 @@ namespace UiPath.CoreIpc.Tests
                     await Task.Delay(message.Delay, cancellationToken);
                 }
             }
-            catch (OperationCanceledException)
+            catch (Exception ex)
             {
+                Trace.WriteLine(ex.ToString());
                 MessageText = message.Text;
                 throw;
             }

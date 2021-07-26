@@ -6,6 +6,7 @@ using UiPath.CoreIpc.NamedPipe;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Shouldly;
+using System.Diagnostics;
 
 namespace UiPath.CoreIpc.Tests
 {
@@ -106,6 +107,7 @@ namespace UiPath.CoreIpc.Tests
                     sendMessageResult.ShouldThrow<TaskCanceledException>();
                     while (_systemService.MessageText != request.Text)
                     {
+                        Trace.WriteLine(this+" CancelServerCallCore");
                         await Task.Yield();
                     }
                     newGuid = Guid.NewGuid();

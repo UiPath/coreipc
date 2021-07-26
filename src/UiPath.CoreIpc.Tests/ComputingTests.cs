@@ -28,12 +28,11 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task ReconnectWithEncrypt()
         {
-            var proxy = ComputingClientBuilder().ValidateAndBuild();
             for (int i = 0; i < 50; i++)
             {
-                await proxy.AddFloat(1, 2);
-                ((IpcProxy)proxy).CloseConnection();
-                await proxy.AddFloat(1, 2);
+                await _computingClient.AddFloat(1, 2);
+                ((IpcProxy)_computingClient).CloseConnection();
+                await _computingClient.AddFloat(1, 2);
             }
         }
 
@@ -57,7 +56,7 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task ClientCancellation()
         {
-            using (var cancellationSource = new CancellationTokenSource(50))
+            using (var cancellationSource = new CancellationTokenSource(10))
             {
                 _computingClient.Infinite(cancellationSource.Token).ShouldThrow<TaskCanceledException>();
             }
@@ -67,7 +66,7 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task ClientTimeout()
         {
-            var proxy = ComputingClientBuilder().RequestTimeout(TimeSpan.FromMilliseconds(100)).ValidateAndBuild();
+            var proxy = ComputingClientBuilder().RequestTimeout(TimeSpan.FromMilliseconds(10)).ValidateAndBuild();
             proxy.Infinite().ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.Infinite)} timed out.");
             await proxy.GetCallbackThreadName(new Message { RequestTimeout = RequestTimeout });
         }
@@ -77,8 +76,15 @@ namespace UiPath.CoreIpc.Tests
         {
             for (int i = 0; i < 20; i++)
             {
-                var request = new SystemMessage { RequestTimeout = TimeSpan.FromMilliseconds(1), Delay = 100 };
-                _computingClient.SendMessage(request).ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.SendMessage)} timed out.");
+                var request = new SystemMessage { RequestTimeout = TimeSpan.FromMilliseconds(10), Delay = 100 };
+                try
+                {
+                    await _computingClient.SendMessage(request);
+                }
+                catch (TimeoutException ex)
+                {
+                    ex.Message.ShouldBe($"{nameof(_computingClient.SendMessage)} timed out.");
+                }
                 await AddFloat();
             }
         }
@@ -91,9 +97,9 @@ namespace UiPath.CoreIpc.Tests
         {
             var result = await _computingClient.AddComplexNumbers(new[]
             {
-                        new ComplexNumber(0.5f, 0.4f),
-                        new ComplexNumber(0.2f, 0.1f),
-                        new ComplexNumber(0.3f, 0.5f),
+                new ComplexNumber(0.5f, 0.4f),
+                new ComplexNumber(0.2f, 0.1f),
+                new ComplexNumber(0.3f, 0.5f),
             });
             result.ShouldBe(new ComplexNumber(1f, 1f));
         }
@@ -107,7 +113,7 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task Callback()
         {
-            var message = new SystemMessage { Text = System.Guid.NewGuid().ToString() };
+            var message = new SystemMessage { Text = Guid.NewGuid().ToString() };
             var returnValue = await _computingClient.SendMessage(message);
             returnValue.ShouldBe($"{Environment.UserName}_{_computingCallback.Id}_{message.Text}");
         }
