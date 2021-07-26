@@ -205,18 +205,13 @@ namespace UiPath.CoreIpc.Tests
         {
             for (int i = 0; i < counter; i++)
             {
-                var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite, Text = System.Guid.NewGuid().ToString() };
+                var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
                 var sendMessageResult = _systemClient.MissingCallback(request);
                 var newGuid = System.Guid.NewGuid();
                 (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
                 await Task.Delay(1);
                 ((IpcProxy)_systemClient).CloseConnection();
                 sendMessageResult.ShouldThrow<Exception>();
-                while (_systemService.MessageText != request.Text)
-                {
-                    Trace.WriteLine(this + " CancelServerCallCore");
-                    await Task.Yield();
-                }
                 newGuid = System.Guid.NewGuid();
                 (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
             }

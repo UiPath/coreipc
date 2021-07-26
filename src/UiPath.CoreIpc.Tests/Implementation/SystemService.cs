@@ -87,22 +87,11 @@ namespace UiPath.CoreIpc.Tests
             return input.Reverse().ToArray();
         }
 
-        public string MessageText;
-
         public async Task<string> MissingCallback(SystemMessage message, CancellationToken cancellationToken = default)
         {
-            try
+            if (message.Delay != 0)
             {
-                if (message.Delay != 0)
-                {
-                    await Task.Delay(message.Delay, cancellationToken);
-                }
-            }
-            catch (Exception ex)
-            {
-                Trace.WriteLine(ex.ToString());
-                MessageText = message.Text;
-                throw;
+                await Task.Delay(message.Delay, cancellationToken);
             }
             var domainName = "";
             var client = message.Client;
