@@ -5,7 +5,7 @@ using Nito.AsyncEx;
 
 namespace UiPath.CoreIpc.Tests
 {
-    public class TestBase : IDisposable
+    public abstract class TestBase : IDisposable
     {
         protected const int MaxReceivedMessageSizeInMegabytes = 1;
         protected static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
@@ -24,5 +24,13 @@ namespace UiPath.CoreIpc.Tests
         {
             _guiThread.Dispose();
         }
+        protected TSettings Configure<TSettings>(TSettings listenerSettings) where TSettings : ListenerSettings
+        {
+            listenerSettings.RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1));
+            listenerSettings.MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes;
+            listenerSettings.ConcurrentAccepts = 10;
+            return listenerSettings;
+        }
+        protected abstract ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder);
     }
 }
