@@ -28,6 +28,8 @@ namespace UiPath.CoreIpc.Tests
         {
             ((IDisposable)_systemClient).Dispose();
             _systemHost.Dispose();
+            ((IpcProxy)_systemClient).CloseConnection();
+            base.Dispose();
         }
         [Fact]
         public async Task ConcurrentRequests()

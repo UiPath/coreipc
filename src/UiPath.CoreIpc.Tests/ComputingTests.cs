@@ -116,6 +116,8 @@ namespace UiPath.CoreIpc.Tests
         {
             ((IDisposable)_computingClient).Dispose();
             _computingHost.Dispose();
+            ((IpcProxy)_computingClient).CloseConnection();
+            base.Dispose();
         }
     }
 }
