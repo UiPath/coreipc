@@ -121,8 +121,8 @@ namespace UiPath.CoreIpc.Tests
         public override void Dispose()
         {
             ((IDisposable)_computingClient).Dispose();
-            _computingHost.Dispose();
             ((IpcProxy)_computingClient).CloseConnection();
+            _computingHost.Dispose();
             base.Dispose();
         }
     }

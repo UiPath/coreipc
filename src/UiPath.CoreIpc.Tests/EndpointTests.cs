@@ -51,9 +51,9 @@ namespace UiPath.CoreIpc.Tests
         {
             ((IDisposable)_computingClient).Dispose();
             ((IDisposable)_systemClient).Dispose();
-            _host.Dispose();
             ((IpcProxy)_computingClient).CloseConnection();
             ((IpcProxy)_systemClient).CloseConnection();
+            _host.Dispose();
         }
         [Fact]
         public Task CallbackConcurrently() => Task.WhenAll(Enumerable.Range(1, 50).Select(_ => CallbackCore()));

@@ -41,9 +41,9 @@ namespace UiPath.CoreIpc
             _serializer = serializer;
             _requestTimeout = requestTimeout;
             _logger = logger;
-            _connectionFactory = connectionFactory ?? ((_, __)=>Task.FromResult((Connection)null));
+            _connectionFactory = connectionFactory;
             EncryptAndSign = encryptAndSign;
-            _beforeCall = beforeCall ?? ((_, __) => Task.CompletedTask);
+            _beforeCall = beforeCall;
             _serviceEndpoint = serviceEndpoint;
         }
 
@@ -110,7 +110,10 @@ namespace UiPath.CoreIpc
                     {
                         newConnection = await EnsureConnection(token);
                     }
-                    await _beforeCall(new(newConnection, methodName, args), token);
+                    if (_beforeCall != null)
+                    {
+                        await _beforeCall(new(newConnection, methodName, args), token);
+                    }
                     var requestId = _connection.NewRequestId();
                     var arguments = args.Select(_serializer.Serialize).ToArray();
                     var request = new Request(typeof(TInterface).Name, requestId, methodName, arguments, messageTimeout.TotalSeconds);
@@ -159,15 +162,18 @@ namespace UiPath.CoreIpc
 
         protected async Task<bool> EnsureConnection(CancellationToken cancellationToken)
         {
-            var externalConnection = await _connectionFactory(_connection, cancellationToken);
-            if (externalConnection != null)
+            if (_connectionFactory != null)
             {
-                if (_connection == null)
+                var externalConnection = await _connectionFactory(_connection, cancellationToken);
+                if (externalConnection != null)
                 {
-                    OnNewConnection(externalConnection);
-                    return true;
+                    if (_connection == null)
+                    {
+                        OnNewConnection(externalConnection);
+                        return true;
+                    }
+                    return false;
                 }
-                return false;
             }
             return await ConnectToServerAsync(cancellationToken);
         }

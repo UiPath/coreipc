@@ -35,8 +35,8 @@ namespace UiPath.CoreIpc.Tests
         public override void Dispose()
         {
             ((IDisposable)_systemClient).Dispose();
-            _systemHost.Dispose();
             ((IpcProxy)_systemClient).CloseConnection();
+            _systemHost.Dispose();
             base.Dispose();
         }
         [Fact]
