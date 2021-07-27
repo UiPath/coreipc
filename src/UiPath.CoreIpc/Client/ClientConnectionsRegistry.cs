@@ -68,16 +68,22 @@ namespace UiPath.CoreIpc
             set
             {
                 _connection = value;
-                _connection.Closed += delegate { OnConnectionClosed(_connection).LogException(_connection.Logger, _connection); };
+                _connection.Closed += OnConnectionClosed;
             }
         }
-        private async Task OnConnectionClosed(Connection closedConnection)
+        private void OnConnectionClosed(object sender, EventArgs _)
         {
+            var closedConnection = (Connection)sender;
             if (!ClientConnectionsRegistry.TryGet(ConnectionKey, out var clientConnection) || clientConnection.Connection != closedConnection)
             {
                 return;
             }
-            using (await clientConnection.LockAsync())
+            var lockTaken = clientConnection.TryLock(out var guard);
+            if (!lockTaken)
+            {
+                return;
+            }
+            using (guard)
             {
                 if (!ClientConnectionsRegistry.TryGet(ConnectionKey, out clientConnection) || clientConnection.Connection != closedConnection)
                 {
@@ -91,6 +97,19 @@ namespace UiPath.CoreIpc
         public Server Server { get; set; }
         IConnectionKey ConnectionKey { get; }
         public Task<IDisposable> LockAsync(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
+        public bool TryLock(out IDisposable guard)
+        {
+            try
+            {
+                guard = _lock.Lock(new(canceled: true));
+                return true;
+            }
+            catch (TaskCanceledException)
+            {
+                guard = null;
+                return false;
+            }
+        }
         public void Close() => Connection?.Dispose();
         public override string ToString() => _connection?.ToString() ?? base.ToString();
     }
