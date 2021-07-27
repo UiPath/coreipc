@@ -78,8 +78,7 @@ namespace UiPath.CoreIpc
             {
                 return;
             }
-            var lockTaken = clientConnection.TryLock(out var guard);
-            if (!lockTaken)
+            if (!clientConnection.TryLock(out var guard))
             {
                 return;
             }
