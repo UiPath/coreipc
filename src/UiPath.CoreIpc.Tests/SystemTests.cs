@@ -178,8 +178,11 @@ namespace UiPath.CoreIpc.Tests
 
             await proxy.DoNothing();
             newConnection.ShouldBeFalse();
-
-            ((IpcProxy)proxy).CloseConnection();
+            var ipcProxy = (IpcProxy)proxy;
+            var closed = new TaskCompletionSource<bool>();
+            ipcProxy.Connection.Closed += delegate { closed.SetResult(true); };
+            ipcProxy.CloseConnection();
+            await closed.Task;
             newConnection.ShouldBeFalse();
             await Task.Delay(1);
             await proxy.DoNothing();

@@ -35,20 +35,6 @@ namespace UiPath.CoreIpc
         }
         private static ClientConnection GetOrAdd(IConnectionKey key)=>_connections.GetOrAdd(key, localKey => new(localKey));
         public static bool TryGet(IConnectionKey key, out ClientConnection connection) => _connections.TryGetValue(key, out connection);
-        public static void Clear()
-        {
-            foreach (var connection in _connections.Values)
-            {
-                connection.Close();
-            }
-        }
-        public static void Close(IConnectionKey key)
-        {
-            if (TryGet(key, out var connection))
-            {
-                connection.Close();
-            }
-        }
         internal static ClientConnection Remove(IConnectionKey connectionKey)
         {
             _connections.TryRemove(connectionKey, out var clientConnection);

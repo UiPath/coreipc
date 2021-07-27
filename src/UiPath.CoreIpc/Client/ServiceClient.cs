@@ -22,6 +22,7 @@ namespace UiPath.CoreIpc
     interface IServiceClient : IDisposable
     {
         Task<TResult> InvokeAsync<TResult>(string methodName, object[] args);
+        Connection Connection { get; }
     }
 
     public class ServiceClient<TInterface> : IServiceClient where TInterface : class
@@ -50,6 +51,8 @@ namespace UiPath.CoreIpc
         public virtual string Name => _connection?.Name;
 
         public bool EncryptAndSign { get; }
+        
+        Connection IServiceClient.Connection => _connection;
 
         public TInterface CreateProxy()
         {
@@ -233,11 +236,13 @@ namespace UiPath.CoreIpc
 
         internal IServiceClient ServiceClient { get; set; }
 
+        public Connection Connection => ServiceClient.Connection;
+
         protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvokeAsync(targetMethod.ReturnType)(ServiceClient, targetMethod.Name, args);
 
         public void Dispose() => ServiceClient.Dispose();
 
-        public void CloseConnection() => ClientConnectionsRegistry.Close((IConnectionKey)ServiceClient);
+        public void CloseConnection() => Connection?.Dispose();
 
         private static InvokeAsyncDelegate GetInvokeAsync(Type returnType) => _invokeAsyncByType.GetOrAdd(returnType, CreateDelegate);
 
@@ -252,7 +257,5 @@ namespace UiPath.CoreIpc
             var lambda = Lambda<InvokeAsyncDelegate>(invokeAsyncCall, serviceClient, methodName, methodArgs);
             return lambda.Compile();
         }
-
-        public static void CloseConnections() => ClientConnectionsRegistry.Clear();
     }
 }
