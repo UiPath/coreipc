@@ -120,11 +120,12 @@ namespace UiPath.CoreIpc
 
         public void Dispose()
         {
+            var closedHandler = Interlocked.Exchange(ref Closed, null);
             Network.Dispose();
             try
             {
                 CompleteRequests();
-                Interlocked.Exchange(ref Closed, null)?.Invoke(this, EventArgs.Empty);
+                closedHandler?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
