@@ -203,7 +203,11 @@ namespace UiPath.CoreIpc.Tests
             var proxy = SystemClientBuilder().DontReconnect().ValidateAndBuild();
             await proxy.GetGuid(System.Guid.Empty);
             ((IpcProxy)proxy).CloseConnection();
-            proxy.GetGuid(System.Guid.Empty).ShouldThrow<ObjectDisposedException>();
+            try
+            {
+                await proxy.GetGuid(System.Guid.Empty);
+            }
+            catch (ObjectDisposedException) { }
         }
         [Fact]
         public Task CancelServerCall() => CancelServerCallCore(10);

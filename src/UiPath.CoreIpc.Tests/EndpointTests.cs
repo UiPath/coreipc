@@ -6,7 +6,6 @@ using UiPath.CoreIpc.NamedPipe;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Shouldly;
-using System.Diagnostics;
 
 namespace UiPath.CoreIpc.Tests
 {
@@ -83,9 +82,15 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task MissingCallback()
         {
-            var ex = _systemClient.MissingCallback(new SystemMessage()).ShouldThrow<RemoteException>();
-            ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.CoreIpc.Tests.ISystemCallback.");
-            ex.Is<ArgumentException>().ShouldBeTrue();
+            try
+            {
+                await _systemClient.MissingCallback(new SystemMessage());
+            }
+            catch (RemoteException ex)
+            {
+                ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.CoreIpc.Tests.ISystemCallback.");
+                ex.Is<ArgumentException>().ShouldBeTrue();
+            }
         }
         [Fact]
         public Task CancelServerCall() => CancelServerCallCore(10);
