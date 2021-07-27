@@ -118,9 +118,15 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task MissingCallback()
         {
-            var ex = _systemClient.MissingCallback(new SystemMessage()).ShouldThrow<RemoteException>();
-            ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's not configured.");
-            ex.Is<ArgumentException>().ShouldBeTrue();
+            try
+            {
+                await _systemClient.MissingCallback(new SystemMessage());
+            }
+            catch (RemoteException ex)
+            {
+                ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's not configured.");
+                ex.Is<ArgumentException>().ShouldBeTrue();
+            }
             await Guid();
         }
 
