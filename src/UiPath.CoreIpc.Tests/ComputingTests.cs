@@ -69,6 +69,7 @@ namespace UiPath.CoreIpc.Tests
             var proxy = ComputingClientBuilder().RequestTimeout(TimeSpan.FromMilliseconds(50)).ValidateAndBuild();
             proxy.Infinite().ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.Infinite)} timed out.");
             await proxy.AddFloat(1f, 2f);
+            ((IDisposable)proxy).Dispose();
         }
 
         [Fact]
