@@ -151,9 +151,8 @@ namespace UiPath.CoreIpc.Tests
             await _systemClient.GetThreadName();
             using (var cancellationSource = new CancellationTokenSource(5))
             {
-                _systemClient.Upload(stream, 20, cancellationSource.Token).ShouldThrow<TaskCanceledException>();
+                _systemClient.Upload(stream, 20, cancellationSource.Token).ShouldThrow<Exception>();
             }
-            await _systemClient.GetThreadName();
         }
 
         [Fact]

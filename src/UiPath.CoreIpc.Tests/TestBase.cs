@@ -23,6 +23,7 @@ namespace UiPath.CoreIpc.Tests
         public virtual void Dispose()
         {
             _guiThread.Dispose();
+            Thread.Sleep(1);
         }
         protected virtual TSettings Configure<TSettings>(TSettings listenerSettings) where TSettings : ListenerSettings
         {
