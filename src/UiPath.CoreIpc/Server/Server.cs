@@ -37,7 +37,7 @@ namespace UiPath.CoreIpc
                 _connectionClosed.Cancel();
             };
             return;
-            async Task OnRequestReceived(Request request, Stream userStream)
+            async Task OnRequestReceived(Request request, Stream uploadStream)
             {
                 try
                 {
@@ -107,7 +107,7 @@ namespace UiPath.CoreIpc
                             var methodResult = await methodCallTask;
                             await methodResult;
                             object returnValue = ((dynamic)methodResult).Result;
-                            return returnValue is Stream userStream ? Response.Success(request, userStream) : Response.Success(request, Serializer.Serialize(returnValue));
+                            return returnValue is Stream donloadStream ? Response.Success(request, donloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
         }
                         else
                         {
@@ -143,7 +143,7 @@ namespace UiPath.CoreIpc
                                 }
                                 else if (parameterType == typeof(Stream))
                                 {
-                                    argument = userStream;
+                                    argument = uploadStream;
                                 }
                                 else
                                 {

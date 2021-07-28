@@ -17,11 +17,11 @@ namespace UiPath.CoreIpc
 {
     using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
     using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
-    using InvokeAsyncDelegate = Func<IServiceClient, string, object[], object>;
+    using InvokeDelegate = Func<IServiceClient, string, object[], object>;
 
     interface IServiceClient : IDisposable
     {
-        Task<TResult> InvokeAsync<TResult>(string methodName, object[] args);
+        Task<TResult> Invoke<TResult>(string methodName, object[] args);
         Connection Connection { get; }
     }
 
@@ -97,15 +97,15 @@ namespace UiPath.CoreIpc
             _server = new(_logger, listenerSettings, connection);
         }
 
-        public async Task<TResult> InvokeAsync<TResult>(string methodName, object[] args)
+        public Task<TResult> Invoke<TResult>(string methodName, object[] args)
         {
             CancellationToken cancellationToken = default;
             TimeSpan messageTimeout = default;
             TimeSpan clientTimeout = _requestTimeout;
-            Stream userStream = null;
+            Stream uploadStream = null;
             SetWellKnownArguments();
-            return await Task.Run(InvokeAsync).ConfigureAwait(false);
-            Task<TResult> InvokeAsync() =>
+            return Task.Run(Invoke);
+            Task<TResult> Invoke() =>
                 cancellationToken.WithTimeout(clientTimeout, async token =>
                 {
                     bool newConnection;
@@ -121,11 +121,11 @@ namespace UiPath.CoreIpc
                     var arguments = args.Select(_serializer.Serialize).ToArray();
                     var request = new Request(typeof(TInterface).Name, requestId, methodName, arguments, messageTimeout.TotalSeconds);
                     _logger?.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
-                    var response = await _connection.Call(request, userStream, token);
+                    var response = await _connection.RemoteCall(request, uploadStream, token);
                     _logger?.LogInformation($"IpcClient called {methodName} {requestId} {Name}.");
-                    if (response.UserStream != null)
+                    if (response.DownloadStream != null)
                     {
-                        return (TResult)(object)response.UserStream;
+                        return (TResult)(object)response.DownloadStream;
                     }
                     return _serializer.Deserialize<TResult>(response.CheckError().Data ?? "");
                 }, methodName, ex =>
@@ -153,7 +153,7 @@ namespace UiPath.CoreIpc
                             args[index] = "";
                             break;
                         case Stream stream:
-                            userStream = stream;
+                            uploadStream = stream;
                             args[index] = "";
                             break;
                     }
@@ -231,30 +231,30 @@ namespace UiPath.CoreIpc
 
     public class IpcProxy : DispatchProxy, IDisposable
     {
-        private static readonly MethodInfo InvokeAsyncMethod = typeof(IServiceClient).GetMethod(nameof(IServiceClient.InvokeAsync));
-        private static readonly ConcurrentDictionary<Type, InvokeAsyncDelegate> _invokeAsyncByType = new();
+        private static readonly MethodInfo InvokeMethod = typeof(IServiceClient).GetMethod(nameof(IServiceClient.Invoke));
+        private static readonly ConcurrentDictionary<Type, InvokeDelegate> InvokeByType = new();
 
         internal IServiceClient ServiceClient { get; set; }
 
         public Connection Connection => ServiceClient.Connection;
 
-        protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvokeAsync(targetMethod.ReturnType)(ServiceClient, targetMethod.Name, args);
+        protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvoke(targetMethod.ReturnType)(ServiceClient, targetMethod.Name, args);
 
         public void Dispose() => ServiceClient.Dispose();
 
         public void CloseConnection() => Connection?.Dispose();
 
-        private static InvokeAsyncDelegate GetInvokeAsync(Type returnType) => _invokeAsyncByType.GetOrAdd(returnType, CreateDelegate);
+        private static InvokeDelegate GetInvoke(Type returnType) => InvokeByType.GetOrAdd(returnType, CreateDelegate);
 
-        private static InvokeAsyncDelegate CreateDelegate(Type taskType)
+        private static InvokeDelegate CreateDelegate(Type taskType)
         {
             var resultType = taskType.GetGenericArguments().SingleOrDefault() ?? typeof(object);
             var serviceClient = Parameter(typeof(IServiceClient), "serviceClient");
             var methodName = Parameter(typeof(string), "methodName");
             var methodArgs = Parameter(typeof(object[]), "methodArgs");
-            var invokeAsyncMethod = InvokeAsyncMethod.MakeGenericMethod(resultType);
-            var invokeAsyncCall = Call(serviceClient, invokeAsyncMethod, methodName, methodArgs);
-            var lambda = Lambda<InvokeAsyncDelegate>(invokeAsyncCall, serviceClient, methodName, methodArgs);
+            var invokeMethod = InvokeMethod.MakeGenericMethod(resultType);
+            var invokeCall = Call(serviceClient, invokeMethod, methodName, methodArgs);
+            var lambda = Lambda<InvokeDelegate>(invokeCall, serviceClient, methodName, methodArgs);
             return lambda.Compile();
         }
     }
