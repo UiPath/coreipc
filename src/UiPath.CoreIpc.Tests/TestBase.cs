@@ -20,11 +20,7 @@ namespace UiPath.CoreIpc.Tests
 
         protected TaskScheduler GuiScheduler => _guiThread.Scheduler;
 
-        public virtual void Dispose()
-        {
-            _guiThread.Dispose();
-            Thread.Sleep(1);
-        }
+        public virtual void Dispose() => _guiThread.Dispose();
         protected virtual TSettings Configure<TSettings>(TSettings listenerSettings) where TSettings : ListenerSettings
         {
             listenerSettings.RequestTimeout = RequestTimeout;
