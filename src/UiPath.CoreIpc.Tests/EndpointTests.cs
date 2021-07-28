@@ -28,7 +28,7 @@ namespace UiPath.CoreIpc.Tests
             _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
             _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
             _host = new ServiceHostBuilder(_serviceProvider)
-                .UseNamedPipes(new NamedPipeSettings("EndpointTests") { RequestTimeout = RequestTimeout })
+                .UseNamedPipes(new NamedPipeSettings(PipeName) { RequestTimeout = RequestTimeout })
                 .AddEndpoint<IComputingServiceBase>()
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService, ISystemCallback>()
@@ -37,15 +37,16 @@ namespace UiPath.CoreIpc.Tests
             _computingClient = ComputingClientBuilder().ValidateAndBuild();
             _systemClient = CreateSystemService();
         }
+        public string PipeName => nameof(EndpointTests)+GetHashCode();
         private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
-            new NamedPipeClientBuilder<IComputingService, IComputingCallback>("EndpointTests", _serviceProvider)
+            new NamedPipeClientBuilder<IComputingService, IComputingCallback>(PipeName, _serviceProvider)
                 .AllowImpersonation()
                 .RequestTimeout(RequestTimeout)
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);
         private ISystemService CreateSystemService() => SystemClientBuilder().ValidateAndBuild();
         private NamedPipeClientBuilder<ISystemService, ISystemCallback> SystemClientBuilder() =>
-            new NamedPipeClientBuilder<ISystemService, ISystemCallback>("EndpointTests", _serviceProvider).CallbackInstance(_systemCallback).RequestTimeout(RequestTimeout).AllowImpersonation();
+            new NamedPipeClientBuilder<ISystemService, ISystemCallback>(PipeName, _serviceProvider).CallbackInstance(_systemCallback).RequestTimeout(RequestTimeout).AllowImpersonation();
         public void Dispose()
         {
             ((IDisposable)_computingClient).Dispose();
@@ -68,7 +69,7 @@ namespace UiPath.CoreIpc.Tests
 
         private async Task CallbackCore()
         {
-            var proxy = new NamedPipeClientBuilder<IComputingServiceBase>("EndpointTests").RequestTimeout(RequestTimeout).AllowImpersonation().ValidateAndBuild();
+            var proxy = new NamedPipeClientBuilder<IComputingServiceBase>(PipeName).RequestTimeout(RequestTimeout).AllowImpersonation().ValidateAndBuild();
             var message = new SystemMessage { Text = Guid.NewGuid().ToString() };
             var computingTask = _computingClient.SendMessage(message);
             var systemTask = _systemClient.SendMessage(message);
