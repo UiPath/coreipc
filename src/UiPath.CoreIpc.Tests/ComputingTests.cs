@@ -66,9 +66,9 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task ClientTimeout()
         {
-            var proxy = ComputingClientBuilder().RequestTimeout(TimeSpan.FromMilliseconds(50)).ValidateAndBuild();
+            var proxy = ComputingClientBuilder().RequestTimeout(TimeSpan.FromMilliseconds(10)).ValidateAndBuild();
             proxy.Infinite().ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.Infinite)} timed out.");
-            await proxy.AddFloat(1f, 2f);
+            await proxy.GetCallbackThreadName(new Message { RequestTimeout = RequestTimeout });
             ((IDisposable)proxy).Dispose();
         }
 
