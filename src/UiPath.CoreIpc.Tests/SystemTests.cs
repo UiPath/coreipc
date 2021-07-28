@@ -194,6 +194,7 @@ namespace UiPath.CoreIpc.Tests
 
             await proxy.DoNothing();
             newConnection.ShouldBeFalse();
+            ipcProxy.CloseConnection();
         }
 
         [Fact]
