@@ -39,7 +39,7 @@ namespace UiPath.CoreIpc
             _callbackFactory = callbackFactory ?? throw new ArgumentNullException(nameof(callbackFactory));
         }
         public void Impersonate(Action action) => _impersonationCallback(action);
-        public TCallbackInterface GetCallback<TCallbackInterface>(EndpointSettings endpoint) where TCallbackInterface : class =>
+        TCallbackInterface ICreateCallback.GetCallback<TCallbackInterface>(EndpointSettings endpoint) where TCallbackInterface : class =>
             (TCallbackInterface) _callbacks.GetOrAdd(endpoint, localEndpoint => _callbackFactory.GetCallback<TCallbackInterface>(localEndpoint));
     }
 }
