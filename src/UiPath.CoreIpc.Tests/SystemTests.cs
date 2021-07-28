@@ -118,15 +118,17 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task MissingCallback()
         {
+            RemoteException exception = null;
             try
             {
                 await _systemClient.MissingCallback(new SystemMessage());
             }
             catch (RemoteException ex)
             {
-                ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's not configured.");
-                ex.Is<ArgumentException>().ShouldBeTrue();
+                exception = ex;
             }
+            exception.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's not configured.");
+            exception.Is<ArgumentException>().ShouldBeTrue();
             await Guid();
         }
 
@@ -203,11 +205,16 @@ namespace UiPath.CoreIpc.Tests
             var proxy = SystemClientBuilder().DontReconnect().ValidateAndBuild();
             await proxy.GetGuid(System.Guid.Empty);
             ((IpcProxy)proxy).CloseConnection();
+            ObjectDisposedException exception = null;
             try
             {
                 await proxy.GetGuid(System.Guid.Empty);
             }
-            catch (ObjectDisposedException) { }
+            catch (ObjectDisposedException ex)
+            {
+                exception = ex;
+            }
+            exception.ShouldNotBeNull();
         }
         [Fact]
         public Task CancelServerCall() => CancelServerCallCore(10);

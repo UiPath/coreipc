@@ -83,15 +83,17 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task MissingCallback()
         {
+            RemoteException exception = null;
             try
             {
                 await _systemClient.MissingCallback(new SystemMessage());
             }
             catch (RemoteException ex)
             {
-                ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.CoreIpc.Tests.ISystemCallback.");
-                ex.Is<ArgumentException>().ShouldBeTrue();
+                exception = ex;
             }
+            exception.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.CoreIpc.Tests.ISystemCallback.");
+            exception.Is<ArgumentException>().ShouldBeTrue();
         }
         [Fact]
         public Task CancelServerCall() => CancelServerCallCore(10);

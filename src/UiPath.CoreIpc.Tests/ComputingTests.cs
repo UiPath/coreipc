@@ -78,14 +78,21 @@ namespace UiPath.CoreIpc.Tests
             for (int i = 0; i < 20; i++)
             {
                 var request = new SystemMessage { RequestTimeout = TimeSpan.FromMilliseconds(10), Delay = 100 };
+                Exception exception = null;
                 try
                 {
                     await _computingClient.SendMessage(request);
                 }
                 catch (TimeoutException ex)
                 {
-                    ex.Message.ShouldBe($"{nameof(_computingClient.SendMessage)} timed out.");
+                    exception = ex;
                 }
+                catch (RemoteException ex)
+                {
+                    exception = ex;
+                    ex.Is<TimeoutException>().ShouldBeTrue();
+                }
+                exception.Message.ShouldBe($"{nameof(_computingClient.SendMessage)} timed out.");
                 await AddFloat();
             }
         }

@@ -21,7 +21,7 @@ namespace UiPath.CoreIpc
         public string MethodName { get; }
         public string[] Parameters { get; }
         public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
-        internal TimeSpan GetTimeout(TimeSpan @default) => TimeoutInSeconds == 0 ? @default : TimeSpan.FromSeconds(TimeoutInSeconds);
+        internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
     }
     class CancellationRequest
     {
