@@ -70,6 +70,7 @@ namespace UiPath.CoreIpc.Tests
             proxy.Infinite().ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.Infinite)} timed out.");
             await proxy.GetCallbackThreadName(new Message { RequestTimeout = RequestTimeout });
             ((IDisposable)proxy).Dispose();
+            ((IpcProxy)proxy).CloseConnection();
         }
 
         [Fact]

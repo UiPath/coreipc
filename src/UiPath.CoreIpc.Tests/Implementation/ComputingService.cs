@@ -120,7 +120,7 @@ namespace UiPath.CoreIpc.Tests
 
         public async Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default)
         {
-            await Task.Delay(message.Delay);
+            await Task.Delay(message.Delay, cancellationToken);
             var client = message.Client;
             var callback = message.GetCallback<IComputingCallback>();
             var clientId = await callback.GetId(message);
