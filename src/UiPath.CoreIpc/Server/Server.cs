@@ -82,7 +82,7 @@ namespace UiPath.CoreIpc
                     {
                         return Response.Fail(request, $"No implementation of interface '{contract.FullName}' found.");
                     }
-                    var method = contract.GetInheritedMethod(request.MethodName);
+                    var method = contract.GetInterfaceMethod(request.MethodName);
                     if (method == null)
                     {
                         return Response.Fail(request, $"Method '{request.MethodName}' not found in interface '{contract.FullName}'.");

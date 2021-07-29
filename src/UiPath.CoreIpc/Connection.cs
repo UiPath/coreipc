@@ -122,13 +122,13 @@ namespace UiPath.CoreIpc
             Network.Dispose();
             try
             {
-                CompleteRequests();
                 closedHandler?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
                 Logger.LogException(ex, this);
             }
+            CompleteRequests();
         }
 
         private void CompleteRequests()
