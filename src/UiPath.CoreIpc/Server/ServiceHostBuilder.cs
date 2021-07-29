@@ -65,7 +65,7 @@ namespace UiPath.CoreIpc
         internal Type CallbackContract { get; }
         internal IServiceProvider ServiceProvider { get; set; }
         public BeforeCallHandler BeforeCall { get; set; }
-        public void Validate() => IOHelpers.Validate(Contract, CallbackContract);
+        public void Validate() => Validator.Validate(Contract, CallbackContract);
     }
     public class EndpointSettings<TContract> : EndpointSettings where TContract : class
     {

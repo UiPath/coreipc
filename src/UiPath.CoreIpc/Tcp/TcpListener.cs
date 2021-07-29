@@ -43,7 +43,7 @@ namespace UiPath.CoreIpc.Tcp
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);
-            _tcpServer.Server?.Dispose();
+            _tcpServer.Stop();
         }
     }
     public static class TcpServiceExtensions

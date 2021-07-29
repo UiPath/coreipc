@@ -12,4 +12,4 @@ steps:
       projects: '**/*Tests*.csproj'
       publishTestResults: true
       testRunTitle: '.NET tests'
-      arguments: '--no-build --configuration $(DotNet_BuildConfiguration)'
+      arguments: '--no-build --configuration $(DotNet_BuildConfiguration) --logger "console;verbosity=detailed"'

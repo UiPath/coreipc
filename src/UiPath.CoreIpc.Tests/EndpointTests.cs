@@ -28,7 +28,7 @@ namespace UiPath.CoreIpc.Tests
             _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
             _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
             _host = new ServiceHostBuilder(_serviceProvider)
-                .UseNamedPipes(new NamedPipeSettings("EndpointTests") { RequestTimeout = RequestTimeout })
+                .UseNamedPipes(new NamedPipeSettings(PipeName) { RequestTimeout = RequestTimeout })
                 .AddEndpoint<IComputingServiceBase>()
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService, ISystemCallback>()
@@ -37,22 +37,23 @@ namespace UiPath.CoreIpc.Tests
             _computingClient = ComputingClientBuilder().ValidateAndBuild();
             _systemClient = CreateSystemService();
         }
+        public string PipeName => nameof(EndpointTests)+GetHashCode();
         private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
-            new NamedPipeClientBuilder<IComputingService, IComputingCallback>("EndpointTests", _serviceProvider)
+            new NamedPipeClientBuilder<IComputingService, IComputingCallback>(PipeName, _serviceProvider)
                 .AllowImpersonation()
                 .RequestTimeout(RequestTimeout)
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);
         private ISystemService CreateSystemService() => SystemClientBuilder().ValidateAndBuild();
         private NamedPipeClientBuilder<ISystemService, ISystemCallback> SystemClientBuilder() =>
-            new NamedPipeClientBuilder<ISystemService, ISystemCallback>("EndpointTests", _serviceProvider).CallbackInstance(_systemCallback).RequestTimeout(RequestTimeout).AllowImpersonation();
+            new NamedPipeClientBuilder<ISystemService, ISystemCallback>(PipeName, _serviceProvider).CallbackInstance(_systemCallback).RequestTimeout(RequestTimeout).AllowImpersonation();
         public void Dispose()
         {
             ((IDisposable)_computingClient).Dispose();
             ((IDisposable)_systemClient).Dispose();
-            _host.Dispose();
             ((IpcProxy)_computingClient).CloseConnection();
             ((IpcProxy)_systemClient).CloseConnection();
+            _host.Dispose();
         }
         [Fact]
         public Task CallbackConcurrently() => Task.WhenAll(Enumerable.Range(1, 50).Select(_ => CallbackCore()));
@@ -68,7 +69,7 @@ namespace UiPath.CoreIpc.Tests
 
         private async Task CallbackCore()
         {
-            var proxy = new NamedPipeClientBuilder<IComputingServiceBase>("EndpointTests").RequestTimeout(RequestTimeout).AllowImpersonation().ValidateAndBuild();
+            var proxy = new NamedPipeClientBuilder<IComputingServiceBase>(PipeName).RequestTimeout(RequestTimeout).AllowImpersonation().ValidateAndBuild();
             var message = new SystemMessage { Text = Guid.NewGuid().ToString() };
             var computingTask = _computingClient.SendMessage(message);
             var systemTask = _systemClient.SendMessage(message);
@@ -82,9 +83,17 @@ namespace UiPath.CoreIpc.Tests
         [Fact]
         public async Task MissingCallback()
         {
-            var ex = _systemClient.MissingCallback(new SystemMessage()).ShouldThrow<RemoteException>();
-            ex.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.CoreIpc.Tests.ISystemCallback.");
-            ex.Is<ArgumentException>().ShouldBeTrue();
+            RemoteException exception = null;
+            try
+            {
+                await _systemClient.MissingCallback(new SystemMessage());
+            }
+            catch (RemoteException ex)
+            {
+                exception = ex;
+            }
+            exception.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.CoreIpc.Tests.ISystemCallback.");
+            exception.Is<ArgumentException>().ShouldBeTrue();
         }
         [Fact]
         public Task CancelServerCall() => CancelServerCallCore(10);
@@ -93,25 +102,20 @@ namespace UiPath.CoreIpc.Tests
         {
             for (int i = 0; i < counter; i++)
             {
-                var proxy = CreateSystemService();
-                var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite, Text = Guid.NewGuid().ToString() };
+                var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
                 Task sendMessageResult;
                 using (var cancellationSource = new CancellationTokenSource())
                 {
-                    sendMessageResult = proxy.MissingCallback(request, cancellationSource.Token);
+                    sendMessageResult = _systemClient.MissingCallback(request, cancellationSource.Token);
                     var newGuid = Guid.NewGuid();
-                    (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
+                    (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
                     await Task.Delay(1);
                     cancellationSource.Cancel();
-                    sendMessageResult.ShouldThrow<TaskCanceledException>();
-                    while (_systemService.MessageText != request.Text)
-                    {
-                        await Task.Yield();
-                    }
+                    sendMessageResult.ShouldThrow<Exception>();
                     newGuid = Guid.NewGuid();
-                    (await proxy.GetGuid(newGuid)).ShouldBe(newGuid);
+                    (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
                 }
-                ((IDisposable)proxy).Dispose();
+                ((IDisposable)_systemClient).Dispose();
             }
         }
 
@@ -123,6 +127,19 @@ namespace UiPath.CoreIpc.Tests
             var message = proxy.GetThreadName().ShouldThrow<InvalidOperationException>().Message;
             message.ShouldStartWith("Duplicate callback proxy instance EndpointTests");
             message.ShouldEndWith("<ISystemService, ISystemCallback>. Consider using a singleton callback proxy.");
+        }
+    }
+    public interface ISystemCallback
+    {
+        Task<string> GetId(Message message = null);
+    }
+    public class SystemCallback : ISystemCallback
+    {
+        public string Id { get; set; }
+        public async Task<string> GetId(Message message)
+        {
+            message.Client.ShouldBeNull();
+            return Id;
         }
     }
 }

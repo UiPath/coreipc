@@ -1,12 +1,38 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using UiPath.CoreIpc;
 
 namespace UiPath.CoreIpc.Tests
 {
+    public interface ISystemService
+    {
+        Task DoNothing(CancellationToken cancellationToken = default);
+        Task VoidThreadName(CancellationToken cancellationToken = default);
+        Task VoidSyncThrow(CancellationToken cancellationToken = default);
+        Task<string> GetThreadName(CancellationToken cancellationToken = default);
+        Task<string> ConvertText(string text, TextStyle style, CancellationToken cancellationToken = default);
+        Task<Guid> GetGuid(Guid guid, CancellationToken cancellationToken = default);
+        Task<byte[]> ReverseBytes(byte[] input, CancellationToken cancellationToken = default);
+        Task<bool> SlowOperation(CancellationToken cancellationToken = default);
+        Task<string> MissingCallback(SystemMessage message, CancellationToken cancellationToken = default);
+        Task<bool> Infinite(CancellationToken cancellationToken = default);
+        Task<string> ImpersonateCaller(Message message = null, CancellationToken cancellationToken = default);
+        Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default);
+        Task<string> Upload(Stream stream, int delay = 0, CancellationToken cancellationToken = default);
+        Task<Stream> Download(string text, CancellationToken cancellationToken = default);
+        Task<Stream> Echo(Stream input, CancellationToken cancellationToken = default);
+    }
+
+    public class SystemMessage : Message
+    {
+        public string Text { get; set; }
+        public int Delay { get; set; }
+    }
     public class SystemService : ISystemService
     {
         public SystemService()
@@ -61,21 +87,11 @@ namespace UiPath.CoreIpc.Tests
             return input.Reverse().ToArray();
         }
 
-        public string MessageText;
-
         public async Task<string> MissingCallback(SystemMessage message, CancellationToken cancellationToken = default)
         {
-            try
+            if (message.Delay != 0)
             {
-                if (message.Delay != 0)
-                {
-                    await Task.Delay(message.Delay, cancellationToken);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                MessageText = message.Text;
-                throw;
+                await Task.Delay(message.Delay, cancellationToken);
             }
             var domainName = "";
             var client = message.Client;
@@ -129,6 +145,22 @@ namespace UiPath.CoreIpc.Tests
             string returnValue = "";
             client.Impersonate(() => returnValue = client.GetUserName());
             return returnValue;
+        }
+
+        public async Task<string> Upload(Stream stream, int delay = 0, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(delay);
+            return await new StreamReader(stream).ReadToEndAsync();
+        }
+
+        public async Task<Stream> Download(string text, CancellationToken cancellationToken = default) => new MemoryStream(Encoding.UTF8.GetBytes(text));
+
+        public async Task<Stream> Echo(Stream input, CancellationToken cancellationToken = default)
+        {
+            var result = new MemoryStream();
+            await input.CopyToAsync(result);
+            result.Position = 0;
+            return result;
         }
     }
 }

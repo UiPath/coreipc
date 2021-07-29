@@ -30,11 +30,11 @@ namespace UiPath.CoreIpc
             {
                 return;
             }
-            _cancellationTokenSource.Cancel();
             foreach (var listener in _listeners)
             {
                 listener.Dispose();
             }
+            _cancellationTokenSource.Cancel();
             _cancellationTokenSource.Dispose();
         }
 

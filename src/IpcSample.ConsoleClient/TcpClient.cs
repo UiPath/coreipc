@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Linq;
 using System.Net;
+using System.IO;
 
 namespace UiPath.CoreIpc.Tests
 {
@@ -50,7 +51,10 @@ namespace UiPath.CoreIpc.Tests
                     .RequestTimeout(TimeSpan.FromSeconds(2))
                     .Logger(serviceProvider)
                     .ValidateAndBuild();
-                while (true)
+                using (var file = File.OpenRead(@"C:\Windows\DPINST.log"))
+                {
+                    Console.WriteLine(await systemClient.Upload(file));
+                }
                 {
                     // test 1: call IPC service method with primitive types
                     float result1 = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);

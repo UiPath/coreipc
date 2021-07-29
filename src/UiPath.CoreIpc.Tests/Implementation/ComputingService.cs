@@ -1,12 +1,82 @@
 ﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using UiPath.CoreIpc;
 
 namespace UiPath.CoreIpc.Tests
 {
+    public interface IInvalid : IDisposable
+    {
+    }
+
+    public interface IDuplicateMessage
+    {
+        Task Test(Message message1, Message message2);
+    }
+
+    public interface IUploadNotification
+    {
+        Task Upload(Stream stream);
+    }
+
+    public interface IDerivedStreamDownload
+    {
+        Task<MemoryStream> Download();
+    }
+
+    public interface IDuplicateStreams
+    {
+        Task<bool> Upload(Stream stream, Stream stream2);
+    }
+
+    public interface IDerivedStreamUpload
+    {
+        Task<bool> Upload(MemoryStream stream);
+    }
+
+    public interface IMessageFirst
+    {
+        Task Test(Message message1, int x);
+    }
+
+    public interface IInvalidCancellationToken
+    {
+        Task Test(CancellationToken token, int x);
+    }
+
+    public interface IComputingServiceBase
+    {
+        Task<float> AddFloat(float x, float y, CancellationToken cancellationToken = default);
+    }
+    public interface IComputingService : IComputingServiceBase
+    {
+        Task<ComplexNumber> AddComplexNumber(ComplexNumber x, ComplexNumber y, CancellationToken cancellationToken = default);
+        Task<ComplexNumber> AddComplexNumbers(IEnumerable<ComplexNumber> numbers, CancellationToken cancellationToken = default);
+        Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default);
+        Task<bool> Infinite(CancellationToken cancellationToken = default);
+        Task InfiniteVoid(CancellationToken cancellationToken = default);
+        Task<string> GetCallbackThreadName(Message message = null, CancellationToken cancellationToken = default);
+    }
+
+    public struct ComplexNumber
+    {
+        public float A { get; set; }
+        public float B { get; set; }
+
+        public ComplexNumber(float a, float b)
+        {
+            A = a;
+            B = b;
+        }
+    }
+
+    public enum TextStyle
+    {
+        TitleCase,
+        Upper
+    }
     public class ComputingService : IComputingService
     {
         private readonly ILogger<ComputingService> _logger;

@@ -35,20 +35,6 @@ namespace UiPath.CoreIpc
         }
         private static ClientConnection GetOrAdd(IConnectionKey key)=>_connections.GetOrAdd(key, localKey => new(localKey));
         public static bool TryGet(IConnectionKey key, out ClientConnection connection) => _connections.TryGetValue(key, out connection);
-        public static void Clear()
-        {
-            foreach (var connection in _connections.Values)
-            {
-                connection.Close();
-            }
-        }
-        public static void Close(IConnectionKey key)
-        {
-            if (TryGet(key, out var connection))
-            {
-                connection.Close();
-            }
-        }
         internal static ClientConnection Remove(IConnectionKey connectionKey)
         {
             _connections.TryRemove(connectionKey, out var clientConnection);
@@ -82,16 +68,21 @@ namespace UiPath.CoreIpc
             set
             {
                 _connection = value;
-                _connection.Closed += (_, __) => OnConnectionClosed(_connection).LogException(_connection.Logger, _connection);
+                _connection.Closed += OnConnectionClosed;
             }
         }
-        private async Task OnConnectionClosed(Connection closedConnection)
+        private void OnConnectionClosed(object sender, EventArgs _)
         {
+            var closedConnection = (Connection)sender;
             if (!ClientConnectionsRegistry.TryGet(ConnectionKey, out var clientConnection) || clientConnection.Connection != closedConnection)
             {
                 return;
             }
-            using (await clientConnection.LockAsync())
+            if (!clientConnection.TryLock(out var guard))
+            {
+                return;
+            }
+            using (guard)
             {
                 if (!ClientConnectionsRegistry.TryGet(ConnectionKey, out clientConnection) || clientConnection.Connection != closedConnection)
                 {
@@ -105,6 +96,19 @@ namespace UiPath.CoreIpc
         public Server Server { get; set; }
         IConnectionKey ConnectionKey { get; }
         public Task<IDisposable> LockAsync(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
+        public bool TryLock(out IDisposable guard)
+        {
+            try
+            {
+                guard = _lock.Lock(new(canceled: true));
+                return true;
+            }
+            catch (TaskCanceledException)
+            {
+                guard = null;
+                return false;
+            }
+        }
         public void Close() => Connection?.Dispose();
         public override string ToString() => _connection?.ToString() ?? base.ToString();
     }

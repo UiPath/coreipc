@@ -11,12 +11,16 @@ namespace UiPath.CoreIpc
     {
         public static TInterface ValidateAndBuild<TDerived, TInterface>(this ServiceClientBuilder<TDerived, TInterface> builder) where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
         {
-            IOHelpers.Validate(builder);
+#if DEBUG
+            Validator.Validate(builder);
+#endif
             return builder.Build();
         }
         public static ServiceHost ValidateAndBuild(this ServiceHostBuilder serviceHostBuilder)
         {
-            IOHelpers.Validate(serviceHostBuilder);
+#if DEBUG
+            Validator.Validate(serviceHostBuilder);
+#endif
             return serviceHostBuilder.Build();
         }
         public static IServiceProvider ConfigureServices() =>
