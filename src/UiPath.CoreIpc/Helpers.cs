@@ -22,18 +22,12 @@ namespace UiPath.CoreIpc
             type.GetInterfaces().Select(t => t.GetMethod(name, InstanceFlags)).FirstOrDefault(m => m != null);
         public static IEnumerable<MethodInfo> GetInterfaceMethods(this Type type) =>
             type.GetMethods().Concat(type.GetInterfaces().SelectMany(i => i.GetMethods()));
-        public static object GetDefaultValue(this ParameterInfo parameter)
+        public static object GetDefaultValue(this ParameterInfo parameter) => parameter switch
         {
-            if (!parameter.HasDefaultValue)
-            {
-                throw new ArgumentException($"{parameter} has no default value!");
-            }
-            if (parameter.DefaultValue == null && parameter.ParameterType.IsValueType)
-            {
-                return Activator.CreateInstance(parameter.ParameterType);
-            }
-            return parameter.DefaultValue;
-        }
+            { HasDefaultValue: false } => throw new ArgumentException($"{parameter} has no default value!"),
+            { ParameterType: { IsValueType: true }, DefaultValue: null } => Activator.CreateInstance(parameter.ParameterType),
+            _ => parameter.DefaultValue
+        };
         public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
         public static async Task<bool> WithResult(this Task task)
         {
