@@ -56,7 +56,6 @@ namespace UiPath.CoreIpc
             }
             void CancelRequest()
             {
-                requestCompletion.TrySetCanceled();
                 if (uploadStream == null)
                 {
                     CancelServerCall(request.Id).LogException(Logger, this);
@@ -65,6 +64,7 @@ namespace UiPath.CoreIpc
                 {
                     Dispose();
                 }
+                requestCompletion.TrySetCanceled();
             }
             Task CancelServerCall(string requestId) => SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId)), default);
         }
