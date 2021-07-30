@@ -34,19 +34,12 @@ namespace UiPath.CoreIpc
             await task;
             return true;
         }
-
-        public static Task WithTimeout(this CancellationToken cancellationToken,
-            TimeSpan timeout, Func<CancellationToken, Task> func, string message, Func<Exception, Task> exceptionHandler) =>
-            new[] { cancellationToken }.WithTimeout(timeout, func, message, exceptionHandler);
-
         public static Task<TResult> WithTimeout<TResult>(this CancellationToken cancellationToken,
             TimeSpan timeout, Func<CancellationToken, Task<TResult>> func, string message, Func<Exception, Task> exceptionHandler) =>
             new[] { cancellationToken }.WithTimeout(timeout, func, message, exceptionHandler);
-
         public static Task WithTimeout(this IEnumerable<CancellationToken> cancellationTokens,
             TimeSpan timeout, Func<CancellationToken, Task> func, string message, Func<Exception, Task> exceptionHandler) =>
             cancellationTokens.WithTimeout(timeout, token => func(token).WithResult(), message, exceptionHandler);
-
         public static void LogException(this ILogger logger, Exception ex, object tag)
         {
             var message = $"{tag} # {ex}";
@@ -59,14 +52,12 @@ namespace UiPath.CoreIpc
                 Trace.TraceError(message);
             }
         }
-
         public static void LogException(this Task task, ILogger logger, object tag) => task.ContinueWith(result => logger.LogException(result.Exception, tag), TaskContinuationOptions.NotOnRanToCompletion);
-
         public static async Task<TResult> WithTimeout<TResult>(this IEnumerable<CancellationToken> cancellationTokens,
             TimeSpan timeout, Func<CancellationToken, Task<TResult>> func, string message, Func<Exception, Task> exceptionHandler)
         {
-            using var timeoutCancellationSource = new CancellationTokenSource(timeout);
-            using var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokens.Concat(new[] { timeoutCancellationSource.Token }).ToArray());
+            var timeoutCancellationSource = new CancellationTokenSource(timeout);
+            var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokens.Concat(new[] { timeoutCancellationSource.Token }).ToArray());
             try
             {
                 return await func(linkedCancellationSource.Token);
@@ -78,11 +69,19 @@ namespace UiPath.CoreIpc
                 {
                     exception = new TimeoutException(message + " timed out.", ex);
                 }
-                timeoutCancellationSource.Dispose();
-                linkedCancellationSource.Dispose();
+                Dispose();
                 await exceptionHandler(exception);
             }
+            finally
+            {
+                Dispose();
+            }
             return default;
+            void Dispose()
+            {
+                timeoutCancellationSource.Dispose();
+                linkedCancellationSource.Dispose();
+            }
         }
     }
     public static class IOHelpers
