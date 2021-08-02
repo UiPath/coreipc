@@ -8,6 +8,7 @@ namespace UiPath.CoreIpc.Tests
     public abstract class TestBase : IDisposable
     {
         protected const int MaxReceivedMessageSizeInMegabytes = 1;
+        protected static int Count = -1;
         protected static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
         protected readonly IServiceProvider _serviceProvider;
         protected readonly AsyncContext _guiThread = new AsyncContextThread().Context;
@@ -17,6 +18,8 @@ namespace UiPath.CoreIpc.Tests
             _guiThread.SynchronizationContext.Send(() => Thread.CurrentThread.Name = "GuiThread");
             _serviceProvider = IpcHelpers.ConfigureServices();
         }
+
+        protected static int GetCount() => Interlocked.Increment(ref Count);
 
         protected TaskScheduler GuiScheduler => _guiThread.Scheduler;
 
