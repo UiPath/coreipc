@@ -69,7 +69,7 @@ namespace UiPath.CoreIpc.Tests
             _systemService.DidNothing.ShouldBeFalse();
             while (!_systemService.DidNothing)
             {
-                await Task.Delay(1);
+                await Task.Delay(10);
                 Trace.WriteLine(this + " Void");
             }
         }
