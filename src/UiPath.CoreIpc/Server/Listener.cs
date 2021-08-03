@@ -2,10 +2,7 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Net.Security;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -34,7 +31,6 @@ namespace UiPath.CoreIpc
     }
     abstract class Listener : IDisposable
     {
-        protected bool _disposed;
         protected Listener(ListenerSettings settings)
         {
             Settings = settings;
@@ -42,7 +38,7 @@ namespace UiPath.CoreIpc
             Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
         }
         public string Name => Settings.Name;
-        protected ILogger Logger { get; }
+        public ILogger Logger { get; }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ListenerSettings Settings { get; }
         public int MaxMessageSize { get; }
@@ -54,70 +50,25 @@ namespace UiPath.CoreIpc
                     await AcceptConnection(token);
                 }
             }));
-        protected abstract Task AcceptConnection(CancellationToken token);
-        class ServerConnection : ICreateCallback
+        protected abstract ServerConnection CreateServerConnection();
+        async Task AcceptConnection(CancellationToken token)
         {
-            private readonly Listener _listener;
-            private readonly Connection _connection;
-            private readonly Server _server;
-            public ServerConnection(Listener listener, Stream network, Func<ServerConnection, IClient> clientFactory, CancellationToken cancellationToken)
+            var serverConnection = CreateServerConnection();
+            try
             {
-                _listener = listener;
-                var stream = Settings.EncryptAndSign ? new NegotiateStream(network) : network;
-                var serializer = Settings.ServiceProvider.GetRequiredService<ISerializer>();
-                _connection = new(stream, serializer, Logger, _listener.Name, _listener.MaxMessageSize);
-                _server = new(Logger, Settings, _connection, new(() => clientFactory(this)), cancellationToken);
-                Listen().LogException(Logger, _listener.Name);
-                return;
-                async Task Listen()
+                await serverConnection.AcceptClient(token);
+                serverConnection.Listen(token).LogException(Logger, Name);
+            }
+            catch (Exception ex)
+            {
+                serverConnection.Dispose();
+                if (!token.IsCancellationRequested)
                 {
-                    if (Settings.EncryptAndSign)
-                    {
-                        await AuthenticateAsServer();
-                    }
-                    // close the connection when the service host closes
-                    using (cancellationToken.Register(_connection.Dispose))
-                    {
-                        await _connection.Listen();
-                    }
-                    return;
-                    async Task AuthenticateAsServer()
-                    {
-                        var negotiateStream = (NegotiateStream)_connection.Network;
-                        try
-                        {
-                            await negotiateStream.AuthenticateAsServerAsync();
-                        }
-                        catch
-                        {
-                            _connection.Dispose();
-                            throw;
-                        }
-                        Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
-                    }
+                    Logger.LogException(ex, Settings.Name);
                 }
             }
-            public ILogger Logger => _listener.Logger;
-            public ListenerSettings Settings => _listener.Settings;
-            TCallbackContract ICreateCallback.GetCallback<TCallbackContract>(EndpointSettings endpoint)
-            {
-                var configuredCallbackContract = endpoint.CallbackContract;
-                if (configuredCallbackContract == null || !typeof(TCallbackContract).IsAssignableFrom(configuredCallbackContract))
-                {
-                    throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackContract)}, but it's {configuredCallbackContract?.ToString() ?? "not configured"}.");
-                }
-                Logger.LogInformation($"Create callback {_listener.Name}");
-                var serializer = _listener.ServiceProvider.GetRequiredService<ISerializer>();
-                var serviceClient = new ServiceClient<TCallbackContract>(serializer, Settings.RequestTimeout, Logger, (_, __) => Task.FromResult(_connection));
-                return serviceClient.CreateProxy();
-            }
         }
-        protected void HandleConnection(Stream network, Func<ICreateCallback, IClient> clientFactory, CancellationToken cancellationToken) => new ServerConnection(this, network, clientFactory, cancellationToken);
-
-        protected virtual void Dispose(bool disposing)
-        {
-            _disposed = true;
-        }
+        protected virtual void Dispose(bool disposing) { }
         public void Dispose()
         {
             Dispose(disposing: true);

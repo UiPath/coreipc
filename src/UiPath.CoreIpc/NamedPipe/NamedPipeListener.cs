@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.IO;
 using System.IO.Pipes;
 using System.Security.Principal;
 using System.Threading;
@@ -15,44 +15,45 @@ namespace UiPath.CoreIpc.NamedPipe
     class NamedPipeListener : Listener
     {
         public NamedPipeListener(NamedPipeSettings settings) : base(settings) { }
-        public new NamedPipeSettings Settings => (NamedPipeSettings)base.Settings;
-        protected override async Task AcceptConnection(CancellationToken token)
+        protected override ServerConnection CreateServerConnection() => new NamedPipeServerConnection(this);
+        class NamedPipeServerConnection : ServerConnection
         {
-            var server = IOHelpers.NewNamedPipeServerStream(Settings.Name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
-                PipeTransmissionMode.Byte, PipeOptions.Asynchronous, GetPipeSecurity);
-            try
+            readonly NamedPipeServerStream _server;
+            public NamedPipeServerConnection(Listener listener) : base(listener)
+            {
+                _server = IOHelpers.NewNamedPipeServerStream(Settings.Name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous, GetPipeSecurity);
+            }
+            public override async Task AcceptClient(CancellationToken cancellationToken)
             {
                 // on linux WaitForConnectionAsync has to be cancelled with Dispose
-                using (token.Register(server.Dispose))
+                using (cancellationToken.Register(Dispose))
                 {
-                    await server.WaitForConnectionAsync();
-                }
-                // pass the ownership of the connection
-                HandleConnection(server, callbackFactory => new Client(action => server.RunAsClient(() => action()), callbackFactory), token);
-            }
-            catch (Exception ex)
-            {
-                server.Dispose();
-                if (!token.IsCancellationRequested)
-                {
-                    Logger.LogException(ex, Settings.Name);
+                    await _server.WaitForConnectionAsync();
                 }
             }
-        }
-        private PipeSecurity GetPipeSecurity()
-        {
-            var setAccessControl = Settings.AccessControl;
-            if (setAccessControl == null)
+            protected override Stream Network => _server;
+            protected override void Impersonate(Action action) => _server.RunAsClient(()=>action());
+            protected override void Dispose(bool disposing)
             {
-                return null;
+                _server.Dispose();
+                base.Dispose(disposing);
             }
-            var pipeSecurity = new PipeSecurity();
-            FullControlFor(WellKnownSidType.BuiltinAdministratorsSid);
-            FullControlFor(WellKnownSidType.LocalSystemSid);
-            pipeSecurity.AllowCurrentUser(onlyNonAdmin: true);
-            setAccessControl(pipeSecurity);
-            return pipeSecurity;
-            void FullControlFor(WellKnownSidType sid) => pipeSecurity.Allow(sid, PipeAccessRights.FullControl);
+            PipeSecurity GetPipeSecurity()
+            {
+                var setAccessControl = ((NamedPipeSettings)Settings).AccessControl;
+                if (setAccessControl == null)
+                {
+                    return null;
+                }
+                var pipeSecurity = new PipeSecurity();
+                FullControlFor(WellKnownSidType.BuiltinAdministratorsSid);
+                FullControlFor(WellKnownSidType.LocalSystemSid);
+                pipeSecurity.AllowCurrentUser(onlyNonAdmin: true);
+                setAccessControl(pipeSecurity);
+                return pipeSecurity;
+                void FullControlFor(WellKnownSidType sid) => pipeSecurity.Allow(sid, PipeAccessRights.FullControl);
+            }
         }
     }
     public static class NamedPipeServiceExtensions
