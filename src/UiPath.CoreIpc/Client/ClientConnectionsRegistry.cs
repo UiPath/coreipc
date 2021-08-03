@@ -3,6 +3,7 @@ using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -33,7 +34,7 @@ namespace UiPath.CoreIpc
             }
             return new(clientConnection, asyncLock);
         }
-        private static ClientConnection GetOrAdd(IConnectionKey key)=>_connections.GetOrAdd(key, localKey => new(localKey));
+        private static ClientConnection GetOrAdd(IConnectionKey key)=>_connections.GetOrAdd(key, key.CreateClientConnection);
         public static bool TryGet(IConnectionKey key, out ClientConnection connection) => _connections.TryGetValue(key, out connection);
         internal static ClientConnection Remove(IConnectionKey connectionKey)
         {
@@ -55,13 +56,15 @@ namespace UiPath.CoreIpc
     interface IConnectionKey : IEquatable<IConnectionKey>
     {
         bool EncryptAndSign { get; }
+        ClientConnection CreateClientConnection(IConnectionKey key);
     }
-    class ClientConnection
+    abstract class ClientConnection : IDisposable
     {
         readonly AsyncLock _lock = new();
         Connection _connection;
-        public ClientConnection(IConnectionKey connectionKey) => ConnectionKey = connectionKey;
-        public object State { get; set; }
+        protected ClientConnection(IConnectionKey connectionKey) => ConnectionKey = connectionKey;
+        public abstract bool Connected { get; }
+        public abstract Stream Network { get; }
         public Connection Connection
         {
             get => _connection;
@@ -71,6 +74,7 @@ namespace UiPath.CoreIpc
                 _connection.Closed += OnConnectionClosed;
             }
         }
+        public abstract Task ConnectAsync(CancellationToken cancellationToken);
         private void OnConnectionClosed(object sender, EventArgs _)
         {
             var closedConnection = (Connection)sender;
@@ -94,7 +98,7 @@ namespace UiPath.CoreIpc
             }
         }
         public Server Server { get; set; }
-        IConnectionKey ConnectionKey { get; }
+        protected IConnectionKey ConnectionKey { get; }
         public Task<IDisposable> LockAsync(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
         public bool TryLock(out IDisposable guard)
         {
@@ -109,7 +113,12 @@ namespace UiPath.CoreIpc
                 return false;
             }
         }
-        public void Close() => Connection?.Dispose();
         public override string ToString() => _connection?.ToString() ?? base.ToString();
+        protected virtual void Dispose(bool disposing) {}
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
     }
 }
