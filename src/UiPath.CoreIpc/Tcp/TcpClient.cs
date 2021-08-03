@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -15,45 +16,30 @@ namespace UiPath.CoreIpc.Tcp
     }
     class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterface : class
     {
-        private TcpClient _tcpClient;
         public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, encryptAndSign, beforeCall, serviceEndpoint) =>
             EndPoint = endPoint;
         public IPEndPoint EndPoint { get; }
         public override int GetHashCode() => EndPoint.GetHashCode();
-        bool IEquatable<IConnectionKey>.Equals(IConnectionKey other) => other == this || (other is ITcpKey otherClient && EndPoint.Equals(otherClient.EndPoint));
-        protected async override Task<bool> ConnectToServerAsync(CancellationToken cancellationToken)
+        public override bool Equals(IConnectionKey other) => other == this || (other is ITcpKey otherClient && EndPoint.Equals(otherClient.EndPoint));
+        public override ClientConnection CreateClientConnection(IConnectionKey key) => new TcpClientConnection(key);
+        class TcpClientConnection : ClientConnection
         {
-            if (_tcpClient?.Connected == true)
+            private TcpClient _tcpClient;
+            public TcpClientConnection(IConnectionKey connectionKey) : base(connectionKey) {}
+            public override bool Connected => _tcpClient?.Connected is true;
+            protected override void Dispose(bool disposing)
             {
-                return false;
+                _tcpClient?.Dispose();
+                base.Dispose(disposing);
             }
-            using var connectionHandle = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
-            var clientConnection = connectionHandle.ClientConnection;
-            var tcpClient = (TcpClient)clientConnection.State;
-            if (tcpClient != null)
+            public override Stream Network => _tcpClient.GetStream();
+            public override async Task ConnectAsync(CancellationToken cancellationToken)
             {
-                if (tcpClient.Connected)
-                {
-                    ReuseClientConnection(clientConnection);
-                    _tcpClient = tcpClient;
-                    return false;
-                }
-                tcpClient.Dispose();
+                var endPoint = ((ITcpKey)ConnectionKey).EndPoint;
+                _tcpClient = new();
+                using var token = cancellationToken.Register(Dispose);
+                await _tcpClient.ConnectAsync(endPoint.Address, endPoint.Port);
             }
-            tcpClient = new();
-            try
-            {
-                using var token = cancellationToken.Register(tcpClient.Dispose);
-                await tcpClient.ConnectAsync(EndPoint.Address, EndPoint.Port);
-            }
-            catch
-            {
-                tcpClient.Dispose();
-                throw;
-            }
-            await CreateClientConnection(clientConnection, tcpClient.GetStream(), tcpClient, EndPoint.ToString());
-            _tcpClient = tcpClient;
-            return true;
         }
     }
 }

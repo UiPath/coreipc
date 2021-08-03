@@ -25,7 +25,7 @@ namespace UiPath.CoreIpc
         Connection Connection { get; }
     }
 
-    public class ServiceClient<TInterface> : IServiceClient where TInterface : class
+    class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterface : class
     {
         private readonly ISerializer _serializer;
         protected readonly TimeSpan _requestTimeout;
@@ -36,6 +36,7 @@ namespace UiPath.CoreIpc
         private readonly AsyncLock _connectionLock = new();
         protected Connection _connection;
         private Server _server;
+        private ClientConnection _clientConnection;
 
         internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign = false, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
         {
@@ -161,8 +162,6 @@ namespace UiPath.CoreIpc
             }
         }
 
-        protected virtual Task<bool> ConnectToServerAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
-
         protected async Task<bool> EnsureConnection(CancellationToken cancellationToken)
         {
             if (_connectionFactory != null)
@@ -178,11 +177,42 @@ namespace UiPath.CoreIpc
                     return false;
                 }
             }
-            return await ConnectToServerAsync(cancellationToken);
+            return await CheckConnection(cancellationToken);
+        }
+
+        private async Task<bool> CheckConnection(CancellationToken cancellationToken)
+        {
+            if (_clientConnection?.Connected is true)
+            {
+                return false;
+            }
+            using var connectionHandle = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
+            var clientConnection = connectionHandle.ClientConnection;
+            if (clientConnection.Connected)
+            {
+                ReuseClientConnection(clientConnection);
+                return false;
+            }
+            else
+            {
+                clientConnection.Dispose();
+            }
+            try
+            {
+                await clientConnection.ConnectAsync(cancellationToken);
+            }
+            catch
+            {
+                clientConnection.Dispose();
+                throw;
+            }
+            await InitializeClientConnection(clientConnection, Name);
+            return true;
         }
 
         private protected void ReuseClientConnection(ClientConnection clientConnection)
         {
+            _clientConnection = clientConnection;
             var alreadyHasServer = clientConnection.Server != null;
             _logger?.LogInformation(nameof(ReuseClientConnection)+" "+clientConnection);
             OnNewConnection(clientConnection.Connection, alreadyHasServer);
@@ -204,13 +234,13 @@ namespace UiPath.CoreIpc
             }
         }
 
-        private protected async Task CreateClientConnection(ClientConnection clientConnection, Stream network, object state, string name)
+        private protected async Task InitializeClientConnection(ClientConnection clientConnection, string name)
         {
-            await CreateConnection(network, name);
+            await CreateConnection(clientConnection.Network, name);
             _connection.Listen().LogException(_logger, name);
             clientConnection.Connection = _connection;
-            clientConnection.State = state;
             clientConnection.Server = _server;
+            _clientConnection = clientConnection;
         }
 
         public void Dispose()
@@ -227,6 +257,10 @@ namespace UiPath.CoreIpc
                 _server?.Endpoints.Remove(_serviceEndpoint.Name);
             }
         }
+
+        public virtual bool Equals(IConnectionKey other) => EncryptAndSign == other.EncryptAndSign;
+
+        public virtual ClientConnection CreateClientConnection(IConnectionKey key) => throw new NotImplementedException();
     }
 
     public class IpcProxy : DispatchProxy, IDisposable
