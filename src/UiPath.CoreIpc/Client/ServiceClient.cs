@@ -28,13 +28,13 @@ namespace UiPath.CoreIpc
     class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterface : class
     {
         private readonly ISerializer _serializer;
-        protected readonly TimeSpan _requestTimeout;
-        protected readonly ILogger _logger;
-        protected readonly ConnectionFactory _connectionFactory;
-        protected readonly BeforeCallHandler _beforeCall;
-        protected readonly EndpointSettings _serviceEndpoint;
+        private readonly TimeSpan _requestTimeout;
+        private readonly ILogger _logger;
+        private readonly ConnectionFactory _connectionFactory;
+        private readonly BeforeCallHandler _beforeCall;
+        private readonly EndpointSettings _serviceEndpoint;
         private readonly AsyncLock _connectionLock = new();
-        protected Connection _connection;
+        private Connection _connection;
         private Server _server;
         private ClientConnection _clientConnection;
 
@@ -62,10 +62,10 @@ namespace UiPath.CoreIpc
             return proxy;
         }
 
-        protected async Task CreateConnection(Stream network, string name)
+        private async Task CreateConnection(Stream network)
         {
             var stream = EncryptAndSign ? await AuthenticateAsClient() : network;
-            OnNewConnection(new(stream, _serializer, _logger, name));
+            OnNewConnection(new(stream, _serializer, _logger, Name));
             _logger?.LogInformation($"CreateConnection {Name}.");
             return;
             async Task<Stream> AuthenticateAsClient()
@@ -85,7 +85,7 @@ namespace UiPath.CoreIpc
             }
         }
 
-        protected void OnNewConnection(Connection connection, bool alreadyHasServer = false)
+        private void OnNewConnection(Connection connection, bool alreadyHasServer = false)
         {
             _connection?.Dispose();
             _connection = connection;
@@ -162,7 +162,7 @@ namespace UiPath.CoreIpc
             }
         }
 
-        protected async Task<bool> EnsureConnection(CancellationToken cancellationToken)
+        private async Task<bool> EnsureConnection(CancellationToken cancellationToken)
         {
             if (_connectionFactory != null)
             {
@@ -193,10 +193,7 @@ namespace UiPath.CoreIpc
                 ReuseClientConnection(clientConnection);
                 return false;
             }
-            else
-            {
-                clientConnection.Dispose();
-            }
+            clientConnection.Dispose();
             try
             {
                 await clientConnection.ConnectAsync(cancellationToken);
@@ -206,11 +203,11 @@ namespace UiPath.CoreIpc
                 clientConnection.Dispose();
                 throw;
             }
-            await InitializeClientConnection(clientConnection, Name);
+            await InitializeClientConnection(clientConnection);
             return true;
         }
 
-        private protected void ReuseClientConnection(ClientConnection clientConnection)
+        private void ReuseClientConnection(ClientConnection clientConnection)
         {
             _clientConnection = clientConnection;
             var alreadyHasServer = clientConnection.Server != null;
@@ -234,10 +231,10 @@ namespace UiPath.CoreIpc
             }
         }
 
-        private protected async Task InitializeClientConnection(ClientConnection clientConnection, string name)
+        private async Task InitializeClientConnection(ClientConnection clientConnection)
         {
-            await CreateConnection(clientConnection.Network, name);
-            _connection.Listen().LogException(_logger, name);
+            await CreateConnection(clientConnection.Network);
+            _connection.Listen().LogException(_logger, Name);
             clientConnection.Connection = _connection;
             clientConnection.Server = _server;
             _clientConnection = clientConnection;
