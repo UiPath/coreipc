@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.IO;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,29 +21,31 @@ namespace UiPath.CoreIpc.Tcp
             _tcpServer.Start(backlog: Settings.ConcurrentAccepts);
         }
         public new TcpSettings Settings => (TcpSettings)base.Settings;
-        protected async override Task AcceptConnection(CancellationToken token)
-        {
-            System.Net.Sockets.TcpClient tcpClient = null;
-            try
-            {
-                using var closeToken = token.Register(Dispose);
-                tcpClient = await _tcpServer.AcceptTcpClientAsync();
-                // pass the ownership of the connection
-                HandleConnection(tcpClient.GetStream(), callbackFactory => new Client(action => action(), callbackFactory), token);
-            }
-            catch (Exception ex)
-            {
-                tcpClient?.Dispose();
-                if (!token.IsCancellationRequested)
-                {
-                    Logger.LogException(ex, Settings.Name);
-                }
-            }
-        }
+        protected override ServerConnection CreateServerConnection() => new TcpServerConnection(this);
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);
             _tcpServer.Stop();
+        }
+        async Task<System.Net.Sockets.TcpClient> AcceptClient(CancellationToken cancellationToken)
+        {
+            using (cancellationToken.Register(Dispose))
+            {
+                return await _tcpServer.AcceptTcpClientAsync();
+            }
+        }
+        class TcpServerConnection : ServerConnection
+        {
+            System.Net.Sockets.TcpClient _tcpClient;
+            public TcpServerConnection(Listener listener) : base(listener){}
+            public override async Task AcceptClient(CancellationToken cancellationToken) =>
+                _tcpClient = await ((TcpListener)_listener).AcceptClient(cancellationToken);
+            protected override void Dispose(bool disposing)
+            {
+                _tcpClient?.Dispose();
+                base.Dispose(disposing);
+            }
+            protected override Stream Network => _tcpClient.GetStream();
         }
     }
     public static class TcpServiceExtensions
