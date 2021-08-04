@@ -35,9 +35,9 @@ namespace UiPath.CoreIpc.Tcp
             public override Stream Network => _tcpClient.GetStream();
             public override async Task ConnectAsync(CancellationToken cancellationToken)
             {
-                var endPoint = ((ITcpKey)ConnectionKey).EndPoint;
                 _tcpClient = new();
                 using var token = cancellationToken.Register(Dispose);
+                var endPoint = ((ITcpKey)ConnectionKey).EndPoint;
                 await _tcpClient.ConnectAsync(endPoint.Address, endPoint.Port);
             }
         }
