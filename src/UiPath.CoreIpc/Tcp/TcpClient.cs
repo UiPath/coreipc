@@ -26,7 +26,7 @@ namespace UiPath.CoreIpc.Tcp
         {
             private TcpClient _tcpClient;
             public TcpClientConnection(IConnectionKey connectionKey) : base(connectionKey) {}
-            public override bool Connected => _tcpClient?.Connected is true;
+            public override bool Connected => _tcpClient?.Client?.Connected is true;
             protected override void Dispose(bool disposing)
             {
                 _tcpClient?.Dispose();
