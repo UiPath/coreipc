@@ -35,33 +35,34 @@ namespace UiPath.CoreIpc
         Client CreateClient() => new(Impersonate, this);
         public async Task Listen(CancellationToken cancellationToken)
         {
-            var stream = Settings.EncryptAndSign ? new NegotiateStream(Network) : Network;
+            var stream = await AuthenticateAsServer();
             var serializer = Settings.ServiceProvider.GetRequiredService<ISerializer>();
             _connection = new(stream, serializer, Logger, _listener.Name, _listener.MaxMessageSize);
             _server = new(Logger, Settings, _connection, new(CreateClient), cancellationToken);
-            if (Settings.EncryptAndSign)
-            {
-                await AuthenticateAsServer();
-            }
             // close the connection when the service host closes
             using (cancellationToken.Register(_connection.Dispose))
             {
                 await _connection.Listen();
             }
             return;
-            async Task AuthenticateAsServer()
+            async Task<Stream> AuthenticateAsServer()
             {
-                var negotiateStream = (NegotiateStream)_connection.Network;
+                if (!Settings.EncryptAndSign)
+                {
+                    return Network;
+                }
+                var negotiateStream = new NegotiateStream(Network);
                 try
                 {
                     await negotiateStream.AuthenticateAsServerAsync();
                 }
                 catch
                 {
-                    _connection.Dispose();
+                    negotiateStream.Dispose();
                     throw;
                 }
                 Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
+                return negotiateStream;
             }
         }
         protected virtual void Dispose(bool disposing){}
