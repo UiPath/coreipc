@@ -26,7 +26,11 @@ namespace UiPath.CoreIpc.Tests
         public virtual void Dispose() => _guiThread.Dispose();
         protected virtual TSettings Configure<TSettings>(TSettings listenerSettings) where TSettings : ListenerSettings
         {
-            listenerSettings.RequestTimeout = RequestTimeout;
+            listenerSettings.RequestTimeout =
+#if CI
+                RequestTimeout+
+#endif
+                RequestTimeout;
             listenerSettings.MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes;
             return listenerSettings;
         }
