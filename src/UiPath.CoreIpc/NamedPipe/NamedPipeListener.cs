@@ -33,7 +33,7 @@ namespace UiPath.CoreIpc.NamedPipe
                 }
             }
             protected override Stream Network => _server;
-            protected override void Impersonate(Action action) => _server.RunAsClient(()=>action());
+            public override void Impersonate(Action action) => _server.RunAsClient(()=>action());
             protected override void Dispose(bool disposing)
             {
                 _server.Dispose();

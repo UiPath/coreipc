@@ -12,15 +12,15 @@ namespace UiPath.CoreIpc
     class Server
     {
         private readonly Connection _connection;
-        private readonly Lazy<IClient> _client;
+        private readonly IClient _client;
         private readonly CancellationTokenSource _connectionClosed = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new();
 
-        public Server(ILogger logger, ListenerSettings settings, Connection connection, Lazy<IClient> client = null, CancellationToken cancellationToken = default)
+        public Server(ILogger logger, ListenerSettings settings, Connection connection, IClient client = null, CancellationToken cancellationToken = default)
         {
             Settings = settings;
             _connection = connection;
-            _client = client ?? new(()=>null);
+            _client = client;
             Serializer = ServiceProvider.GetRequiredService<ISerializer>();
             Logger = logger;
             connection.RequestReceived += OnRequestReceived;
@@ -162,7 +162,7 @@ namespace UiPath.CoreIpc
                             if (argument is Message message)
                             {
                                 message.Endpoint = endpoint;
-                                message.Client = _client.Value;
+                                message.Client = _client;
                             }
                             return argument;
                         }

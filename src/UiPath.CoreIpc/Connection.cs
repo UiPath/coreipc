@@ -13,7 +13,6 @@ namespace UiPath.CoreIpc
     public sealed class Connection : IDisposable
     {
         private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new();
-        private readonly ISerializer _serializer;
         private long _requestCounter = -1;
         private readonly int _maxMessageSize;
         private readonly Lazy<Task> _receiveLoop;
@@ -22,7 +21,7 @@ namespace UiPath.CoreIpc
         public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
         {
             Network = network;
-            _serializer = serializer;
+            Serializer = serializer;
             Logger = logger;
             Name = $"{name} {GetHashCode()}";
             _maxMessageSize = maxMessageSize;
@@ -31,6 +30,7 @@ namespace UiPath.CoreIpc
         public Stream Network { get; }
         public ILogger Logger { get; }
         public string Name { get; }
+        public ISerializer Serializer { get; }
         public override string ToString() => Name;
         public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
         public Task Listen() => _receiveLoop.Value;
@@ -210,8 +210,8 @@ namespace UiPath.CoreIpc
             return new NestedStream(Network, userStreamLength);
         }
 
-        private byte[] Serialize(object value) => _serializer.SerializeToBytes(value);
-        private T Deserialize<T>(byte[] data) => _serializer.Deserialize<T>(data);
+        private byte[] Serialize(object value) => Serializer.SerializeToBytes(value);
+        private T Deserialize<T>(byte[] data) => Serializer.Deserialize<T>(data);
         private Task OnRequestReceived(byte[] data, Stream uploadStream = null) => RequestReceived(Deserialize<Request>(data), uploadStream);
         private void OnResponseReceived(byte[] data, Stream downloadStream = null)
         {

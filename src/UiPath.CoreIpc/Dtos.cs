@@ -2,9 +2,24 @@
 using System.IO;
 using System.Text;
 using Newtonsoft.Json;
-
 namespace UiPath.CoreIpc
 {
+    public class Message
+    {
+        [JsonIgnore]
+        internal EndpointSettings Endpoint { get; set; }
+        [JsonIgnore]
+        public IClient Client { get; set; }
+        [JsonIgnore]
+        public TimeSpan RequestTimeout { get; set; }
+        public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => Client.GetCallback<TCallbackInterface>(Endpoint);
+        public void ImpersonateClient(Action action) => Client.Impersonate(action);
+    }
+    public class Message<TPayload> : Message
+    {
+        public Message(TPayload payload) => Payload = payload;
+        public TPayload Payload { get; }
+    }
     class Request
     {
         public Request(string endpoint, string id, string methodName, string[] parameters, double timeoutInSeconds)
