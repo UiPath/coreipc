@@ -25,7 +25,6 @@ namespace UiPath.CoreIpc
             Settings = settings;
             _connection = connection;
             _client = client;
-            Serializer = ServiceProvider.GetRequiredService<ISerializer>();
             Logger = logger;
             connection.RequestReceived += OnRequestReceived;
             connection.CancellationRequestReceived += requestId =>
@@ -192,7 +191,7 @@ namespace UiPath.CoreIpc
         private ILogger Logger { get; }
         private ListenerSettings Settings { get; }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
-        public ISerializer Serializer { get; }
+        public ISerializer Serializer => _connection.Serializer;
         public string Name => _connection.Name;
         public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
         async Task SendResponse(Response response, CancellationToken responseCancellation)
