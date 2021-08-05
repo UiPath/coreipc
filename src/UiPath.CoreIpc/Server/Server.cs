@@ -56,10 +56,7 @@ namespace UiPath.CoreIpc
                     var timeout = request.GetTimeout(Settings.RequestTimeout);
                     await new[] { cancellationToken, requestCancellation.Token, _connectionClosed.Token }.WithTimeout(timeout, async token =>
                     {
-                        using (var scope = ServiceProvider.CreateScope())
-                        {
-                            response = await HandleRequest(endpoint, scope, token);
-                        }
+                        response = await HandleRequest(endpoint, token);
                         Logger.LogInformation($"{Name} sending response for {request}");
                         await SendResponse(response, token);
                     }, request.MethodName, OnError);
@@ -77,14 +74,9 @@ namespace UiPath.CoreIpc
                     _connectionClosed.Dispose();
                 }
                 return;
-                async Task<Response> HandleRequest(EndpointSettings endpoint, IServiceScope scope, CancellationToken cancellationToken)
+                async Task<Response> HandleRequest(EndpointSettings endpoint, CancellationToken cancellationToken)
                 {
                     var contract = endpoint.Contract;
-                    var service = endpoint.ServiceInstance ?? scope.ServiceProvider.GetService(contract);
-                    if (service == null)
-                    {
-                        return Response.Fail(request, $"No implementation of interface '{contract.FullName}' found.");
-                    }
                     var method = contract.GetInterfaceMethod(request.MethodName);
                     if (method == null)
                     {
@@ -100,7 +92,21 @@ namespace UiPath.CoreIpc
                     {
                         await beforeCall(new(default, request.MethodName, arguments), cancellationToken);
                     }
-                    return await InvokeMethod();
+                    IServiceScope scope = null;
+                    var service = endpoint.ServiceInstance;
+                    try
+                    {
+                        if (service == null)
+                        {
+                            scope = ServiceProvider.CreateScope();
+                            service = scope.ServiceProvider.GetRequiredService(contract);
+                        }
+                        return await InvokeMethod();
+                    }
+                    finally
+                    {
+                        scope?.Dispose();
+                    }
                     async Task<Response> InvokeMethod()
                     {
                         var hasReturnValue = method.ReturnType != typeof(Task);
@@ -111,7 +117,7 @@ namespace UiPath.CoreIpc
                         {
                             var methodResult = await methodCallTask;
                             await methodResult;
-                            var returnValue = GetTaskResult(method.ReturnType.GenericTypeArguments[0], methodResult);
+                            var returnValue = GetTaskResult(method, methodResult);
                             return returnValue is Stream donloadStream ? Response.Success(request, donloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
                         }
                         else
@@ -203,7 +209,8 @@ namespace UiPath.CoreIpc
             await _connection.Send(response, responseCancellation);
         }
         static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
-        static object GetTaskResult(Type resultType, Task task) => GetTaskResultByType.GetOrAdd(resultType, GetTaskResultFunc)(task);
+        static object GetTaskResult(MethodInfo method, Task task) => 
+            GetTaskResultByType.GetOrAdd(method.ReturnType.GenericTypeArguments[0], GetTaskResultFunc)(task);
         static GetTaskResultFunc GetTaskResultFunc(Type resultType)
         {
             var getTaskResult = GetResultMethod.MakeGenericMethod(resultType);
