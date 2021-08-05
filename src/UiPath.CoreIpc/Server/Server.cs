@@ -105,12 +105,14 @@ namespace UiPath.CoreIpc
                     async Task<Response> InvokeMethod()
                     {
                         var hasReturnValue = method.ReturnType != typeof(Task);
-                        var methodCallTask = Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler ?? TaskScheduler.Default);
+                        var methodCallTask = endpoint.Scheduler == null ?
+                            Task.FromResult(MethodCall()) :
+                            Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler);
                         if (hasReturnValue)
                         {
                             var methodResult = await methodCallTask;
                             await methodResult;
-                            object returnValue = GetTaskResult(method.ReturnType.GenericTypeArguments[0], methodResult);
+                            var returnValue = GetTaskResult(method.ReturnType.GenericTypeArguments[0], methodResult);
                             return returnValue is Stream donloadStream ? Response.Success(request, donloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
                         }
                         else
