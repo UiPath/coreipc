@@ -4,13 +4,17 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc
 {
+    using GetTaskResultFunc = Func<Task, object>;
     class Server
     {
+        private static readonly MethodInfo GetResultMethod = typeof(Server).GetMethod(nameof(GetTaskResultImpl), BindingFlags.Static | BindingFlags.NonPublic);
+        private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
         private readonly Connection _connection;
         private readonly IClient _client;
         private readonly CancellationTokenSource _connectionClosed = new();
@@ -106,9 +110,9 @@ namespace UiPath.CoreIpc
                         {
                             var methodResult = await methodCallTask;
                             await methodResult;
-                            object returnValue = ((dynamic)methodResult).Result;
+                            object returnValue = GetTaskResult(method.ReturnType.GenericTypeArguments[0], methodResult);
                             return returnValue is Stream donloadStream ? Response.Success(request, donloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
-        }
+                        }
                         else
                         {
                             methodCallTask.Unwrap().LogException(Logger, method);
@@ -196,6 +200,13 @@ namespace UiPath.CoreIpc
                 return;
             }
             await _connection.Send(response, responseCancellation);
+        }
+        static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
+        static object GetTaskResult(Type resultType, Task task) => GetTaskResultByType.GetOrAdd(resultType, GetTaskResultFunc)(task);
+        static GetTaskResultFunc GetTaskResultFunc(Type resultType)
+        {
+            var getTaskResult = GetResultMethod.MakeGenericMethod(resultType);
+            return (GetTaskResultFunc)Delegate.CreateDelegate(typeof(GetTaskResultFunc), getTaskResult);
         }
     }
 }
