@@ -62,8 +62,7 @@ namespace UiPath.CoreIpc.NamedPipe
         {
             settings.ServiceProvider = builder.ServiceProvider;
             settings.Endpoints = builder.Endpoints;
-            builder.AddListener(new NamedPipeListener(settings));
-            return builder;
+            return builder.AddListener(new NamedPipeListener(settings));
         }
     }
 }

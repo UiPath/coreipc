@@ -54,8 +54,7 @@ namespace UiPath.CoreIpc.Tcp
         {
             settings.ServiceProvider = builder.ServiceProvider;
             settings.Endpoints = builder.Endpoints;
-            builder.AddListener(new TcpListener(settings));
-            return builder;
+            return builder.AddListener(new TcpListener(settings));
         }
     }
 }
