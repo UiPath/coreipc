@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -11,7 +10,7 @@ namespace UiPath.CoreIpc
 {
     static class ClientConnectionsRegistry
     {
-        private static readonly ConcurrentDictionary<IConnectionKey, ClientConnection> _connections = new();
+        private static readonly ConcurrentDictionaryWrapper<IConnectionKey, ClientConnection> _connections = new(CreateClientConnection);
         public static async Task<ClientConnectionHandle> GetOrCreate(IConnectionKey key, CancellationToken cancellationToken)
         {
             var clientConnection = GetOrAdd(key);
@@ -34,7 +33,8 @@ namespace UiPath.CoreIpc
             }
             return new(clientConnection, asyncLock);
         }
-        private static ClientConnection GetOrAdd(IConnectionKey key)=>_connections.GetOrAdd(key, key.CreateClientConnection);
+        private static ClientConnection GetOrAdd(IConnectionKey key)=>_connections.GetOrAdd(key);
+        static ClientConnection CreateClientConnection(IConnectionKey key) => key.CreateClientConnection(key);
         public static bool TryGet(IConnectionKey key, out ClientConnection connection) => _connections.TryGetValue(key, out connection);
         internal static ClientConnection Remove(IConnectionKey connectionKey)
         {

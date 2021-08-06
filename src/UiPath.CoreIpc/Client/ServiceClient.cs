@@ -263,7 +263,7 @@ namespace UiPath.CoreIpc
     public class IpcProxy : DispatchProxy, IDisposable
     {
         private static readonly MethodInfo InvokeMethod = typeof(IServiceClient).GetMethod(nameof(IServiceClient.Invoke));
-        private static readonly ConcurrentDictionary<Type, InvokeDelegate> InvokeByType = new();
+        private static readonly ConcurrentDictionaryWrapper<Type, InvokeDelegate> InvokeByType = new(CreateDelegate);
 
         internal IServiceClient ServiceClient { get; set; }
 
@@ -275,7 +275,7 @@ namespace UiPath.CoreIpc
 
         public void CloseConnection() => Connection?.Dispose();
 
-        private static InvokeDelegate GetInvoke(Type returnType) => InvokeByType.GetOrAdd(returnType, CreateDelegate);
+        private static InvokeDelegate GetInvoke(Type returnType) => InvokeByType.GetOrAdd(returnType);
 
         private static InvokeDelegate CreateDelegate(Type taskType)
         {
