@@ -110,19 +110,17 @@ namespace UiPath.CoreIpc
                     async Task<Response> InvokeMethod()
                     {
                         var hasReturnValue = method.ReturnType != typeof(Task);
-                        var methodCallTask = endpoint.Scheduler == null ?
-                            Task.FromResult(MethodCall()) :
-                            Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler);
+                        var hasScheduler = endpoint.Scheduler != null;
                         if (hasReturnValue)
                         {
-                            var methodResult = await methodCallTask;
+                            var methodResult = hasScheduler ? await RunOnScheduler() : MethodCall();
                             await methodResult;
                             var returnValue = GetTaskResult(method, methodResult);
                             return returnValue is Stream donloadStream ? Response.Success(request, donloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
                         }
                         else
                         {
-                            methodCallTask.Unwrap().LogException(Logger, method);
+                            (hasScheduler ? RunOnScheduler().Unwrap() : MethodCall()).LogException(Logger, method);
                             return Response.Success(request, "");
                         }
                         Task MethodCall()
@@ -130,6 +128,7 @@ namespace UiPath.CoreIpc
                             Logger.LogDebug($"Processing {method.Name} on {Thread.CurrentThread.Name}.");
                             return (Task)method.Invoke(service, arguments);
                         }
+                        Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler);
                     }
                     object[] GetArguments()
                     {
