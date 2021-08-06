@@ -14,7 +14,7 @@ namespace UiPath.CoreIpc
         public static async Task<ClientConnectionHandle> GetOrCreate(IConnectionKey key, CancellationToken cancellationToken)
         {
             var clientConnection = GetOrAdd(key);
-            var asyncLock = await clientConnection.LockAsync(cancellationToken);
+            var asyncLock = await clientConnection.Lock(cancellationToken);
             try
             {
                 // check again just in case it was removed after GetOrAdd but before entering the lock
@@ -22,7 +22,7 @@ namespace UiPath.CoreIpc
                 while ((newClientConnection = GetOrAdd(key)) != clientConnection)
                 {
                     asyncLock.Dispose();
-                    asyncLock = await newClientConnection.LockAsync(cancellationToken);
+                    asyncLock = await newClientConnection.Lock(cancellationToken);
                     clientConnection = newClientConnection;
                 }
             }
@@ -74,7 +74,7 @@ namespace UiPath.CoreIpc
                 _connection.Closed += OnConnectionClosed;
             }
         }
-        public abstract Task ConnectAsync(CancellationToken cancellationToken);
+        public abstract Task Connect(CancellationToken cancellationToken);
         private void OnConnectionClosed(object sender, EventArgs _)
         {
             var closedConnection = (Connection)sender;
@@ -99,7 +99,7 @@ namespace UiPath.CoreIpc
         }
         public Server Server { get; set; }
         protected IConnectionKey ConnectionKey { get; }
-        public Task<IDisposable> LockAsync(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
+        public Task<IDisposable> Lock(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
         public bool TryLock(out IDisposable guard)
         {
             try

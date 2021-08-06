@@ -33,7 +33,7 @@ namespace UiPath.CoreIpc.Tcp
                 base.Dispose(disposing);
             }
             public override Stream Network => _tcpClient.GetStream();
-            public override async Task ConnectAsync(CancellationToken cancellationToken)
+            public override async Task Connect(CancellationToken cancellationToken)
             {
                 _tcpClient = new();
                 using var token = cancellationToken.Register(Dispose);

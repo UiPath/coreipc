@@ -47,7 +47,7 @@ namespace UiPath.CoreIpc.NamedPipe
                 base.Dispose(disposing);
             }
             public override Stream Network => _pipe;
-            public override Task ConnectAsync(CancellationToken cancellationToken)
+            public override Task Connect(CancellationToken cancellationToken)
             {
                 var key = (INamedPipeKey)ConnectionKey;
                 _pipe = new(key.ServerName, key.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous, key.AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);

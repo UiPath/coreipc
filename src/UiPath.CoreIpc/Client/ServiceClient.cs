@@ -196,7 +196,7 @@ namespace UiPath.CoreIpc
             clientConnection.Dispose();
             try
             {
-                await clientConnection.ConnectAsync(cancellationToken);
+                await clientConnection.Connect(cancellationToken);
             }
             catch
             {

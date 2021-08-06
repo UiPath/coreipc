@@ -42,7 +42,7 @@ namespace UiPath.CoreIpc
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ListenerSettings Settings { get; }
         public int MaxMessageSize { get; }
-        public Task ListenAsync(CancellationToken token) =>
+        public Task Listen(CancellationToken token) =>
             Task.WhenAll(Enumerable.Range(1, Settings.ConcurrentAccepts).Select(async _ =>
             {
                 while (!token.IsCancellationRequested)
