@@ -16,7 +16,7 @@ WCF-like service model API for communication over named pipes. .NET Standard (.N
 - access to the underlying transport with `Stream` parameters
 - SSPI encryption and signing
 
-Check [the tests](https://github.com/UiPath/CoreIpc/blob/master/src/UiPath.CoreIpc.Tests/IpcTests.cs) and the sample.
+Check [the tests](https://github.com/UiPath/CoreIpc/blob/master/src/UiPath.CoreIpc.Tests/) and the sample.
 ```C#
 // configure and start the server
 _ = new ServiceHostBuilder(serviceProvider)
