@@ -120,7 +120,7 @@ namespace UiPath.CoreIpc
                         }
                         else
                         {
-                            (hasScheduler ? RunOnScheduler().Unwrap() : MethodCall()).LogException(Logger, method);
+                            (hasScheduler ? RunOnScheduler() : MethodCall()).LogException(Logger, method);
                             return Response.Success(request, "");
                         }
                         Task MethodCall()
