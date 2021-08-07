@@ -13,7 +13,7 @@ namespace UiPath.CoreIpc
     using GetTaskResultFunc = Func<Task, object>;
     class Server
     {
-        private static readonly MethodInfo GetResultMethod = typeof(Server).GetMethod(nameof(GetTaskResultImpl), BindingFlags.Static | BindingFlags.NonPublic);
+        private static readonly MethodInfo GetResultMethod = typeof(Server).GetStaticMethod(nameof(GetTaskResultImpl));
         private static readonly ConcurrentDictionaryWrapper<Type, GetTaskResultFunc> GetTaskResultByType = new(GetTaskResultFunc);
         private readonly Connection _connection;
         private readonly IClient _client;
@@ -210,10 +210,7 @@ namespace UiPath.CoreIpc
         static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
         static object GetTaskResult(MethodInfo method, Task task) => 
             GetTaskResultByType.GetOrAdd(method.ReturnType.GenericTypeArguments[0])(task);
-        static GetTaskResultFunc GetTaskResultFunc(Type resultType)
-        {
-            var getTaskResult = GetResultMethod.MakeGenericMethod(resultType);
-            return (GetTaskResultFunc)Delegate.CreateDelegate(typeof(GetTaskResultFunc), getTaskResult);
-        }
+        static GetTaskResultFunc GetTaskResultFunc(Type resultType) => 
+            (GetTaskResultFunc)GetResultMethod.MakeGenericMethod(resultType).CreateDelegate(typeof(GetTaskResultFunc));
     }
 }

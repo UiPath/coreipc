@@ -19,6 +19,7 @@ namespace UiPath.CoreIpc
     public static class Helpers
     {
         public const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly;
+        public static MethodInfo GetStaticMethod(this Type type, string name) => type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
         public static MethodInfo GetInterfaceMethod(this Type type, string name) => type.GetMethod(name, InstanceFlags) ??
             type.GetInterfaces().Select(t => t.GetMethod(name, InstanceFlags)).FirstOrDefault(m => m != null);
         public static IEnumerable<MethodInfo> GetInterfaceMethods(this Type type) =>

@@ -3,7 +3,6 @@ using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
-using static System.Linq.Expressions.Expression;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -100,14 +99,15 @@ namespace UiPath.CoreIpc
 
         public Task<TResult> Invoke<TResult>(string methodName, object[] args)
         {
-            CancellationToken cancellationToken = default;
-            TimeSpan messageTimeout = default;
-            TimeSpan clientTimeout = _requestTimeout;
-            Stream uploadStream = null;
-            SetWellKnownArguments();
             return Task.Run(Invoke);
-            Task<TResult> Invoke() =>
-                cancellationToken.WithTimeout(clientTimeout, async token =>
+            Task<TResult> Invoke()
+            {
+                CancellationToken cancellationToken = default;
+                TimeSpan messageTimeout = default;
+                TimeSpan clientTimeout = _requestTimeout;
+                Stream uploadStream = null;
+                SetWellKnownArguments();
+                return cancellationToken.WithTimeout(clientTimeout, async token =>
                 {
                     bool newConnection;
                     using (await _connectionLock.LockAsync(token))
@@ -139,24 +139,25 @@ namespace UiPath.CoreIpc
                     ExceptionDispatchInfo.Capture(exception).Throw();
                     return Task.CompletedTask;
                 });
-            void SetWellKnownArguments()
-            {
-                for(int index = 0; index < args.Length; index++)
+                void SetWellKnownArguments()
                 {
-                    switch (args[index])
+                    for (int index = 0; index < args.Length; index++)
                     {
-                        case Message { RequestTimeout: var requestTimeout } when requestTimeout != TimeSpan.Zero:
-                            messageTimeout = requestTimeout;
-                            clientTimeout = requestTimeout;
-                            break;
-                        case CancellationToken token:
-                            cancellationToken = token;
-                            args[index] = "";
-                            break;
-                        case Stream stream:
-                            uploadStream = stream;
-                            args[index] = "";
-                            break;
+                        switch (args[index])
+                        {
+                            case Message { RequestTimeout: var requestTimeout } when requestTimeout != TimeSpan.Zero:
+                                messageTimeout = requestTimeout;
+                                clientTimeout = requestTimeout;
+                                break;
+                            case CancellationToken token:
+                                cancellationToken = token;
+                                args[index] = "";
+                                break;
+                            case Stream stream:
+                                uploadStream = stream;
+                                args[index] = "";
+                                break;
+                        }
                     }
                 }
             }
@@ -262,31 +263,26 @@ namespace UiPath.CoreIpc
 
     public class IpcProxy : DispatchProxy, IDisposable
     {
-        private static readonly MethodInfo InvokeMethod = typeof(IServiceClient).GetMethod(nameof(IServiceClient.Invoke));
+        private static readonly MethodInfo InvokeMethod = typeof(IpcProxy).GetStaticMethod(nameof(GenericInvoke));
         private static readonly ConcurrentDictionaryWrapper<Type, InvokeDelegate> InvokeByType = new(CreateDelegate);
 
         internal IServiceClient ServiceClient { get; set; }
 
         public Connection Connection => ServiceClient.Connection;
 
-        protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvoke(targetMethod.ReturnType)(ServiceClient, targetMethod.Name, args);
+        protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvoke(targetMethod)(ServiceClient, targetMethod.Name, args);
 
         public void Dispose() => ServiceClient.Dispose();
 
         public void CloseConnection() => Connection?.Dispose();
 
-        private static InvokeDelegate GetInvoke(Type returnType) => InvokeByType.GetOrAdd(returnType);
+        private static InvokeDelegate GetInvoke(MethodInfo targetMethod) => InvokeByType.GetOrAdd(targetMethod.ReturnType);
 
         private static InvokeDelegate CreateDelegate(Type taskType)
         {
-            var resultType = taskType.GetGenericArguments().SingleOrDefault() ?? typeof(object);
-            var serviceClient = Parameter(typeof(IServiceClient), "serviceClient");
-            var methodName = Parameter(typeof(string), "methodName");
-            var methodArgs = Parameter(typeof(object[]), "methodArgs");
-            var invokeMethod = InvokeMethod.MakeGenericMethod(resultType);
-            var invokeCall = Call(serviceClient, invokeMethod, methodName, methodArgs);
-            var lambda = Lambda<InvokeDelegate>(invokeCall, serviceClient, methodName, methodArgs);
-            return lambda.Compile();
+            var resultType = taskType.GenericTypeArguments.Length == 0 ? typeof(object) : taskType.GenericTypeArguments[0];
+            return (InvokeDelegate) InvokeMethod.MakeGenericMethod(resultType).CreateDelegate(typeof(InvokeDelegate));
         }
+        private static object GenericInvoke<T>(IServiceClient serviceClient, string method, object[] args) => serviceClient.Invoke<T>(method, args);
     }
 }
