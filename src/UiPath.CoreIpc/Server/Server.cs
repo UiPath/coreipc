@@ -78,14 +78,6 @@ namespace UiPath.CoreIpc
                 {
                     var contract = endpoint.Contract;
                     var method = contract.GetInterfaceMethod(request.MethodName);
-                    if (method == null)
-                    {
-                        return Response.Fail(request, $"Method '{request.MethodName}' not found in interface '{contract.FullName}'.");
-                    }
-                    if (method.IsGenericMethod)
-                    {
-                        return Response.Fail(request, "Generic methods are not supported " + method);
-                    }
                     var arguments = GetArguments();
                     var beforeCall = endpoint.BeforeCall;
                     if (beforeCall != null)

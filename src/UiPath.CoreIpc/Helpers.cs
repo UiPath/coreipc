@@ -20,8 +20,17 @@ namespace UiPath.CoreIpc
     {
         public const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly;
         public static MethodInfo GetStaticMethod(this Type type, string name) => type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
-        public static MethodInfo GetInterfaceMethod(this Type type, string name) => type.GetMethod(name, InstanceFlags) ??
-            type.GetInterfaces().Select(t => t.GetMethod(name, InstanceFlags)).FirstOrDefault(m => m != null);
+        public static MethodInfo GetInterfaceMethod(this Type type, string name)
+        {
+            var method = type.GetMethod(name, InstanceFlags) ?? 
+                type.GetInterfaces().Select(t => t.GetMethod(name, InstanceFlags)).FirstOrDefault(m => m != null) ??
+                throw new ArgumentOutOfRangeException(nameof(name), name, $"Method '{name}' not found in interface '{type}'.");
+            if (method.IsGenericMethod)
+            {
+                throw new ArgumentOutOfRangeException(nameof(name), name, "Generic methods are not supported " + method);
+            }
+            return method;
+        }
         public static IEnumerable<MethodInfo> GetInterfaceMethods(this Type type) =>
             type.GetMethods().Concat(type.GetInterfaces().SelectMany(i => i.GetMethods()));
         public static object GetDefaultValue(this ParameterInfo parameter) => parameter switch
