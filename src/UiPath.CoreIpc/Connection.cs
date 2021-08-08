@@ -50,6 +50,11 @@ namespace UiPath.CoreIpc
                     return await requestCompletion.Task;
                 }
             }
+            catch (IOException)
+            {
+                Dispose();
+                throw;
+            }
             finally
             {
                 _requests.TryRemove(request.Id, out _);
@@ -118,11 +123,15 @@ namespace UiPath.CoreIpc
 
         public void Dispose()
         {
-            var closedHandler = Interlocked.Exchange(ref Closed, null);
+            var closedHandler = Interlocked.CompareExchange(ref Closed, Closed, null);
+            if (closedHandler == null)
+            {
+                return;
+            }
             Network.Dispose();
             try
             {
-                closedHandler?.Invoke(this, EventArgs.Empty);
+                closedHandler.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
