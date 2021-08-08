@@ -50,11 +50,6 @@ namespace UiPath.CoreIpc
                     return await requestCompletion.Task;
                 }
             }
-            catch (IOException)
-            {
-                Dispose();
-                throw;
-            }
             finally
             {
                 _requests.TryRemove(request.Id, out _);
