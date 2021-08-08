@@ -109,18 +109,18 @@ namespace UiPath.CoreIpc
                     }
                     async Task<Response> InvokeMethod()
                     {
-                        var hasReturnValue = method.ReturnType != typeof(Task);
-                        var hasScheduler = endpoint.Scheduler != null;
-                        if (hasReturnValue)
+                        var returnTaskType = method.ReturnType;
+                        var scheduler = endpoint.Scheduler;
+                        if (returnTaskType.IsGenericType)
                         {
-                            var methodResult = hasScheduler ? await RunOnScheduler() : MethodCall();
+                            var methodResult = scheduler is null ? MethodCall() : await RunOnScheduler();
                             await methodResult;
-                            var returnValue = GetTaskResult(method, methodResult);
+                            var returnValue = GetTaskResult(returnTaskType, methodResult);
                             return returnValue is Stream donloadStream ? Response.Success(request, donloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
                         }
                         else
                         {
-                            (hasScheduler ? RunOnScheduler() : MethodCall()).LogException(Logger, method);
+                            (scheduler is null ? MethodCall() : RunOnScheduler()).LogException(Logger, method);
                             return Response.Success(request, "");
                         }
                         Task MethodCall()
@@ -128,7 +128,7 @@ namespace UiPath.CoreIpc
                             Logger.LogDebug($"Processing {method.Name} on {Thread.CurrentThread.Name}.");
                             return (Task)method.Invoke(service, arguments);
                         }
-                        Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler);
+                        Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
                     }
                     object[] GetArguments()
                     {
@@ -208,8 +208,8 @@ namespace UiPath.CoreIpc
             await _connection.Send(response, responseCancellation);
         }
         static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
-        static object GetTaskResult(MethodInfo method, Task task) => 
-            GetTaskResultByType.GetOrAdd(method.ReturnType.GenericTypeArguments[0])(task);
+        static object GetTaskResult(Type taskType, Task task) => 
+            GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0])(task);
         static GetTaskResultFunc GetTaskResultFunc(Type resultType) => 
             (GetTaskResultFunc)GetResultMethod.MakeGenericMethod(resultType).CreateDelegate(typeof(GetTaskResultFunc));
     }
