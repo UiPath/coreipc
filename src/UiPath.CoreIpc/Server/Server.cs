@@ -211,17 +211,15 @@ namespace UiPath.CoreIpc
         static Method CreateMethod((Type contract,string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName));
         readonly struct Method
         {
+            static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
+            static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
             readonly MethodExecutor _executor;
             readonly MethodInfo _methodInfo;
-            public ParameterInfo[] Parameters { get; }
-            public object[] Defaults { get; }
+            public readonly ParameterInfo[] Parameters;
+            public readonly object[] Defaults;
             public Type ReturnType => _methodInfo.ReturnType;
             public Method(MethodInfo method)
             {
-                // Parameters to executor
-                var targetParameter = Parameter(typeof(object), "target");
-                var parametersParameter = Parameter(typeof(object[]), "parameters");
-                // Build parameter list
                 Parameters = method.GetParameters();
                 var parameters = new List<Expression>(Parameters.Length);
                 Defaults = new object[Parameters.Length];
@@ -229,17 +227,12 @@ namespace UiPath.CoreIpc
                 {
                     var paramInfo = Parameters[index];
                     Defaults[index] = paramInfo.GetDefaultValue();
-                    var valueObj = ArrayIndex(parametersParameter, Constant(index));
-                    var valueCast = Convert(valueObj, paramInfo.ParameterType);
-                    // valueCast is "(Ti) parameters[i]"
-                    parameters.Add(valueCast);
+                    var paramValue = ArrayIndex(ParametersParameter, Constant(index));
+                    parameters.Add(Convert(paramValue, paramInfo.ParameterType));
                 }
-                // Call method
-                var instanceCast = Convert(targetParameter, method.DeclaringType);
+                var instanceCast = Convert(TargetParameter, method.DeclaringType);
                 var methodCall = Call(instanceCast, method, parameters);
-                // methodCall is "((Ttarget) target) method((T0) parameters[0], (T1) parameters[1], ...)"
-                // must coerce methodCall to match ActionExecutor signature
-                var lambda = Lambda<MethodExecutor>(methodCall, targetParameter, parametersParameter);
+                var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter);
                 _executor = lambda.Compile();
                 _methodInfo = method;
             }
