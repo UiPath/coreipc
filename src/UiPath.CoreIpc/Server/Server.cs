@@ -81,7 +81,7 @@ namespace UiPath.CoreIpc
                 async Task<Response> HandleRequest(EndpointSettings endpoint, CancellationToken cancellationToken)
                 {
                     var contract = endpoint.Contract;
-                    var method = GetMethod((contract, request.MethodName));
+                    var method = GetMethod(contract, request.MethodName);
                     var arguments = GetArguments();
                     var beforeCall = endpoint.BeforeCall;
                     if (beforeCall != null)
@@ -207,12 +207,8 @@ namespace UiPath.CoreIpc
         static object GetTaskResult(Type taskType, Task task) => 
             GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0])(task);
         static GetTaskResultFunc GetTaskResultFunc(Type resultType) => GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType);
-        static Method GetMethod((Type contract, string methodName) key) => _methods.GetOrAdd(key);
-        static Method CreateMethod((Type contract,string methodName) key)
-        {
-            var method = key.contract.GetInterfaceMethod(key.methodName);
-            return new Method(method);
-        }
+        static Method GetMethod(Type contract, string methodName) => _methods.GetOrAdd((contract, methodName));
+        static Method CreateMethod((Type contract,string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName));
         readonly struct Method
         {
             readonly MethodExecutor _executor;
