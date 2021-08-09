@@ -17,7 +17,7 @@ namespace UiPath.CoreIpc
     class Server
     {
         private static readonly MethodInfo GetResultMethod = typeof(Server).GetStaticMethod(nameof(GetTaskResultImpl));
-        private static readonly ConcurrentDictionaryWrapper<(Type,string), Method> _methods = new(CreateMethod);
+        private static readonly ConcurrentDictionaryWrapper<(Type,string), Method> Methods = new(CreateMethod);
         private static readonly ConcurrentDictionaryWrapper<Type, GetTaskResultFunc> GetTaskResultByType = new(GetTaskResultFunc);
         private readonly Connection _connection;
         private readonly IClient _client;
@@ -207,7 +207,7 @@ namespace UiPath.CoreIpc
         static object GetTaskResult(Type taskType, Task task) => 
             GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0])(task);
         static GetTaskResultFunc GetTaskResultFunc(Type resultType) => GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType);
-        static Method GetMethod(Type contract, string methodName) => _methods.GetOrAdd((contract, methodName));
+        static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName));
         static Method CreateMethod((Type contract,string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName));
         readonly struct Method
         {
