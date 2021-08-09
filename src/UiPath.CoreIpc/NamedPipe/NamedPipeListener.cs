@@ -58,11 +58,7 @@ namespace UiPath.CoreIpc.NamedPipe
     }
     public static class NamedPipeServiceExtensions
     {
-        public static ServiceHostBuilder UseNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings)
-        {
-            settings.ServiceProvider = builder.ServiceProvider;
-            settings.Endpoints = builder.Endpoints;
-            return builder.AddListener(new NamedPipeListener(settings));
-        }
+        public static ServiceHostBuilder UseNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings) => 
+            builder.AddListener(new NamedPipeListener(settings));
     }
 }

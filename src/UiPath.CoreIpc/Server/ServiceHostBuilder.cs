@@ -21,6 +21,8 @@ namespace UiPath.CoreIpc
         }
         internal ServiceHostBuilder AddListener(Listener listener)
         {
+            listener.Settings.ServiceProvider = ServiceProvider;
+            listener.Settings.Endpoints = Endpoints;
             _listeners.Add(listener);
             return this;
         }

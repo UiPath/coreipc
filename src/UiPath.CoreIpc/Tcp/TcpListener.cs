@@ -50,11 +50,6 @@ namespace UiPath.CoreIpc.Tcp
     }
     public static class TcpServiceExtensions
     {
-        public static ServiceHostBuilder UseTcp(this ServiceHostBuilder builder, TcpSettings settings)
-        {
-            settings.ServiceProvider = builder.ServiceProvider;
-            settings.Endpoints = builder.Endpoints;
-            return builder.AddListener(new TcpListener(settings));
-        }
+        public static ServiceHostBuilder UseTcp(this ServiceHostBuilder builder, TcpSettings settings) => builder.AddListener(new TcpListener(settings));
     }
 }

@@ -35,21 +35,23 @@ namespace UiPath.CoreIpc
         {
             Settings = settings;
             MaxMessageSize = settings.MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
-            Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
         }
         public string Name => Settings.Name;
-        public ILogger Logger { get; }
+        public ILogger Logger { get; private set; }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ListenerSettings Settings { get; }
         public int MaxMessageSize { get; }
-        public Task Listen(CancellationToken token) =>
-            Task.WhenAll(Enumerable.Range(1, Settings.ConcurrentAccepts).Select(async _ =>
+        public Task Listen(CancellationToken token)
+        {
+            Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
+            return Task.WhenAll(Enumerable.Range(1, Settings.ConcurrentAccepts).Select(async _ =>
             {
                 while (!token.IsCancellationRequested)
                 {
                     await AcceptConnection(token);
                 }
             }));
+        }
         protected abstract ServerConnection CreateServerConnection();
         async Task AcceptConnection(CancellationToken token)
         {
