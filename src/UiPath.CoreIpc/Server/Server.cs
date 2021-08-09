@@ -202,7 +202,6 @@ namespace UiPath.CoreIpc
         static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
         static object GetTaskResult(Type taskType, Task task) => 
             GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0])(task);
-        static GetTaskResultFunc GetTaskResultFunc(Type resultType) => 
-            (GetTaskResultFunc)GetResultMethod.MakeGenericMethod(resultType).CreateDelegate(typeof(GetTaskResultFunc));
+        static GetTaskResultFunc GetTaskResultFunc(Type resultType) => GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType);
     }
 }

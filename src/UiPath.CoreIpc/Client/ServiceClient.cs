@@ -281,7 +281,7 @@ namespace UiPath.CoreIpc
         private static InvokeDelegate CreateDelegate(Type taskType)
         {
             var resultType = taskType.IsGenericType ? taskType.GenericTypeArguments[0] : typeof(object);
-            return (InvokeDelegate) InvokeMethod.MakeGenericMethod(resultType).CreateDelegate(typeof(InvokeDelegate));
+            return InvokeMethod.MakeGenericDelegate<InvokeDelegate>(resultType);
         }
         private static object GenericInvoke<T>(IServiceClient serviceClient, string method, object[] args) => serviceClient.Invoke<T>(method, args);
     }
