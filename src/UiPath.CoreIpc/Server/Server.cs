@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Linq.Expressions;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -11,9 +12,12 @@ using System.Threading.Tasks;
 namespace UiPath.CoreIpc
 {
     using GetTaskResultFunc = Func<Task, object>;
+    using MethodExecutor = Func<object, object[], Task>;
+    using static Expression;
     class Server
     {
         private static readonly MethodInfo GetResultMethod = typeof(Server).GetStaticMethod(nameof(GetTaskResultImpl));
+        private static readonly ConcurrentDictionaryWrapper<(Type,string), Method> _methods = new(CreateMethod);
         private static readonly ConcurrentDictionaryWrapper<Type, GetTaskResultFunc> GetTaskResultByType = new(GetTaskResultFunc);
         private readonly Connection _connection;
         private readonly IClient _client;
@@ -77,7 +81,7 @@ namespace UiPath.CoreIpc
                 async Task<Response> HandleRequest(EndpointSettings endpoint, CancellationToken cancellationToken)
                 {
                     var contract = endpoint.Contract;
-                    var method = contract.GetInterfaceMethod(request.MethodName);
+                    var method = GetMethod(contract, request.MethodName);
                     var arguments = GetArguments();
                     var beforeCall = endpoint.BeforeCall;
                     if (beforeCall != null)
@@ -117,14 +121,14 @@ namespace UiPath.CoreIpc
                         }
                         Task MethodCall()
                         {
-                            Logger.LogDebug($"Processing {method.Name} on {Thread.CurrentThread.Name}.");
-                            return (Task)method.Invoke(service, arguments);
+                            Logger.LogDebug($"Processing {method} on {Thread.CurrentThread.Name}.");
+                            return method.Invoke(service, arguments);
                         }
                         Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
                     }
                     object[] GetArguments()
                     {
-                        var parameters = method.GetParameters();
+                        var parameters = method.Parameters;
                         if (request.Parameters.Length > parameters.Length)
                         {
                             throw new ArgumentException("Too many parameters for " + method);
@@ -173,7 +177,7 @@ namespace UiPath.CoreIpc
                             for (int index = request.Parameters.Length; index < parameters.Length; index++)
                             {
                                 var parameter = parameters[index];
-                                allArguments[index] = CheckMessage(parameter.GetDefaultValue(), parameter.ParameterType);
+                                allArguments[index] = CheckMessage(method.Defaults[index], parameter.ParameterType);
                             }
                         }
                     }
@@ -203,5 +207,44 @@ namespace UiPath.CoreIpc
         static object GetTaskResult(Type taskType, Task task) => 
             GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0])(task);
         static GetTaskResultFunc GetTaskResultFunc(Type resultType) => GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType);
+        static Method GetMethod(Type contract, string methodName) => _methods.GetOrAdd((contract, methodName));
+        static Method CreateMethod((Type contract,string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName));
+        readonly struct Method
+        {
+            readonly MethodExecutor _executor;
+            readonly MethodInfo _methodInfo;
+            public ParameterInfo[] Parameters { get; }
+            public object[] Defaults { get; }
+            public Type ReturnType => _methodInfo.ReturnType;
+            public Method(MethodInfo method)
+            {
+                // Parameters to executor
+                var targetParameter = Parameter(typeof(object), "target");
+                var parametersParameter = Parameter(typeof(object[]), "parameters");
+                // Build parameter list
+                Parameters = method.GetParameters();
+                var parameters = new List<Expression>(Parameters.Length);
+                Defaults = new object[Parameters.Length];
+                for (int index = 0; index < Parameters.Length; index++)
+                {
+                    var paramInfo = Parameters[index];
+                    Defaults[index] = paramInfo.GetDefaultValue();
+                    var valueObj = ArrayIndex(parametersParameter, Constant(index));
+                    var valueCast = Convert(valueObj, paramInfo.ParameterType);
+                    // valueCast is "(Ti) parameters[i]"
+                    parameters.Add(valueCast);
+                }
+                // Call method
+                var instanceCast = Convert(targetParameter, method.DeclaringType);
+                var methodCall = Call(instanceCast, method, parameters);
+                // methodCall is "((Ttarget) target) method((T0) parameters[0], (T1) parameters[1], ...)"
+                // must coerce methodCall to match ActionExecutor signature
+                var lambda = Lambda<MethodExecutor>(methodCall, targetParameter, parametersParameter);
+                _executor = lambda.Compile();
+                _methodInfo = method;
+            }
+            public Task Invoke(object service, object[] arguments) => _executor.Invoke(service, arguments);
+            public override string ToString() => _methodInfo.ToString();
+        }
     }
 }

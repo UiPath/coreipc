@@ -37,7 +37,7 @@ namespace UiPath.CoreIpc
             type.GetMethods().Concat(type.GetInterfaces().SelectMany(i => i.GetMethods()));
         public static object GetDefaultValue(this ParameterInfo parameter) => parameter switch
         {
-            { HasDefaultValue: false } => throw new ArgumentException($"{parameter} has no default value!"),
+            { HasDefaultValue: false } => null,
             { ParameterType: { IsValueType: true }, DefaultValue: null } => Activator.CreateInstance(parameter.ParameterType),
             _ => parameter.DefaultValue
         };
