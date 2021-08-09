@@ -81,7 +81,7 @@ namespace UiPath.CoreIpc
                 async Task<Response> HandleRequest(EndpointSettings endpoint, CancellationToken cancellationToken)
                 {
                     var contract = endpoint.Contract;
-                    var serverMethod = GetMethod((contract, request.MethodName));
+                    var method = GetMethod((contract, request.MethodName));
                     var arguments = GetArguments();
                     var beforeCall = endpoint.BeforeCall;
                     if (beforeCall != null)
@@ -105,7 +105,7 @@ namespace UiPath.CoreIpc
                     }
                     async Task<Response> InvokeMethod()
                     {
-                        var returnTaskType = serverMethod.ReturnType;
+                        var returnTaskType = method.ReturnType;
                         var scheduler = endpoint.Scheduler;
                         if (returnTaskType.IsGenericType)
                         {
@@ -116,22 +116,22 @@ namespace UiPath.CoreIpc
                         }
                         else
                         {
-                            (scheduler is null ? MethodCall() : RunOnScheduler()).LogException(Logger, serverMethod);
+                            (scheduler is null ? MethodCall() : RunOnScheduler()).LogException(Logger, method);
                             return Response.Success(request, "");
                         }
                         Task MethodCall()
                         {
-                            Logger.LogDebug($"Processing {serverMethod} on {Thread.CurrentThread.Name}.");
-                            return serverMethod.Invoke(service, arguments);
+                            Logger.LogDebug($"Processing {method} on {Thread.CurrentThread.Name}.");
+                            return method.Invoke(service, arguments);
                         }
                         Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
                     }
                     object[] GetArguments()
                     {
-                        var parameters = serverMethod.Parameters;
+                        var parameters = method.Parameters;
                         if (request.Parameters.Length > parameters.Length)
                         {
-                            throw new ArgumentException("Too many parameters for " + serverMethod);
+                            throw new ArgumentException("Too many parameters for " + method);
                         }
                         var allArguments = new object[parameters.Length];
                         Deserialize();
@@ -177,7 +177,7 @@ namespace UiPath.CoreIpc
                             for (int index = request.Parameters.Length; index < parameters.Length; index++)
                             {
                                 var parameter = parameters[index];
-                                allArguments[index] = CheckMessage(serverMethod.Defaults[index], parameter.ParameterType);
+                                allArguments[index] = CheckMessage(method.Defaults[index], parameter.ParameterType);
                             }
                         }
                     }
