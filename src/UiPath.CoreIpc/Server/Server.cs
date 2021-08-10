@@ -176,8 +176,7 @@ namespace UiPath.CoreIpc
                         {
                             for (int index = request.Parameters.Length; index < parameters.Length; index++)
                             {
-                                var parameter = parameters[index];
-                                allArguments[index] = CheckMessage(method.Defaults[index], parameter.ParameterType);
+                                allArguments[index] = CheckMessage(method.Defaults[index], parameters[index].ParameterType);
                             }
                         }
                     }
