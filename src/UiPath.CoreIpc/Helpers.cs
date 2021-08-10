@@ -42,17 +42,9 @@ namespace UiPath.CoreIpc
             _ => parameter.DefaultValue
         };
         public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
-        public static async Task<bool> WithResult(this Task task)
-        {
-            await task;
-            return true;
-        }
         public static Task<TResult> WithTimeout<TResult>(this CancellationToken cancellationToken,
             TimeSpan timeout, Func<CancellationToken, Task<TResult>> func, string message, Func<Exception, Task> exceptionHandler) =>
             new[] { cancellationToken }.WithTimeout(timeout, func, message, exceptionHandler);
-        public static Task WithTimeout(this IEnumerable<CancellationToken> cancellationTokens,
-            TimeSpan timeout, Func<CancellationToken, Task> func, string message, Func<Exception, Task> exceptionHandler) =>
-            cancellationTokens.WithTimeout(timeout, token => func(token).WithResult(), message, exceptionHandler);
         public static void LogException(this ILogger logger, Exception ex, object tag)
         {
             var message = $"{tag} # {ex}";

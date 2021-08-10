@@ -62,6 +62,7 @@ namespace UiPath.CoreIpc
                         response = await HandleRequest(endpoint, token);
                         Logger.LogInformation($"{Name} sending response for {request}");
                         await SendResponse(response, token);
+                        return true;
                     }, request.MethodName, OnError);
                 }
                 catch (Exception ex)
