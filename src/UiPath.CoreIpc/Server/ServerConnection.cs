@@ -36,7 +36,7 @@ namespace UiPath.CoreIpc
                 throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackContract)}, but it's {configuredCallbackContract?.ToString() ?? "not configured"}.");
             }
             Logger.LogInformation($"Create callback {_listener.Name}");
-            var serviceClient = new ServiceClient<TCallbackContract>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, __) => Task.FromResult(_connection));
+            var serviceClient = new ServiceClient<TCallbackContract>(_connection.Serializer, Settings.RequestTimeout, Logger, (_,_) => Task.FromResult(_connection));
             return serviceClient.CreateProxy();
         }
         public async Task Listen(CancellationToken cancellationToken)
