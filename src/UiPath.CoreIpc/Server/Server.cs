@@ -220,21 +220,23 @@ namespace UiPath.CoreIpc
             public Type ReturnType => _methodInfo.ReturnType;
             public Method(MethodInfo method)
             {
-                Parameters = method.GetParameters();
-                var parameters = new List<Expression>(Parameters.Length);
-                Defaults = new object[Parameters.Length];
-                for (int index = 0; index < Parameters.Length; index++)
+                var parameters = method.GetParameters();
+                var callParameters = new Expression[parameters.Length];
+                var defaults = new object[parameters.Length];
+                for (int index = 0; index < parameters.Length; index++)
                 {
-                    var paramInfo = Parameters[index];
-                    Defaults[index] = paramInfo.GetDefaultValue();
-                    var paramValue = ArrayIndex(ParametersParameter, Constant(index));
-                    parameters.Add(Convert(paramValue, paramInfo.ParameterType));
+                    var parameter = parameters[index];
+                    defaults[index] = parameter.GetDefaultValue();
+                    var paramValue = ArrayIndex(ParametersParameter, Constant(index, typeof(int)));
+                    callParameters[index] = Convert(paramValue, parameter.ParameterType);
                 }
                 var instanceCast = Convert(TargetParameter, method.DeclaringType);
-                var methodCall = Call(instanceCast, method, parameters);
+                var methodCall = Call(instanceCast, method, callParameters);
                 var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter);
                 _executor = lambda.Compile();
                 _methodInfo = method;
+                Parameters = parameters;
+                Defaults = defaults;
             }
             public Task Invoke(object service, object[] arguments) => _executor.Invoke(service, arguments);
             public override string ToString() => _methodInfo.ToString();
