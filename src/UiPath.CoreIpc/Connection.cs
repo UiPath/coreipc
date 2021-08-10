@@ -28,7 +28,7 @@ namespace UiPath.CoreIpc
             _receiveLoop = new(ReceiveLoop);
         }
         public Stream Network { get; }
-        public ILogger Logger { get; }
+        public ILogger Logger { get; internal set; }
         public string Name { get; }
         public ISerializer Serializer { get; }
         public override string ToString() => Name;

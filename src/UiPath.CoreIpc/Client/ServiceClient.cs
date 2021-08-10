@@ -92,6 +92,7 @@ namespace UiPath.CoreIpc
             {
                 return;
             }
+            connection.Logger ??= _logger;
             var endpoints = new ConcurrentDictionary<string, EndpointSettings> { [_serviceEndpoint.Name] = _serviceEndpoint };
             var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
             _server = new(listenerSettings, connection);
