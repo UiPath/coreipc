@@ -112,7 +112,7 @@ namespace UiPath.CoreIpc
                             var methodResult = scheduler is null ? MethodCall() : await RunOnScheduler();
                             await methodResult;
                             var returnValue = GetTaskResult(returnTaskType, methodResult);
-                            return returnValue is Stream donloadStream ? Response.Success(request, donloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
+                            return returnValue is Stream downloadStream ? Response.Success(request, downloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
                         }
                         else
                         {
