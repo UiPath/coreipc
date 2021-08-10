@@ -57,7 +57,7 @@ namespace UiPath.CoreIpc
                     var requestCancellation = new CancellationTokenSource();
                     _requests[request.Id] = requestCancellation;
                     var timeout = request.GetTimeout(Settings.RequestTimeout);
-                    await new[] { cancellationToken, requestCancellation.Token, _connectionClosed.Token }.WithTimeout(timeout, async token =>
+                    await timeout.Timeout(new() { cancellationToken, requestCancellation.Token, _connectionClosed.Token }, async token =>
                     {
                         response = await HandleRequest(endpoint, token);
                         Logger.LogInformation($"{Name} sending response for {request}");

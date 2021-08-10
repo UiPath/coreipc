@@ -42,9 +42,6 @@ namespace UiPath.CoreIpc
             _ => parameter.DefaultValue
         };
         public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
-        public static Task<TResult> WithTimeout<TResult>(this CancellationToken cancellationToken,
-            TimeSpan timeout, Func<CancellationToken, Task<TResult>> func, string message, Func<Exception, Task> exceptionHandler) =>
-            new[] { cancellationToken }.WithTimeout(timeout, func, message, exceptionHandler);
         public static void LogException(this ILogger logger, Exception ex, object tag)
         {
             var message = $"{tag} # {ex}";
@@ -58,11 +55,12 @@ namespace UiPath.CoreIpc
             }
         }
         public static void LogException(this Task task, ILogger logger, object tag) => task.ContinueWith(result => logger.LogException(result.Exception, tag), TaskContinuationOptions.NotOnRanToCompletion);
-        public static async Task<TResult> WithTimeout<TResult>(this IEnumerable<CancellationToken> cancellationTokens,
-            TimeSpan timeout, Func<CancellationToken, Task<TResult>> func, string message, Func<Exception, Task> exceptionHandler)
+        public static async Task<TResult> Timeout<TResult>(this TimeSpan timeout, List<CancellationToken> cancellationTokens,
+            Func<CancellationToken, Task<TResult>> func, string message, Func<Exception, Task> exceptionHandler)
         {
             var timeoutCancellationSource = new CancellationTokenSource(timeout);
-            var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokens.Concat(new[] { timeoutCancellationSource.Token }).ToArray());
+            cancellationTokens.Add(timeoutCancellationSource.Token);
+            var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokens.ToArray());
             try
             {
                 return await func(linkedCancellationSource.Token);

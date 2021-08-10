@@ -108,7 +108,7 @@ namespace UiPath.CoreIpc
                 TimeSpan clientTimeout = _requestTimeout;
                 Stream uploadStream = null;
                 SetWellKnownArguments();
-                return cancellationToken.WithTimeout(clientTimeout, async token =>
+                return clientTimeout.Timeout(new() { cancellationToken }, async token =>
                 {
                     bool newConnection;
                     using (await _connectionLock.LockAsync(token))
