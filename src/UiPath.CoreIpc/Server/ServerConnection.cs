@@ -44,7 +44,7 @@ namespace UiPath.CoreIpc
             var stream = await AuthenticateAsServer();
             var serializer = Settings.ServiceProvider.GetRequiredService<ISerializer>();
             _connection = new(stream, serializer, Logger, _listener.Name, _listener.MaxMessageSize);
-            _server = new(Logger, Settings, _connection, this, cancellationToken);
+            _server = new(Settings, _connection, this, cancellationToken);
             // close the connection when the service host closes
             using (cancellationToken.Register(_connection.Dispose))
             {

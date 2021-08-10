@@ -24,12 +24,11 @@ namespace UiPath.CoreIpc
         private readonly CancellationTokenSource _connectionClosed = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new();
 
-        public Server(ILogger logger, ListenerSettings settings, Connection connection, IClient client = null, CancellationToken cancellationToken = default)
+        public Server(ListenerSettings settings, Connection connection, IClient client = null, CancellationToken cancellationToken = default)
         {
             Settings = settings;
             _connection = connection;
             _client = client;
-            Logger = logger;
             connection.RequestReceived += OnRequestReceived;
             connection.CancellationRequestReceived += requestId =>
             {
@@ -189,7 +188,7 @@ namespace UiPath.CoreIpc
                 }
             }
         }
-        private ILogger Logger { get; }
+        private ILogger Logger => _connection.Logger;
         private ListenerSettings Settings { get; }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ISerializer Serializer => _connection.Serializer;

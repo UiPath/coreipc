@@ -94,7 +94,7 @@ namespace UiPath.CoreIpc
             }
             var endpoints = new ConcurrentDictionary<string, EndpointSettings> { [_serviceEndpoint.Name] = _serviceEndpoint };
             var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
-            _server = new(_logger, listenerSettings, connection);
+            _server = new(listenerSettings, connection);
         }
 
         public Task<TResult> Invoke<TResult>(string methodName, object[] args)
