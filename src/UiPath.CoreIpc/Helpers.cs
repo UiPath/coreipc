@@ -329,7 +329,7 @@ namespace UiPath.CoreIpc
             _dictionary = new(Environment.ProcessorCount, capacity);
             _valueFactory = key => valueFactory(key);
         }
-        public TValue GetOrAdd(in TKey key) => _dictionary.GetOrAdd(key, _valueFactory);
+        public TValue GetOrAdd(TKey key) => _dictionary.GetOrAdd(key, _valueFactory);
         public bool TryGetValue(TKey key, out TValue value) => _dictionary.TryGetValue(key, out value);
         public bool TryRemove(TKey key, out TValue value) => _dictionary.TryRemove(key, out value);
     }
