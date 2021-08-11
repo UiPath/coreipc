@@ -9,7 +9,11 @@ namespace UiPath.CoreIpc.Tests
     {
         protected const int MaxReceivedMessageSizeInMegabytes = 1;
         protected static int Count = -1;
-        protected static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
+        protected static readonly TimeSpan RequestTimeout =
+#if CI
+            TimeSpan.FromSeconds(2) +
+#endif
+            TimeSpan.FromSeconds(2);
         protected readonly IServiceProvider _serviceProvider;
         protected readonly AsyncContext _guiThread = new AsyncContextThread().Context;
 
@@ -26,11 +30,7 @@ namespace UiPath.CoreIpc.Tests
         public virtual void Dispose() => _guiThread.Dispose();
         protected virtual TSettings Configure<TSettings>(TSettings listenerSettings) where TSettings : ListenerSettings
         {
-            listenerSettings.RequestTimeout =
-#if CI
-                RequestTimeout+
-#endif
-                RequestTimeout;
+            listenerSettings.RequestTimeout = RequestTimeout;
             listenerSettings.MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes;
             return listenerSettings;
         }
