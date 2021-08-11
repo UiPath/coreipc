@@ -69,7 +69,7 @@ namespace UiPath.CoreIpc
             async Task CancelServerCall(string requestId) => 
                 await SendMessage(MessageType.CancellationRequest, await SerializeToStream(new CancellationRequest(requestId)), default);
         }
-        private Task SendRequest(Stream requestBytes, Stream uploadStream, CancellationToken cancellationToken) => uploadStream == null ?
+        private Task SendRequest(MemoryStream requestBytes, Stream uploadStream, CancellationToken cancellationToken) => uploadStream == null ?
                 SendMessage(MessageType.Request, requestBytes, cancellationToken) :
                 SendStream(new(MessageType.UploadRequest, requestBytes), uploadStream, cancellationToken);
         internal async Task Send(Response response, CancellationToken cancellationToken)
@@ -100,7 +100,7 @@ namespace UiPath.CoreIpc
             }
         }
 
-        private Task SendMessage(MessageType messageType, Stream data, CancellationToken cancellationToken) => 
+        private Task SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken) => 
             SendMessage(new(messageType, data), cancellationToken).WaitAsync(cancellationToken);
 
         private async Task SendMessage(WireMessage wireMessage, CancellationToken cancellationToken)
@@ -209,7 +209,7 @@ namespace UiPath.CoreIpc
             return new NestedStream(Network, userStreamLength);
         }
 
-        private async Task<Stream> SerializeToStream(object value)
+        private async Task<MemoryStream> SerializeToStream(object value)
         {
             var stream = new MemoryStream();
             await Serializer.Serialize(value, stream);

@@ -91,8 +91,6 @@ namespace UiPath.CoreIpc
     }
     public static class IOHelpers
     {
-        private const int BufferSize = 32768;
-
         internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity> pipeSecurity)
         {
 #if NET461
@@ -161,7 +159,7 @@ namespace UiPath.CoreIpc
             // https://github.com/dotnet/runtime/blob/85441ce69b81dfd5bf57b9d00ba525440b7bb25d/src/libraries/System.Private.CoreLib/src/System/BitConverter.cs#L133
             Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(header.AsSpan(1)), message.Data.Length);
             await stream.WriteBuffer(header, cancellationToken);
-            await message.Data.CopyToAsync(stream, BufferSize, cancellationToken);
+            await stream.WriteAsync(message.Data.GetBuffer(), 0, (int)message.Data.Length, cancellationToken);
         }
         internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
@@ -179,10 +177,12 @@ namespace UiPath.CoreIpc
             {
                 throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize/(1024*1024)} megabytes.");
             }
-            var resultStream = new MemoryStream();
-            using var nestedStream = new NestedStream(stream, length);
-            await nestedStream.CopyToAsync(resultStream, BufferSize, cancellationToken);
-            return new(messageType, resultStream);
+            var data = await stream.ReadBufferCore(length, cancellationToken);
+            if (data.Length == 0)
+            {
+                return new();
+            }
+            return new(messageType, new MemoryStream(data));
         }
 
         internal static async Task<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
