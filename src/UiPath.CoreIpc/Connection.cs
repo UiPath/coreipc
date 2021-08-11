@@ -68,15 +68,9 @@ namespace UiPath.CoreIpc
             }
             Task CancelServerCall(string requestId) => SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId)), default);
         }
-        private async Task SendRequest(byte[] requestBytes, Stream uploadStream, CancellationToken cancellationToken)
-        {
-            if (uploadStream == null)
-            {
-                await SendMessage(MessageType.Request, requestBytes, cancellationToken);
-                return;
-            }
-            await SendStream(new(MessageType.UploadRequest, requestBytes), uploadStream, cancellationToken);
-        }
+        private Task SendRequest(byte[] requestBytes, Stream uploadStream, CancellationToken cancellationToken) => uploadStream == null ?
+                SendMessage(MessageType.Request, requestBytes, cancellationToken) :
+                SendStream(new(MessageType.UploadRequest, requestBytes), uploadStream, cancellationToken);
         internal async Task Send(Response response, CancellationToken cancellationToken)
         {
             var responseBytes = Serialize(response);
