@@ -194,14 +194,8 @@ namespace UiPath.CoreIpc
         public ISerializer Serializer => _connection.Serializer;
         public string Name => _connection.Name;
         public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
-        Task SendResponse(Response response, CancellationToken responseCancellation)
-        {
-            if (_connectionClosed.IsCancellationRequested)
-            {
-                return Task.CompletedTask;
-            }
-            return _connection.Send(response, responseCancellation);
-        }
+        Task SendResponse(Response response, CancellationToken responseCancellation) => 
+            _connectionClosed.IsCancellationRequested ? Task.CompletedTask : _connection.Send(response, responseCancellation);
         static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
         static object GetTaskResult(Type taskType, Task task) => 
             GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0])(task);
