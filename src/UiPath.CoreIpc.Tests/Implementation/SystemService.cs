@@ -26,6 +26,7 @@ namespace UiPath.CoreIpc.Tests
         Task<string> Upload(Stream stream, int delay = 0, CancellationToken cancellationToken = default);
         Task<Stream> Download(string text, CancellationToken cancellationToken = default);
         Task<Stream> Echo(Stream input, CancellationToken cancellationToken = default);
+        Task<string> UploadNoRead(Stream memoryStream, int delay = 0, CancellationToken cancellationToken = default);
     }
 
     public class SystemMessage : Message
@@ -151,6 +152,12 @@ namespace UiPath.CoreIpc.Tests
         {
             await Task.Delay(delay);
             return await new StreamReader(stream).ReadToEndAsync();
+        }
+
+        public async Task<string> UploadNoRead(Stream stream, int delay = 0, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(delay);
+            return "";
         }
 
         public async Task<Stream> Download(string text, CancellationToken cancellationToken = default) => new MemoryStream(Encoding.UTF8.GetBytes(text));

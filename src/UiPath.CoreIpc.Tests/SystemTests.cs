@@ -161,10 +161,27 @@ namespace UiPath.CoreIpc.Tests
         public async Task Upload() => (await _systemClient.Upload(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")))).ShouldBe("Hello world");
 
         [Fact]
+        public async Task UploadNoRead()
+        {
+            try
+            {
+                (await _systemClient.UploadNoRead(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")))).ShouldBeEmpty();
+            }
+            catch (IOException) { }
+            await Guid();
+        }
+
+        [Fact]
         public async Task Download()
         {
             using var stream = await _systemClient.Download("Hello world");
             (await new StreamReader(stream).ReadToEndAsync()).ShouldBe("Hello world");
+        }
+        [Fact]
+        public async Task DownloadNoRead()
+        {
+            using (await _systemClient.Download("Hello world")) { }
+            await Guid();
         }
         protected abstract TBuilder CreateSystemClientBuilder();
         protected TBuilder SystemClientBuilder() => CreateSystemClientBuilder().RequestTimeout(RequestTimeout).Logger(_serviceProvider);

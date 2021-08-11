@@ -125,6 +125,10 @@ namespace UiPath.CoreIpc
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
+            if (_remainingBytes != 0)
+            {
+                _underlyingStream?.Dispose();
+            }
             _underlyingStream = null;
             Disposed?.Invoke(this, EventArgs.Empty);
             base.Dispose(disposing);
