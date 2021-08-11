@@ -156,6 +156,7 @@ namespace UiPath.CoreIpc
         {
             var header = new byte[sizeof(int) + 1];
             header[0] = (byte)message.MessageType;
+            // https://github.com/dotnet/runtime/blob/85441ce69b81dfd5bf57b9d00ba525440b7bb25d/src/libraries/System.Private.CoreLib/src/System/BitConverter.cs#L133
             Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(header.AsSpan(1)), message.Data.Length);
             await stream.WriteBuffer(header, cancellationToken);
             await stream.WriteBuffer(message.Data, cancellationToken);

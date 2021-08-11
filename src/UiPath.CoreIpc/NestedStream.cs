@@ -6,6 +6,7 @@ namespace UiPath.CoreIpc
 {
     /// <summary>
     /// A stream that allows for reading from another stream up to a given number of bytes.
+    /// https://github.com/AArnott/Nerdbank.Streams/blob/3303c541c29b979f61c86c3c2ed5c0e7372d7a55/src/Nerdbank.Streams/NestedStream.cs#L18
     /// </summary>
     public class NestedStream : Stream
     {
