@@ -11,7 +11,7 @@ namespace UiPath.CoreIpc.Tests
 {
     public class EndpointTests : IDisposable
     {
-        private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(2);
+        private static TimeSpan RequestTimeout => TestBase.RequestTimeout;
         private readonly ServiceHost _host;
         private readonly IComputingService _computingClient;
         private readonly ISystemService _systemClient;

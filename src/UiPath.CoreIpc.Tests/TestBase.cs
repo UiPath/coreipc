@@ -9,7 +9,7 @@ namespace UiPath.CoreIpc.Tests
     {
         protected const int MaxReceivedMessageSizeInMegabytes = 1;
         protected static int Count = -1;
-        protected static readonly TimeSpan RequestTimeout =
+        public static readonly TimeSpan RequestTimeout =
 #if CI
             TimeSpan.FromSeconds(2) +
 #endif
