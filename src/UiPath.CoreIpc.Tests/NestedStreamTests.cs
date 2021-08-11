@@ -105,11 +105,18 @@ namespace UiPath.CoreIpc.Tests
         }
 
         [Fact]
-        public void Dispose_DoesNotDisposeUnderylingStream()
+        public void Dispose_IncompleteDisposesUnderylingStream()
         {
             this.stream.Dispose();
-            Assert.True(this.underlyingStream.CanSeek);
+            Assert.False(this.underlyingStream.CanSeek);
+        }
 
+        [Fact]
+        public void Dispose_DoesNotDisposeUnderylingStream()
+        {
+            this.stream.Read(new byte[DefaultNestedLength], 0, DefaultNestedLength);
+            this.stream.Dispose();
+            Assert.True(this.underlyingStream.CanSeek);
             // A sanity check that if it were disposed, our assertion above would fail.
             this.underlyingStream.Dispose();
             Assert.False(this.underlyingStream.CanSeek);
