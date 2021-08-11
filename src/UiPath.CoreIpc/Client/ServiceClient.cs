@@ -257,6 +257,8 @@ namespace UiPath.CoreIpc
             }
         }
 
+        public override string ToString() => Name;
+
         public virtual bool Equals(IConnectionKey other) => EncryptAndSign == other.EncryptAndSign;
 
         public virtual ClientConnection CreateClientConnection(IConnectionKey key) => throw new NotImplementedException();

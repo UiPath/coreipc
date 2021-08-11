@@ -18,6 +18,7 @@ namespace UiPath.CoreIpc.Tcp
     {
         public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, encryptAndSign, beforeCall, serviceEndpoint) =>
             EndPoint = endPoint;
+        public override string Name => base.Name ?? EndPoint.ToString();
         public IPEndPoint EndPoint { get; }
         public override int GetHashCode() => EndPoint.GetHashCode();
         public override bool Equals(IConnectionKey other) => other == this || (other is ITcpKey otherClient && EndPoint.Equals(otherClient.EndPoint));
