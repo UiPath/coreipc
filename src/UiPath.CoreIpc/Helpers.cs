@@ -91,6 +91,8 @@ namespace UiPath.CoreIpc
     }
     public static class IOHelpers
     {
+        private const int BufferSize = 32768;
+
         internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity> pipeSecurity)
         {
 #if NET461
@@ -159,7 +161,7 @@ namespace UiPath.CoreIpc
             // https://github.com/dotnet/runtime/blob/85441ce69b81dfd5bf57b9d00ba525440b7bb25d/src/libraries/System.Private.CoreLib/src/System/BitConverter.cs#L133
             Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(header.AsSpan(1)), message.Data.Length);
             await stream.WriteBuffer(header, cancellationToken);
-            await stream.WriteBuffer(message.Data, cancellationToken);
+            await message.Data.CopyToAsync(stream, BufferSize, cancellationToken);
         }
         internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
@@ -169,7 +171,7 @@ namespace UiPath.CoreIpc
             var header = await stream.ReadBufferCore(sizeof(int)+1, cancellationToken);
             if (header.Length == 0)
             {
-                return new(default, header);
+                return new();
             }
             var messageType = (MessageType)header[0];
             var length = BitConverter.ToInt32(header, 1);
@@ -177,8 +179,10 @@ namespace UiPath.CoreIpc
             {
                 throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize/(1024*1024)} megabytes.");
             }
-            var messageData = await stream.ReadBuffer(length, cancellationToken);
-            return new(messageType, messageData);
+            var resultStream = new MemoryStream();
+            using var nestedStream = new NestedStream(stream, length);
+            await nestedStream.CopyToAsync(resultStream, BufferSize, cancellationToken);
+            return new(messageType, resultStream);
         }
 
         internal static async Task<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
@@ -208,15 +212,7 @@ namespace UiPath.CoreIpc
             }
             return bytes;
         }
-
-        public static byte[] SerializeToBytes(this ISerializer serializer, object obj)
-        {
-            var json = serializer.Serialize(obj);
-            return Encoding.UTF8.GetBytes(json);
-        }
-
-        public static T Deserialize<T>(this ISerializer serializer, byte[] binary) => serializer.Deserialize<T>(Encoding.UTF8.GetString(binary));
-
+        public static T Deserialize<T>(this ISerializer serializer, Stream binary) => (T)serializer.Deserialize(binary, typeof(T));
         public static T Deserialize<T>(this ISerializer serializer, string json) => (T)serializer.Deserialize(json, typeof(T));
     }
     public static class Validator

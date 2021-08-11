@@ -122,13 +122,14 @@ namespace UiPath.CoreIpc
     enum MessageType : byte { Request, Response, CancellationRequest, UploadRequest, DownloadResponse }
     readonly struct WireMessage
     {
-        public WireMessage(MessageType messageType, byte[] data)
+        public WireMessage(MessageType messageType, Stream data)
         {
             MessageType = messageType;
             Data = data;
+            data.Position = 0;
         }
         public MessageType MessageType { get; }
-        public byte[] Data { get; }
-        public bool Empty => Data.Length == 0;
+        public Stream Data { get; }
+        public bool Empty => Data == null;
     }
 }

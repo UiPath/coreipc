@@ -39,7 +39,7 @@ namespace UiPath.CoreIpc
         public event EventHandler<EventArgs> Closed;
         internal async Task<Response> RemoteCall(Request request, Stream uploadStream, CancellationToken token)
         {
-            var requestBytes = Serialize(request);
+            var requestBytes = await SerializeToStream(request);
             var requestCompletion = new RequestCompletionSource();
             _requests[request.Id] = requestCompletion;
             try
@@ -66,14 +66,15 @@ namespace UiPath.CoreIpc
                 }
                 requestCompletion.TrySetCanceled();
             }
-            Task CancelServerCall(string requestId) => SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId)), default);
+            async Task CancelServerCall(string requestId) => 
+                await SendMessage(MessageType.CancellationRequest, await SerializeToStream(new CancellationRequest(requestId)), default);
         }
-        private Task SendRequest(byte[] requestBytes, Stream uploadStream, CancellationToken cancellationToken) => uploadStream == null ?
+        private Task SendRequest(Stream requestBytes, Stream uploadStream, CancellationToken cancellationToken) => uploadStream == null ?
                 SendMessage(MessageType.Request, requestBytes, cancellationToken) :
                 SendStream(new(MessageType.UploadRequest, requestBytes), uploadStream, cancellationToken);
         internal async Task Send(Response response, CancellationToken cancellationToken)
         {
-            var responseBytes = Serialize(response);
+            var responseBytes = await SerializeToStream(response);
             var downloadStream = response.DownloadStream;
             if (downloadStream == null)
             {
@@ -99,7 +100,7 @@ namespace UiPath.CoreIpc
             }
         }
 
-        private Task SendMessage(MessageType messageType, byte[] data, CancellationToken cancellationToken) => 
+        private Task SendMessage(MessageType messageType, Stream data, CancellationToken cancellationToken) => 
             SendMessage(new(messageType, data), cancellationToken).WaitAsync(cancellationToken);
 
         private async Task SendMessage(WireMessage wireMessage, CancellationToken cancellationToken)
@@ -186,7 +187,7 @@ namespace UiPath.CoreIpc
             }
         }
 
-        private async Task OnDownloadResponse(byte[] data)
+        private async Task OnDownloadResponse(Stream data)
         {
             var downloadStream = await WrapNetworkStream();
             var streamDisposed = new TaskCompletionSource<bool>();
@@ -195,7 +196,7 @@ namespace UiPath.CoreIpc
             await streamDisposed.Task;
         }
 
-        private async Task OnUploadRequest(byte[] data)
+        private async Task OnUploadRequest(Stream data)
         {
             using var uploadStream = await WrapNetworkStream();
             await OnRequestReceived(data, uploadStream);
@@ -208,10 +209,15 @@ namespace UiPath.CoreIpc
             return new NestedStream(Network, userStreamLength);
         }
 
-        private byte[] Serialize(object value) => Serializer.SerializeToBytes(value);
-        private T Deserialize<T>(byte[] data) => Serializer.Deserialize<T>(data);
-        private Task OnRequestReceived(byte[] data, Stream uploadStream = null) => RequestReceived(Deserialize<Request>(data), uploadStream);
-        private void OnResponseReceived(byte[] data, Stream downloadStream = null)
+        private async Task<Stream> SerializeToStream(object value)
+        {
+            var stream = new MemoryStream();
+            await Serializer.Serialize(value, stream);
+            return stream;
+        }
+        private T Deserialize<T>(Stream data) => Serializer.Deserialize<T>(data);
+        private Task OnRequestReceived(Stream data, Stream uploadStream = null) => RequestReceived(Deserialize<Request>(data), uploadStream);
+        private void OnResponseReceived(Stream data, Stream downloadStream = null)
         {
             var response = Deserialize<Response>(data);
             response.DownloadStream = downloadStream;

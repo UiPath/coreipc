@@ -12,7 +12,7 @@ namespace UiPath.CoreIpc
     public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
     {
         protected readonly IServiceProvider _serviceProvider;
-        protected ISerializer _serializer = new JsonSerializer();
+        protected ISerializer _serializer = new IpcJsonSerializer();
         protected TimeSpan _requestTimeout = Timeout.InfiniteTimeSpan;
         protected ILogger _logger;
         protected ConnectionFactory _connectionFactory;

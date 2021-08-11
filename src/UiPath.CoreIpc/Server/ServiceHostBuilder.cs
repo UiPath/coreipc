@@ -47,7 +47,7 @@ namespace UiPath.CoreIpc
     {
         public static IServiceCollection AddIpc(this IServiceCollection services)
         {
-            services.AddSingleton<ISerializer, JsonSerializer>();
+            services.AddSingleton<ISerializer, IpcJsonSerializer>();
             return services;
         }
     }
