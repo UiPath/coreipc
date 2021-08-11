@@ -8,6 +8,8 @@ using System.IO;
 using System.IO.Pipes;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
@@ -152,28 +154,24 @@ namespace UiPath.CoreIpc
 
         internal static async Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
         {
-            await stream.WriteBuffer(new[] { (byte)message.MessageType }, cancellationToken);
-            await stream.WriteBuffer(BitConverter.GetBytes(message.Data.Length), cancellationToken);
+            var header = new byte[sizeof(int) + 1];
+            header[0] = (byte)message.MessageType;
+            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(header.AsSpan(1)), message.Data.Length);
+            await stream.WriteBuffer(header, cancellationToken);
             await stream.WriteBuffer(message.Data, cancellationToken);
         }
-
         internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
 
         internal static async Task<WireMessage> ReadMessage(this Stream stream, int maxMessageSize, CancellationToken cancellationToken = default)
         {
-            var messageTypeBuffer = await stream.ReadBufferCore(1, cancellationToken);
-            if (messageTypeBuffer.Length == 0)
+            var header = await stream.ReadBufferCore(sizeof(int)+1, cancellationToken);
+            if (header.Length == 0)
             {
-                return new(default, messageTypeBuffer);
+                return new(default, header);
             }
-            var messageType = (MessageType)messageTypeBuffer[0];
-            var lengthBuffer = await stream.ReadBufferCore(sizeof(int), cancellationToken);
-            if (lengthBuffer.Length == 0)
-            {
-                return new(messageType, lengthBuffer);
-            }
-            var length = BitConverter.ToInt32(lengthBuffer, 0);
+            var messageType = (MessageType)header[0];
+            var length = BitConverter.ToInt32(header, 1);
             if(length > maxMessageSize)
             {
                 throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize/(1024*1024)} megabytes.");
