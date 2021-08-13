@@ -155,7 +155,7 @@ namespace UiPath.CoreIpc
             Logger?.LogInformation($"{nameof(ReceiveLoop)} {Name} finished.");
             Dispose();
             return;
-            async Task HandleMessage(WireMessage message)
+            Task HandleMessage(WireMessage message)
             {
                 var data = message.Data;
                 Action callback = null;
@@ -171,11 +171,9 @@ namespace UiPath.CoreIpc
                         callback = () => CancellationRequestReceived(Deserialize<CancellationRequest>(data).RequestId);
                         break;
                     case MessageType.UploadRequest:
-                        await OnUploadRequest(data);
-                        break;
+                        return OnUploadRequest(data);
                     case MessageType.DownloadResponse:
-                        await OnDownloadResponse(data);
-                        break;
+                        return OnDownloadResponse(data);
                     default:
                         Logger?.LogInformation("Unknown message type " + message.MessageType);
                         break;
@@ -184,6 +182,7 @@ namespace UiPath.CoreIpc
                 {
                     Task.Run(callback).LogException(Logger, this);
                 }
+                return Task.CompletedTask;
             }
         }
 
