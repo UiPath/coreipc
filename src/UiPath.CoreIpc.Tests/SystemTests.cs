@@ -128,7 +128,7 @@ namespace UiPath.CoreIpc.Tests
                 exception = ex;
             }
             exception.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's not configured.");
-            exception.Is<ArgumentException>().ShouldBeTrue();
+            exception.Is<InvalidOperationException>().ShouldBeTrue();
             await Guid();
         }
 

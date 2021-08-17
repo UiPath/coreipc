@@ -222,14 +222,11 @@ namespace UiPath.CoreIpc
             else if (_serviceEndpoint != null)
             {
                 _server = clientConnection.Server;
-                try
+                if (_server.Endpoints.ContainsKey(_serviceEndpoint.Name))
                 {
-                    _server.Endpoints.Add(_serviceEndpoint.Name, _serviceEndpoint);
+                    throw new InvalidOperationException($"Duplicate callback proxy instance {Name} <{typeof(TInterface).Name}, {_serviceEndpoint.Contract.Name}>. Consider using a singleton callback proxy.");
                 }
-                catch (ArgumentException ex)
-                {
-                    throw new InvalidOperationException($"Duplicate callback proxy instance {Name} <{typeof(TInterface).Name}, {_serviceEndpoint.Contract.Name}>. Consider using a singleton callback proxy.", ex);
-                }
+                _server.Endpoints.Add(_serviceEndpoint.Name, _serviceEndpoint);
             }
         }
 

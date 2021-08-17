@@ -11,12 +11,12 @@ namespace UiPath.CoreIpc
 {
     public interface IClient
     {
-        TCallbackInterface GetCallback<TCallbackInterface>(EndpointSettings endpoint) where TCallbackInterface : class;
+        TCallbackInterface GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class;
         void Impersonate(Action action);
     }
     abstract class ServerConnection : IClient, IDisposable
     {
-        private readonly ConcurrentDictionary<EndpointSettings, object> _callbacks = new();
+        private readonly ConcurrentDictionary<Type, object> _callbacks = new();
         protected readonly Listener _listener;
         private Connection _connection;
         private Server _server;
@@ -26,14 +26,13 @@ namespace UiPath.CoreIpc
         public abstract Task AcceptClient(CancellationToken cancellationToken);
         protected abstract Stream Network { get; }
         public virtual void Impersonate(Action action) => action();
-        public TCallbackInterface GetCallback<TCallbackInterface>(EndpointSettings endpoint) where TCallbackInterface : class =>
-            (TCallbackInterface)_callbacks.GetOrAdd(endpoint, CreateCallback<TCallbackInterface>);
-        TCallbackContract CreateCallback<TCallbackContract>(EndpointSettings endpoint) where TCallbackContract : class
+        TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class =>
+            (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, CreateCallback<TCallbackInterface>);
+        TCallbackContract CreateCallback<TCallbackContract>(Type callbackContract) where TCallbackContract : class
         {
-            var configuredCallbackContract = endpoint.CallbackContract;
-            if (configuredCallbackContract == null || !typeof(TCallbackContract).IsAssignableFrom(configuredCallbackContract))
+            if (!typeof(TCallbackContract).IsAssignableFrom(callbackContract))
             {
-                throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackContract)}, but it's {configuredCallbackContract?.ToString() ?? "not configured"}.");
+                throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackContract)}, but it's {callbackContract}.");
             }
             Logger.LogInformation($"Create callback {_listener.Name}");
             var serviceClient = new ServiceClient<TCallbackContract>(_connection.Serializer, Settings.RequestTimeout, Logger, (_,_) => Task.FromResult(_connection));
