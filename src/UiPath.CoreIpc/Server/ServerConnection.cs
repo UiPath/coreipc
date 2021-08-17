@@ -26,8 +26,14 @@ namespace UiPath.CoreIpc
         public abstract Task AcceptClient(CancellationToken cancellationToken);
         protected abstract Stream Network { get; }
         public virtual void Impersonate(Action action) => action();
-        TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class =>
-            (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, CreateCallback<TCallbackInterface>);
+        TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class
+        {
+            if (callbackContract == null)
+            {
+                throw new InvalidOperationException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's not configured.");
+            }
+            return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, CreateCallback<TCallbackInterface>);
+        }
         TCallbackContract CreateCallback<TCallbackContract>(Type callbackContract) where TCallbackContract : class
         {
             if (!typeof(TCallbackContract).IsAssignableFrom(callbackContract))
