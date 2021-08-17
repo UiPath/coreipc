@@ -7,13 +7,13 @@ namespace UiPath.CoreIpc
     public class Message
     {
         [JsonIgnore]
-        internal EndpointSettings Endpoint { get; set; }
+        internal Type CallbackContract { get; set; }
         [JsonIgnore]
         public IClient Client { get; set; }
         [JsonIgnore]
         public TimeSpan RequestTimeout { get; set; }
         public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => 
-            Client.GetCallback<TCallbackInterface>(Endpoint.CallbackContract ??
+            Client.GetCallback<TCallbackInterface>(CallbackContract ??
                 throw new InvalidOperationException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's not configured."));
         public void ImpersonateClient(Action action) => Client.Impersonate(action);
     }

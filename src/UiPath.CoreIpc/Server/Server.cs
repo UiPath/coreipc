@@ -167,7 +167,7 @@ namespace UiPath.CoreIpc
                             }
                             if (argument is Message message)
                             {
-                                message.Endpoint = endpoint;
+                                message.CallbackContract = endpoint.CallbackContract;
                                 message.Client = _client;
                             }
                             return argument;
