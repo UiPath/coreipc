@@ -32,17 +32,17 @@ namespace UiPath.CoreIpc
             {
                 throw new InvalidOperationException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's not configured.");
             }
-            return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, CreateCallback<TCallbackInterface>);
-        }
-        TCallbackContract CreateCallback<TCallbackContract>(Type callbackContract) where TCallbackContract : class
-        {
-            if (!typeof(TCallbackContract).IsAssignableFrom(callbackContract))
+            return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, CreateCallback);
+            TCallbackInterface CreateCallback(Type callbackContract)
             {
-                throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackContract)}, but it's {callbackContract}.");
+                if (!typeof(TCallbackInterface).IsAssignableFrom(callbackContract))
+                {
+                    throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's {callbackContract}.");
+                }
+                Logger.LogInformation($"Create callback {_listener.Name}");
+                var serviceClient = new ServiceClient<TCallbackInterface>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, _) => Task.FromResult(_connection));
+                return serviceClient.CreateProxy();
             }
-            Logger.LogInformation($"Create callback {_listener.Name}");
-            var serviceClient = new ServiceClient<TCallbackContract>(_connection.Serializer, Settings.RequestTimeout, Logger, (_,_) => Task.FromResult(_connection));
-            return serviceClient.CreateProxy();
         }
         public async Task Listen(CancellationToken cancellationToken)
         {
