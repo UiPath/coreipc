@@ -91,6 +91,7 @@ namespace UiPath.CoreIpc
     }
     public static class IOHelpers
     {
+        internal const int HeaderLength = sizeof(int) + 1;
         internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity> pipeSecurity)
         {
 #if NET461
@@ -154,12 +155,13 @@ namespace UiPath.CoreIpc
 
         internal static async Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
         {
-            var header = new byte[sizeof(int) + 1];
-            header[0] = (byte)message.MessageType;
+            var buffer = message.Data.GetBuffer();
+            var totalLength = (int)message.Data.Length;
+            buffer[0] = (byte)message.MessageType;
+            var payloadLength = totalLength - HeaderLength;
             // https://github.com/dotnet/runtime/blob/85441ce69b81dfd5bf57b9d00ba525440b7bb25d/src/libraries/System.Private.CoreLib/src/System/BitConverter.cs#L133
-            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(header.AsSpan(1)), message.Length);
-            await stream.WriteBuffer(header, cancellationToken);
-            await stream.WriteAsync(message.Buffer, 0, message.Length, cancellationToken);
+            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer.AsSpan(1, sizeof(int))), payloadLength);
+            await stream.WriteAsync(buffer, 0, totalLength, cancellationToken);
         }
         internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);

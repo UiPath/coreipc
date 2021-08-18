@@ -210,7 +210,7 @@ namespace UiPath.CoreIpc
 
         private async Task<MemoryStream> SerializeToStream(object value)
         {
-            var stream = new MemoryStream();
+            var stream = new MemoryStream { Position = IOHelpers.HeaderLength };
             await Serializer.Serialize(value, stream);
             return stream;
         }

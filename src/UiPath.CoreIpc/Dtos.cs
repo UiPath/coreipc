@@ -131,7 +131,5 @@ namespace UiPath.CoreIpc
         public MessageType MessageType { get; }
         public MemoryStream Data { get; }
         public bool Empty => Data == null;
-        public int Length => (int)Data.Length;
-        public byte[] Buffer => Data.GetBuffer();
     }
 }
