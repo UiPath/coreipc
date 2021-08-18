@@ -205,7 +205,8 @@ namespace UiPath.CoreIpc
                 clientConnection.Dispose();
                 throw;
             }
-            await InitializeClientConnection(clientConnection);
+            await CreateConnection(clientConnection.Network);
+            InitializeClientConnection(clientConnection);
             return true;
         }
 
@@ -230,9 +231,8 @@ namespace UiPath.CoreIpc
             }
         }
 
-        private async Task InitializeClientConnection(ClientConnection clientConnection)
+        private void InitializeClientConnection(ClientConnection clientConnection)
         {
-            await CreateConnection(clientConnection.Network);
             _connection.Listen().LogException(_logger, Name);
             clientConnection.Connection = _connection;
             clientConnection.Server = _server;

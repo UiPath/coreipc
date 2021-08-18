@@ -22,12 +22,12 @@ namespace UiPath.CoreIpc
             return serializer.Deserialize(streamReader, type);
         }
         public string Serialize(object obj) => JsonConvert.SerializeObject(obj);
-        public async Task Serialize(object obj, Stream stream)
+        public Task Serialize(object obj, Stream stream)
         {
             var serializer = JsonSerializer.CreateDefault();
             var streamWriter = new StreamWriter(stream);
             serializer.Serialize(streamWriter, obj);
-            await streamWriter.FlushAsync();
+            return streamWriter.FlushAsync();
         }
     }
 }
