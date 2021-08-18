@@ -153,7 +153,7 @@ namespace UiPath.CoreIpc
             return false;
         }
 
-        internal static async Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
+        internal static Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
         {
             var buffer = message.Data.GetBuffer();
             var totalLength = (int)message.Data.Length;
@@ -161,7 +161,7 @@ namespace UiPath.CoreIpc
             var payloadLength = totalLength - HeaderLength;
             // https://github.com/dotnet/runtime/blob/85441ce69b81dfd5bf57b9d00ba525440b7bb25d/src/libraries/System.Private.CoreLib/src/System/BitConverter.cs#L133
             Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer.AsSpan(1, sizeof(int))), payloadLength);
-            await stream.WriteAsync(buffer, 0, totalLength, cancellationToken);
+            return stream.WriteAsync(buffer, 0, totalLength, cancellationToken);
         }
         internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
