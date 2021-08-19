@@ -49,13 +49,13 @@ namespace UiPath.CoreIpc
             {
                 endpoint.Scheduler = taskScheduler;
             }
-            var tasks = _listeners.Select(listener => Task.Run(() =>
-            {
-                _logger.LogDebug($"Starting endpoint '{listener}'...");
-                _cancellationTokenSource.Token.Register(() => _logger.LogInformation($"Stopping endpoint '{listener}'..."));
-                return listener.Listen(_cancellationTokenSource.Token).ContinueWith(_ => _logger.LogInformation($"Endpoint '{listener}' stopped."));
-            }));
-            return Task.WhenAll(tasks);
+            return Task.Run(() =>
+                Task.WhenAll(_listeners.Select(listener => 
+                {
+                    _logger.LogDebug($"Starting endpoint '{listener}'...");
+                    _cancellationTokenSource.Token.Register(() => _logger.LogInformation($"Stopping endpoint '{listener}'..."));
+                    return listener.Listen(_cancellationTokenSource.Token).ContinueWith(_ => _logger.LogInformation($"Endpoint '{listener}' stopped."));
+                })));
         }
     }
 }
