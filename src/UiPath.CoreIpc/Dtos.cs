@@ -57,7 +57,6 @@ namespace UiPath.CoreIpc
         public Error Error { get; }
         [JsonIgnore]
         public Stream DownloadStream { get; set; }
-        public static Response Fail(Request request, string message) => Fail(request, new Exception(message));
         public static Response Fail(Request request, Exception ex) => new(request.Id, null, new(ex));
         public static Response Success(Request request, string data) => new(request.Id, data, null);
         public static Response Success(Request request, Stream downloadStream) => new(request.Id, null, null) { DownloadStream = downloadStream };
