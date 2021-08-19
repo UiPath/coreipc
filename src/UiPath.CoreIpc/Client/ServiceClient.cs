@@ -122,8 +122,8 @@ namespace UiPath.CoreIpc
                         await _beforeCall(new(newConnection, methodName, args), token);
                     }
                     var requestId = _connection.NewRequestId();
-                    var arguments = args.Select(_serializer.Serialize).ToArray();
-                    var request = new Request(typeof(TInterface).Name, requestId, methodName, arguments, messageTimeout.TotalSeconds);
+                    var serializedArguments = Serialize(args);
+                    var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds);
                     _logger?.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
                     var response = await _connection.RemoteCall(request, uploadStream, token);
                     _logger?.LogInformation($"IpcClient called {methodName} {requestId} {Name}.");
@@ -162,6 +162,15 @@ namespace UiPath.CoreIpc
                                 break;
                         }
                     }
+                }
+                string[] Serialize(object[] args)
+                {
+                    var serializedArgs = new string[args.Length];
+                    for (int index = 0; index < serializedArgs.Length; index++)
+                    {
+                        serializedArgs[index] = _serializer.Serialize(args[index]);
+                    }
+                    return serializedArgs;
                 }
             }
         }
