@@ -61,29 +61,6 @@ namespace UiPath.CoreIpc
             return proxy;
         }
 
-        private async Task CreateConnection(Stream network)
-        {
-            var stream = EncryptAndSign ? await AuthenticateAsClient() : network;
-            OnNewConnection(new(stream, _serializer, _logger, Name));
-            _logger?.LogInformation($"CreateConnection {Name}.");
-            return;
-            async Task<Stream> AuthenticateAsClient()
-            {
-                var negotiateStream = new NegotiateStream(network);
-                try
-                {
-                    await negotiateStream.AuthenticateAsClientAsync(new(), "", ProtectionLevel.EncryptAndSign, TokenImpersonationLevel.Identification);
-                }
-                catch
-                {
-                    negotiateStream.Dispose();
-                    throw;
-                }
-                Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
-                return negotiateStream;
-            }
-        }
-
         private void OnNewConnection(Connection connection, bool alreadyHasServer = false)
         {
             _connection?.Dispose();
@@ -214,9 +191,26 @@ namespace UiPath.CoreIpc
                 clientConnection.Dispose();
                 throw;
             }
-            await CreateConnection(clientConnection.Network);
+            var stream = EncryptAndSign ? await AuthenticateAsClient(clientConnection.Network) : clientConnection.Network;
+            OnNewConnection(new(stream, _serializer, _logger, Name));
+            _logger?.LogInformation($"CreateConnection {Name}."); 
             InitializeClientConnection(clientConnection);
             return true;
+            static async Task<Stream> AuthenticateAsClient(Stream network)
+            {
+                var negotiateStream = new NegotiateStream(network);
+                try
+                {
+                    await negotiateStream.AuthenticateAsClientAsync(new(), "", ProtectionLevel.EncryptAndSign, TokenImpersonationLevel.Identification);
+                }
+                catch
+                {
+                    negotiateStream.Dispose();
+                    throw;
+                }
+                Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
+                return negotiateStream;
+            }
         }
 
         private void ReuseClientConnection(ClientConnection clientConnection)
