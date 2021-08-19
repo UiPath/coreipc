@@ -26,9 +26,9 @@ namespace UiPath.CoreIpc
             Name = $"{name} {GetHashCode()}";
             _maxMessageSize = maxMessageSize;
             _receiveLoop = new(ReceiveLoop);
-            _onResponse = OnResponseReceived;
-            _onRequest = OnRequestReceived;
-            _onCancellation = OnCancellationReceived;
+            _onResponse = data => OnResponseReceived((Stream)data, null);
+            _onRequest = data => OnRequestReceived((Stream)data, null);
+            _onCancellation = data => CancellationRequestReceived(Deserialize<CancellationRequest>((Stream)data).RequestId);
         }
         public Stream Network { get; }
         public ILogger Logger { get; internal set; }
@@ -204,9 +204,7 @@ namespace UiPath.CoreIpc
             return stream;
         }
         private T Deserialize<T>(Stream data) => Serializer.Deserialize<T>(data);
-        private void OnRequestReceived(object data) => OnRequestReceived((Stream)data, null);
         private Task OnRequestReceived(Stream data, Stream uploadStream) => RequestReceived(Deserialize<Request>(data), uploadStream);
-        private void OnResponseReceived(object data) => OnResponseReceived((Stream)data, null);
         private void OnResponseReceived(Stream data, Stream downloadStream)
         {
             var response = Deserialize<Response>(data);
@@ -217,6 +215,5 @@ namespace UiPath.CoreIpc
                 completionSource.TrySetResult(response);
             }
         }
-        private void OnCancellationReceived(object data) => CancellationRequestReceived(Deserialize<CancellationRequest>((Stream)data).RequestId);
     }
 }
