@@ -100,7 +100,9 @@ namespace UiPath.CoreIpc
 
         public Task<TResult> Invoke<TResult>(string methodName, object[] args)
         {
-            return Task.Run(Invoke);
+            var syncContext = SynchronizationContext.Current;
+            var defaultContext = syncContext == null || syncContext.GetType() == typeof(SynchronizationContext);
+            return defaultContext ? Invoke() : Task.Run(Invoke);
             Task<TResult> Invoke()
             {
                 CancellationToken cancellationToken = default;
