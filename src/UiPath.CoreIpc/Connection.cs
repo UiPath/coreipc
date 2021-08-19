@@ -5,11 +5,9 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-
 namespace UiPath.CoreIpc
 {
     using RequestCompletionSource = TaskCompletionSource<Response>;
-
     public sealed class Connection : IDisposable
     {
         private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new();
@@ -17,7 +15,9 @@ namespace UiPath.CoreIpc
         private readonly int _maxMessageSize;
         private readonly Lazy<Task> _receiveLoop;
         private readonly AsyncLock _sendLock = new();
-
+        private readonly Action<object> _onResponse;
+        private readonly Action<object> _onRequest;
+        private readonly Action<object> _onCancellation;
         public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
         {
             Network = network;
@@ -26,6 +26,9 @@ namespace UiPath.CoreIpc
             Name = $"{name} {GetHashCode()}";
             _maxMessageSize = maxMessageSize;
             _receiveLoop = new(ReceiveLoop);
+            _onResponse = OnResponseReceived;
+            _onRequest = OnRequestReceived;
+            _onCancellation = OnCancellationReceived;
         }
         public Stream Network { get; }
         public ILogger Logger { get; internal set; }
@@ -99,10 +102,8 @@ namespace UiPath.CoreIpc
                 }
             }
         }
-
         private Task SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken) => 
             SendMessage(new(messageType, data), cancellationToken).WaitAsync(cancellationToken);
-
         private async Task SendMessage(WireMessage wireMessage, CancellationToken cancellationToken)
         {
             using (await _sendLock.LockAsync(cancellationToken))
@@ -110,7 +111,6 @@ namespace UiPath.CoreIpc
                 await Network.WriteMessage(wireMessage, CancellationToken.None);
             }
         }
-
         public void Dispose()
         {
             var closedHandler = Interlocked.CompareExchange(ref Closed, null, Closed);
@@ -129,7 +129,6 @@ namespace UiPath.CoreIpc
             }
             CompleteRequests();
         }
-
         private void CompleteRequests()
         {
             foreach (var completionSource in _requests.Values)
@@ -137,7 +136,6 @@ namespace UiPath.CoreIpc
                 completionSource.TrySetException(new IOException("Connection closed."));
             }
         }
-
         private async Task ReceiveLoop()
         {
             WireMessage message;
@@ -158,17 +156,17 @@ namespace UiPath.CoreIpc
             Task HandleMessage(WireMessage message)
             {
                 var data = message.Data;
-                Action callback = null;
+                Action<object> callback = null;
                 switch (message.MessageType)
                 {
                     case MessageType.Response:
-                        callback = () => OnResponseReceived(data);
+                        callback = _onResponse;
                         break;
                     case MessageType.Request when RequestReceived != null:
-                        callback = () => OnRequestReceived(data);
+                        callback = _onRequest;
                         break;
                     case MessageType.CancellationRequest when CancellationRequestReceived != null:
-                        callback = () => CancellationRequestReceived(Deserialize<CancellationRequest>(data).RequestId);
+                        callback = _onCancellation;
                         break;
                     case MessageType.UploadRequest:
                         return OnUploadRequest(data);
@@ -180,12 +178,11 @@ namespace UiPath.CoreIpc
                 };
                 if (callback != null)
                 {
-                    Task.Run(callback).LogException(Logger, this);
+                    Task.Factory.StartNew(callback, data, default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default).LogException(Logger, this);
                 }
                 return Task.CompletedTask;
             }
         }
-
         private async Task OnDownloadResponse(Stream data)
         {
             var downloadStream = await WrapNetworkStream();
@@ -194,20 +191,17 @@ namespace UiPath.CoreIpc
             OnResponseReceived(data, downloadStream);
             await streamDisposed.Task;
         }
-
         private async Task OnUploadRequest(Stream data)
         {
             using var uploadStream = await WrapNetworkStream();
             await OnRequestReceived(data, uploadStream);
         }
-
         private async Task<NestedStream> WrapNetworkStream()
         {
             var lengthBytes = await Network.ReadBuffer(sizeof(long), default);
             var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
             return new NestedStream(Network, userStreamLength);
         }
-
         private async Task<MemoryStream> SerializeToStream(object value)
         {
             var stream = new MemoryStream { Position = IOHelpers.HeaderLength };
@@ -215,8 +209,10 @@ namespace UiPath.CoreIpc
             return stream;
         }
         private T Deserialize<T>(Stream data) => Serializer.Deserialize<T>(data);
-        private Task OnRequestReceived(Stream data, Stream uploadStream = null) => RequestReceived(Deserialize<Request>(data), uploadStream);
-        private void OnResponseReceived(Stream data, Stream downloadStream = null)
+        private void OnRequestReceived(object data) => OnRequestReceived((Stream)data, null);
+        private Task OnRequestReceived(Stream data, Stream uploadStream) => RequestReceived(Deserialize<Request>(data), uploadStream);
+        private void OnResponseReceived(object data) => OnResponseReceived((Stream)data, null);
+        private void OnResponseReceived(Stream data, Stream downloadStream)
         {
             var response = Deserialize<Response>(data);
             response.DownloadStream = downloadStream;
@@ -226,5 +222,6 @@ namespace UiPath.CoreIpc
                 completionSource.TrySetResult(response);
             }
         }
+        private void OnCancellationReceived(object data) => CancellationRequestReceived(Deserialize<CancellationRequest>((Stream)data).RequestId);
     }
 }
