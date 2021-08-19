@@ -42,12 +42,11 @@ namespace UiPath.CoreIpc
         public event EventHandler<EventArgs> Closed;
         internal async Task<Response> RemoteCall(Request request, Stream uploadStream, CancellationToken token)
         {
-            var requestBytes = await SerializeToStream(request);
             var requestCompletion = new RequestCompletionSource();
             _requests[request.Id] = requestCompletion;
             try
             {
-                await SendRequest(requestBytes, uploadStream, token);
+                await SendRequest(SerializeToStream(request), uploadStream, token);
                 using (token.Register(CancelRequest))
                 {
                     return await requestCompletion.Task;
@@ -69,21 +68,17 @@ namespace UiPath.CoreIpc
                 }
                 requestCompletion.TrySetCanceled();
             }
-            async Task CancelServerCall(string requestId) => 
-                await SendMessage(MessageType.CancellationRequest, await SerializeToStream(new CancellationRequest(requestId)), default);
+            Task CancelServerCall(string requestId) => 
+                SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default);
         }
         private Task SendRequest(MemoryStream requestBytes, Stream uploadStream, CancellationToken cancellationToken) => uploadStream == null ?
                 SendMessage(MessageType.Request, requestBytes, cancellationToken) :
                 SendStream(new(MessageType.UploadRequest, requestBytes), uploadStream, cancellationToken);
-        internal async Task Send(Response response, CancellationToken cancellationToken)
+        internal Task Send(Response response, CancellationToken cancellationToken) => response.DownloadStream == null ? 
+                SendMessage(MessageType.Response, SerializeToStream(response), cancellationToken) : 
+                SendDownloadStream(SerializeToStream(response), response.DownloadStream, cancellationToken);
+        private async Task SendDownloadStream(MemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
         {
-            var responseBytes = await SerializeToStream(response);
-            var downloadStream = response.DownloadStream;
-            if (downloadStream == null)
-            {
-                await SendMessage(MessageType.Response, responseBytes, cancellationToken);
-                return;
-            }
             using (downloadStream)
             {
                 await SendStream(new(MessageType.DownloadResponse, responseBytes), downloadStream, cancellationToken);
@@ -202,10 +197,10 @@ namespace UiPath.CoreIpc
             var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
             return new NestedStream(Network, userStreamLength);
         }
-        private async Task<MemoryStream> SerializeToStream(object value)
+        private MemoryStream SerializeToStream(object value)
         {
             var stream = new MemoryStream { Position = IOHelpers.HeaderLength };
-            await Serializer.Serialize(value, stream);
+            Serializer.Serialize(value, stream);
             return stream;
         }
         private T Deserialize<T>(Stream data) => Serializer.Deserialize<T>(data);

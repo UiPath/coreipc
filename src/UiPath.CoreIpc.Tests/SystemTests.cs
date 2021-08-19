@@ -193,7 +193,7 @@ namespace UiPath.CoreIpc.Tests
             {
                 newConnection = c.NewConnection;
                 c.MethodName.ShouldBe(nameof(ISystemService.DoNothing));
-                c.Arguments.Single().ShouldBe(""); // cancellation token
+                c.Arguments.Single().ShouldBe(CancellationToken.None); // cancellation token
             }).ValidateAndBuild();
             newConnection.ShouldBeFalse();
 

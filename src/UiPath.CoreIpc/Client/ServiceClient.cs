@@ -109,7 +109,8 @@ namespace UiPath.CoreIpc
                 TimeSpan messageTimeout = default;
                 TimeSpan clientTimeout = _requestTimeout;
                 Stream uploadStream = null;
-                SetWellKnownArguments();
+                string[] serializedArguments;
+                SerializeArguments();
                 return clientTimeout.Timeout(new() { cancellationToken }, async token =>
                 {
                     bool newConnection;
@@ -122,7 +123,6 @@ namespace UiPath.CoreIpc
                         await _beforeCall(new(newConnection, methodName, args), token);
                     }
                     var requestId = _connection.NewRequestId();
-                    var serializedArguments = Serialize(args);
                     var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds);
                     _logger?.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
                     var response = await _connection.RemoteCall(request, uploadStream, token);
@@ -142,8 +142,10 @@ namespace UiPath.CoreIpc
                     ExceptionDispatchInfo.Capture(exception).Throw();
                     return Task.CompletedTask;
                 });
-                void SetWellKnownArguments()
+                void SerializeArguments()
                 {
+                    serializedArguments = new string[args.Length];
+                    string argument;
                     for (int index = 0; index < args.Length; index++)
                     {
                         switch (args[index])
@@ -151,26 +153,22 @@ namespace UiPath.CoreIpc
                             case Message { RequestTimeout: var requestTimeout } when requestTimeout != TimeSpan.Zero:
                                 messageTimeout = requestTimeout;
                                 clientTimeout = requestTimeout;
+                                argument = _serializer.Serialize(args[index]);
                                 break;
                             case CancellationToken token:
                                 cancellationToken = token;
-                                args[index] = "";
+                                argument = "";
                                 break;
                             case Stream stream:
                                 uploadStream = stream;
-                                args[index] = "";
+                                argument = "";
+                                break;
+                            default:
+                                argument = _serializer.Serialize(args[index]);
                                 break;
                         }
+                        serializedArguments[index] = argument;
                     }
-                }
-                string[] Serialize(object[] args)
-                {
-                    var serializedArgs = new string[args.Length];
-                    for (int index = 0; index < serializedArgs.Length; index++)
-                    {
-                        serializedArgs[index] = _serializer.Serialize(args[index]);
-                    }
-                    return serializedArgs;
                 }
             }
         }
