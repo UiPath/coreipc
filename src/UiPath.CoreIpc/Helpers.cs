@@ -186,17 +186,7 @@ namespace UiPath.CoreIpc
             return new(messageType, new MemoryStream(data));
         }
 
-        internal static async Task<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
-        {
-            var messageData = await stream.ReadBufferCore(length, cancellationToken);
-            if (messageData.Length == 0)
-            {
-                throw new IOException("Connection closed.");
-            }
-            return messageData;
-        }
-
-        private static async Task<byte[]> ReadBufferCore(this Stream stream, int length, CancellationToken cancellationToken)
+        public static async ValueTask<byte[]> ReadBufferCore(this Stream stream, int length, CancellationToken cancellationToken)
         {
             var bytes = new byte[length];
             int offset = 0;

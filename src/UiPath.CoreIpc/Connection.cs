@@ -191,9 +191,13 @@ namespace UiPath.CoreIpc
             using var uploadStream = await WrapNetworkStream();
             await OnRequestReceived(data, uploadStream);
         }
-        private async Task<NestedStream> WrapNetworkStream()
+        private async ValueTask<NestedStream> WrapNetworkStream()
         {
-            var lengthBytes = await Network.ReadBuffer(sizeof(long), default);
+            var lengthBytes = await Network.ReadBufferCore(sizeof(long), default);
+            if (lengthBytes.Length == 0)
+            {
+                throw new IOException("Connection closed.");
+            }
             var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
             return new NestedStream(Network, userStreamLength);
         }
