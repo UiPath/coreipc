@@ -28,7 +28,7 @@ namespace UiPath.CoreIpc
             _receiveLoop = new(ReceiveLoop);
             _onResponse = data => OnResponseReceived((Stream)data, null);
             _onRequest = data => OnRequestReceived((Stream)data, null);
-            _onCancellation = data => CancellationRequestReceived(Deserialize<CancellationRequest>((Stream)data).RequestId);
+            _onCancellation = data => OnCancellationReceived((Stream)data);
         }
         public Stream Network { get; }
         public ILogger Logger { get; internal set; }
@@ -38,7 +38,7 @@ namespace UiPath.CoreIpc
         public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
         public Task Listen() => _receiveLoop.Value;
         internal event Func<Request, Stream, Task> RequestReceived;
-        internal event Action<string> CancellationRequestReceived;
+        internal event Action<string> CancellationReceived;
         public event EventHandler<EventArgs> Closed;
         internal async Task<Response> RemoteCall(Request request, Stream uploadStream, CancellationToken token)
         {
@@ -160,7 +160,7 @@ namespace UiPath.CoreIpc
                     case MessageType.Request when RequestReceived != null:
                         callback = _onRequest;
                         break;
-                    case MessageType.CancellationRequest when CancellationRequestReceived != null:
+                    case MessageType.CancellationRequest when CancellationReceived != null:
                         callback = _onCancellation;
                         break;
                     case MessageType.UploadRequest:
@@ -204,6 +204,7 @@ namespace UiPath.CoreIpc
             return stream;
         }
         private T Deserialize<T>(Stream data) => Serializer.Deserialize<T>(data);
+        private void OnCancellationReceived(Stream data) => CancellationReceived(Deserialize<CancellationRequest>(data).RequestId);
         private Task OnRequestReceived(Stream data, Stream uploadStream) => RequestReceived(Deserialize<Request>(data), uploadStream);
         private void OnResponseReceived(Stream data, Stream downloadStream)
         {

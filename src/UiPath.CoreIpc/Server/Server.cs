@@ -30,7 +30,7 @@ namespace UiPath.CoreIpc
             _connection = connection;
             _client = client;
             connection.RequestReceived += OnRequestReceived;
-            connection.CancellationRequestReceived += requestId =>
+            connection.CancellationReceived += requestId =>
             {
                 if (_requests.TryGetValue(requestId, out var cancellation))
                 {
