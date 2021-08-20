@@ -102,12 +102,12 @@ namespace UiPath.CoreIpc
                     var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds);
                     if (LogEnabled)
                     {
-                        _logger.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
+                        Log($"IpcClient calling {methodName} {requestId} {Name}.");
                     }
                     var response = await _connection.RemoteCall(request, uploadStream, token);
                     if (LogEnabled)
                     {
-                        _logger.LogInformation($"IpcClient called {methodName} {requestId} {Name}.");
+                        Log($"IpcClient called {methodName} {requestId} {Name}.");
                     }
                     if (response.DownloadStream != null)
                     {
@@ -200,7 +200,7 @@ namespace UiPath.CoreIpc
             OnNewConnection(new(stream, _serializer, _logger, Name));
             if (LogEnabled)
             {
-                _logger.LogInformation($"CreateConnection {Name}.");
+                Log($"CreateConnection {Name}.");
             }
             InitializeClientConnection(clientConnection);
             return true;
@@ -227,7 +227,7 @@ namespace UiPath.CoreIpc
             var alreadyHasServer = clientConnection.Server != null;
             if (LogEnabled)
             {
-                _logger.LogInformation(nameof(ReuseClientConnection) + " " + clientConnection);
+                Log(nameof(ReuseClientConnection) + " " + clientConnection);
             }
             OnNewConnection(clientConnection.Connection, alreadyHasServer);
             if (!alreadyHasServer)
@@ -244,6 +244,8 @@ namespace UiPath.CoreIpc
                 _server.Endpoints.Add(_serviceEndpoint.Name, _serviceEndpoint);
             }
         }
+
+        public void Log(string message) => _logger.LogInformation(message);
 
         private void InitializeClientConnection(ClientConnection clientConnection)
         {
@@ -263,7 +265,7 @@ namespace UiPath.CoreIpc
         {
             if (LogEnabled)
             {
-                _logger.LogInformation($"Dispose {Name}");
+                Log($"Dispose {Name}");
             }
             if (disposing)
             {

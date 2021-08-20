@@ -41,7 +41,7 @@ namespace UiPath.CoreIpc
             {
                 if (LogEnabled)
                 {
-                    Logger.LogInformation($"Server {Name} closed.");
+                    Log($"Server {Name} closed.");
                 }
                 _connectionClosed.Cancel();
             };
@@ -52,7 +52,7 @@ namespace UiPath.CoreIpc
                 {
                     if (LogEnabled)
                     {
-                        Logger.LogInformation($"{Name} received request {request}");
+                        Log($"{Name} received request {request}");
                     }
                     if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
                     {
@@ -68,7 +68,7 @@ namespace UiPath.CoreIpc
                         response = await HandleRequest(endpoint, token);
                         if (LogEnabled)
                         {
-                            Logger.LogInformation($"{Name} sending response for {request}");
+                            Log($"{Name} sending response for {request}");
                         }
                         await SendResponse(response, token);
                         return true;
@@ -193,6 +193,7 @@ namespace UiPath.CoreIpc
                 }
             }
         }
+        private void Log(string message) => _connection.Log(message);
         private ILogger Logger => _connection.Logger;
         private bool LogEnabled => Logger.Enabled();
         private ListenerSettings Settings { get; }

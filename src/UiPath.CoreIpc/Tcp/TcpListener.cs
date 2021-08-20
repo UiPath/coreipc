@@ -27,13 +27,7 @@ namespace UiPath.CoreIpc.Tcp
             base.Dispose(disposing);
             _tcpServer.Stop();
         }
-        async Task<System.Net.Sockets.TcpClient> AcceptClient(CancellationToken cancellationToken)
-        {
-            using (cancellationToken.Register(Dispose))
-            {
-                return await _tcpServer.AcceptTcpClientAsync();
-            }
-        }
+        Task<System.Net.Sockets.TcpClient> AcceptClient(CancellationToken cancellationToken) => _tcpServer.AcceptTcpClientAsync();
         class TcpServerConnection : ServerConnection
         {
             System.Net.Sockets.TcpClient _tcpClient;

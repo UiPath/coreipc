@@ -39,7 +39,10 @@ namespace UiPath.CoreIpc
                 {
                     throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's {callbackContract}.");
                 }
-                Logger.LogInformation($"Create callback {_listener.Name}");
+                if (Logger.Enabled())
+                {
+                    _listener.Log($"Create callback {_listener.Name}");
+                }
                 var serviceClient = new ServiceClient<TCallbackInterface>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, _) => Task.FromResult(_connection));
                 return serviceClient.CreateProxy();
             }

@@ -1,11 +1,8 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-
 namespace UiPath.CoreIpc
 {
     public class ServiceHost : IDisposable
@@ -13,17 +10,12 @@ namespace UiPath.CoreIpc
         private readonly CancellationTokenSource _cancellationTokenSource = new();
         private readonly IDictionary<string, EndpointSettings> _endpoints;
         private readonly IReadOnlyCollection<Listener> _listeners;
-        private readonly ILogger<ServiceHost> _logger;
-
         internal ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, EndpointSettings> endpoints, IServiceProvider serviceProvider)
         {
             _endpoints = endpoints.ToReadOnlyDictionary();
             _listeners = listeners.ToArray();
-            _logger = serviceProvider.GetRequiredService<ILogger<ServiceHost>>();
         }
-
         public IServiceProvider ServiceProvider => _endpoints.Values.FirstOrDefault()?.ServiceProvider;
-
         public void Dispose()
         {
             if(_cancellationTokenSource.IsCancellationRequested)
@@ -37,25 +29,14 @@ namespace UiPath.CoreIpc
             _cancellationTokenSource.Cancel();
             _cancellationTokenSource.Dispose();
         }
-
-        public void Run()
-        {
-            RunAsync().Wait();
-        }
-
+        public void Run() => RunAsync().Wait();
         public Task RunAsync(TaskScheduler taskScheduler = null)
         {
             foreach (var endpoint in _endpoints.Values)
             {
                 endpoint.Scheduler = taskScheduler;
             }
-            return Task.Run(() =>
-                Task.WhenAll(_listeners.Select(listener => 
-                {
-                    _logger.LogDebug($"Starting endpoint '{listener}'...");
-                    _cancellationTokenSource.Token.Register(() => _logger.LogInformation($"Stopping endpoint '{listener}'..."));
-                    return listener.Listen(_cancellationTokenSource.Token).ContinueWith(_ => _logger.LogInformation($"Endpoint '{listener}' stopped."));
-                })));
+            return Task.Run(() => Task.WhenAll(_listeners.Select(listener => listener.Listen(_cancellationTokenSource.Token))));
         }
     }
 }

@@ -44,6 +44,10 @@ namespace UiPath.CoreIpc
         public Task Listen(CancellationToken token)
         {
             Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
+            if (Logger.Enabled())
+            {
+                Log($"Starting listener {Name}...");
+            }
             return Task.WhenAll(Enumerable.Range(1, Settings.ConcurrentAccepts).Select(async _ =>
             {
                 while (!token.IsCancellationRequested)
@@ -73,8 +77,13 @@ namespace UiPath.CoreIpc
         protected virtual void Dispose(bool disposing) { }
         public void Dispose()
         {
+            if (Logger.Enabled())
+            {
+                Log($"Stopping listener {Name}...");
+            }
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
+        public void Log(string message) => Logger.LogInformation(message);
     }
 }
