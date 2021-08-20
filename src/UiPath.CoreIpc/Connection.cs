@@ -32,6 +32,7 @@ namespace UiPath.CoreIpc
         }
         public Stream Network { get; }
         public ILogger Logger { get; internal set; }
+        public bool LogEnabled => Logger.Enabled();
         public string Name { get; }
         public ISerializer Serializer { get; }
         public override string ToString() => Name;
@@ -145,7 +146,10 @@ namespace UiPath.CoreIpc
             {
                 Logger.LogException(ex, $"{nameof(ReceiveLoop)} {Name}");
             }
-            Logger?.LogInformation($"{nameof(ReceiveLoop)} {Name} finished.");
+            if (LogEnabled)
+            {
+                Logger?.LogInformation($"{nameof(ReceiveLoop)} {Name} finished.");
+            }
             Dispose();
             return;
             Task HandleMessage(WireMessage message)
@@ -168,7 +172,10 @@ namespace UiPath.CoreIpc
                     case MessageType.DownloadResponse:
                         return OnDownloadResponse(data);
                     default:
-                        Logger?.LogInformation("Unknown message type " + message.MessageType);
+                        if (LogEnabled)
+                        {
+                            Logger?.LogInformation("Unknown message type " + message.MessageType);
+                        }
                         break;
                 };
                 if (callback != null)
@@ -214,7 +221,10 @@ namespace UiPath.CoreIpc
         {
             var response = Deserialize<Response>(data);
             response.DownloadStream = downloadStream;
-            Logger?.LogInformation($"Received response for request {response.RequestId} {Name}.");
+            if (LogEnabled)
+            {
+                Logger?.LogInformation($"Received response for request {response.RequestId} {Name}.");
+            }
             if (_requests.TryGetValue(response.RequestId, out var completionSource))
             {
                 completionSource.TrySetResult(response);

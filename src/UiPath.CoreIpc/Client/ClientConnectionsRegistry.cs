@@ -93,7 +93,10 @@ namespace UiPath.CoreIpc
                     return;
                 }
                 var removedConnection = ClientConnectionsRegistry.Remove(ConnectionKey);
-                _connection.Logger?.LogInformation($"Remove connection {removedConnection}.");
+                if (_connection.LogEnabled)
+                {
+                    _connection.Logger.LogInformation($"Remove connection {removedConnection}.");
+                }
                 Debug.Assert(removedConnection?.Connection == closedConnection, "Removed the wrong connection.");
             }
         }

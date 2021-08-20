@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -49,7 +48,7 @@ namespace UiPath.CoreIpc
         }
 
         public virtual string Name => _connection?.Name;
-
+        private bool LogEnabled => _logger.Enabled();
         public bool EncryptAndSign { get; }
         
         Connection IServiceClient.Connection => _connection;
@@ -101,9 +100,15 @@ namespace UiPath.CoreIpc
                     }
                     var requestId = _connection.NewRequestId();
                     var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds);
-                    _logger?.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
+                    if (LogEnabled)
+                    {
+                        _logger.LogInformation($"IpcClient calling {methodName} {requestId} {Name}.");
+                    }
                     var response = await _connection.RemoteCall(request, uploadStream, token);
-                    _logger?.LogInformation($"IpcClient called {methodName} {requestId} {Name}.");
+                    if (LogEnabled)
+                    {
+                        _logger.LogInformation($"IpcClient called {methodName} {requestId} {Name}.");
+                    }
                     if (response.DownloadStream != null)
                     {
                         return (TResult)(object)response.DownloadStream;
@@ -193,7 +198,10 @@ namespace UiPath.CoreIpc
             }
             var stream = EncryptAndSign ? await AuthenticateAsClient(clientConnection.Network) : clientConnection.Network;
             OnNewConnection(new(stream, _serializer, _logger, Name));
-            _logger?.LogInformation($"CreateConnection {Name}."); 
+            if (LogEnabled)
+            {
+                _logger.LogInformation($"CreateConnection {Name}.");
+            }
             InitializeClientConnection(clientConnection);
             return true;
             static async Task<Stream> AuthenticateAsClient(Stream network)
@@ -217,7 +225,10 @@ namespace UiPath.CoreIpc
         {
             _clientConnection = clientConnection;
             var alreadyHasServer = clientConnection.Server != null;
-            _logger?.LogInformation(nameof(ReuseClientConnection)+" "+clientConnection);
+            if (LogEnabled)
+            {
+                _logger?.LogInformation(nameof(ReuseClientConnection) + " " + clientConnection);
+            }
             OnNewConnection(clientConnection.Connection, alreadyHasServer);
             if (!alreadyHasServer)
             {
@@ -250,7 +261,10 @@ namespace UiPath.CoreIpc
 
         protected virtual void Dispose(bool disposing)
         {
-            _logger?.LogInformation($"Dispose {Name}");
+            if (LogEnabled)
+            {
+                _logger?.LogInformation($"Dispose {Name}");
+            }
             if (disposing)
             {
                 _server?.Endpoints.Remove(_serviceEndpoint.Name);

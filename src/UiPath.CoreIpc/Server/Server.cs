@@ -39,7 +39,10 @@ namespace UiPath.CoreIpc
             };
             connection.Closed += delegate
             {
-                Logger.LogDebug($"{Name} closed.");
+                if (LogEnabled)
+                {
+                    Logger.LogInformation($"Server {Name} closed.");
+                }
                 _connectionClosed.Cancel();
             };
             return;
@@ -47,7 +50,10 @@ namespace UiPath.CoreIpc
             {
                 try
                 {
-                    Logger.LogInformation($"{Name} received request {request}");
+                    if (LogEnabled)
+                    {
+                        Logger.LogInformation($"{Name} received request {request}");
+                    }
                     if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
                     {
                         await OnError(new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
@@ -60,7 +66,10 @@ namespace UiPath.CoreIpc
                     await timeout.Timeout(new() { cancellationToken, requestCancellation.Token, _connectionClosed.Token }, async token =>
                     {
                         response = await HandleRequest(endpoint, token);
-                        Logger.LogInformation($"{Name} sending response for {request}");
+                        if (LogEnabled)
+                        {
+                            Logger.LogInformation($"{Name} sending response for {request}");
+                        }
                         await SendResponse(response, token);
                         return true;
                     }, request.MethodName, OnError);
@@ -185,6 +194,7 @@ namespace UiPath.CoreIpc
             }
         }
         private ILogger Logger => _connection.Logger;
+        private bool LogEnabled => Logger.Enabled();
         private ListenerSettings Settings { get; }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
         public ISerializer Serializer => _connection.Serializer;
