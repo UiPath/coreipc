@@ -119,11 +119,7 @@ namespace UiPath.CoreIpc
                             (scheduler is null ? MethodCall() : RunOnScheduler()).LogException(Logger, method);
                             return Response.Success(request, "");
                         }
-                        Task MethodCall()
-                        {
-                            Logger.LogDebug($"Processing {method} on {Thread.CurrentThread.Name}.");
-                            return method.Invoke(service, arguments);
-                        }
+                        Task MethodCall() => method.Invoke(service, arguments);
                         Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
                     }
                     object[] GetArguments()
