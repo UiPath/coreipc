@@ -227,7 +227,7 @@ namespace UiPath.CoreIpc
             var alreadyHasServer = clientConnection.Server != null;
             if (LogEnabled)
             {
-                _logger?.LogInformation(nameof(ReuseClientConnection) + " " + clientConnection);
+                _logger.LogInformation(nameof(ReuseClientConnection) + " " + clientConnection);
             }
             OnNewConnection(clientConnection.Connection, alreadyHasServer);
             if (!alreadyHasServer)
@@ -263,7 +263,7 @@ namespace UiPath.CoreIpc
         {
             if (LogEnabled)
             {
-                _logger?.LogInformation($"Dispose {Name}");
+                _logger.LogInformation($"Dispose {Name}");
             }
             if (disposing)
             {

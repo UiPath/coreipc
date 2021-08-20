@@ -148,7 +148,7 @@ namespace UiPath.CoreIpc
             }
             if (LogEnabled)
             {
-                Logger?.LogInformation($"{nameof(ReceiveLoop)} {Name} finished.");
+                Logger.LogInformation($"{nameof(ReceiveLoop)} {Name} finished.");
             }
             Dispose();
             return;
@@ -174,7 +174,7 @@ namespace UiPath.CoreIpc
                     default:
                         if (LogEnabled)
                         {
-                            Logger?.LogInformation("Unknown message type " + message.MessageType);
+                            Logger.LogInformation("Unknown message type " + message.MessageType);
                         }
                         break;
                 };
@@ -223,7 +223,7 @@ namespace UiPath.CoreIpc
             response.DownloadStream = downloadStream;
             if (LogEnabled)
             {
-                Logger?.LogInformation($"Received response for request {response.RequestId} {Name}.");
+                Logger.LogInformation($"Received response for request {response.RequestId} {Name}.");
             }
             if (_requests.TryGetValue(response.RequestId, out var completionSource))
             {
