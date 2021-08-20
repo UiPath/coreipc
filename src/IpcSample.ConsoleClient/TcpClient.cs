@@ -51,10 +51,11 @@ namespace UiPath.CoreIpc.Tests
                     .RequestTimeout(TimeSpan.FromSeconds(2))
                     .Logger(serviceProvider)
                     .ValidateAndBuild();
-                using (var file = File.OpenRead(@"C:\Windows\DPINST.log"))
-                {
-                    Console.WriteLine(await systemClient.Upload(file));
-                }
+                //using (var file = File.OpenRead(@"C:\Windows\DPINST.log"))
+                //{
+                //    Console.WriteLine(await systemClient.Upload(file));
+                //}
+                for(int i =0; i<50;i++)
                 {
                     // test 1: call IPC service method with primitive types
                     float result1 = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);
@@ -76,8 +77,8 @@ namespace UiPath.CoreIpc.Tests
                     Console.WriteLine($"[TEST 3] sum of 3 complexe number is: {result3.A}+{result3.B}i", cancellationToken);
 
                     // test 4: call IPC service method without parameter or return
-                    await systemClient.DoNothing(cancellationToken);
-                    Console.WriteLine($"[TEST 4] invoked DoNothing()");
+                    //await systemClient.DoNothing(cancellationToken);
+                    //Console.WriteLine($"[TEST 4] invoked DoNothing()");
                     //((IDisposable)systemClient).Dispose();
 
                     // test 5: call IPC service method with enum parameter
@@ -113,6 +114,8 @@ namespace UiPath.CoreIpc.Tests
                 callbackProxy.Dispose();
                 callbackProxy.Dispose();
                 //((IpcProxy)callbackProxy).CloseConnection();
+                ((IpcProxy)computingClient).CloseConnection();
+                ((IpcProxy)systemClient).CloseConnection();
             }
             finally
             {
