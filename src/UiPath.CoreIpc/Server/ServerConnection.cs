@@ -19,6 +19,7 @@ namespace UiPath.CoreIpc
         private readonly ConcurrentDictionary<Type, object> _callbacks = new();
         protected readonly Listener _listener;
         private Connection _connection;
+        private Task<Connection> _connectionAsTask;
         private Server _server;
         protected ServerConnection(Listener listener) => _listener = listener;
         public ILogger Logger => _listener.Logger;
@@ -43,7 +44,8 @@ namespace UiPath.CoreIpc
                 {
                     _listener.Log($"Create callback {callbackContract} {_listener.Name}");
                 }
-                var serviceClient = new ServiceClient<TCallbackInterface>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, _) => Task.FromResult(_connection));
+                _connectionAsTask ??= Task.FromResult(_connection);
+                var serviceClient = new ServiceClient<TCallbackInterface>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, _) => _connectionAsTask);
                 return serviceClient.CreateProxy();
             }
         }
