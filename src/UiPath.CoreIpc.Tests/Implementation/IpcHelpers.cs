@@ -41,14 +41,14 @@ namespace UiPath.CoreIpc
         {
             services.AddLogging(builder =>
             {
-                if (logToConsole)
-                {
-                    builder.AddConsole();
-                }
-                foreach(var listener in Trace.Listeners.Cast<TraceListener>().Where(l => !(l is DefaultTraceListener)))
-                {
-                    builder.AddTraceSource(new SourceSwitch(listener.Name, "All"), listener);
-                }
+                //if (logToConsole)
+                //{
+                //    builder.AddConsole();
+                //}
+                //foreach (var listener in Trace.Listeners.Cast<TraceListener>().Where(l => !(l is DefaultTraceListener)))
+                //{
+                //    builder.AddTraceSource(new SourceSwitch(listener.Name, "All"), listener);
+                //}
             });
             return services.AddIpc();
         }
