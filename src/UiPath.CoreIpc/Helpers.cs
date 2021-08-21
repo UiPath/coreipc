@@ -174,7 +174,6 @@ namespace UiPath.CoreIpc
             return bytes;
         }
         public static T Deserialize<T>(this ISerializer serializer, Stream binary) => (T)serializer.Deserialize(binary, typeof(T));
-        public static T Deserialize<T>(this ISerializer serializer, string json) => (T)serializer.Deserialize(json, typeof(T));
     }
     public static class Validator
     {

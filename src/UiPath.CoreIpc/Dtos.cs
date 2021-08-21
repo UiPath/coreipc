@@ -61,6 +61,8 @@ namespace UiPath.CoreIpc
         public static Response Success(Request request, string data) => new(request.Id, data, null);
         public static Response Success(Request request, Stream downloadStream) => new(request.Id, null, null) { DownloadStream = downloadStream };
         public Response CheckError() => Error == null ? this : throw new RemoteException(Error);
+        public TResult Deserialize<TResult>(ISerializer serializer) => 
+            (TResult) (DownloadStream ?? serializer.Deserialize(CheckError().Data ?? "", typeof(TResult)));
     }
     [Serializable]
     public class Error

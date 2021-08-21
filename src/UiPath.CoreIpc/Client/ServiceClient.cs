@@ -111,8 +111,8 @@ namespace UiPath.CoreIpc
                     {
                         Log($"IpcClient called {methodName} {requestId} {Name}.");
                     }
-                    var downloadStream = response.DownloadStream;
-                    return downloadStream == null ? _serializer.Deserialize<TResult>(response.CheckError().Data ?? "") : (TResult)(object)downloadStream;                }
+                    return response.Deserialize<TResult>(_serializer);
+                }
                 catch (Exception ex)
                 {
                     ExceptionDispatchInfo.Capture(timeoutHelper.CheckTimeout(ex, methodName)).Throw();
