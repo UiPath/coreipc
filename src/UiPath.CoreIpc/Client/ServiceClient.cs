@@ -79,7 +79,7 @@ namespace UiPath.CoreIpc
             var syncContext = SynchronizationContext.Current;
             var defaultContext = syncContext == null || syncContext.GetType() == typeof(SynchronizationContext);
             return defaultContext ? Invoke() : Task.Run(Invoke);
-            Task<TResult> Invoke()
+            async Task<TResult> Invoke()
             {
                 CancellationToken cancellationToken = default;
                 TimeSpan messageTimeout = default;
@@ -87,8 +87,10 @@ namespace UiPath.CoreIpc
                 Stream uploadStream = null;
                 string[] serializedArguments;
                 SerializeArguments();
-                return clientTimeout.Timeout(new() { cancellationToken }, async token =>
+                var timeoutHelper = new TimeoutHelper(clientTimeout, new() { cancellationToken });
+                try
                 {
+                    var token = timeoutHelper.Token;
                     bool newConnection;
                     using (await _connectionLock.LockAsync(token))
                     {
@@ -109,21 +111,17 @@ namespace UiPath.CoreIpc
                     {
                         Log($"IpcClient called {methodName} {requestId} {Name}.");
                     }
-                    if (response.DownloadStream != null)
-                    {
-                        return (TResult)(object)response.DownloadStream;
-                    }
-                    return _serializer.Deserialize<TResult>(response.CheckError().Data ?? "");
-                }, methodName, ex =>
+                    var downloadStream = response.DownloadStream;
+                    return downloadStream == null ? _serializer.Deserialize<TResult>(response.CheckError().Data ?? "") : (TResult)(object)downloadStream;                }
+                catch (Exception ex)
                 {
-                    var exception = ex;
-                    if (cancellationToken.IsCancellationRequested && !(ex is TaskCanceledException))
-                    {
-                        exception = new TaskCanceledException(methodName, ex);
-                    }
-                    ExceptionDispatchInfo.Capture(exception).Throw();
-                    return Task.CompletedTask;
-                });
+                    ExceptionDispatchInfo.Capture(timeoutHelper.CheckTimeout(ex, methodName)).Throw();
+                    throw;
+                }
+                finally
+                {
+                    timeoutHelper.Dispose();
+                }
                 void SerializeArguments()
                 {
                     serializedArguments = new string[args.Length];

@@ -57,37 +57,6 @@ namespace UiPath.CoreIpc
             }
         }
         public static void LogException(this Task task, ILogger logger, object tag) => task.ContinueWith(result => logger.LogException(result.Exception, tag), TaskContinuationOptions.NotOnRanToCompletion);
-        public static async Task<TResult> Timeout<TResult>(this TimeSpan timeout, List<CancellationToken> cancellationTokens,
-            Func<CancellationToken, Task<TResult>> func, string message, Func<Exception, Task> exceptionHandler)
-        {
-            var timeoutCancellationSource = new CancellationTokenSource(timeout);
-            cancellationTokens.Add(timeoutCancellationSource.Token);
-            var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokens.ToArray());
-            try
-            {
-                return await func(linkedCancellationSource.Token);
-            }
-            catch (Exception ex)
-            {
-                var exception = ex;
-                if (timeoutCancellationSource.IsCancellationRequested)
-                {
-                    exception = new TimeoutException(message + " timed out.", ex);
-                }
-                Dispose();
-                await exceptionHandler(exception);
-            }
-            finally
-            {
-                Dispose();
-            }
-            return default;
-            void Dispose()
-            {
-                timeoutCancellationSource.Dispose();
-                linkedCancellationSource.Dispose();
-            }
-        }
     }
     public static class IOHelpers
     {
@@ -319,5 +288,34 @@ namespace UiPath.CoreIpc
         public TValue GetOrAdd(TKey key) => _dictionary.GetOrAdd(key, _valueFactory);
         public bool TryGetValue(TKey key, out TValue value) => _dictionary.TryGetValue(key, out value);
         public bool TryRemove(TKey key, out TValue value) => _dictionary.TryRemove(key, out value);
+    }
+    public readonly struct TimeoutHelper : IDisposable
+    {
+        private readonly CancellationTokenSource _timeoutCancellationSource;
+        private readonly CancellationTokenSource _linkedCancellationSource;
+        public TimeoutHelper(TimeSpan timeout, List<CancellationToken> cancellationTokens)
+        {
+            _timeoutCancellationSource = new CancellationTokenSource(timeout);
+            cancellationTokens.Add(_timeoutCancellationSource.Token);
+            _linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokens.ToArray());
+        }
+        public Exception CheckTimeout(Exception exception, string message)
+        {
+            if (_timeoutCancellationSource.IsCancellationRequested)
+            {
+                return new TimeoutException(message + " timed out.", exception);
+            }
+            if (_linkedCancellationSource.IsCancellationRequested && exception is not TaskCanceledException)
+            {
+                return new TaskCanceledException(message, exception);
+            }
+            return exception;
+        }
+        public void Dispose()
+        {
+            _timeoutCancellationSource.Dispose();
+            _linkedCancellationSource.Dispose();
+        }
+        public CancellationToken Token => _linkedCancellationSource.Token;
     }
 }
