@@ -115,8 +115,7 @@ namespace UiPath.CoreIpc
                 }
                 catch (Exception ex)
                 {
-                    ExceptionDispatchInfo.Capture(timeoutHelper.CheckTimeout(ex, methodName)).Throw();
-                    throw;
+                    throw ExceptionDispatchInfo.Capture(timeoutHelper.CheckTimeout(ex, methodName)).SourceException;
                 }
                 finally
                 {
