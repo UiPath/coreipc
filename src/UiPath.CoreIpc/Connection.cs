@@ -47,13 +47,14 @@ namespace UiPath.CoreIpc
         public event EventHandler<EventArgs> Closed;
         internal async Task<Response> RemoteCall(Request request, Stream uploadStream, CancellationToken token)
         {
+            var requestBytes = SerializeToStream(request);
             var requestCompletion = new RequestCompletionSource();
             _requests[request.Id] = requestCompletion;
             CancellationTokenRegistration tokenRegistration = default;
             try
             {
                 tokenRegistration = token.Register(uploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
-                await SendRequest(SerializeToStream(request), uploadStream, token);
+                await SendRequest(requestBytes, uploadStream, token);
                 return await requestCompletion.Task;
             }
             finally
