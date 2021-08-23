@@ -86,7 +86,7 @@ namespace UiPath.CoreIpc
         public CancellationTokenTaskSource(CancellationToken cancellationToken)
         {
             var tcs = new TaskCompletionSource<bool>();
-            _registration = cancellationToken.Register(state => ((TaskCompletionSource<bool>)state).TrySetCanceled(), tcs, useSynchronizationContext: false);
+            _registration = cancellationToken.Register(state => ((TaskCompletionSource<bool>)state).TrySetCanceled(), tcs);
             Task = tcs.Task;
         }
         public Task Task { get; }
