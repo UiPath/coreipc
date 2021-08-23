@@ -51,9 +51,9 @@ namespace UiPath.CoreIpc
             _requests[request.Id] = requestCompletion;
             try
             {
-                await SendRequest(SerializeToStream(request), uploadStream, token);
                 using (token.Register(uploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id))
                 {
+                    await SendRequest(SerializeToStream(request), uploadStream, token);
                     return await requestCompletion.Task;
                 }
             }
