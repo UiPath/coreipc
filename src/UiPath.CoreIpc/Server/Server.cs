@@ -67,7 +67,7 @@ namespace UiPath.CoreIpc
                     try
                     {
                         var token = timeoutHelper.Token;
-                        response = await HandleRequest(endpoint, token);
+                        response = await HandleRequest(endpoint, request, uploadStream, token);
                         if (LogEnabled)
                         {
                             Log($"{Name} sending response for {request}");
@@ -96,7 +96,7 @@ namespace UiPath.CoreIpc
                     _connectionClosed.Dispose();
                 }
                 return;
-                async Task<Response> HandleRequest(EndpointSettings endpoint, CancellationToken cancellationToken)
+                async Task<Response> HandleRequest(EndpointSettings endpoint, Request request, Stream uploadStream, CancellationToken cancellationToken)
                 {
                     var contract = endpoint.Contract;
                     var method = GetMethod(contract, request.MethodName);
