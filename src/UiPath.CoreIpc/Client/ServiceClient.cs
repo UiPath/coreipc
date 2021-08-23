@@ -87,7 +87,7 @@ namespace UiPath.CoreIpc
                 Stream uploadStream = null;
                 string[] serializedArguments;
                 SerializeArguments();
-                var timeoutHelper = new TimeoutHelper(clientTimeout, new() { cancellationToken });
+                var timeoutHelper = TimeoutHelper.Creaate(clientTimeout, cancellationToken);
                 try
                 {
                     var token = timeoutHelper.Token;

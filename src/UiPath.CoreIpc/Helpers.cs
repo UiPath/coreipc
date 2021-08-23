@@ -298,6 +298,11 @@ namespace UiPath.CoreIpc
             cancellationTokens.Add(_timeoutCancellationSource.Token);
             _linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokens.ToArray());
         }
+        private TimeoutHelper(TimeSpan timeout, CancellationToken token)
+        {
+            _timeoutCancellationSource = new CancellationTokenSource(timeout);
+            _linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(token, _timeoutCancellationSource.Token);
+        }
         public Exception CheckTimeout(Exception exception, string message)
         {
             if (_timeoutCancellationSource.IsCancellationRequested)
@@ -324,5 +329,6 @@ namespace UiPath.CoreIpc
             _linkedCancellationSource.Dispose();
         }
         public CancellationToken Token => _linkedCancellationSource.Token;
+        public static TimeoutHelper Creaate(TimeSpan timeout, CancellationToken token) => new(timeout, token);
     }
 }
