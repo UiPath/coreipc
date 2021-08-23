@@ -282,7 +282,7 @@ namespace UiPath.CoreIpc
         public ConcurrentDictionaryWrapper(Func<TKey, TValue> valueFactory, int capacity = 31)
         {
             _dictionary = new(Environment.ProcessorCount, capacity);
-            _valueFactory = key => valueFactory(key);
+            _valueFactory = valueFactory;
         }
         public TValue GetOrAdd(TKey key) => _dictionary.GetOrAdd(key, _valueFactory);
         public bool TryGetValue(TKey key, out TValue value) => _dictionary.TryGetValue(key, out value);
