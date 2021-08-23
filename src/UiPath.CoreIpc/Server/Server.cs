@@ -22,11 +22,13 @@ namespace UiPath.CoreIpc
         private readonly IClient _client;
         private readonly CancellationTokenSource _connectionClosed = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new();
+        private readonly CancellationToken _hostCancellationToken;
         public Server(ListenerSettings settings, Connection connection, IClient client = null, CancellationToken cancellationToken = default)
         {
             Settings = settings;
             _connection = connection;
             _client = client;
+            _hostCancellationToken = cancellationToken;
             connection.RequestReceived += OnRequestReceived;
             connection.CancellationReceived += requestId =>
             {
@@ -43,62 +45,61 @@ namespace UiPath.CoreIpc
                 }
                 _connectionClosed.Cancel();
             };
-            return;
-            async Task OnRequestReceived(Request request, Stream uploadStream)
+        }
+        async Task OnRequestReceived(Request request, Stream uploadStream)
+        {
+            try
             {
+                if (LogEnabled)
+                {
+                    Log($"{Name} received request {request}");
+                }
+                if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
+                {
+                    await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
+                    return;
+                }
+                Response response;
+                var requestCancellation = new CancellationTokenSource();
+                _requests[request.Id] = requestCancellation;
+                var timeout = request.GetTimeout(Settings.RequestTimeout);
+                var timeoutHelper = new TimeoutHelper(timeout, new() { _hostCancellationToken, requestCancellation.Token, _connectionClosed.Token });
                 try
                 {
+                    var token = timeoutHelper.Token;
+                    response = await HandleRequest(endpoint, request, uploadStream, token);
                     if (LogEnabled)
                     {
-                        Log($"{Name} received request {request}");
+                        Log($"{Name} sending response for {request}");
                     }
-                    if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
-                    {
-                        await OnError(new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
-                        return;
-                    }
-                    Response response;
-                    var requestCancellation = new CancellationTokenSource();
-                    _requests[request.Id] = requestCancellation;
-                    var timeout = request.GetTimeout(Settings.RequestTimeout);
-                    var timeoutHelper = new TimeoutHelper(timeout, new() { cancellationToken, requestCancellation.Token, _connectionClosed.Token });
-                    try
-                    {
-                        var token = timeoutHelper.Token;
-                        response = await HandleRequest(endpoint, request, uploadStream, token);
-                        if (LogEnabled)
-                        {
-                            Log($"{Name} sending response for {request}");
-                        }
-                        await SendResponse(response, token);
-                    }
-                    catch (Exception ex)
-                    {
-                        await OnError(timeoutHelper.CheckTimeout(ex, request.MethodName));
-                    }
-                    finally
-                    {
-                        timeoutHelper.Dispose();
-                    }
+                    await SendResponse(response, token);
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogException(ex, $"{Name} {request}");
+                    await OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName));
                 }
-                if (_requests.TryRemove(request.Id, out var cancellation))
+                finally
                 {
-                    cancellation.Dispose();
-                }
-                if (_connectionClosed.IsCancellationRequested)
-                {
-                    _connectionClosed.Dispose();
-                }
-                Task OnError(Exception ex)
-                {
-                    Logger.LogException(ex, $"{Name} {request}");
-                    return SendResponse(Response.Fail(request, ex), cancellationToken);
+                    timeoutHelper.Dispose();
                 }
             }
+            catch (Exception ex)
+            {
+                Logger.LogException(ex, $"{Name} {request}");
+            }
+            if (_requests.TryRemove(request.Id, out var cancellation))
+            {
+                cancellation.Dispose();
+            }
+            if (_connectionClosed.IsCancellationRequested)
+            {
+                _connectionClosed.Dispose();
+            }
+        }
+        Task OnError(Request request, Exception ex)
+        {
+            Logger.LogException(ex, $"{Name} {request}");
+            return SendResponse(Response.Fail(request, ex), _hostCancellationToken);
         }
         async Task<Response> HandleRequest(EndpointSettings endpoint, Request request, Stream uploadStream, CancellationToken cancellationToken)
         {
