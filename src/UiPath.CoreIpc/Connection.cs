@@ -18,6 +18,8 @@ namespace UiPath.CoreIpc
         private readonly Action<object> _onResponse;
         private readonly Action<object> _onRequest;
         private readonly Action<object> _onCancellation;
+        private readonly Action<object> _cancelRequest;
+        private readonly Action<object> _cancelUploadRequest;
         public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
         {
             Network = network;
@@ -29,6 +31,8 @@ namespace UiPath.CoreIpc
             _onResponse = data => OnResponseReceived((Stream)data, null);
             _onRequest = data => OnRequestReceived((Stream)data, null);
             _onCancellation = data => OnCancellationReceived((Stream)data);
+            _cancelRequest = requestId => CancelRequest((string)requestId);
+            _cancelUploadRequest = requestId => CancelUploadRequest((string)requestId);
         }
         public Stream Network { get; }
         public ILogger Logger { get; internal set; }
@@ -48,7 +52,7 @@ namespace UiPath.CoreIpc
             try
             {
                 await SendRequest(SerializeToStream(request), uploadStream, token);
-                using (token.Register(CancelRequest))
+                using (token.Register(uploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id))
                 {
                     return await requestCompletion.Task;
                 }
@@ -57,20 +61,26 @@ namespace UiPath.CoreIpc
             {
                 _requests.TryRemove(request.Id, out _);
             }
-            void CancelRequest()
+        }
+        void CancelRequest(string requestId)
+        {
+            CancelServerCall(requestId).LogException(Logger, this);
+            TryCancelRequest(requestId);
+            return;
+            Task CancelServerCall(string requestId) =>
+                SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default);
+        }
+        void CancelUploadRequest(string requestId)
+        {
+            Dispose();
+            TryCancelRequest(requestId);
+        }
+        private void TryCancelRequest(string requestId)
+        {
+            if (_requests.TryGetValue(requestId, out var requestCompletion))
             {
-                if (uploadStream == null)
-                {
-                    CancelServerCall(request.Id).LogException(Logger, this);
-                }
-                else
-                {
-                    Dispose();
-                }
                 requestCompletion.TrySetCanceled();
             }
-            Task CancelServerCall(string requestId) => 
-                SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default);
         }
         private Task SendRequest(MemoryStream requestBytes, Stream uploadStream, CancellationToken cancellationToken) => uploadStream == null ?
                 SendMessage(MessageType.Request, requestBytes, cancellationToken) :
