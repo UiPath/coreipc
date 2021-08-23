@@ -109,7 +109,7 @@ namespace UiPath.CoreIpc
             }
         }
         private Task SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken) => 
-            SendMessage(new(messageType, data), cancellationToken).WaitAsync(cancellationToken);
+            SendMessage(new(messageType, data), cancellationToken);
         private async Task SendMessage(WireMessage wireMessage, CancellationToken cancellationToken)
         {
             using (await _sendLock.LockAsync(cancellationToken))
