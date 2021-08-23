@@ -8,7 +8,6 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-
 namespace UiPath.CoreIpc
 {
     using GetTaskResultFunc = Func<Task, object>;
@@ -23,7 +22,6 @@ namespace UiPath.CoreIpc
         private readonly IClient _client;
         private readonly CancellationTokenSource _connectionClosed = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new();
-
         public Server(ListenerSettings settings, Connection connection, IClient client = null, CancellationToken cancellationToken = default)
         {
             Settings = settings;
@@ -95,110 +93,109 @@ namespace UiPath.CoreIpc
                 {
                     _connectionClosed.Dispose();
                 }
-                return;
-                async Task<Response> HandleRequest(EndpointSettings endpoint, Request request, Stream uploadStream, CancellationToken cancellationToken)
-                {
-                    var contract = endpoint.Contract;
-                    var method = GetMethod(contract, request.MethodName);
-                    var arguments = GetArguments();
-                    var beforeCall = endpoint.BeforeCall;
-                    if (beforeCall != null)
-                    {
-                        await beforeCall(new(default, request.MethodName, arguments), cancellationToken);
-                    }
-                    IServiceScope scope = null;
-                    var service = endpoint.ServiceInstance;
-                    try
-                    {
-                        if (service == null)
-                        {
-                            scope = ServiceProvider.CreateScope();
-                            service = scope.ServiceProvider.GetRequiredService(contract);
-                        }
-                        return await InvokeMethod();
-                    }
-                    finally
-                    {
-                        scope?.Dispose();
-                    }
-                    async Task<Response> InvokeMethod()
-                    {
-                        var returnTaskType = method.ReturnType;
-                        var scheduler = endpoint.Scheduler;
-                        if (returnTaskType.IsGenericType)
-                        {
-                            var methodResult = scheduler is null ? MethodCall() : await RunOnScheduler();
-                            await methodResult;
-                            var returnValue = GetTaskResult(returnTaskType, methodResult);
-                            return returnValue is Stream downloadStream ? Response.Success(request, downloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
-                        }
-                        else
-                        {
-                            (scheduler is null ? MethodCall() : RunOnScheduler()).LogException(Logger, method);
-                            return Response.Success(request, "");
-                        }
-                        Task MethodCall() => method.Invoke(service, arguments);
-                        Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
-                    }
-                    object[] GetArguments()
-                    {
-                        var parameters = method.Parameters;
-                        if (request.Parameters.Length > parameters.Length)
-                        {
-                            throw new ArgumentException("Too many parameters for " + method);
-                        }
-                        var allArguments = new object[parameters.Length];
-                        Deserialize();
-                        SetOptionalArguments();
-                        return allArguments;
-                        void Deserialize()
-                        {
-                            object argument;
-                            for (int index = 0; index < request.Parameters.Length; index++)
-                            {
-                                var parameterType = parameters[index].ParameterType;
-                                if (parameterType == typeof(CancellationToken))
-                                {
-                                    argument = cancellationToken;
-                                }
-                                else if (parameterType == typeof(Stream))
-                                {
-                                    argument = uploadStream;
-                                }
-                                else
-                                {
-                                    argument = Serializer.Deserialize(request.Parameters[index], parameterType);
-                                    argument = CheckMessage(argument, parameterType);
-                                }
-                                allArguments[index] = argument;
-                            }
-                        }
-                        object CheckMessage(object argument, Type parameterType)
-                        {
-                            if (parameterType == typeof(Message) && argument == null)
-                            {
-                                argument = new Message();
-                            }
-                            if (argument is Message message)
-                            {
-                                message.CallbackContract = endpoint.CallbackContract;
-                                message.Client = _client;
-                            }
-                            return argument;
-                        }
-                        void SetOptionalArguments()
-                        {
-                            for (int index = request.Parameters.Length; index < parameters.Length; index++)
-                            {
-                                allArguments[index] = CheckMessage(method.Defaults[index], parameters[index].ParameterType);
-                            }
-                        }
-                    }
-                }
                 Task OnError(Exception ex)
                 {
                     Logger.LogException(ex, $"{Name} {request}");
                     return SendResponse(Response.Fail(request, ex), cancellationToken);
+                }
+            }
+        }
+        async Task<Response> HandleRequest(EndpointSettings endpoint, Request request, Stream uploadStream, CancellationToken cancellationToken)
+        {
+            var contract = endpoint.Contract;
+            var method = GetMethod(contract, request.MethodName);
+            var arguments = GetArguments();
+            var beforeCall = endpoint.BeforeCall;
+            if (beforeCall != null)
+            {
+                await beforeCall(new(default, request.MethodName, arguments), cancellationToken);
+            }
+            IServiceScope scope = null;
+            var service = endpoint.ServiceInstance;
+            try
+            {
+                if (service == null)
+                {
+                    scope = ServiceProvider.CreateScope();
+                    service = scope.ServiceProvider.GetRequiredService(contract);
+                }
+                return await InvokeMethod();
+            }
+            finally
+            {
+                scope?.Dispose();
+            }
+            async Task<Response> InvokeMethod()
+            {
+                var returnTaskType = method.ReturnType;
+                var scheduler = endpoint.Scheduler;
+                if (returnTaskType.IsGenericType)
+                {
+                    var methodResult = scheduler is null ? MethodCall() : await RunOnScheduler();
+                    await methodResult;
+                    var returnValue = GetTaskResult(returnTaskType, methodResult);
+                    return returnValue is Stream downloadStream ? Response.Success(request, downloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
+                }
+                else
+                {
+                    (scheduler is null ? MethodCall() : RunOnScheduler()).LogException(Logger, method);
+                    return Response.Success(request, "");
+                }
+                Task MethodCall() => method.Invoke(service, arguments);
+                Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
+            }
+            object[] GetArguments()
+            {
+                var parameters = method.Parameters;
+                if (request.Parameters.Length > parameters.Length)
+                {
+                    throw new ArgumentException("Too many parameters for " + method);
+                }
+                var allArguments = new object[parameters.Length];
+                Deserialize();
+                SetOptionalArguments();
+                return allArguments;
+                void Deserialize()
+                {
+                    object argument;
+                    for (int index = 0; index < request.Parameters.Length; index++)
+                    {
+                        var parameterType = parameters[index].ParameterType;
+                        if (parameterType == typeof(CancellationToken))
+                        {
+                            argument = cancellationToken;
+                        }
+                        else if (parameterType == typeof(Stream))
+                        {
+                            argument = uploadStream;
+                        }
+                        else
+                        {
+                            argument = Serializer.Deserialize(request.Parameters[index], parameterType);
+                            argument = CheckMessage(argument, parameterType);
+                        }
+                        allArguments[index] = argument;
+                    }
+                }
+                object CheckMessage(object argument, Type parameterType)
+                {
+                    if (parameterType == typeof(Message) && argument == null)
+                    {
+                        argument = new Message();
+                    }
+                    if (argument is Message message)
+                    {
+                        message.CallbackContract = endpoint.CallbackContract;
+                        message.Client = _client;
+                    }
+                    return argument;
+                }
+                void SetOptionalArguments()
+                {
+                    for (int index = request.Parameters.Length; index < parameters.Length; index++)
+                    {
+                        allArguments[index] = CheckMessage(method.Defaults[index], parameters[index].ParameterType);
+                    }
                 }
             }
         }
