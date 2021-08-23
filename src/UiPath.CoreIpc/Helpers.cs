@@ -14,7 +14,6 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
-
 namespace UiPath.CoreIpc
 {
     public static class Helpers
@@ -57,6 +56,44 @@ namespace UiPath.CoreIpc
             }
         }
         public static void LogException(this Task task, ILogger logger, object tag) => task.ContinueWith(result => logger.LogException(result.Exception, tag), TaskContinuationOptions.NotOnRanToCompletion);
+        /// <summary>
+        /// Asynchronously waits for the task to complete, or for the cancellation token to be canceled.
+        /// </summary>
+        /// <param name="task">The task to wait for. May not be <c>null</c>.</param>
+        /// <param name="cancellationToken">The cancellation token that cancels the wait.</param>
+        public static Task WaitAsync(this Task task, CancellationToken cancellationToken)
+        {
+            if (task == null)
+                throw new ArgumentNullException(nameof(task));
+            if (!cancellationToken.CanBeCanceled)
+                return task;
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromCanceled(cancellationToken);
+            return DoWaitAsync(task, cancellationToken);
+        }
+        private static async Task DoWaitAsync(Task task, CancellationToken cancellationToken)
+        {
+            using var cancelTaskSource = new CancellationTokenTaskSource(cancellationToken);
+            await (await Task.WhenAny(task, cancelTaskSource.Task).ConfigureAwait(false)).ConfigureAwait(false);
+        }
+    }
+    /// <summary>
+    /// Holds the task for a cancellation token, as well as the token registration. The registration is disposed when this instance is disposed.
+    /// </summary>
+    public readonly struct CancellationTokenTaskSource : IDisposable
+    {
+        private readonly IDisposable _registration;
+        public CancellationTokenTaskSource(CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            _registration = cancellationToken.Register(state => ((TaskCompletionSource<bool>)state).TrySetCanceled(), tcs, useSynchronizationContext: false);
+            Task = tcs.Task;
+        }
+        public Task Task { get; }
+        /// <summary>
+        /// Disposes the cancellation token registration, if any. Note that this may cause <see cref="Task"/> to never complete.
+        /// </summary>
+        public void Dispose() => _registration.Dispose();
     }
     public static class IOHelpers
     {
