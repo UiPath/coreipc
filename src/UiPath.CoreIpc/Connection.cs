@@ -49,16 +49,16 @@ namespace UiPath.CoreIpc
         {
             var requestCompletion = new RequestCompletionSource();
             _requests[request.Id] = requestCompletion;
+            CancellationTokenRegistration tokenRegistration = default;
             try
             {
-                using (token.Register(uploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id))
-                {
-                    await SendRequest(SerializeToStream(request), uploadStream, token);
-                    return await requestCompletion.Task;
-                }
+                tokenRegistration = token.Register(uploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
+                await SendRequest(SerializeToStream(request), uploadStream, token);
+                return await requestCompletion.Task;
             }
             finally
             {
+                tokenRegistration.Dispose();
                 _requests.TryRemove(request.Id, out _);
             }
         }
