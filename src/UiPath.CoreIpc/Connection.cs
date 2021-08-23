@@ -180,7 +180,7 @@ namespace UiPath.CoreIpc
                 };
                 if (callback != null)
                 {
-                    Task.Factory.StartNew(callback, data, default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default).LogException(Logger, this);
+                    Task.Factory.StartNew(callback, data, default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
                 }
                 return Task.CompletedTask;
             }
@@ -215,19 +215,48 @@ namespace UiPath.CoreIpc
             return stream;
         }
         private T Deserialize<T>(Stream data) => Serializer.Deserialize<T>(data);
-        private void OnCancellationReceived(Stream data) => CancellationReceived(Deserialize<CancellationRequest>(data).RequestId);
-        private Task OnRequestReceived(Stream data, Stream uploadStream) => RequestReceived(Deserialize<Request>(data), uploadStream);
+        private void OnCancellationReceived(Stream data)
+        {
+            try
+            {
+                CancellationReceived(Deserialize<CancellationRequest>(data).RequestId);
+            }
+            catch(Exception ex)
+            {
+                Log(ex);
+            }
+        }
+        private void Log(Exception ex) => Logger.LogException(ex, Name);
+        private Task OnRequestReceived(Stream data, Stream uploadStream)
+        {
+            try
+            {
+                return RequestReceived(Deserialize<Request>(data), uploadStream);
+            }
+            catch (Exception ex)
+            {
+                Log(ex);
+            }
+            return Task.CompletedTask;
+        }
         private void OnResponseReceived(Stream data, Stream downloadStream)
         {
-            var response = Deserialize<Response>(data);
-            response.DownloadStream = downloadStream;
-            if (LogEnabled)
+            try
             {
-                Log($"Received response for request {response.RequestId} {Name}.");
+                var response = Deserialize<Response>(data);
+                response.DownloadStream = downloadStream;
+                if (LogEnabled)
+                {
+                    Log($"Received response for request {response.RequestId} {Name}.");
+                }
+                if (_requests.TryGetValue(response.RequestId, out var completionSource))
+                {
+                    completionSource.TrySetResult(response);
+                }
             }
-            if (_requests.TryGetValue(response.RequestId, out var completionSource))
+            catch (Exception ex)
             {
-                completionSource.TrySetResult(response);
+                Log(ex);
             }
         }
         public void Log(string message) => Logger.LogInformation(message);
