@@ -20,6 +20,9 @@ namespace UiPath.CoreIpc
     {
         public const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly;
         public static bool Enabled(this ILogger logger) => logger != null && logger.IsEnabled(LogLevel.Information);
+        [Conditional("DEBUG")]
+        public static void AssertDisposed(this SemaphoreSlim semaphore) =>
+            Debug.Assert(typeof(SemaphoreSlim).GetField("m_waitHandle", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(semaphore) == null);
         public static TDelegate MakeGenericDelegate<TDelegate>(this MethodInfo genericMethod, Type genericArgument) where TDelegate : Delegate =>
             (TDelegate)genericMethod.MakeGenericMethod(genericArgument).CreateDelegate(typeof(TDelegate));
         public static MethodInfo GetStaticMethod(this Type type, string name) => type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);

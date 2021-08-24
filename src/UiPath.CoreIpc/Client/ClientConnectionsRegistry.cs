@@ -1,5 +1,4 @@
-﻿using Nito.AsyncEx;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -10,27 +9,27 @@ namespace UiPath.CoreIpc
     static class ClientConnectionsRegistry
     {
         private static readonly ConcurrentDictionaryWrapper<IConnectionKey, ClientConnection> Connections = new(CreateClientConnection);
-        public static async Task<ClientConnectionHandle> GetOrCreate(IConnectionKey key, CancellationToken cancellationToken)
+        public static async Task<ClientConnection> GetOrCreate(IConnectionKey key, CancellationToken cancellationToken)
         {
             var clientConnection = GetOrAdd(key);
-            var asyncLock = await clientConnection.Lock(cancellationToken);
+            await clientConnection.Lock(cancellationToken);
             try
             {
                 // check again just in case it was removed after GetOrAdd but before entering the lock
                 ClientConnection newClientConnection;
                 while ((newClientConnection = GetOrAdd(key)) != clientConnection)
                 {
-                    asyncLock.Dispose();
-                    asyncLock = await newClientConnection.Lock(cancellationToken);
+                    clientConnection.Release();
+                    await newClientConnection.Lock(cancellationToken);
                     clientConnection = newClientConnection;
                 }
             }
             catch
             {
-                asyncLock.Dispose();
+                clientConnection.Release();
                 throw;
             }
-            return new(clientConnection, asyncLock);
+            return clientConnection;
         }
         private static ClientConnection GetOrAdd(IConnectionKey key)=>Connections.GetOrAdd(key);
         static ClientConnection CreateClientConnection(IConnectionKey key) => key.CreateClientConnection(key);
@@ -41,17 +40,6 @@ namespace UiPath.CoreIpc
             return clientConnection;
         }
     }
-    readonly struct ClientConnectionHandle : IDisposable
-    {
-        private readonly IDisposable _asyncLock;
-        public ClientConnectionHandle(ClientConnection clientConnection, IDisposable asyncLock)
-        {
-            ClientConnection = clientConnection;
-            _asyncLock = asyncLock;
-        }
-        public ClientConnection ClientConnection { get; }
-        public void Dispose() => _asyncLock.Dispose();
-    }
     interface IConnectionKey : IEquatable<IConnectionKey>
     {
         bool EncryptAndSign { get; }
@@ -59,7 +47,7 @@ namespace UiPath.CoreIpc
     }
     abstract class ClientConnection : IDisposable
     {
-        readonly AsyncLock _lock = new();
+        readonly SemaphoreSlim _lock = new(1);
         Connection _connection;
         protected ClientConnection(IConnectionKey connectionKey) => ConnectionKey = connectionKey;
         public abstract bool Connected { get; }
@@ -81,11 +69,11 @@ namespace UiPath.CoreIpc
             {
                 return;
             }
-            if (!clientConnection.TryLock(out var guard))
+            if (!clientConnection.TryLock())
             {
                 return;
             }
-            using (guard)
+            try
             {
                 if (!ClientConnectionsRegistry.TryGet(ConnectionKey, out clientConnection) || clientConnection.Connection != closedConnection)
                 {
@@ -98,25 +86,18 @@ namespace UiPath.CoreIpc
                 }
                 Debug.Assert(removedConnection?.Connection == closedConnection, "Removed the wrong connection.");
             }
+            finally
+            {
+                Release();
+            }
         }
         public Server Server { get; set; }
         protected IConnectionKey ConnectionKey { get; }
-        public Task<IDisposable> Lock(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
-        public bool TryLock(out IDisposable guard)
-        {
-            try
-            {
-                guard = _lock.Lock(new(canceled: true));
-                return true;
-            }
-            catch (TaskCanceledException)
-            {
-                guard = null;
-                return false;
-            }
-        }
+        public Task Lock(CancellationToken cancellationToken = default) => _lock.WaitAsync(cancellationToken);
+        public void Release() => _lock.Release();
+        public bool TryLock() => _lock.Wait(millisecondsTimeout: 0);
         public override string ToString() => _connection?.ToString() ?? base.ToString();
-        protected virtual void Dispose(bool disposing) {}
+        protected virtual void Dispose(bool disposing) => _lock.AssertDisposed();
         public void Dispose()
         {
             Dispose(disposing: true);

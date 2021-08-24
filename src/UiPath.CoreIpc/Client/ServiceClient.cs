@@ -1,5 +1,4 @@
-﻿using Nito.AsyncEx;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Reflection;
@@ -30,7 +29,7 @@ namespace UiPath.CoreIpc
         private readonly ConnectionFactory _connectionFactory;
         private readonly BeforeCallHandler _beforeCall;
         private readonly EndpointSettings _serviceEndpoint;
-        private readonly AsyncLock _connectionLock = new();
+        private readonly SemaphoreSlim _connectionLock = new(1);
         private Connection _connection;
         private Server _server;
         private ClientConnection _clientConnection;
@@ -91,9 +90,14 @@ namespace UiPath.CoreIpc
                 {
                     var token = timeoutHelper.Token;
                     bool newConnection;
-                    using (await _connectionLock.LockAsync(token))
+                    await _connectionLock.WaitAsync(token);
+                    try
                     {
                         newConnection = await EnsureConnection(token);
+                    }
+                    finally
+                    {
+                        _connectionLock.Release();
                     }
                     if (_beforeCall != null)
                     {
@@ -176,30 +180,36 @@ namespace UiPath.CoreIpc
             {
                 return false;
             }
-            using var connectionHandle = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
-            var clientConnection = connectionHandle.ClientConnection;
-            if (clientConnection.Connected)
-            {
-                ReuseClientConnection(clientConnection);
-                return false;
-            }
-            clientConnection.Dispose();
+            var clientConnection = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
             try
             {
-                await clientConnection.Connect(cancellationToken);
-            }
-            catch
-            {
+                if (clientConnection.Connected)
+                {
+                    ReuseClientConnection(clientConnection);
+                    return false;
+                }
                 clientConnection.Dispose();
-                throw;
+                try
+                {
+                    await clientConnection.Connect(cancellationToken);
+                }
+                catch
+                {
+                    clientConnection.Dispose();
+                    throw;
+                }
+                var stream = EncryptAndSign ? await AuthenticateAsClient(clientConnection.Network) : clientConnection.Network;
+                OnNewConnection(new(stream, _serializer, _logger, Name));
+                if (LogEnabled)
+                {
+                    Log($"CreateConnection {Name}.");
+                }
+                InitializeClientConnection(clientConnection);
             }
-            var stream = EncryptAndSign ? await AuthenticateAsClient(clientConnection.Network) : clientConnection.Network;
-            OnNewConnection(new(stream, _serializer, _logger, Name));
-            if (LogEnabled)
+            finally
             {
-                Log($"CreateConnection {Name}.");
+                clientConnection.Release();
             }
-            InitializeClientConnection(clientConnection);
             return true;
             static async Task<Stream> AuthenticateAsClient(Stream network)
             {
@@ -260,6 +270,7 @@ namespace UiPath.CoreIpc
 
         protected virtual void Dispose(bool disposing)
         {
+            _connectionLock.AssertDisposed();
             if (LogEnabled)
             {
                 Log($"Dispose {Name}");

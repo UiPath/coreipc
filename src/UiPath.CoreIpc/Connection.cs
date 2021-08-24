@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
-using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,7 +14,7 @@ namespace UiPath.CoreIpc
         private long _requestCounter = -1;
         private readonly int _maxMessageSize;
         private readonly Lazy<Task> _receiveLoop;
-        private readonly AsyncLock _sendLock = new();
+        private readonly SemaphoreSlim _sendLock = new(1);
         private readonly Action<object> _onResponse;
         private readonly Action<object> _onRequest;
         private readonly Action<object> _onCancellation;
@@ -98,24 +98,34 @@ namespace UiPath.CoreIpc
         }
         private async Task SendStream(WireMessage message, Stream userStream, CancellationToken cancellationToken)
         {
-            using (await _sendLock.LockAsync(cancellationToken))
+            await _sendLock.WaitAsync(cancellationToken);
+            CancellationTokenRegistration tokenRegistration = default;
+            try
             {
-                using (cancellationToken.Register(Dispose))
-                {
-                    await Network.WriteMessage(message, cancellationToken);
-                    await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
-                    const int DefaultCopyBufferSize = 81920;
-                    await userStream.CopyToAsync(Network, DefaultCopyBufferSize, cancellationToken);
-                }
+                tokenRegistration = cancellationToken.Register(Dispose);
+                await Network.WriteMessage(message, cancellationToken);
+                await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
+                const int DefaultCopyBufferSize = 81920;
+                await userStream.CopyToAsync(Network, DefaultCopyBufferSize, cancellationToken);
+            }
+            finally
+            {
+                _sendLock.Release();
+                tokenRegistration.Dispose();
             }
         }
         private Task SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken) => 
             SendMessage(new(messageType, data), cancellationToken);
         private async Task SendMessage(WireMessage wireMessage, CancellationToken cancellationToken)
         {
-            using (await _sendLock.LockAsync(cancellationToken))
+            await _sendLock.WaitAsync(cancellationToken);
+            try
             {
                 await Network.WriteMessage(wireMessage, CancellationToken.None);
+            }
+            finally
+            {
+                _sendLock.Release();
             }
         }
         public void Dispose()
@@ -125,6 +135,7 @@ namespace UiPath.CoreIpc
             {
                 return;
             }
+            _sendLock.AssertDisposed();
             Network.Dispose();
             try
             {
