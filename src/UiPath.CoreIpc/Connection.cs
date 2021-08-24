@@ -53,8 +53,8 @@ namespace UiPath.CoreIpc
             CancellationTokenRegistration tokenRegistration = default;
             try
             {
-                tokenRegistration = token.Register(uploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
                 await SendRequest(requestBytes, uploadStream, token);
+                tokenRegistration = token.Register(uploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
                 return await requestCompletion.Task;
             }
             finally
