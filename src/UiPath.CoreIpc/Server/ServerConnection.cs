@@ -11,7 +11,7 @@ namespace UiPath.CoreIpc
 {
     public interface IClient
     {
-        TCallbackInterface GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class;
+        TCallbackInterface GetCallback<TCallbackInterface>(Type callbackContract, bool objectParameters) where TCallbackInterface : class;
         void Impersonate(Action action);
     }
     abstract class ServerConnection : IClient, IDisposable
@@ -27,7 +27,7 @@ namespace UiPath.CoreIpc
         public abstract Task AcceptClient(CancellationToken cancellationToken);
         protected abstract Stream Network { get; }
         public virtual void Impersonate(Action action) => action();
-        TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class
+        TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract, bool objectParameters) where TCallbackInterface : class
         {
             if (callbackContract == null)
             {
@@ -45,7 +45,10 @@ namespace UiPath.CoreIpc
                     _listener.Log($"Create callback {callbackContract} {_listener.Name}");
                 }
                 _connectionAsTask ??= Task.FromResult(_connection);
-                var serviceClient = new ServiceClient<TCallbackInterface>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, _) => _connectionAsTask);
+                var serviceClient = new ServiceClient<TCallbackInterface>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, _) => _connectionAsTask)
+                {
+                    ObjectParameters = objectParameters
+                };
                 return serviceClient.CreateProxy();
             }
         }

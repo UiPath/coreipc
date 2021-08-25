@@ -19,7 +19,6 @@ namespace UiPath.CoreIpc
     {
         Task<TResult> Invoke<TResult>(MethodInfo method, object[] args);
         Connection Connection { get; }
-        bool ObjectParameters { get; set; }
     }
 
     class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterface : class
@@ -50,7 +49,7 @@ namespace UiPath.CoreIpc
         private bool LogEnabled => _logger.Enabled();
         public bool EncryptAndSign { get; }
         Connection IServiceClient.Connection => _connection;
-        public bool ObjectParameters { get; set; } = true;
+        public bool ObjectParameters { get; init; } = true;
 
         public TInterface CreateProxy()
         {

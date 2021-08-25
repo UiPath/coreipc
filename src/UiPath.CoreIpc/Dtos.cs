@@ -16,12 +16,8 @@ namespace UiPath.CoreIpc
         public IClient Client { get; set; }
         [JsonIgnore]
         public TimeSpan RequestTimeout { get; set; }
-        public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class
-        {
-            var callback = Client.GetCallback<TCallbackInterface>(CallbackContract);
-            (callback as IpcProxy).ServiceClient.ObjectParameters = ObjectParameters;
-            return callback;
-        }
+        public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => 
+            Client.GetCallback<TCallbackInterface>(CallbackContract, ObjectParameters);
         public void ImpersonateClient(Action action) => Client.Impersonate(action);
     }
     public class Message<TPayload> : Message
