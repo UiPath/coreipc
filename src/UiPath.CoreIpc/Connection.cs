@@ -64,7 +64,7 @@ namespace UiPath.CoreIpc
         }
         internal Task Send(Request request, Stream uploadStream, CancellationToken token)
         {
-            Debug.Assert(request.Parameters == null);
+            Debug.Assert(request.Parameters == null || request.ObjectParameters == null);
             return SendRequest(SerializeToStream(request), uploadStream, token);
         }
         void CancelRequest(string requestId)
@@ -92,7 +92,7 @@ namespace UiPath.CoreIpc
                 SendStream(new(MessageType.UploadRequest, requestBytes), uploadStream, cancellationToken);
         internal Task Send(Response response, CancellationToken cancellationToken)
         {
-            Debug.Assert(response.Data == null);
+            Debug.Assert(response.Data == null || response.ObjectData == null);
             return response.DownloadStream == null ?
                 SendMessage(MessageType.Response, SerializeToStream(response), cancellationToken) :
                 SendDownloadStream(SerializeToStream(response), response.DownloadStream, cancellationToken);
