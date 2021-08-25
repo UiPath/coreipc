@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -79,7 +80,11 @@ namespace UiPath.CoreIpc.Tests
         {
             await _systemClient.VoidThreadName();
             await _systemClient.GetThreadName();
-            _systemService.ThreadName.ShouldBe("GuiThread");
+            while (_systemService.ThreadName != "GuiThread")
+            {
+                await Task.Delay(0);
+                Trace.WriteLine(this + " VoidThreadName");
+            }
         }
 
         [Fact]
@@ -192,8 +197,8 @@ namespace UiPath.CoreIpc.Tests
             var proxy = SystemClientBuilder().BeforeCall(async (c, _) =>
             {
                 newConnection = c.NewConnection;
-                c.MethodName.ShouldBe(nameof(ISystemService.DoNothing));
-                c.Arguments.Single().ShouldBe(CancellationToken.None); // cancellation token
+                c.Method.ShouldBe(typeof(ISystemService).GetMethod(nameof(ISystemService.DoNothing)));
+                c.Arguments.Single().ShouldBe(""); // cancellation token
             }).ValidateAndBuild();
             newConnection.ShouldBeFalse();
 
@@ -256,20 +261,20 @@ namespace UiPath.CoreIpc.Tests
         public virtual async void BeforeCallServerSide()
         {
             var newGuid = System.Guid.NewGuid();
-            var methodName = "";
+            MethodInfo method = null;
             using var protectedService = Configure(new ServiceHostBuilder(_serviceProvider))
                 .AddEndpoint(new EndpointSettings<ISystemService>
                 {
                     BeforeCall = async (call, ct) =>
                     {
-                        methodName = call.MethodName;
+                        method = call.Method;
                         call.Arguments[0].ShouldBe(newGuid);
                     }
                 })
                 .ValidateAndBuild();
             _ = protectedService.RunAsync();
             await CreateSystemService().GetGuid(newGuid);
-            methodName.ShouldBe("GetGuid");
+            method.ShouldBe(typeof(ISystemService).GetMethod(nameof(ISystemService.GetGuid)));
         }
     }
 }

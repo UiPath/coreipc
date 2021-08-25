@@ -13,12 +13,13 @@ namespace UiPath.CoreIpc
 {
     using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
     using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
-    using InvokeDelegate = Func<IServiceClient, string, object[], object>;
+    using InvokeDelegate = Func<IServiceClient, MethodInfo, object[], object>;
 
     interface IServiceClient : IDisposable
     {
-        Task<TResult> Invoke<TResult>(string methodName, object[] args);
+        Task<TResult> Invoke<TResult>(MethodInfo method, object[] args);
         Connection Connection { get; }
+        bool ObjectParameters { get; set; }
     }
 
     class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterface : class
@@ -48,8 +49,8 @@ namespace UiPath.CoreIpc
         public virtual string Name => _connection?.Name;
         private bool LogEnabled => _logger.Enabled();
         public bool EncryptAndSign { get; }
-        
         Connection IServiceClient.Connection => _connection;
+        public bool ObjectParameters { get; set; } = true;
 
         public TInterface CreateProxy()
         {
@@ -72,7 +73,7 @@ namespace UiPath.CoreIpc
             _server = new(listenerSettings, connection);
         }
 
-        public Task<TResult> Invoke<TResult>(string methodName, object[] args)
+        public Task<TResult> Invoke<TResult>(MethodInfo method, object[] args)
         {
             var syncContext = SynchronizationContext.Current;
             var defaultContext = syncContext == null || syncContext.GetType() == typeof(SynchronizationContext);
@@ -83,7 +84,8 @@ namespace UiPath.CoreIpc
                 TimeSpan messageTimeout = default;
                 TimeSpan clientTimeout = _requestTimeout;
                 Stream uploadStream = null;
-                string[] serializedArguments;
+                string[] serializedArguments = null;
+                var methodName = method.Name;
                 SerializeArguments();
                 var timeoutHelper = TimeoutHelper.Creaate(clientTimeout, cancellationToken);
                 try
@@ -101,15 +103,15 @@ namespace UiPath.CoreIpc
                     }
                     if (_beforeCall != null)
                     {
-                        await _beforeCall(new(newConnection, methodName, args), token);
+                        await _beforeCall(new(newConnection, method, args), token);
                     }
                     var requestId = _connection.NewRequestId();
-                    var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds);
+                    var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds);
                     if (LogEnabled)
                     {
                         Log($"IpcClient calling {methodName} {requestId} {Name}.");
                     }
-                    if (request.HasObjectParameters)
+                    if (request.HasObjectParameters && !method.ReturnType.IsGenericType)
                     {
                         await _connection.Send(request, uploadStream, token);
                         return default;
@@ -119,7 +121,7 @@ namespace UiPath.CoreIpc
                     {
                         Log($"IpcClient called {methodName} {requestId} {Name}.");
                     }
-                    return response.Deserialize<TResult>(_serializer);
+                    return response.Deserialize<TResult>(_serializer, ObjectParameters);
                 }
                 catch (Exception ex)
                 {
@@ -132,8 +134,10 @@ namespace UiPath.CoreIpc
                 }
                 void SerializeArguments()
                 {
-                    serializedArguments = new string[args.Length];
-                    string argument;
+                    if (!ObjectParameters)
+                    {
+                        serializedArguments = new string[args.Length];
+                    }
                     for (int index = 0; index < args.Length; index++)
                     {
                         switch (args[index])
@@ -141,21 +145,20 @@ namespace UiPath.CoreIpc
                             case Message { RequestTimeout: var requestTimeout } when requestTimeout != TimeSpan.Zero:
                                 messageTimeout = requestTimeout;
                                 clientTimeout = requestTimeout;
-                                argument = _serializer.Serialize(args[index]);
                                 break;
                             case CancellationToken token:
                                 cancellationToken = token;
-                                argument = "";
+                                args[index] = "";
                                 break;
                             case Stream stream:
                                 uploadStream = stream;
-                                argument = "";
-                                break;
-                            default:
-                                argument = _serializer.Serialize(args[index]);
+                                args[index] = "";
                                 break;
                         }
-                        serializedArguments[index] = argument;
+                        if (!ObjectParameters)
+                        {
+                            serializedArguments[index] = _serializer.Serialize(args[index]);
+                        }
                     }
                 }
             }
@@ -302,7 +305,7 @@ namespace UiPath.CoreIpc
 
         public Connection Connection => ServiceClient.Connection;
 
-        protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvoke(targetMethod)(ServiceClient, targetMethod.Name, args);
+        protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvoke(targetMethod)(ServiceClient, targetMethod, args);
 
         public void Dispose() => ServiceClient.Dispose();
 
@@ -315,6 +318,6 @@ namespace UiPath.CoreIpc
             var resultType = taskType.IsGenericType ? taskType.GenericTypeArguments[0] : typeof(object);
             return InvokeMethod.MakeGenericDelegate<InvokeDelegate>(resultType);
         }
-        private static object GenericInvoke<T>(IServiceClient serviceClient, string method, object[] args) => serviceClient.Invoke<T>(method, args);
+        private static object GenericInvoke<T>(IServiceClient serviceClient, MethodInfo method, object[] args) => serviceClient.Invoke<T>(method, args);
     }
 }

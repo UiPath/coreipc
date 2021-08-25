@@ -22,7 +22,7 @@ namespace UiPath.CoreIpc
             var streamReader = new StreamReader(json);
             return serializer.Deserialize(streamReader, type);
         }
-        public object Deserialize(object json, Type type) => ((JToken)json)?.ToObject(type);
+        public object Deserialize(object json, Type type) => JToken.FromObject(json ?? "").ToObject(type);
         public string Serialize(object obj) => JsonConvert.SerializeObject(obj);
         public void Serialize(object obj, Stream stream)
         {

@@ -114,7 +114,7 @@ namespace UiPath.CoreIpc
             var beforeCall = endpoint.BeforeCall;
             if (beforeCall != null)
             {
-                await beforeCall(new(default, request.MethodName, arguments), cancellationToken);
+                await beforeCall(new(default, method.MethodInfo, arguments), cancellationToken);
             }
             IServiceScope scope = null;
             var service = endpoint.ServiceInstance;
@@ -157,7 +157,8 @@ namespace UiPath.CoreIpc
             object[] GetArguments()
             {
                 var parameters = method.Parameters;
-                if (request.Parameters.Length > parameters.Length)
+                var parametersLength = request.ParametersLength;
+                if (parametersLength > parameters.Length)
                 {
                     throw new ArgumentException("Too many parameters for " + method);
                 }
@@ -168,8 +169,7 @@ namespace UiPath.CoreIpc
                 void Deserialize()
                 {
                     object argument;
-                    var length = request.HasObjectParameters ? request.ObjectParameters.Length : request.Parameters.Length;
-                    for (int index = 0; index < length; index++)
+                    for (int index = 0; index < parametersLength; index++)
                     {
                         var parameterType = parameters[index].ParameterType;
                         if (parameterType == typeof(CancellationToken))
@@ -182,9 +182,7 @@ namespace UiPath.CoreIpc
                         }
                         else
                         {
-                            argument = request.HasObjectParameters ? 
-                                Serializer.Deserialize(request.ObjectParameters[index], parameterType) : 
-                                Serializer.Deserialize(request.Parameters[index], parameterType);
+                            argument = request.DeserializeParameter(Serializer, index, parameterType);
                             argument = CheckMessage(argument, parameterType);
                         }
                         allArguments[index] = argument;
@@ -200,12 +198,13 @@ namespace UiPath.CoreIpc
                     {
                         message.CallbackContract = endpoint.CallbackContract;
                         message.Client = _client;
+                        message.ObjectParameters = request.HasObjectParameters;
                     }
                     return argument;
                 }
                 void SetOptionalArguments()
                 {
-                    for (int index = request.Parameters.Length; index < parameters.Length; index++)
+                    for (int index = request.ParametersLength; index < parameters.Length; index++)
                     {
                         allArguments[index] = CheckMessage(method.Defaults[index], parameters[index].ParameterType);
                     }
@@ -233,10 +232,10 @@ namespace UiPath.CoreIpc
             static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
             static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
             readonly MethodExecutor _executor;
-            readonly MethodInfo _methodInfo;
+            public readonly MethodInfo MethodInfo;
             public readonly ParameterInfo[] Parameters;
             public readonly object[] Defaults;
-            public Type ReturnType => _methodInfo.ReturnType;
+            public Type ReturnType => MethodInfo.ReturnType;
             public Method(MethodInfo method)
             {
                 // https://github.com/dotnet/aspnetcore/blob/3f620310883092905ed6f13d784c908b5f4a9d7e/src/Shared/ObjectMethodExecutor/ObjectMethodExecutor.cs#L156
@@ -254,12 +253,12 @@ namespace UiPath.CoreIpc
                 var methodCall = Call(instanceCast, method, callParameters);
                 var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter);
                 _executor = lambda.Compile();
-                _methodInfo = method;
+                MethodInfo = method;
                 Parameters = parameters;
                 Defaults = defaults;
             }
             public Task Invoke(object service, object[] arguments) => _executor.Invoke(service, arguments);
-            public override string ToString() => _methodInfo.ToString();
+            public override string ToString() => MethodInfo.ToString();
         }
     }
 }
