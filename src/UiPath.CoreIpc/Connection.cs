@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -61,7 +62,11 @@ namespace UiPath.CoreIpc
                 _requests.TryRemove(request.Id, out _);
             }
         }
-        internal Task Send(Request request, Stream uploadStream, CancellationToken token) => SendRequest(SerializeToStream(request), uploadStream, token);
+        internal Task Send(Request request, Stream uploadStream, CancellationToken token)
+        {
+            Debug.Assert(request.Parameters == null);
+            return SendRequest(SerializeToStream(request), uploadStream, token);
+        }
         void CancelRequest(string requestId)
         {
             CancelServerCall(requestId).LogException(Logger, this);
@@ -85,9 +90,13 @@ namespace UiPath.CoreIpc
         private Task SendRequest(MemoryStream requestBytes, Stream uploadStream, CancellationToken cancellationToken) => uploadStream == null ?
                 SendMessage(MessageType.Request, requestBytes, cancellationToken) :
                 SendStream(new(MessageType.UploadRequest, requestBytes), uploadStream, cancellationToken);
-        internal Task Send(Response response, CancellationToken cancellationToken) => response.DownloadStream == null ? 
-                SendMessage(MessageType.Response, SerializeToStream(response), cancellationToken) : 
+        internal Task Send(Response response, CancellationToken cancellationToken)
+        {
+            Debug.Assert(response.Data == null);
+            return response.DownloadStream == null ?
+                SendMessage(MessageType.Response, SerializeToStream(response), cancellationToken) :
                 SendDownloadStream(SerializeToStream(response), response.DownloadStream, cancellationToken);
+        }
         private async Task SendDownloadStream(MemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
         {
             using (downloadStream)
