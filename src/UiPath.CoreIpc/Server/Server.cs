@@ -157,8 +157,8 @@ namespace UiPath.CoreIpc
             object[] GetArguments()
             {
                 var parameters = method.Parameters;
-                var parametersLength = request.ParametersLength;
-                if (parametersLength > parameters.Length)
+                var requestParametersLength = request.ParametersLength;
+                if (requestParametersLength > parameters.Length)
                 {
                     throw new ArgumentException("Too many parameters for " + method);
                 }
@@ -169,7 +169,7 @@ namespace UiPath.CoreIpc
                 void Deserialize()
                 {
                     object argument;
-                    for (int index = 0; index < parametersLength; index++)
+                    for (int index = 0; index < requestParametersLength; index++)
                     {
                         var parameterType = parameters[index].ParameterType;
                         if (parameterType == typeof(CancellationToken))
