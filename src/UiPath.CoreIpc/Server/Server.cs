@@ -60,7 +60,7 @@ namespace UiPath.CoreIpc
                     return;
                 }
                 var method = GetMethod(endpoint.Contract, request.MethodName);
-                if (request.HasObjectParameters && !method.ReturnType.IsGenericType)
+                if (!method.ReturnType.IsGenericType && request.HasObjectParameters)
                 {
                     await HandleRequest(method, endpoint, request, uploadStream, default);
                     return;
