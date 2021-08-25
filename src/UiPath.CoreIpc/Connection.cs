@@ -46,13 +46,12 @@ namespace UiPath.CoreIpc
         public event EventHandler<EventArgs> Closed;
         internal async Task<Response> RemoteCall(Request request, Stream uploadStream, CancellationToken token)
         {
-            var requestBytes = SerializeToStream(request);
             var requestCompletion = new RequestCompletionSource();
             _requests[request.Id] = requestCompletion;
             CancellationTokenRegistration tokenRegistration = default;
             try
             {
-                await SendRequest(requestBytes, uploadStream, token);
+                await SendRequest(SerializeToStream(request), uploadStream, token);
                 tokenRegistration = token.Register(uploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
                 return await requestCompletion.Task;
             }
@@ -231,11 +230,18 @@ namespace UiPath.CoreIpc
         }
         private MemoryStream SerializeToStream(object value)
         {
-            var stream = new MemoryStream { Position = IOHelpers.HeaderLength };
+            var stream = IOHelpers.GetStream();
+            stream.Position = IOHelpers.HeaderLength;
             Serializer.Serialize(value, stream);
             return stream;
         }
-        private T Deserialize<T>(Stream data) => Serializer.Deserialize<T>(data);
+        private T Deserialize<T>(Stream data)
+        {
+            using (data)
+            {
+                return Serializer.Deserialize<T>(data);
+            }
+        }
         private void OnCancellationReceived(Stream data)
         {
             try

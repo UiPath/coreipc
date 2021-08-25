@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.IO;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -62,7 +63,10 @@ namespace UiPath.CoreIpc
     }
     public static class IOHelpers
     {
+        private static readonly RecyclableMemoryStreamManager Pool = new();
+        internal static MemoryStream GetStream() => Pool.GetStream("Write");
         internal const int HeaderLength = sizeof(int) + 1;
+        internal const int BufferSize = 32*1024;
         internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity> pipeSecurity)
         {
 #if NET461
@@ -126,17 +130,24 @@ namespace UiPath.CoreIpc
 
         internal static Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
         {
-            var buffer = message.Data.GetBuffer();
+            var recyclableStream = (RecyclableMemoryStream)message.Data;
+            var buffer = recyclableStream.GetSpan(HeaderLength);
             var totalLength = (int)message.Data.Length;
             buffer[0] = (byte)message.MessageType;
             var payloadLength = totalLength - HeaderLength;
             // https://github.com/dotnet/runtime/blob/85441ce69b81dfd5bf57b9d00ba525440b7bb25d/src/libraries/System.Private.CoreLib/src/System/BitConverter.cs#L133
-            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer.AsSpan(1, sizeof(int))), payloadLength);
-            return stream.WriteAsync(buffer, 0, totalLength, cancellationToken);
+            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer.Slice(1)), payloadLength);
+            return stream.WriteMessageCore(recyclableStream, cancellationToken);
+        }
+        private static async Task WriteMessageCore(this Stream stream, RecyclableMemoryStream recyclableStream, CancellationToken cancellationToken)
+        {
+            using (recyclableStream)
+            {
+                await recyclableStream.CopyToAsync(stream, BufferSize, cancellationToken);
+            }
         }
         internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
-
         internal static async Task<WireMessage> ReadMessage(this Stream stream, int maxMessageSize, CancellationToken cancellationToken = default)
         {
             var header = await stream.ReadBufferCore(sizeof(int)+1, cancellationToken);
@@ -150,12 +161,18 @@ namespace UiPath.CoreIpc
             {
                 throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize/(1024*1024)} megabytes.");
             }
-            var data = await stream.ReadBufferCore(length, cancellationToken);
-            if (data.Length == 0)
+            using var nestedStream = new NestedStream(stream, length);
+            var recyclableStream = Pool.GetStream("Read", length);
+            try
             {
-                return new();
+                await nestedStream.CopyToAsync(recyclableStream, BufferSize, cancellationToken);
             }
-            return new(messageType, new MemoryStream(data));
+            catch
+            {
+                recyclableStream.Dispose();
+                throw;
+            }
+            return new(messageType, recyclableStream);
         }
 
         public static async ValueTask<byte[]> ReadBufferCore(this Stream stream, int length, CancellationToken cancellationToken)
