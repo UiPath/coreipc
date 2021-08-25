@@ -109,6 +109,11 @@ namespace UiPath.CoreIpc
                     {
                         Log($"IpcClient calling {methodName} {requestId} {Name}.");
                     }
+                    if (request.HasObjectParameters)
+                    {
+                        await _connection.Send(request, uploadStream, token);
+                        return default;
+                    }
                     var response = await _connection.RemoteCall(request, uploadStream, token);
                     if (LogEnabled)
                     {

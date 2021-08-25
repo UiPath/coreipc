@@ -59,6 +59,12 @@ namespace UiPath.CoreIpc
                     await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
                     return;
                 }
+                var method = GetMethod(endpoint.Contract, request.MethodName);
+                if (request.HasObjectParameters && !method.ReturnType.IsGenericType)
+                {
+                    await HandleRequest(method, endpoint, request, uploadStream, default);
+                    return;
+                }
                 Response response;
                 var requestCancellation = new CancellationTokenSource();
                 _requests[request.Id] = requestCancellation;
@@ -67,7 +73,7 @@ namespace UiPath.CoreIpc
                 try
                 {
                     var token = timeoutHelper.Token;
-                    response = await HandleRequest(endpoint, request, uploadStream, token);
+                    response = await HandleRequest(method, endpoint, request, uploadStream, token);
                     if (LogEnabled)
                     {
                         Log($"{Name} sending response for {request}");
@@ -101,10 +107,9 @@ namespace UiPath.CoreIpc
             Logger.LogException(ex, $"{Name} {request}");
             return SendResponse(Response.Fail(request, ex), _hostCancellationToken);
         }
-        async Task<Response> HandleRequest(EndpointSettings endpoint, Request request, Stream uploadStream, CancellationToken cancellationToken)
+        async Task<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, Stream uploadStream, CancellationToken cancellationToken)
         {
             var contract = endpoint.Contract;
-            var method = GetMethod(contract, request.MethodName);
             var arguments = GetArguments();
             var beforeCall = endpoint.BeforeCall;
             if (beforeCall != null)
@@ -135,12 +140,16 @@ namespace UiPath.CoreIpc
                     var methodResult = scheduler is null ? MethodCall() : await RunOnScheduler();
                     await methodResult;
                     var returnValue = GetTaskResult(returnTaskType, methodResult);
-                    return returnValue is Stream downloadStream ? Response.Success(request, downloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
+                    if (returnValue is Stream downloadStream)
+                    {
+                        return Response.Success(request, downloadStream);
+                    }
+                    return request.HasObjectParameters ? new Response(request.Id, null, null, returnValue) : Response.Success(request, Serializer.Serialize(returnValue));
                 }
                 else
                 {
                     (scheduler is null ? MethodCall() : RunOnScheduler()).LogException(Logger, method);
-                    return Response.Success(request, "");
+                    return request.HasObjectParameters ? null : Response.Success(request, "");
                 }
                 Task MethodCall() => method.Invoke(service, arguments);
                 Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
@@ -159,7 +168,8 @@ namespace UiPath.CoreIpc
                 void Deserialize()
                 {
                     object argument;
-                    for (int index = 0; index < request.Parameters.Length; index++)
+                    var length = request.HasObjectParameters ? request.ObjectParameters.Length : request.Parameters.Length;
+                    for (int index = 0; index < length; index++)
                     {
                         var parameterType = parameters[index].ParameterType;
                         if (parameterType == typeof(CancellationToken))
@@ -172,7 +182,9 @@ namespace UiPath.CoreIpc
                         }
                         else
                         {
-                            argument = Serializer.Deserialize(request.Parameters[index], parameterType);
+                            argument = request.HasObjectParameters ? 
+                                Serializer.Deserialize(request.ObjectParameters[index], parameterType) : 
+                                Serializer.Deserialize(request.Parameters[index], parameterType);
                             argument = CheckMessage(argument, parameterType);
                         }
                         allArguments[index] = argument;

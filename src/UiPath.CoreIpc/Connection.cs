@@ -51,7 +51,7 @@ namespace UiPath.CoreIpc
             CancellationTokenRegistration tokenRegistration = default;
             try
             {
-                await SendRequest(SerializeToStream(request), uploadStream, token);
+                await Send(request, uploadStream, token);
                 tokenRegistration = token.Register(uploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
                 return await requestCompletion.Task;
             }
@@ -61,6 +61,7 @@ namespace UiPath.CoreIpc
                 _requests.TryRemove(request.Id, out _);
             }
         }
+        internal Task Send(Request request, Stream uploadStream, CancellationToken token) => SendRequest(SerializeToStream(request), uploadStream, token);
         void CancelRequest(string requestId)
         {
             CancelServerCall(requestId).LogException(Logger, this);

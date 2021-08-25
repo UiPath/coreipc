@@ -35,7 +35,10 @@ namespace UiPath.CoreIpc
         public string Id { get; }
         public string MethodName { get; }
         public string[] Parameters { get; }
+        public object[] ObjectParameters { get; }
         public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
+        [JsonIgnore]
+        public bool HasObjectParameters => ObjectParameters is not null;
         internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
     }
     class CancellationRequest
@@ -45,15 +48,16 @@ namespace UiPath.CoreIpc
     }
     class Response
     {
-        [JsonConstructor]
-        private Response(string requestId, string data, Error error)
+        public Response(string requestId, string data, Error error, object objectData = null)
         {
             RequestId = requestId;
             Data = data;
             Error = error;
+            ObjectData = objectData;
         }
         public string RequestId { get; }
         public string Data { get; }
+        public object ObjectData { get; }
         public Error Error { get; }
         [JsonIgnore]
         public Stream DownloadStream { get; set; }
