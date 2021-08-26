@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -46,13 +47,12 @@ namespace UiPath.CoreIpc
         public event EventHandler<EventArgs> Closed;
         internal async Task<Response> RemoteCall(Request request, Stream uploadStream, CancellationToken token)
         {
-            var requestBytes = SerializeToStream(request);
             var requestCompletion = new RequestCompletionSource();
             _requests[request.Id] = requestCompletion;
             CancellationTokenRegistration tokenRegistration = default;
             try
             {
-                await SendRequest(requestBytes, uploadStream, token);
+                await Send(request, uploadStream, token);
                 tokenRegistration = token.Register(uploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
                 return await requestCompletion.Task;
             }
@@ -61,6 +61,11 @@ namespace UiPath.CoreIpc
                 tokenRegistration.Dispose();
                 _requests.TryRemove(request.Id, out _);
             }
+        }
+        internal Task Send(Request request, Stream uploadStream, CancellationToken token)
+        {
+            Debug.Assert(request.Parameters == null || request.ObjectParameters == null);
+            return SendRequest(SerializeToStream(request), uploadStream, token);
         }
         void CancelRequest(string requestId)
         {
@@ -85,9 +90,13 @@ namespace UiPath.CoreIpc
         private Task SendRequest(MemoryStream requestBytes, Stream uploadStream, CancellationToken cancellationToken) => uploadStream == null ?
                 SendMessage(MessageType.Request, requestBytes, cancellationToken) :
                 SendStream(new(MessageType.UploadRequest, requestBytes), uploadStream, cancellationToken);
-        internal Task Send(Response response, CancellationToken cancellationToken) => response.DownloadStream == null ? 
-                SendMessage(MessageType.Response, SerializeToStream(response), cancellationToken) : 
+        internal Task Send(Response response, CancellationToken cancellationToken)
+        {
+            Debug.Assert(response.Data == null || response.ObjectData == null);
+            return response.DownloadStream == null ?
+                SendMessage(MessageType.Response, SerializeToStream(response), cancellationToken) :
                 SendDownloadStream(SerializeToStream(response), response.DownloadStream, cancellationToken);
+        }
         private async Task SendDownloadStream(MemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
         {
             using (downloadStream)
@@ -208,7 +217,7 @@ namespace UiPath.CoreIpc
         }
         private async Task OnDownloadResponse(Stream data)
         {
-            var downloadStream = await WrapNetworkStream();
+            var downloadStream = await WrapNetworkStream(data);
             var streamDisposed = new TaskCompletionSource<bool>();
             downloadStream.Disposed += delegate { streamDisposed.TrySetResult(true); };
             OnResponseReceived(data, downloadStream);
@@ -216,26 +225,49 @@ namespace UiPath.CoreIpc
         }
         private async Task OnUploadRequest(Stream data)
         {
-            using var uploadStream = await WrapNetworkStream();
+            using var uploadStream = await WrapNetworkStream(data);
             await OnRequestReceived(data, uploadStream);
         }
-        private async ValueTask<NestedStream> WrapNetworkStream()
+        private async ValueTask<NestedStream> WrapNetworkStream(Stream data)
         {
-            var lengthBytes = await Network.ReadBufferCore(sizeof(long), default);
-            if (lengthBytes.Length == 0)
+            try
             {
-                throw new IOException("Connection closed.");
+                var lengthBytes = await Network.ReadBufferCore(sizeof(long), default);
+                if (lengthBytes.Length == 0)
+                {
+                    throw new IOException("Connection closed.");
+                }
+                var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
+                return new NestedStream(Network, userStreamLength);
             }
-            var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
-            return new NestedStream(Network, userStreamLength);
+            catch
+            {
+                data.Dispose();
+                throw;
+            }
         }
         private MemoryStream SerializeToStream(object value)
         {
-            var stream = new MemoryStream { Position = IOHelpers.HeaderLength };
-            Serializer.Serialize(value, stream);
+            var stream = IOHelpers.GetStream();
+            try
+            {
+                stream.Position = IOHelpers.HeaderLength;
+                Serializer.Serialize(value, stream);
+            }
+            catch
+            {
+                stream.Dispose();
+                throw;
+            }
             return stream;
         }
-        private T Deserialize<T>(Stream data) => Serializer.Deserialize<T>(data);
+        private T Deserialize<T>(Stream data)
+        {
+            using (data)
+            {
+                return Serializer.Deserialize<T>(data);
+            }
+        }
         private void OnCancellationReceived(Stream data)
         {
             try

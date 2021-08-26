@@ -2,17 +2,22 @@
 using System.IO;
 using System.Text;
 using Newtonsoft.Json;
+using UiPath.CoreIpc;
+
 namespace UiPath.CoreIpc
 {
     public class Message
     {
+        [JsonIgnore]
+        internal bool ObjectParameters { get; set; }
         [JsonIgnore]
         internal Type CallbackContract { get; set; }
         [JsonIgnore]
         public IClient Client { get; set; }
         [JsonIgnore]
         public TimeSpan RequestTimeout { get; set; }
-        public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => Client.GetCallback<TCallbackInterface>(CallbackContract);
+        public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => 
+            Client.GetCallback<TCallbackInterface>(CallbackContract, ObjectParameters);
         public void ImpersonateClient(Action action) => Client.Impersonate(action);
     }
     public class Message<TPayload> : Message
@@ -22,21 +27,29 @@ namespace UiPath.CoreIpc
     }
     class Request
     {
-        public Request(string endpoint, string id, string methodName, string[] parameters, double timeoutInSeconds)
+        public Request(string endpoint, string id, string methodName, string[] parameters, object[] objectParameters, double timeoutInSeconds)
         {
             Endpoint = endpoint;
             Id = id;
             MethodName = methodName;
             Parameters = parameters;
             TimeoutInSeconds = timeoutInSeconds;
+            ObjectParameters = objectParameters;
         }
         public double TimeoutInSeconds { get; }
         public string Endpoint { get; }
         public string Id { get; }
         public string MethodName { get; }
         public string[] Parameters { get; }
+        public object[] ObjectParameters { get; }
         public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
+        [JsonIgnore]
+        public bool HasObjectParameters => ObjectParameters is not null;
         internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
+        [JsonIgnore]
+        public int ParametersLength => HasObjectParameters ? ObjectParameters.Length : Parameters.Length;
+        public object DeserializeParameter(ISerializer serializer, int index, Type parameterType) =>
+            HasObjectParameters ? serializer.Deserialize(ObjectParameters[index], parameterType) : serializer.Deserialize(Parameters[index], parameterType);
     }
     class CancellationRequest
     {
@@ -45,24 +58,31 @@ namespace UiPath.CoreIpc
     }
     class Response
     {
-        [JsonConstructor]
-        private Response(string requestId, string data, Error error)
+        public Response(string requestId, string data = null, object objectData = null, Error error = null)
         {
             RequestId = requestId;
             Data = data;
             Error = error;
+            ObjectData = objectData;
         }
         public string RequestId { get; }
         public string Data { get; }
+        public object ObjectData { get; }
         public Error Error { get; }
         [JsonIgnore]
         public Stream DownloadStream { get; set; }
-        public static Response Fail(Request request, Exception ex) => new(request.Id, null, new(ex));
-        public static Response Success(Request request, string data) => new(request.Id, data, null);
-        public static Response Success(Request request, Stream downloadStream) => new(request.Id, null, null) { DownloadStream = downloadStream };
-        public Response CheckError() => Error == null ? this : throw new RemoteException(Error);
-        public TResult Deserialize<TResult>(ISerializer serializer) => 
-            (TResult) (DownloadStream ?? serializer.Deserialize(CheckError().Data ?? "", typeof(TResult)));
+        public static Response Fail(Request request, Exception ex) => new(request.Id, error: new(ex));
+        public static Response Success(Request request, string data) => new(request.Id, data);
+        public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
+        public TResult Deserialize<TResult>(ISerializer serializer, bool objectParameters)
+        {
+            if (Error != null)
+            {
+                throw new RemoteException(Error);
+            }
+            return (TResult)(DownloadStream ?? (objectParameters ?
+                serializer.Deserialize(ObjectData, typeof(TResult)) : serializer.Deserialize(Data ?? "", typeof(TResult))));
+        }
     }
     [Serializable]
     public class Error

@@ -59,6 +59,12 @@ namespace UiPath.CoreIpc
                     await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
                     return;
                 }
+                var method = GetMethod(endpoint.Contract, request.MethodName);
+                if (!method.ReturnType.IsGenericType && request.HasObjectParameters)
+                {
+                    await HandleRequest(method, endpoint, request, uploadStream, default);
+                    return;
+                }
                 Response response;
                 var requestCancellation = new CancellationTokenSource();
                 _requests[request.Id] = requestCancellation;
@@ -67,7 +73,7 @@ namespace UiPath.CoreIpc
                 try
                 {
                     var token = timeoutHelper.Token;
-                    response = await HandleRequest(endpoint, request, uploadStream, token);
+                    response = await HandleRequest(method, endpoint, request, uploadStream, token);
                     if (LogEnabled)
                     {
                         Log($"{Name} sending response for {request}");
@@ -101,15 +107,14 @@ namespace UiPath.CoreIpc
             Logger.LogException(ex, $"{Name} {request}");
             return SendResponse(Response.Fail(request, ex), _hostCancellationToken);
         }
-        async Task<Response> HandleRequest(EndpointSettings endpoint, Request request, Stream uploadStream, CancellationToken cancellationToken)
+        async Task<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, Stream uploadStream, CancellationToken cancellationToken)
         {
             var contract = endpoint.Contract;
-            var method = GetMethod(contract, request.MethodName);
             var arguments = GetArguments();
             var beforeCall = endpoint.BeforeCall;
             if (beforeCall != null)
             {
-                await beforeCall(new(default, request.MethodName, arguments), cancellationToken);
+                await beforeCall(new(default, method.MethodInfo, arguments), cancellationToken);
             }
             IServiceScope scope = null;
             var service = endpoint.ServiceInstance;
@@ -135,12 +140,16 @@ namespace UiPath.CoreIpc
                     var methodResult = scheduler is null ? MethodCall() : await RunOnScheduler();
                     await methodResult;
                     var returnValue = GetTaskResult(returnTaskType, methodResult);
-                    return returnValue is Stream downloadStream ? Response.Success(request, downloadStream) : Response.Success(request, Serializer.Serialize(returnValue));
+                    if (returnValue is Stream downloadStream)
+                    {
+                        return Response.Success(request, downloadStream);
+                    }
+                    return request.HasObjectParameters ? new Response(request.Id, objectData: returnValue) : Response.Success(request, Serializer.Serialize(returnValue));
                 }
                 else
                 {
                     (scheduler is null ? MethodCall() : RunOnScheduler()).LogException(Logger, method);
-                    return Response.Success(request, "");
+                    return request.HasObjectParameters ? null : Response.Success(request, "");
                 }
                 Task MethodCall() => method.Invoke(service, arguments);
                 Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
@@ -148,7 +157,8 @@ namespace UiPath.CoreIpc
             object[] GetArguments()
             {
                 var parameters = method.Parameters;
-                if (request.Parameters.Length > parameters.Length)
+                var requestParametersLength = request.ParametersLength;
+                if (requestParametersLength > parameters.Length)
                 {
                     throw new ArgumentException("Too many parameters for " + method);
                 }
@@ -159,7 +169,7 @@ namespace UiPath.CoreIpc
                 void Deserialize()
                 {
                     object argument;
-                    for (int index = 0; index < request.Parameters.Length; index++)
+                    for (int index = 0; index < requestParametersLength; index++)
                     {
                         var parameterType = parameters[index].ParameterType;
                         if (parameterType == typeof(CancellationToken))
@@ -172,7 +182,7 @@ namespace UiPath.CoreIpc
                         }
                         else
                         {
-                            argument = Serializer.Deserialize(request.Parameters[index], parameterType);
+                            argument = request.DeserializeParameter(Serializer, index, parameterType);
                             argument = CheckMessage(argument, parameterType);
                         }
                         allArguments[index] = argument;
@@ -188,12 +198,13 @@ namespace UiPath.CoreIpc
                     {
                         message.CallbackContract = endpoint.CallbackContract;
                         message.Client = _client;
+                        message.ObjectParameters = request.HasObjectParameters;
                     }
                     return argument;
                 }
                 void SetOptionalArguments()
                 {
-                    for (int index = request.Parameters.Length; index < parameters.Length; index++)
+                    for (int index = requestParametersLength; index < parameters.Length; index++)
                     {
                         allArguments[index] = CheckMessage(method.Defaults[index], parameters[index].ParameterType);
                     }
@@ -221,10 +232,10 @@ namespace UiPath.CoreIpc
             static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
             static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
             readonly MethodExecutor _executor;
-            readonly MethodInfo _methodInfo;
+            public readonly MethodInfo MethodInfo;
             public readonly ParameterInfo[] Parameters;
             public readonly object[] Defaults;
-            public Type ReturnType => _methodInfo.ReturnType;
+            public Type ReturnType => MethodInfo.ReturnType;
             public Method(MethodInfo method)
             {
                 // https://github.com/dotnet/aspnetcore/blob/3f620310883092905ed6f13d784c908b5f4a9d7e/src/Shared/ObjectMethodExecutor/ObjectMethodExecutor.cs#L156
@@ -242,12 +253,12 @@ namespace UiPath.CoreIpc
                 var methodCall = Call(instanceCast, method, callParameters);
                 var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter);
                 _executor = lambda.Compile();
-                _methodInfo = method;
+                MethodInfo = method;
                 Parameters = parameters;
                 Defaults = defaults;
             }
             public Task Invoke(object service, object[] arguments) => _executor.Invoke(service, arguments);
-            public override string ToString() => _methodInfo.ToString();
+            public override string ToString() => MethodInfo.ToString();
         }
     }
 }

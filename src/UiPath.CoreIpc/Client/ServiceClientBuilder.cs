@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -89,14 +90,14 @@ namespace UiPath.CoreIpc
 
     public readonly struct CallInfo
     {
-        public CallInfo(bool newConnection, string methodName, object[] arguments)
+        public CallInfo(bool newConnection, MethodInfo method, object[] arguments)
         {
             NewConnection = newConnection;
-            MethodName = methodName;
+            Method = method;
             Arguments = arguments;
         }
         public bool NewConnection { get; }
-        public string MethodName { get; }
+        public MethodInfo Method { get; }
         public object[] Arguments { get; }
     }
 }

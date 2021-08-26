@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Nito.AsyncEx;
@@ -13,7 +14,7 @@ namespace UiPath.CoreIpc.Tests
 #if CI
             TimeSpan.FromSeconds(2) +
 #endif
-            TimeSpan.FromSeconds(2);
+            (Debugger.IsAttached ? Timeout.InfiniteTimeSpan : TimeSpan.FromSeconds(2));
         protected readonly IServiceProvider _serviceProvider;
         protected readonly AsyncContext _guiThread = new AsyncContextThread().Context;
 
