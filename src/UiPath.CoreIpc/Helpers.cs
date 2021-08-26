@@ -150,7 +150,7 @@ namespace UiPath.CoreIpc
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
         internal static async Task<WireMessage> ReadMessage(this Stream stream, int maxMessageSize, CancellationToken cancellationToken = default)
         {
-            var header = await stream.ReadBufferCore(sizeof(int)+1, cancellationToken);
+            var header = await stream.ReadBuffer(sizeof(int)+1, cancellationToken);
             if (header.Length == 0)
             {
                 return new();
@@ -175,7 +175,7 @@ namespace UiPath.CoreIpc
             return new(messageType, recyclableStream);
         }
 
-        public static async ValueTask<byte[]> ReadBufferCore(this Stream stream, int length, CancellationToken cancellationToken)
+        public static async ValueTask<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
         {
             var bytes = new byte[length];
             int offset = 0;

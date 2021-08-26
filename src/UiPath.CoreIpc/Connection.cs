@@ -232,7 +232,7 @@ namespace UiPath.CoreIpc
         {
             try
             {
-                var lengthBytes = await Network.ReadBufferCore(sizeof(long), default);
+                var lengthBytes = await Network.ReadBuffer(sizeof(long), default);
                 if (lengthBytes.Length == 0)
                 {
                     throw new IOException("Connection closed.");
