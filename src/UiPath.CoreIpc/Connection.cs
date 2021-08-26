@@ -217,7 +217,7 @@ namespace UiPath.CoreIpc
         }
         private async Task OnDownloadResponse(Stream data)
         {
-            var downloadStream = await WrapNetworkStream();
+            var downloadStream = await WrapNetworkStream(data);
             var streamDisposed = new TaskCompletionSource<bool>();
             downloadStream.Disposed += delegate { streamDisposed.TrySetResult(true); };
             OnResponseReceived(data, downloadStream);
@@ -225,18 +225,26 @@ namespace UiPath.CoreIpc
         }
         private async Task OnUploadRequest(Stream data)
         {
-            using var uploadStream = await WrapNetworkStream();
+            using var uploadStream = await WrapNetworkStream(data);
             await OnRequestReceived(data, uploadStream);
         }
-        private async ValueTask<NestedStream> WrapNetworkStream()
+        private async ValueTask<NestedStream> WrapNetworkStream(Stream data)
         {
-            var lengthBytes = await Network.ReadBufferCore(sizeof(long), default);
-            if (lengthBytes.Length == 0)
+            try
             {
-                throw new IOException("Connection closed.");
+                var lengthBytes = await Network.ReadBufferCore(sizeof(long), default);
+                if (lengthBytes.Length == 0)
+                {
+                    throw new IOException("Connection closed.");
+                }
+                var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
+                return new NestedStream(Network, userStreamLength);
             }
-            var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
-            return new NestedStream(Network, userStreamLength);
+            catch
+            {
+                data.Dispose();
+                throw;
+            }
         }
         private MemoryStream SerializeToStream(object value)
         {
