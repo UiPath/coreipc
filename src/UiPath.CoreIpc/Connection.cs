@@ -241,8 +241,16 @@ namespace UiPath.CoreIpc
         private MemoryStream SerializeToStream(object value)
         {
             var stream = IOHelpers.GetStream();
-            stream.Position = IOHelpers.HeaderLength;
-            Serializer.Serialize(value, stream);
+            try
+            {
+                stream.Position = IOHelpers.HeaderLength;
+                Serializer.Serialize(value, stream);
+            }
+            catch
+            {
+                stream.Dispose();
+                throw;
+            }
             return stream;
         }
         private T Deserialize<T>(Stream data)
