@@ -204,7 +204,7 @@ namespace UiPath.CoreIpc
                 }
                 void SetOptionalArguments()
                 {
-                    for (int index = request.ParametersLength; index < parameters.Length; index++)
+                    for (int index = requestParametersLength; index < parameters.Length; index++)
                     {
                         allArguments[index] = CheckMessage(method.Defaults[index], parameters[index].ParameterType);
                     }
