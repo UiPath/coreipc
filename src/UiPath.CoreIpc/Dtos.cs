@@ -58,7 +58,7 @@ namespace UiPath.CoreIpc
     }
     class Response
     {
-        public Response(string requestId, string data, Error error, object objectData = null)
+        public Response(string requestId, string data = null, object objectData = null, Error error = null)
         {
             RequestId = requestId;
             Data = data;
@@ -71,9 +71,9 @@ namespace UiPath.CoreIpc
         public Error Error { get; }
         [JsonIgnore]
         public Stream DownloadStream { get; set; }
-        public static Response Fail(Request request, Exception ex) => new(request.Id, null, new(ex));
-        public static Response Success(Request request, string data) => new(request.Id, data, null);
-        public static Response Success(Request request, Stream downloadStream) => new(request.Id, null, null) { DownloadStream = downloadStream };
+        public static Response Fail(Request request, Exception ex) => new(request.Id, error: new(ex));
+        public static Response Success(Request request, string data) => new(request.Id, data);
+        public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
         public Response CheckError() => Error == null ? this : throw new RemoteException(Error);
         public TResult Deserialize<TResult>(ISerializer serializer, bool objectParameters)
         {

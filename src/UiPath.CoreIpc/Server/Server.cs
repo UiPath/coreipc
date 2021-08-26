@@ -144,7 +144,7 @@ namespace UiPath.CoreIpc
                     {
                         return Response.Success(request, downloadStream);
                     }
-                    return request.HasObjectParameters ? new Response(request.Id, null, null, returnValue) : Response.Success(request, Serializer.Serialize(returnValue));
+                    return request.HasObjectParameters ? new Response(request.Id, objectData: returnValue) : Response.Success(request, Serializer.Serialize(returnValue));
                 }
                 else
                 {
