@@ -74,10 +74,12 @@ namespace UiPath.CoreIpc
         public static Response Fail(Request request, Exception ex) => new(request.Id, error: new(ex));
         public static Response Success(Request request, string data) => new(request.Id, data);
         public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
-        public Response CheckError() => Error == null ? this : throw new RemoteException(Error);
         public TResult Deserialize<TResult>(ISerializer serializer, bool objectParameters)
         {
-            CheckError();
+            if (Error != null)
+            {
+                throw new RemoteException(Error);
+            }
             return (TResult)(DownloadStream ?? (objectParameters ?
                 serializer.Deserialize(ObjectData, typeof(TResult)) : serializer.Deserialize(Data ?? "", typeof(TResult))));
         }
