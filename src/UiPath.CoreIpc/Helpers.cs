@@ -63,7 +63,8 @@ namespace UiPath.CoreIpc
     }
     public static class IOHelpers
     {
-        private static readonly RecyclableMemoryStreamManager Pool = new();
+        const int MaxBytes = 100 * 1024 * 1024;
+        private static readonly RecyclableMemoryStreamManager Pool = new(MaxBytes, MaxBytes);
         internal static MemoryStream GetStream() => Pool.GetStream("Write");
         internal const int HeaderLength = sizeof(int) + 1;
         internal const int BufferSize = 32*1024;
