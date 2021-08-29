@@ -2,12 +2,13 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace UiPath.CoreIpc
 {
     public interface ISerializer
     {
-        object Deserialize(Stream json, Type type);
+        Task<T> DeserializeAsync<T>(Stream json);
         object Deserialize(string json, Type type);
         object Deserialize(object json, Type type);
         string Serialize(object obj);
@@ -16,11 +17,11 @@ namespace UiPath.CoreIpc
     class IpcJsonSerializer : ISerializer
     {
         public object Deserialize(string json, Type type) => JsonConvert.DeserializeObject(json, type);
-        public object Deserialize(Stream json, Type type)
+        public async Task<T> DeserializeAsync<T>(Stream json)
         {
-            var serializer = JsonSerializer.CreateDefault();
-            var streamReader = new StreamReader(json);
-            return serializer.Deserialize(streamReader, type);
+            var reader = new JsonTextReader(new StreamReader(json));
+            var jToken = await JToken.LoadAsync(reader);
+            return jToken.ToObject<T>();
         }
         public object Deserialize(object json, Type type) => json switch
         {

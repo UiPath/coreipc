@@ -28,9 +28,9 @@ namespace UiPath.CoreIpc
             Name = $"{name} {GetHashCode()}";
             _maxMessageSize = maxMessageSize;
             _receiveLoop = new(ReceiveLoop);
-            _onResponse = data => OnResponseReceived((Stream)data, null);
-            _onRequest = data => OnRequestReceived((Stream)data, null);
-            _onCancellation = data => OnCancellationReceived((Stream)data);
+            _onResponse = data => OnResponseReceived((Response)data, null);
+            _onRequest = data => OnRequestReceived((Request)data, null);
+            _onCancellation = data => OnCancellationReceived((string)data);
             _cancelRequest = requestId => CancelRequest((string)requestId);
             _cancelUploadRequest = requestId => CancelUploadRequest((string)requestId);
         }
@@ -182,25 +182,31 @@ namespace UiPath.CoreIpc
             }
             Dispose();
             return;
-            Task HandleMessage(WireMessage message)
+            async Task HandleMessage(WireMessage message)
             {
-                var data = message.Data;
+                object state = null;
+                var stream = message.Data;
                 Action<object> callback = null;
                 switch (message.MessageType)
                 {
                     case MessageType.Response:
+                        state = await Deserialize<Response>(stream);
                         callback = _onResponse;
                         break;
-                    case MessageType.Request when RequestReceived != null:
+                    case MessageType.Request:
+                        state = await Deserialize<Request>(stream);
                         callback = _onRequest;
                         break;
-                    case MessageType.CancellationRequest when CancellationReceived != null:
+                    case MessageType.CancellationRequest:
+                        state = (await Deserialize<CancellationRequest>(stream)).RequestId;
                         callback = _onCancellation;
                         break;
                     case MessageType.UploadRequest:
-                        return OnUploadRequest(data);
+                        await OnUploadRequest(stream);
+                        return;
                     case MessageType.DownloadResponse:
-                        return OnDownloadResponse(data);
+                        await OnDownloadResponse(stream);
+                        return;
                     default:
                         if (LogEnabled)
                         {
@@ -210,41 +216,34 @@ namespace UiPath.CoreIpc
                 };
                 if (callback != null)
                 {
-                    Task.Factory.StartNew(callback, data, default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
+                    _=Task.Factory.StartNew(callback, state, default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
                 }
-                return Task.CompletedTask;
             }
         }
         private async Task OnDownloadResponse(Stream data)
         {
-            var downloadStream = await WrapNetworkStream(data);
+            var response = await Deserialize<Response>(data);
+            var downloadStream = await WrapNetworkStream();
             var streamDisposed = new TaskCompletionSource<bool>();
             downloadStream.Disposed += delegate { streamDisposed.TrySetResult(true); };
-            OnResponseReceived(data, downloadStream);
+            OnResponseReceived(response, downloadStream);
             await streamDisposed.Task;
         }
         private async Task OnUploadRequest(Stream data)
         {
-            using var uploadStream = await WrapNetworkStream(data);
-            await OnRequestReceived(data, uploadStream);
+            var request = await Deserialize<Request>(data);
+            using var uploadStream = await WrapNetworkStream();
+            await OnRequestReceived(request, uploadStream);
         }
-        private async ValueTask<NestedStream> WrapNetworkStream(Stream data)
+        private async ValueTask<NestedStream> WrapNetworkStream()
         {
-            try
+            var lengthBytes = await Network.ReadBuffer(sizeof(long), default);
+            if (lengthBytes.Length == 0)
             {
-                var lengthBytes = await Network.ReadBuffer(sizeof(long), default);
-                if (lengthBytes.Length == 0)
-                {
-                    throw new IOException("Connection closed.");
-                }
-                var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
-                return new NestedStream(Network, userStreamLength);
+                throw new IOException("Connection closed.");
             }
-            catch
-            {
-                data.Dispose();
-                throw;
-            }
+            var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
+            return new NestedStream(Network, userStreamLength);
         }
         private MemoryStream SerializeToStream(object value)
         {
@@ -253,26 +252,20 @@ namespace UiPath.CoreIpc
             {
                 stream.Position = IOHelpers.HeaderLength;
                 Serializer.Serialize(value, stream);
+                return stream;
             }
             catch
             {
                 stream.Dispose();
                 throw;
             }
-            return stream;
         }
-        private T Deserialize<T>(Stream data)
-        {
-            using (data)
-            {
-                return Serializer.Deserialize<T>(data);
-            }
-        }
-        private void OnCancellationReceived(Stream data)
+        private Task<T> Deserialize<T>(Stream data) => Serializer.DeserializeAsync<T>(data);
+        private void OnCancellationReceived(string requestId)
         {
             try
             {
-                CancellationReceived(Deserialize<CancellationRequest>(data).RequestId);
+                CancellationReceived(requestId);
             }
             catch(Exception ex)
             {
@@ -280,11 +273,11 @@ namespace UiPath.CoreIpc
             }
         }
         private void Log(Exception ex) => Logger.LogException(ex, Name);
-        private Task OnRequestReceived(Stream data, Stream uploadStream)
+        private Task OnRequestReceived(Request request, Stream uploadStream)
         {
             try
             {
-                return RequestReceived(Deserialize<Request>(data), uploadStream);
+                return RequestReceived(request, uploadStream);
             }
             catch (Exception ex)
             {
@@ -292,11 +285,10 @@ namespace UiPath.CoreIpc
             }
             return Task.CompletedTask;
         }
-        private void OnResponseReceived(Stream data, Stream downloadStream)
+        private void OnResponseReceived(Response response, Stream downloadStream)
         {
             try
             {
-                var response = Deserialize<Response>(data);
                 response.DownloadStream = downloadStream;
                 if (LogEnabled)
                 {

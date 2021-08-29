@@ -65,9 +65,8 @@ namespace UiPath.CoreIpc
     {
         const int MaxBytes = 100 * 1024 * 1024;
         private static readonly RecyclableMemoryStreamManager Pool = new(MaxBytes, MaxBytes);
-        internal static MemoryStream GetStream() => Pool.GetStream("Write");
+        internal static MemoryStream GetStream() => Pool.GetStream();
         internal const int HeaderLength = sizeof(int) + 1;
-        internal const int BufferSize = 32*1024;
         internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity> pipeSecurity)
         {
 #if NET461
@@ -132,6 +131,7 @@ namespace UiPath.CoreIpc
         internal static Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
         {
             var recyclableStream = (RecyclableMemoryStream)message.Data;
+            recyclableStream.Position = 0;
             var buffer = recyclableStream.GetSpan(HeaderLength);
             var totalLength = (int)message.Data.Length;
             buffer[0] = (byte)message.MessageType;
@@ -144,7 +144,7 @@ namespace UiPath.CoreIpc
         {
             using (recyclableStream)
             {
-                await recyclableStream.CopyToAsync(stream, BufferSize, cancellationToken);
+                await recyclableStream.CopyToAsync(stream, 0, cancellationToken);
             }
         }
         internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
@@ -162,18 +162,7 @@ namespace UiPath.CoreIpc
             {
                 throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize/(1024*1024)} megabytes.");
             }
-            using var nestedStream = new NestedStream(stream, length);
-            var recyclableStream = Pool.GetStream("Read", length);
-            try
-            {
-                await nestedStream.CopyToAsync(recyclableStream, BufferSize, cancellationToken);
-            }
-            catch
-            {
-                recyclableStream.Dispose();
-                throw;
-            }
-            return new(messageType, recyclableStream);
+            return new(messageType, new NestedStream(stream, length));
         }
 
         public static async ValueTask<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
@@ -193,7 +182,6 @@ namespace UiPath.CoreIpc
             }
             return bytes;
         }
-        public static T Deserialize<T>(this ISerializer serializer, Stream binary) => (T)serializer.Deserialize(binary, typeof(T));
     }
     public static class Validator
     {
