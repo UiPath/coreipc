@@ -65,7 +65,7 @@ namespace UiPath.CoreIpc
     {
         const int MaxBytes = 100 * 1024 * 1024;
         private static readonly RecyclableMemoryStreamManager Pool = new(MaxBytes, MaxBytes);
-        internal static MemoryStream GetStream() => Pool.GetStream();
+        internal static MemoryStream GetStream() => Pool.GetStream("IpcRequest");
         internal const int HeaderLength = sizeof(int) + 1;
         internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity> pipeSecurity)
         {
