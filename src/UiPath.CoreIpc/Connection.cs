@@ -21,9 +21,12 @@ namespace UiPath.CoreIpc
         private readonly Action<object> _onCancellation;
         private readonly Action<object> _cancelRequest;
         private readonly Action<object> _cancelUploadRequest;
+        private readonly byte[] _buffer = new byte[sizeof(long)];
+        private readonly NestedStream _nestedStream;
         public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
         {
             Network = network;
+            _nestedStream = new NestedStream(network, 0);
             Serializer = serializer;
             Logger = logger;
             Name = $"{name} {GetHashCode()}";
@@ -162,19 +165,35 @@ namespace UiPath.CoreIpc
                 completionSource.TrySetException(new IOException("Connection closed."));
             }
         }
+        public async ValueTask<bool> ReadBuffer(int length)
+        {
+            int offset = 0;
+            int remaining = length;
+            while (remaining > 0)
+            {
+                var read = await Network.ReadAsync(_buffer, offset, remaining);
+                if (read == 0)
+                {
+                    return false;
+                }
+                remaining -= read;
+                offset += read;
+            }
+            return true;
+        }
         private async Task ReceiveLoop()
         {
             try
             {
-                byte[] header;
-                while ((header = await Network.ReadBuffer(HeaderLength)).Length > 0)
+                while (await ReadBuffer(HeaderLength))
                 {
-                    var length = BitConverter.ToInt32(header, startIndex: 1);
+                    var length = BitConverter.ToInt32(_buffer, startIndex: 1);
                     if (length > _maxMessageSize)
                     {
                         throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
                     }
-                    await HandleMessage((MessageType)header[0], new NestedStream(Network, length));
+                    _nestedStream.Reset(length);
+                    await HandleMessage();
                 }
             }
             catch (Exception ex)
@@ -187,29 +206,30 @@ namespace UiPath.CoreIpc
             }
             Dispose();
             return;
-            async Task HandleMessage(MessageType messageType, Stream stream)
+            async Task HandleMessage()
             {
+                var messageType = (MessageType)_buffer[0];
                 object state = null;
                 Action<object> callback = null;
                 switch (messageType)
                 {
                     case MessageType.Response:
-                        state = await Deserialize<Response>(stream);
+                        state = await Deserialize<Response>();
                         callback = _onResponse;
                         break;
                     case MessageType.Request:
-                        state = await Deserialize<Request>(stream);
+                        state = await Deserialize<Request>();
                         callback = _onRequest;
                         break;
                     case MessageType.CancellationRequest:
-                        state = (await Deserialize<CancellationRequest>(stream)).RequestId;
+                        state = (await Deserialize<CancellationRequest>()).RequestId;
                         callback = _onCancellation;
                         break;
                     case MessageType.UploadRequest:
-                        await OnUploadRequest(stream);
+                        await OnUploadRequest();
                         return;
                     case MessageType.DownloadResponse:
-                        await OnDownloadResponse(stream);
+                        await OnDownloadResponse();
                         return;
                     default:
                         if (LogEnabled)
@@ -224,32 +244,42 @@ namespace UiPath.CoreIpc
                 }
             }
         }
-        private async Task OnDownloadResponse(Stream data)
+        private async Task OnDownloadResponse()
         {
-            var response = await Deserialize<Response>(data);
-            var downloadStream = await WrapNetworkStream();
+            var response = await Deserialize<Response>();
+            await EnterStreamMode();
             var streamDisposed = new TaskCompletionSource<bool>();
-            downloadStream.Disposed += delegate { streamDisposed.TrySetResult(true); };
-            response.DownloadStream = downloadStream;
-            OnResponseReceived(response);
-            await streamDisposed.Task;
+            EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
+            _nestedStream.Disposed += disposedHandler;
+            try
+            {
+                response.DownloadStream = _nestedStream;
+                OnResponseReceived(response);
+                await streamDisposed.Task;
+            }
+            finally
+            {
+                _nestedStream.Disposed -= disposedHandler;
+            }
         }
-        private async Task OnUploadRequest(Stream data)
+        private async Task OnUploadRequest()
         {
-            var request = await Deserialize<Request>(data);
-            using var uploadStream = await WrapNetworkStream();
-            request.UploadStream = uploadStream;
-            await OnRequestReceived(request);
+            var request = await Deserialize<Request>();
+            await EnterStreamMode();
+            using (_nestedStream)
+            {
+                request.UploadStream = _nestedStream;
+                await OnRequestReceived(request);
+            }
         }
-        private async ValueTask<NestedStream> WrapNetworkStream()
+        private async ValueTask EnterStreamMode()
         {
-            var lengthBytes = await Network.ReadBuffer(sizeof(long));
-            if (lengthBytes.Length == 0)
+            if (!await ReadBuffer(sizeof(long)))
             {
                 throw new IOException("Connection closed.");
             }
-            var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
-            return new NestedStream(Network, userStreamLength);
+            var userStreamLength = BitConverter.ToInt64(_buffer, startIndex: 0);
+            _nestedStream.Reset(userStreamLength);
         }
         private MemoryStream SerializeToStream(object value)
         {
@@ -266,7 +296,7 @@ namespace UiPath.CoreIpc
                 throw;
             }
         }
-        private Task<T> Deserialize<T>(Stream data) => Serializer.DeserializeAsync<T>(data);
+        private Task<T> Deserialize<T>() => Serializer.DeserializeAsync<T>(_nestedStream);
         private void OnCancellationReceived(string requestId)
         {
             try

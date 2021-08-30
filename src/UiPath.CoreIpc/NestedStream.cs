@@ -17,7 +17,7 @@ namespace UiPath.CoreIpc
         /// <summary>
         /// The total length of the stream.
         /// </summary>
-        private readonly long _length;
+        private long _length;
         /// <summary>
         /// The remaining bytes allowed to be read.
         /// </summary>
@@ -30,9 +30,15 @@ namespace UiPath.CoreIpc
         public NestedStream(Stream underlyingStream, long length)
         {
             _underlyingStream = underlyingStream;
+            Reset(length);
+        }
+
+        public void Reset(long length)
+        {
             _remainingBytes = length;
             _length = length;
         }
+
         public event EventHandler Disposed;
         /// <inheritdoc />
         public bool IsDisposed => _underlyingStream == null;
@@ -129,8 +135,8 @@ namespace UiPath.CoreIpc
             if (_remainingBytes != 0)
             {
                 _underlyingStream?.Dispose();
+                _underlyingStream = null;
             }
-            _underlyingStream = null;
             Disposed?.Invoke(this, EventArgs.Empty);
             base.Dispose(disposing);
         }

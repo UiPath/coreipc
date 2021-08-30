@@ -149,23 +149,6 @@ namespace UiPath.CoreIpc
         }
         internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
-        public static async ValueTask<byte[]> ReadBuffer(this Stream stream, int length)
-        {
-            var bytes = new byte[length];
-            int offset = 0;
-            int remaining = length;
-            while(remaining > 0)
-            {
-                var read = await stream.ReadAsync(bytes, offset, remaining);
-                if(read == 0)
-                {
-                    return Array.Empty<byte>();
-                }
-                remaining -= read;
-                offset += read;
-            }
-            return bytes;
-        }
     }
     public static class Validator
     {

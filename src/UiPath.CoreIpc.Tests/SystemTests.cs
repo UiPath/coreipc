@@ -163,7 +163,11 @@ namespace UiPath.CoreIpc.Tests
         }
 
         [Fact]
-        public async Task Upload() => (await _systemClient.Upload(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")))).ShouldBe("Hello world");
+        public async Task Upload()
+        {
+            (await _systemClient.Upload(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")))).ShouldBe("Hello world");
+            await Guid();
+        }
 
         [Fact]
         public async Task UploadNoRead()
