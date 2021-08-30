@@ -26,7 +26,7 @@ namespace UiPath.CoreIpc
             _listeners.Add(listener);
             return this;
         }
-        public ServiceHost Build() => new(_listeners, Endpoints, ServiceProvider);
+        public ServiceHost Build() => new(_listeners, Endpoints);
     }
     public static class ServiceHostBuilderExtensions
     {

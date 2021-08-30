@@ -10,12 +10,11 @@ namespace UiPath.CoreIpc
         private readonly CancellationTokenSource _cancellationTokenSource = new();
         private readonly IDictionary<string, EndpointSettings> _endpoints;
         private readonly IReadOnlyCollection<Listener> _listeners;
-        internal ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, EndpointSettings> endpoints, IServiceProvider serviceProvider)
+        internal ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, EndpointSettings> endpoints)
         {
             _endpoints = endpoints.ToReadOnlyDictionary();
             _listeners = listeners.ToArray();
         }
-        public IServiceProvider ServiceProvider => _endpoints.Values.FirstOrDefault()?.ServiceProvider;
         public void Dispose()
         {
             if(_cancellationTokenSource.IsCancellationRequested)
