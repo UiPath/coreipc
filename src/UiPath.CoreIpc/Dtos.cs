@@ -42,6 +42,8 @@ namespace UiPath.CoreIpc
         public string MethodName { get; }
         public string[] Parameters { get; }
         public object[] ObjectParameters { get; }
+        [JsonIgnore]
+        public Stream UploadStream { get; set; }
         public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
         [JsonIgnore]
         public bool HasObjectParameters => ObjectParameters is not null;
@@ -141,15 +143,4 @@ namespace UiPath.CoreIpc
         public bool Is<TException>() where TException : Exception => Type == typeof(TException).FullName;
     }
     enum MessageType : byte { Request, Response, CancellationRequest, UploadRequest, DownloadResponse }
-    readonly struct WireMessage
-    {
-        public WireMessage(MessageType messageType, Stream data)
-        {
-            MessageType = messageType;
-            Data = data;
-        }
-        public MessageType MessageType { get; }
-        public Stream Data { get; }
-        public bool Empty => Data == null;
-    }
 }

@@ -28,8 +28,8 @@ namespace UiPath.CoreIpc
             Name = $"{name} {GetHashCode()}";
             _maxMessageSize = maxMessageSize;
             _receiveLoop = new(ReceiveLoop);
-            _onResponse = data => OnResponseReceived((Response)data, null);
-            _onRequest = data => OnRequestReceived((Request)data, null);
+            _onResponse = data => OnResponseReceived((Response)data);
+            _onRequest = data => OnRequestReceived((Request)data);
             _onCancellation = data => OnCancellationReceived((string)data);
             _cancelRequest = requestId => CancelRequest((string)requestId);
             _cancelUploadRequest = requestId => CancelUploadRequest((string)requestId);
@@ -42,18 +42,18 @@ namespace UiPath.CoreIpc
         public override string ToString() => Name;
         public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
         public Task Listen() => _receiveLoop.Value;
-        internal event Func<Request, Stream, Task> RequestReceived;
+        internal event Func<Request, Task> RequestReceived;
         internal event Action<string> CancellationReceived;
         public event EventHandler<EventArgs> Closed;
-        internal async Task<Response> RemoteCall(Request request, Stream uploadStream, CancellationToken token)
+        internal async Task<Response> RemoteCall(Request request, CancellationToken token)
         {
             var requestCompletion = new RequestCompletionSource();
             _requests[request.Id] = requestCompletion;
             CancellationTokenRegistration tokenRegistration = default;
             try
             {
-                await Send(request, uploadStream, token);
-                tokenRegistration = token.Register(uploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
+                await Send(request, token);
+                tokenRegistration = token.Register(request.UploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
                 return await requestCompletion.Task;
             }
             finally
@@ -62,10 +62,13 @@ namespace UiPath.CoreIpc
                 _requests.TryRemove(request.Id, out _);
             }
         }
-        internal Task Send(Request request, Stream uploadStream, CancellationToken token)
+        internal Task Send(Request request, CancellationToken token)
         {
             Debug.Assert(request.Parameters == null || request.ObjectParameters == null);
-            return SendRequest(SerializeToStream(request), uploadStream, token);
+            var requestBytes = SerializeToStream(request);
+            return request.UploadStream == null ?
+                SendMessage(MessageType.Request, requestBytes, token) :
+                SendStream(MessageType.UploadRequest, requestBytes, request.UploadStream, token);
         }
         void CancelRequest(string requestId)
         {
@@ -87,31 +90,29 @@ namespace UiPath.CoreIpc
                 requestCompletion.TrySetCanceled();
             }
         }
-        private Task SendRequest(MemoryStream requestBytes, Stream uploadStream, CancellationToken cancellationToken) => uploadStream == null ?
-                SendMessage(MessageType.Request, requestBytes, cancellationToken) :
-                SendStream(new(MessageType.UploadRequest, requestBytes), uploadStream, cancellationToken);
         internal Task Send(Response response, CancellationToken cancellationToken)
         {
             Debug.Assert(response.Data == null || response.ObjectData == null);
+            var responseBytes = SerializeToStream(response);
             return response.DownloadStream == null ?
-                SendMessage(MessageType.Response, SerializeToStream(response), cancellationToken) :
-                SendDownloadStream(SerializeToStream(response), response.DownloadStream, cancellationToken);
+                SendMessage(MessageType.Response, responseBytes, cancellationToken) :
+                SendDownloadStream(responseBytes, response.DownloadStream, cancellationToken);
         }
         private async Task SendDownloadStream(MemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
         {
             using (downloadStream)
             {
-                await SendStream(new(MessageType.DownloadResponse, responseBytes), downloadStream, cancellationToken);
+                await SendStream(MessageType.DownloadResponse, responseBytes, downloadStream, cancellationToken);
             }
         }
-        private async Task SendStream(WireMessage message, Stream userStream, CancellationToken cancellationToken)
+        private async Task SendStream(MessageType messageType, Stream data, Stream userStream, CancellationToken cancellationToken)
         {
             await _sendLock.WaitAsync(cancellationToken);
             CancellationTokenRegistration tokenRegistration = default;
             try
             {
                 tokenRegistration = cancellationToken.Register(Dispose);
-                await Network.WriteMessage(message, cancellationToken);
+                await Network.WriteMessage(messageType, data, cancellationToken);
                 await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
                 const int DefaultCopyBufferSize = 81920;
                 await userStream.CopyToAsync(Network, DefaultCopyBufferSize, cancellationToken);
@@ -122,14 +123,12 @@ namespace UiPath.CoreIpc
                 tokenRegistration.Dispose();
             }
         }
-        private Task SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken) => 
-            SendMessage(new(messageType, data), cancellationToken);
-        private async Task SendMessage(WireMessage wireMessage, CancellationToken cancellationToken)
+        private async Task SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken)
         {
             await _sendLock.WaitAsync(cancellationToken);
             try
             {
-                await Network.WriteMessage(wireMessage, CancellationToken.None);
+                await Network.WriteMessage(messageType, data, CancellationToken.None);
             }
             finally
             {
@@ -164,12 +163,16 @@ namespace UiPath.CoreIpc
         }
         private async Task ReceiveLoop()
         {
-            WireMessage message;
             try
             {
-                while (!(message = await Network.ReadMessage(_maxMessageSize)).Empty)
+                while (true)
                 {
-                    await HandleMessage(message);
+                    var (messageType, data) = await Network.ReadMessage(_maxMessageSize);
+                    if (data == null)
+                    {
+                        break;
+                    }
+                    await HandleMessage(messageType, data);
                 }
             }
             catch (Exception ex)
@@ -182,12 +185,11 @@ namespace UiPath.CoreIpc
             }
             Dispose();
             return;
-            async Task HandleMessage(WireMessage message)
+            async Task HandleMessage(MessageType messageType, Stream stream)
             {
                 object state = null;
-                var stream = message.Data;
                 Action<object> callback = null;
-                switch (message.MessageType)
+                switch (messageType)
                 {
                     case MessageType.Response:
                         state = await Deserialize<Response>(stream);
@@ -210,7 +212,7 @@ namespace UiPath.CoreIpc
                     default:
                         if (LogEnabled)
                         {
-                            Log("Unknown message type " + message.MessageType);
+                            Log("Unknown message type " + messageType);
                         }
                         break;
                 };
@@ -226,14 +228,16 @@ namespace UiPath.CoreIpc
             var downloadStream = await WrapNetworkStream();
             var streamDisposed = new TaskCompletionSource<bool>();
             downloadStream.Disposed += delegate { streamDisposed.TrySetResult(true); };
-            OnResponseReceived(response, downloadStream);
+            response.DownloadStream = downloadStream;
+            OnResponseReceived(response);
             await streamDisposed.Task;
         }
         private async Task OnUploadRequest(Stream data)
         {
             var request = await Deserialize<Request>(data);
             using var uploadStream = await WrapNetworkStream();
-            await OnRequestReceived(request, uploadStream);
+            request.UploadStream = uploadStream;
+            await OnRequestReceived(request);
         }
         private async ValueTask<NestedStream> WrapNetworkStream()
         {
@@ -273,11 +277,11 @@ namespace UiPath.CoreIpc
             }
         }
         private void Log(Exception ex) => Logger.LogException(ex, Name);
-        private Task OnRequestReceived(Request request, Stream uploadStream)
+        private Task OnRequestReceived(Request request)
         {
             try
             {
-                return RequestReceived(request, uploadStream);
+                return RequestReceived(request);
             }
             catch (Exception ex)
             {
@@ -285,11 +289,10 @@ namespace UiPath.CoreIpc
             }
             return Task.CompletedTask;
         }
-        private void OnResponseReceived(Response response, Stream downloadStream)
+        private void OnResponseReceived(Response response)
         {
             try
             {
-                response.DownloadStream = downloadStream;
                 if (LogEnabled)
                 {
                     Log($"Received response for request {response.RequestId} {Name}.");

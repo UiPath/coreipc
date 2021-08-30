@@ -105,17 +105,20 @@ namespace UiPath.CoreIpc
                         await _beforeCall(new(newConnection, method, args), token);
                     }
                     var requestId = _connection.NewRequestId();
-                    var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds);
+                    var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds)
+                    {
+                        UploadStream = uploadStream
+                    };
                     if (LogEnabled)
                     {
                         Log($"IpcClient calling {methodName} {requestId} {Name}.");
                     }
                     if (request.HasObjectParameters && !method.ReturnType.IsGenericType)
                     {
-                        await _connection.Send(request, uploadStream, token);
+                        await _connection.Send(request, token);
                         return default;
                     }
-                    var response = await _connection.RemoteCall(request, uploadStream, token);
+                    var response = await _connection.RemoteCall(request, token);
                     if (LogEnabled)
                     {
                         Log($"IpcClient called {methodName} {requestId} {Name}.");

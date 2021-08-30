@@ -128,13 +128,13 @@ namespace UiPath.CoreIpc
             return false;
         }
 
-        internal static Task WriteMessage(this Stream stream, WireMessage message, CancellationToken cancellationToken = default)
+        internal static Task WriteMessage(this Stream stream, MessageType messageType, Stream data, CancellationToken cancellationToken = default)
         {
-            var recyclableStream = (RecyclableMemoryStream)message.Data;
+            var recyclableStream = (RecyclableMemoryStream)data;
             recyclableStream.Position = 0;
             var buffer = recyclableStream.GetSpan(HeaderLength);
-            var totalLength = (int)message.Data.Length;
-            buffer[0] = (byte)message.MessageType;
+            var totalLength = (int)recyclableStream.Length;
+            buffer[0] = (byte)messageType;
             var payloadLength = totalLength - HeaderLength;
             // https://github.com/dotnet/runtime/blob/85441ce69b81dfd5bf57b9d00ba525440b7bb25d/src/libraries/System.Private.CoreLib/src/System/BitConverter.cs#L133
             Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer.Slice(1)), payloadLength);
@@ -149,7 +149,7 @@ namespace UiPath.CoreIpc
         }
         internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
-        internal static async Task<WireMessage> ReadMessage(this Stream stream, int maxMessageSize, CancellationToken cancellationToken = default)
+        internal static async Task<(MessageType MessageType, Stream Data)> ReadMessage(this Stream stream, int maxMessageSize, CancellationToken cancellationToken = default)
         {
             var header = await stream.ReadBuffer(sizeof(int)+1, cancellationToken);
             if (header.Length == 0)
@@ -162,7 +162,7 @@ namespace UiPath.CoreIpc
             {
                 throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize/(1024*1024)} megabytes.");
             }
-            return new(messageType, new NestedStream(stream, length));
+            return (messageType, new NestedStream(stream, length));
         }
 
         public static async ValueTask<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)

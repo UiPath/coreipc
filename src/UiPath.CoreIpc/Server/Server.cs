@@ -46,7 +46,7 @@ namespace UiPath.CoreIpc
                 _connectionClosed.Cancel();
             };
         }
-        async Task OnRequestReceived(Request request, Stream uploadStream)
+        async Task OnRequestReceived(Request request)
         {
             try
             {
@@ -62,7 +62,7 @@ namespace UiPath.CoreIpc
                 var method = GetMethod(endpoint.Contract, request.MethodName);
                 if (!method.ReturnType.IsGenericType && request.HasObjectParameters)
                 {
-                    await HandleRequest(method, endpoint, request, uploadStream, default);
+                    await HandleRequest(method, endpoint, request, default);
                     return;
                 }
                 Response response;
@@ -73,7 +73,7 @@ namespace UiPath.CoreIpc
                 try
                 {
                     var token = timeoutHelper.Token;
-                    response = await HandleRequest(method, endpoint, request, uploadStream, token);
+                    response = await HandleRequest(method, endpoint, request, token);
                     if (LogEnabled)
                     {
                         Log($"{Name} sending response for {request}");
@@ -107,7 +107,7 @@ namespace UiPath.CoreIpc
             Logger.LogException(ex, $"{Name} {request}");
             return SendResponse(Response.Fail(request, ex), _hostCancellationToken);
         }
-        async Task<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, Stream uploadStream, CancellationToken cancellationToken)
+        async Task<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
         {
             var contract = endpoint.Contract;
             var arguments = GetArguments();
@@ -178,7 +178,7 @@ namespace UiPath.CoreIpc
                         }
                         else if (parameterType == typeof(Stream))
                         {
-                            argument = uploadStream;
+                            argument = request.UploadStream;
                         }
                         else
                         {
