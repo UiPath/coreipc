@@ -165,7 +165,7 @@ namespace UiPath.CoreIpc
                 completionSource.TrySetException(new IOException("Connection closed."));
             }
         }
-        public async ValueTask<bool> ReadBuffer(int length)
+        private async ValueTask<bool> ReadBuffer(int length)
         {
             int offset = 0;
             int remaining = length;
