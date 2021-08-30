@@ -149,30 +149,14 @@ namespace UiPath.CoreIpc
         }
         internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
-        internal static async Task<(MessageType MessageType, Stream Data)> ReadMessage(this Stream stream, int maxMessageSize, CancellationToken cancellationToken = default)
-        {
-            var header = await stream.ReadBuffer(sizeof(int)+1, cancellationToken);
-            if (header.Length == 0)
-            {
-                return new();
-            }
-            var messageType = (MessageType)header[0];
-            var length = BitConverter.ToInt32(header, 1);
-            if(length > maxMessageSize)
-            {
-                throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize/(1024*1024)} megabytes.");
-            }
-            return (messageType, new NestedStream(stream, length));
-        }
-
-        public static async ValueTask<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
+        public static async ValueTask<byte[]> ReadBuffer(this Stream stream, int length)
         {
             var bytes = new byte[length];
             int offset = 0;
             int remaining = length;
             while(remaining > 0)
             {
-                var read = await stream.ReadAsync(bytes, offset, remaining, cancellationToken);
+                var read = await stream.ReadAsync(bytes, offset, remaining);
                 if(read == 0)
                 {
                     return Array.Empty<byte>();

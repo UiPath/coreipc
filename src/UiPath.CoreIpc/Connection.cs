@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 namespace UiPath.CoreIpc
 {
     using RequestCompletionSource = TaskCompletionSource<Response>;
+    using static IOHelpers;
     public sealed class Connection : IDisposable
     {
         private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new();
@@ -165,14 +166,16 @@ namespace UiPath.CoreIpc
         {
             try
             {
-                while (true)
+                byte[] header;
+                while ((header = await Network.ReadBuffer(HeaderLength)).Length > 0)
                 {
-                    var (messageType, data) = await Network.ReadMessage(_maxMessageSize);
-                    if (data == null)
+                    var messageType = (MessageType)header[0];
+                    var length = BitConverter.ToInt32(header, 1);
+                    if (length > _maxMessageSize)
                     {
-                        break;
+                        throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
                     }
-                    await HandleMessage(messageType, data);
+                    await HandleMessage(messageType, new NestedStream(Network, length));
                 }
             }
             catch (Exception ex)
@@ -241,7 +244,7 @@ namespace UiPath.CoreIpc
         }
         private async ValueTask<NestedStream> WrapNetworkStream()
         {
-            var lengthBytes = await Network.ReadBuffer(sizeof(long), default);
+            var lengthBytes = await Network.ReadBuffer(sizeof(long));
             if (lengthBytes.Length == 0)
             {
                 throw new IOException("Connection closed.");
@@ -251,10 +254,10 @@ namespace UiPath.CoreIpc
         }
         private MemoryStream SerializeToStream(object value)
         {
-            var stream = IOHelpers.GetStream();
+            var stream = GetStream();
             try
             {
-                stream.Position = IOHelpers.HeaderLength;
+                stream.Position = HeaderLength;
                 Serializer.Serialize(value, stream);
                 return stream;
             }
