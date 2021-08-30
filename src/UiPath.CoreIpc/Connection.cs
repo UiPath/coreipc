@@ -169,13 +169,12 @@ namespace UiPath.CoreIpc
                 byte[] header;
                 while ((header = await Network.ReadBuffer(HeaderLength)).Length > 0)
                 {
-                    var messageType = (MessageType)header[0];
-                    var length = BitConverter.ToInt32(header, 1);
+                    var length = BitConverter.ToInt32(header, startIndex: 1);
                     if (length > _maxMessageSize)
                     {
                         throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
                     }
-                    await HandleMessage(messageType, new NestedStream(Network, length));
+                    await HandleMessage((MessageType)header[0], new NestedStream(Network, length));
                 }
             }
             catch (Exception ex)
