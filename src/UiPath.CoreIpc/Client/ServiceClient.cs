@@ -113,7 +113,7 @@ namespace UiPath.CoreIpc
                     {
                         Log($"IpcClient calling {methodName} {requestId} {Name}.");
                     }
-                    if (request.HasObjectParameters && !method.ReturnType.IsGenericType)
+                    if (ObjectParameters && !method.ReturnType.IsGenericType)
                     {
                         await _connection.Send(request, token);
                         return default;
