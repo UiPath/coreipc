@@ -107,7 +107,7 @@ namespace UiPath.CoreIpc
             Logger.LogException(ex, $"{Name} {request}");
             return SendResponse(Response.Fail(request, ex), _hostCancellationToken);
         }
-        async Task<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
+        async ValueTask<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
         {
             var contract = endpoint.Contract;
             var arguments = GetArguments();
@@ -131,7 +131,7 @@ namespace UiPath.CoreIpc
             {
                 scope?.Dispose();
             }
-            async Task<Response> InvokeMethod()
+            async ValueTask<Response> InvokeMethod()
             {
                 var returnTaskType = method.ReturnType;
                 var scheduler = endpoint.Scheduler;
