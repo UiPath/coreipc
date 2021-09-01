@@ -67,7 +67,7 @@ namespace UiPath.CoreIpc
             {
                 return 0;
             }
-            int bytesRead = await _underlyingStream.ReadAsync(buffer, offset, count).ConfigureAwait(false);
+            int bytesRead = await _underlyingStream.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
             _remainingBytes -= bytesRead;
             return bytesRead;
         }
