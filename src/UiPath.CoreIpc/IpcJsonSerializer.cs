@@ -16,13 +16,14 @@ namespace UiPath.CoreIpc
     }
     class IpcJsonSerializer : ISerializer, IArrayPool<char>
     {
+        static readonly JsonLoadSettings LoadSettings = new(){ LineInfoHandling = LineInfoHandling.Ignore };
         public object Deserialize(string json, Type type) => JsonConvert.DeserializeObject(json, type);
         public async Task<T> DeserializeAsync<T>(Stream json)
         {
             JToken jToken;
             using (var reader = new JsonTextReader(new StreamReader(json)) { ArrayPool = this })
             {
-                jToken = await JToken.LoadAsync(reader, new JsonLoadSettings { LineInfoHandling = LineInfoHandling.Ignore });
+                jToken = await JToken.LoadAsync(reader, LoadSettings);
             }
             return jToken.ToObject<T>();
         }
