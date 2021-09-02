@@ -19,8 +19,11 @@ namespace UiPath.CoreIpc
         public object Deserialize(string json, Type type) => JsonConvert.DeserializeObject(json, type);
         public async Task<T> DeserializeAsync<T>(Stream json)
         {
-            var reader = new JsonTextReader(new StreamReader(json)) { ArrayPool = this };
-            var jToken = await JToken.LoadAsync(reader);
+            JToken jToken;
+            using (var reader = new JsonTextReader(new StreamReader(json)) { ArrayPool = this })
+            {
+                jToken = await JToken.LoadAsync(reader, new JsonLoadSettings { LineInfoHandling = LineInfoHandling.Ignore });
+            }
             return jToken.ToObject<T>();
         }
         public object Deserialize(object json, Type type) => json switch
@@ -33,7 +36,7 @@ namespace UiPath.CoreIpc
         public void Serialize(object obj, Stream stream)
         {
             var serializer = JsonSerializer.CreateDefault();
-            var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this };
+            using var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this, CloseOutput = false };
             serializer.Serialize(writer, obj);
             writer.Flush();
         }

@@ -181,15 +181,15 @@ namespace UiPath.CoreIpc
                     return false;
                 }
             }
-            return await CheckConnection(cancellationToken);
-        }
-
-        private async Task<bool> CheckConnection(CancellationToken cancellationToken)
-        {
             if (_clientConnection?.Connected is true)
             {
                 return false;
             }
+            return await Connect(cancellationToken);
+        }
+
+        private async Task<bool> Connect(CancellationToken cancellationToken)
+        {
             var clientConnection = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
             try
             {
