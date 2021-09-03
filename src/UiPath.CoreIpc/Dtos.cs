@@ -6,9 +6,7 @@ namespace UiPath.CoreIpc
 {
     public class Message
     {
-        [JsonIgnore]
         internal bool ObjectParameters { get; set; }
-        [JsonIgnore]
         internal Type CallbackContract { get; set; }
         [JsonIgnore]
         public IClient Client { get; set; }
@@ -40,14 +38,11 @@ namespace UiPath.CoreIpc
         public string MethodName { get; }
         public string[] Parameters { get; }
         public object[] ObjectParameters { get; }
-        [JsonIgnore]
-        public Stream UploadStream { get; set; }
+        internal Stream UploadStream { get; set; }
         public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
-        [JsonIgnore]
-        public bool HasObjectParameters => ObjectParameters is not null;
+        internal bool HasObjectParameters => ObjectParameters is not null;
         internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
-        [JsonIgnore]
-        public int ParametersLength => HasObjectParameters ? ObjectParameters.Length : Parameters.Length;
+        internal int ParametersLength => HasObjectParameters ? ObjectParameters.Length : Parameters.Length;
         public object DeserializeParameter(ISerializer serializer, int index, Type parameterType) =>
             HasObjectParameters ? serializer.Deserialize(ObjectParameters[index], parameterType) : serializer.Deserialize(Parameters[index], parameterType);
     }
@@ -69,8 +64,7 @@ namespace UiPath.CoreIpc
         public string Data { get; }
         public object ObjectData { get; }
         public Error Error { get; }
-        [JsonIgnore]
-        public Stream DownloadStream { get; set; }
+        internal Stream DownloadStream { get; set; }
         public static Response Fail(Request request, Exception ex) => new(request.Id, error: new(ex));
         public static Response Success(Request request, string data) => new(request.Id, data);
         public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
