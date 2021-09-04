@@ -49,7 +49,7 @@ namespace UiPath.CoreIpc
         /// <inheritdoc />
         public override bool CanWrite => false;
         /// <inheritdoc />
-        public override long Length => _underlyingStream.CanSeek ? _length : throw new NotSupportedException();
+        public override long Length => _length;
         /// <inheritdoc />
         public override long Position
         {

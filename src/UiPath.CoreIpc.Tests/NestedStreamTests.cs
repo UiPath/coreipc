@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Shouldly;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -63,7 +64,7 @@ namespace UiPath.CoreIpc.Tests
             using (var gzipStream = new GZipStream(Stream.Null, CompressionMode.Decompress))
             using (var stream = gzipStream.ReadSlice(10))
             {
-                Assert.Throws<NotSupportedException>(() => stream.Length);
+                stream.Length.ShouldBe(10);
             }
         }
 

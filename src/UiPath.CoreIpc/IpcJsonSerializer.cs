@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Buffers;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 namespace UiPath.CoreIpc
 {
@@ -21,7 +22,8 @@ namespace UiPath.CoreIpc
         public async Task<T> DeserializeAsync<T>(Stream json)
         {
             JToken jToken;
-            using (var reader = new JsonTextReader(new StreamReader(json)) { ArrayPool = this })
+            var streamReader = new StreamReader(json, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: (int)Math.Min(4096, json.Length));
+            using (var reader = new JsonTextReader(streamReader) { ArrayPool = this })
             {
                 jToken = await JToken.LoadAsync(reader, LoadSettings);
             }
