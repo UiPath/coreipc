@@ -22,7 +22,7 @@ namespace UiPath.CoreIpc
         public async Task<T> DeserializeAsync<T>(Stream json)
         {
             JToken jToken;
-            var streamReader = new StreamReader(json, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: (int)Math.Min(4096, json.Length));
+            var streamReader = new StreamReader(json, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: Math.Min(4096, (int)json.Length));
             using (var reader = new JsonTextReader(streamReader) { ArrayPool = this })
             {
                 jToken = await JToken.LoadAsync(reader, LoadSettings);
