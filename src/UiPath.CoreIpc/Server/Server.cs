@@ -135,7 +135,7 @@ namespace UiPath.CoreIpc
             {
                 var returnTaskType = method.ReturnType;
                 var scheduler = endpoint.Scheduler;
-                var hasScheduler = scheduler != null && scheduler != TaskScheduler.Default;
+                var hasScheduler = scheduler != TaskScheduler.Default;
                 if (returnTaskType.IsGenericType)
                 {
                     var methodResult = hasScheduler ? await RunOnScheduler() : MethodCall();
