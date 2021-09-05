@@ -135,9 +135,10 @@ namespace UiPath.CoreIpc
             {
                 var returnTaskType = method.ReturnType;
                 var scheduler = endpoint.Scheduler;
+                var hasScheduler = scheduler != null && scheduler != TaskScheduler.Default;
                 if (returnTaskType.IsGenericType)
                 {
-                    var methodResult = scheduler is null ? MethodCall() : await RunOnScheduler();
+                    var methodResult = hasScheduler ? await RunOnScheduler() : MethodCall();
                     await methodResult;
                     var returnValue = GetTaskResult(returnTaskType, methodResult);
                     if (returnValue is Stream downloadStream)
@@ -148,7 +149,7 @@ namespace UiPath.CoreIpc
                 }
                 else
                 {
-                    (scheduler is null ? MethodCall() : RunOnScheduler()).LogException(Logger, method);
+                    (hasScheduler ? RunOnScheduler() : MethodCall()).LogException(Logger, method);
                     return request.HasObjectParameters ? null : Response.Success(request, "");
                 }
                 Task MethodCall() => method.Invoke(service, arguments);
