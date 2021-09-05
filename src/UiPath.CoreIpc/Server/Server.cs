@@ -8,6 +8,8 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
+
 namespace UiPath.CoreIpc
 {
     using GetTaskResultFunc = Func<Task, object>;
@@ -135,6 +137,7 @@ namespace UiPath.CoreIpc
             {
                 var returnTaskType = method.ReturnType;
                 var scheduler = endpoint.Scheduler;
+                Debug.Assert(scheduler != null);
                 var hasScheduler = scheduler != TaskScheduler.Default;
                 if (returnTaskType.IsGenericType)
                 {
