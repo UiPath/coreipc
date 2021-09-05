@@ -32,9 +32,9 @@ namespace UiPath.CoreIpc
             Name = $"{name} {GetHashCode()}";
             _maxMessageSize = maxMessageSize;
             _receiveLoop = new(ReceiveLoop);
-            _onResponse = data => OnResponseReceived((Response)data);
-            _onRequest = data => OnRequestReceived((Request)data);
-            _onCancellation = data => OnCancellationReceived((string)data);
+            _onResponse = response => OnResponseReceived((Response)response);
+            _onRequest = request => OnRequestReceived((Request)request);
+            _onCancellation = requestId => OnCancellationReceived((string)requestId);
             _cancelRequest = requestId => CancelRequest((string)requestId);
             _cancelUploadRequest = requestId => CancelUploadRequest((string)requestId);
         }
