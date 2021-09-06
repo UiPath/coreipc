@@ -50,7 +50,6 @@ namespace UiPath.CoreIpc
         private bool LogEnabled => _logger.Enabled();
         Connection IServiceClient.Connection => _connection;
         public bool ObjectParameters { get; init; } = true;
-        public bool EncryptAndSign { get; }
 
         public TInterface CreateProxy()
         {
