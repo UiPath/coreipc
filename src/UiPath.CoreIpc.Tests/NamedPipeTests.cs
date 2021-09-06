@@ -21,7 +21,7 @@ namespace UiPath.CoreIpc.Tests
             IOHelpers.PipeExists("system"+GetHashCode(), 30).ShouldBeTrue();
         }
         [Fact]
-        public Task ServerName() => SystemClientBuilder().ServerName(Environment.MachineName).ValidateAndBuild().GetGuid(System.Guid.Empty);
+        public Task ServerName() => SystemClientBuilder().ValidateAndBuild().GetGuid(System.Guid.Empty);
         [Fact]
         public override void BeforeCallServerSide()
         {

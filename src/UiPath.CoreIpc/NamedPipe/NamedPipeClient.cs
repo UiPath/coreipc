@@ -20,19 +20,18 @@ namespace UiPath.CoreIpc.NamedPipe
 
     class NamedPipeClient<TInterface> : ServiceClient<TInterface>, INamedPipeKey where TInterface : class
     {
-        private readonly int _hashCode;
-        public NamedPipeClient(string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, encryptAndSign, beforeCall, serviceEndpoint)
+        public NamedPipeClient(string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint)
+            : base(serializer, requestTimeout, logger, connectionFactory, sslServer, beforeCall, serviceEndpoint)
         {
             ServerName = serverName;
             PipeName = pipeName;
             AllowImpersonation = allowImpersonation;
-            _hashCode = (serverName, pipeName, allowImpersonation, encryptAndSign).GetHashCode();
+            HashCode = (serverName, pipeName, allowImpersonation, sslServer).GetHashCode();
         }
         public override string Name => base.Name ?? PipeName;
         public string ServerName { get; }
         public string PipeName { get; }
         public bool AllowImpersonation { get; }
-        public override int GetHashCode() => _hashCode;
         public override bool Equals(IConnectionKey other) => other == this || (other is INamedPipeKey otherClient &&
             otherClient.ServerName == ServerName && otherClient.PipeName == PipeName && otherClient.AllowImpersonation == AllowImpersonation && base.Equals(other));
         public override ClientConnection CreateClientConnection(IConnectionKey key) => new NamedPipeClientConnection(key);

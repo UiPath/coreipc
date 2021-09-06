@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,20 +11,10 @@ namespace UiPath.CoreIpc
 {
     public class ListenerSettings
     {
-        private bool _encryptAndSign;
-
         public ListenerSettings(string name) => Name = name;
         public byte ConcurrentAccepts { get; set; } = 5;
         public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
-        public bool EncryptAndSign
-        {
-            get => _encryptAndSign;
-#if WINDOWS
-            set => _encryptAndSign = value;
-#else
-            set => _encryptAndSign = false;
-#endif
-        }
+        public X509Certificate Certificate { get; set; }
         public string Name { get; }
         public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
         internal IServiceProvider ServiceProvider { get; set; }
@@ -74,7 +65,14 @@ namespace UiPath.CoreIpc
                 }
             }
         }
-        protected virtual void Dispose(bool disposing) { }
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposing)
+            {
+                return;
+            }
+            Settings.Certificate?.Dispose();
+        }
         public void Dispose()
         {
             if (LogEnabled)

@@ -40,7 +40,8 @@ namespace UiPath.CoreIpc.Tests
         {
             var serviceProvider = ConfigureServices();
             var callback = new ComputingCallback { Id = "custom made" };
-            var computingClientBuilder = new TcpClientBuilder<IComputingService, IComputingCallback>(SystemEndPoint, serviceProvider).CallbackInstance(callback).RequestTimeout(TimeSpan.FromSeconds(2));
+            var computingClientBuilder = new TcpClientBuilder<IComputingService, IComputingCallback>(SystemEndPoint, serviceProvider)
+                .CallbackInstance(callback).EncryptAndSign("localhost").RequestTimeout(TimeSpan.FromSeconds(2));
             var stopwatch = Stopwatch.StartNew();
             int count = 0;
             try
@@ -48,6 +49,7 @@ namespace UiPath.CoreIpc.Tests
                 var computingClient = computingClientBuilder.ValidateAndBuild();
                 var systemClient =
                     new TcpClientBuilder<ISystemService>(SystemEndPoint)
+                    .EncryptAndSign("localhost")
                     .RequestTimeout(TimeSpan.FromSeconds(2))
                     .Logger(serviceProvider)
                     .ValidateAndBuild();

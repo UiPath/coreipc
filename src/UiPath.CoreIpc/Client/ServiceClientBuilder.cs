@@ -20,7 +20,7 @@ namespace UiPath.CoreIpc
         protected BeforeCallHandler _beforeCall;
         protected object _callbackInstance;
         protected TaskScheduler _taskScheduler;
-        protected bool _encryptAndSign;
+        protected string _sslServer;
 
         protected ServiceClientBuilder(Type callbackContract, IServiceProvider serviceProvider)
         {
@@ -38,11 +38,13 @@ namespace UiPath.CoreIpc
             return (TDerived)this;
         }
 
-        public TDerived EncryptAndSign()
+        public TDerived EncryptAndSign(string certificateServerName)
         {
-#if WINDOWS
-            _encryptAndSign = true;
-#endif
+            if (string.IsNullOrWhiteSpace(certificateServerName))
+            {
+                throw new ArgumentException($"'{nameof(certificateServerName)}' must match the name on the server's certificate.", nameof(certificateServerName));
+            }
+            _sslServer = certificateServerName;
             return (TDerived)this;
         }
 
