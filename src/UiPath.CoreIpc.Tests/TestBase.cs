@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Nito.AsyncEx;
@@ -18,6 +19,10 @@ namespace UiPath.CoreIpc.Tests
         protected readonly IServiceProvider _serviceProvider;
         protected readonly AsyncContext _guiThread = new AsyncContextThread().Context;
 
+        static TestBase()
+        {
+            AppContext.SetSwitch("Switch.System.Net.DontEnableSystemDefaultTlsVersions", false);
+        }
         public TestBase()
         {
             _guiThread.SynchronizationContext.Send(() => Thread.CurrentThread.Name = "GuiThread");

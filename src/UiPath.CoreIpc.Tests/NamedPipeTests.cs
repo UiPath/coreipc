@@ -1,5 +1,7 @@
 ﻿using System;
+using System.IO;
 using System.IO.Pipes;
+using System.Security.Cryptography.X509Certificates;
 using System.Security.Principal;
 using System.Threading.Tasks;
 using Shouldly;
@@ -47,12 +49,15 @@ namespace UiPath.CoreIpc.Tests
     }
     public class ComputingNamedPipeTests : ComputingTests<NamedPipeClientBuilder<IComputingService, IComputingCallback>>
     {
-        protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder) =>
-            serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings("computing"+GetHashCode()){ EncryptAndSign = true }));
+        protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder)
+        {
+            var data = File.ReadAllBytes(@"../../../../localhost.pfx");
+            return serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings("computing" + GetHashCode()) { Certificate = new X509Certificate(data, "1") }));
+        }
         protected override NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
             new NamedPipeClientBuilder<IComputingService, IComputingCallback>("computing" + GetHashCode(), _serviceProvider)
                 .AllowImpersonation()
-                .EncryptAndSign()
+                .EncryptAndSign("localhost")
                 .RequestTimeout(RequestTimeout)
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);
