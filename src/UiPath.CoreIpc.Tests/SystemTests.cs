@@ -181,6 +181,8 @@ namespace UiPath.CoreIpc.Tests
         }
 
         [Fact]
+        public Task DownloadUiThread() => Task.Factory.StartNew(Download, default, TaskCreationOptions.DenyChildAttach, GuiScheduler);
+        [Fact]
         public async Task Download()
         {
             using var stream = await _systemClient.Download("Hello world");

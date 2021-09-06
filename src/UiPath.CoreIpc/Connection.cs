@@ -187,6 +187,7 @@ namespace UiPath.CoreIpc
             {
                 while (await ReadBuffer(HeaderLength))
                 {
+                    Debug.Assert(SynchronizationContext.Current == null);
                     var length = BitConverter.ToInt32(_buffer, startIndex: 1);
                     if (length > _maxMessageSize)
                     {
