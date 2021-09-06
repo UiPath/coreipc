@@ -32,7 +32,7 @@ namespace UiPath.CoreIpc.Tests
             Console.WriteLine(SynchronizationContext.Current);
             var serviceProvider = ConfigureServices();
             // build and run service host
-            var data = File.ReadAllBytes(@"..\..\..\..\localhost.pfx");
+            var data = File.ReadAllBytes(@"../../../../localhost.pfx");
             var host = new ServiceHostBuilder(serviceProvider)
                 .UseTcp(new TcpSettings(SystemEndPoint)
                 {
