@@ -1,5 +1,7 @@
 ﻿using System;
+using System.IO;
 using System.IO.Pipes;
+using System.Security.Cryptography.X509Certificates;
 using System.Security.Principal;
 using System.Threading.Tasks;
 using Shouldly;
@@ -21,7 +23,7 @@ namespace UiPath.CoreIpc.Tests
             IOHelpers.PipeExists("system"+GetHashCode(), 30).ShouldBeTrue();
         }
         [Fact]
-        public Task ServerName() => SystemClientBuilder().ServerName(Environment.MachineName).ValidateAndBuild().GetGuid(System.Guid.Empty);
+        public Task ServerName() => SystemClientBuilder().ValidateAndBuild().GetGuid(System.Guid.Empty);
         [Fact]
         public override void BeforeCallServerSide()
         {
@@ -48,11 +50,10 @@ namespace UiPath.CoreIpc.Tests
     public class ComputingNamedPipeTests : ComputingTests<NamedPipeClientBuilder<IComputingService, IComputingCallback>>
     {
         protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder) =>
-            serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings("computing"+GetHashCode()){ EncryptAndSign = true }));
+            serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings("computing" + GetHashCode())));
         protected override NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
             new NamedPipeClientBuilder<IComputingService, IComputingCallback>("computing" + GetHashCode(), _serviceProvider)
                 .AllowImpersonation()
-                .EncryptAndSign()
                 .RequestTimeout(RequestTimeout)
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);

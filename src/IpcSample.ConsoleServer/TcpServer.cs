@@ -2,9 +2,11 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.IO.Pipes;
 using System.Net;
 using System.Security.AccessControl;
+using System.Security.Cryptography.X509Certificates;
 using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,10 +32,12 @@ namespace UiPath.CoreIpc.Tests
             Console.WriteLine(SynchronizationContext.Current);
             var serviceProvider = ConfigureServices();
             // build and run service host
+            var data = File.ReadAllBytes(@"../../../../localhost.pfx");
             var host = new ServiceHostBuilder(serviceProvider)
                 .UseTcp(new TcpSettings(SystemEndPoint)
                 {
                     RequestTimeout = TimeSpan.FromSeconds(2),
+                    Certificate = new X509Certificate(data, "1"),
                 })
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService>()

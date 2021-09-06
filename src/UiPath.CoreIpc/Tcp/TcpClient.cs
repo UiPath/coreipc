@@ -16,12 +16,15 @@ namespace UiPath.CoreIpc.Tcp
     }
     class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterface : class
     {
-        public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, encryptAndSign, beforeCall, serviceEndpoint) =>
+        public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, sslServer, beforeCall, serviceEndpoint)
+        {
             EndPoint = endPoint;
+            HashCode = (EndPoint, sslServer).GetHashCode();
+        }
         public override string Name => base.Name ?? EndPoint.ToString();
         public IPEndPoint EndPoint { get; }
-        public override int GetHashCode() => EndPoint.GetHashCode();
-        public override bool Equals(IConnectionKey other) => other == this || (other is ITcpKey otherClient && EndPoint.Equals(otherClient.EndPoint));
+        public override bool Equals(IConnectionKey other) => other == this || (other is ITcpKey otherClient && EndPoint.Equals(otherClient.EndPoint) && 
+            base.Equals(other));
         public override ClientConnection CreateClientConnection(IConnectionKey key) => new TcpClientConnection(key);
         class TcpClientConnection : ClientConnection
         {

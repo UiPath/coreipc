@@ -14,7 +14,7 @@ WCF-like service model API for communication over named pipes and TCP. .NET Stan
 - configurable task scheduler
 - client authentication and impersonation
 - access to the underlying transport with `Stream` parameters
-- SSPI encryption and signing
+- SSL
 
 Check [the tests](https://github.com/UiPath/CoreIpc/blob/master/src/UiPath.CoreIpc.Tests/) and the sample.
 ```C#

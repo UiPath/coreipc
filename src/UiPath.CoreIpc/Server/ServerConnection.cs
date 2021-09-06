@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Security;
+using System.Security.Authentication;
 using System.Threading;
 using System.Threading.Tasks;
 namespace UiPath.CoreIpc
@@ -66,22 +67,23 @@ namespace UiPath.CoreIpc
             return;
             async Task<Stream> AuthenticateAsServer()
             {
-                if (!Settings.EncryptAndSign)
+                var certificate = Settings.Certificate;
+                if (certificate == null)
                 {
                     return Network;
                 }
-                var negotiateStream = new NegotiateStream(Network);
+                var sslStream = new SslStream(Network);
                 try
                 {
-                    await negotiateStream.AuthenticateAsServerAsync();
+                    await sslStream.AuthenticateAsServerAsync(certificate, clientCertificateRequired: false, SslProtocols.None, checkCertificateRevocation: false);
                 }
                 catch
                 {
-                    negotiateStream.Dispose();
+                    sslStream.Dispose();
                     throw;
                 }
-                Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
-                return negotiateStream;
+                Debug.Assert(sslStream.IsEncrypted && sslStream.IsSigned);
+                return sslStream;
             }
         }
         protected virtual void Dispose(bool disposing){}

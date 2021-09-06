@@ -6,8 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Net.Security;
-using System.Security.Principal;
 using System.Diagnostics;
+using System.Security.Authentication;
 
 namespace UiPath.CoreIpc
 {
@@ -34,20 +34,20 @@ namespace UiPath.CoreIpc
         private Server _server;
         private ClientConnection _clientConnection;
 
-        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, bool encryptAndSign = false, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
+        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
         {
             _serializer = serializer;
             _requestTimeout = requestTimeout;
             _logger = logger;
             _connectionFactory = connectionFactory;
-            EncryptAndSign = encryptAndSign;
+            SslServer = sslServer;
             _beforeCall = beforeCall;
             _serviceEndpoint = serviceEndpoint;
         }
-
+        protected int HashCode { get; init; }
+        public string SslServer { get; init; }
         public virtual string Name => _connection?.Name;
         private bool LogEnabled => _logger.Enabled();
-        public bool EncryptAndSign { get; }
         Connection IServiceClient.Connection => _connection;
         public bool ObjectParameters { get; init; } = true;
 
@@ -57,6 +57,8 @@ namespace UiPath.CoreIpc
             (proxy as IpcProxy).ServiceClient = this;
             return proxy;
         }
+        
+        public override int GetHashCode() => HashCode;
 
         private void OnNewConnection(Connection connection, bool alreadyHasServer = false)
         {
@@ -208,7 +210,7 @@ namespace UiPath.CoreIpc
                     clientConnection.Dispose();
                     throw;
                 }
-                var stream = EncryptAndSign ? await AuthenticateAsClient(clientConnection.Network) : clientConnection.Network;
+                var stream = SslServer == null ? clientConnection.Network : await AuthenticateAsClient(clientConnection.Network);
                 OnNewConnection(new(stream, _serializer, _logger, Name));
                 if (LogEnabled)
                 {
@@ -221,20 +223,20 @@ namespace UiPath.CoreIpc
                 clientConnection.Release();
             }
             return true;
-            static async Task<Stream> AuthenticateAsClient(Stream network)
+            async Task<Stream> AuthenticateAsClient(Stream network)
             {
-                var negotiateStream = new NegotiateStream(network);
+                var sslStream = new SslStream(network);
                 try
                 {
-                    await negotiateStream.AuthenticateAsClientAsync(new(), "", ProtectionLevel.EncryptAndSign, TokenImpersonationLevel.Identification);
+                    await sslStream.AuthenticateAsClientAsync(SslServer, clientCertificates: null, SslProtocols.None, checkCertificateRevocation: false);
                 }
                 catch
                 {
-                    negotiateStream.Dispose();
+                    sslStream.Dispose();
                     throw;
                 }
-                Debug.Assert(negotiateStream.IsEncrypted && negotiateStream.IsSigned);
-                return negotiateStream;
+                Debug.Assert(sslStream.IsEncrypted && sslStream.IsSigned);
+                return sslStream;
             }
         }
 
@@ -293,7 +295,7 @@ namespace UiPath.CoreIpc
 
         public override string ToString() => Name;
 
-        public virtual bool Equals(IConnectionKey other) => EncryptAndSign == other.EncryptAndSign;
+        public virtual bool Equals(IConnectionKey other) => SslServer == other.SslServer;
 
         public virtual ClientConnection CreateClientConnection(IConnectionKey key) => throw new NotImplementedException();
     }

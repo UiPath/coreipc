@@ -42,7 +42,7 @@ namespace UiPath.CoreIpc
     }
     interface IConnectionKey : IEquatable<IConnectionKey>
     {
-        bool EncryptAndSign { get; }
+        string SslServer { get; }
         ClientConnection CreateClientConnection(IConnectionKey key);
     }
     abstract class ClientConnection : IDisposable
