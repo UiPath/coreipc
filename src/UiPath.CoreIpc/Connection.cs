@@ -141,8 +141,8 @@ namespace UiPath.CoreIpc
         }
         public void Dispose()
         {
-            var closedHandler = Interlocked.CompareExchange(ref Closed, null, Closed);
-            if (closedHandler == null)
+            var closedHandler = Closed;
+            if (closedHandler == null || (closedHandler = Interlocked.CompareExchange(ref Closed, null, closedHandler)) == null)
             {
                 return;
             }
