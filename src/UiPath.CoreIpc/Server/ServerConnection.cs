@@ -75,7 +75,7 @@ namespace UiPath.CoreIpc
                 var sslStream = new SslStream(Network);
                 try
                 {
-                    await sslStream.AuthenticateAsServerAsync(certificate, clientCertificateRequired: false, SslProtocols.None, checkCertificateRevocation: false);
+                    await sslStream.AuthenticateAsServerAsync(certificate);
                 }
                 catch
                 {
