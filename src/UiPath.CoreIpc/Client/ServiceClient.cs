@@ -7,8 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Net.Security;
 using System.Diagnostics;
-using System.Security.Authentication;
-
 namespace UiPath.CoreIpc
 {
     using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
