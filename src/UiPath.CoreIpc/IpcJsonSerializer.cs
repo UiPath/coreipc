@@ -10,10 +10,10 @@ namespace UiPath.CoreIpc
     public interface ISerializer
     {
         Task<T> DeserializeAsync<T>(Stream json);
-        object Deserialize(string json, Type type);
         object Deserialize(object json, Type type);
-        string Serialize(object obj);
         void Serialize(object obj, Stream stream);
+        string Serialize(object obj);
+        object Deserialize(string json, Type type);
     }
     class IpcJsonSerializer : ISerializer, IArrayPool<char>
     {
@@ -27,7 +27,6 @@ namespace UiPath.CoreIpc
             serializer.PreserveReferencesHandling = PreserveReferencesHandling.None;
             return serializer;
         }
-        public object Deserialize(string json, Type type) => JsonConvert.DeserializeObject(json, type);
         public async Task<T> DeserializeAsync<T>(Stream json)
         {
             JToken jToken;
@@ -44,7 +43,6 @@ namespace UiPath.CoreIpc
             {} => type.IsAssignableFrom(json.GetType()) ? json : JToken.FromObject(json, DefaultSerializer).ToObject(type, DefaultSerializer),
             null => null,
         };
-        public string Serialize(object obj) => JsonConvert.SerializeObject(obj);
         public void Serialize(object obj, Stream stream)
         {
             using var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this, CloseOutput = false };
@@ -53,5 +51,7 @@ namespace UiPath.CoreIpc
         }
         public char[] Rent(int minimumLength) => ArrayPool<char>.Shared.Rent(minimumLength);
         public void Return(char[] array) => ArrayPool<char>.Shared.Return(array);
+        public string Serialize(object obj) => JsonConvert.SerializeObject(obj);
+        public object Deserialize(string json, Type type) => JsonConvert.DeserializeObject(json, type);
     }
 }
