@@ -37,7 +37,7 @@ namespace UiPath.CoreIpc.Tests
                 .UseTcp(new TcpSettings(SystemEndPoint)
                 {
                     RequestTimeout = TimeSpan.FromSeconds(2),
-                    Certificate = new X509Certificate(data, "1"),
+                    //Certificate = new X509Certificate(data, "1"),
                 })
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService>()

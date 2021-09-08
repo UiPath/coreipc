@@ -18,6 +18,15 @@ namespace UiPath.CoreIpc
     class IpcJsonSerializer : ISerializer, IArrayPool<char>
     {
         static readonly JsonLoadSettings LoadSettings = new(){ LineInfoHandling = LineInfoHandling.Ignore };
+        static readonly JsonSerializer DefaultSerializer = CreateDefaultSerializer();
+        private static JsonSerializer CreateDefaultSerializer()
+        {
+            var serializer = JsonSerializer.CreateDefault();
+            serializer.DefaultValueHandling = DefaultValueHandling.Ignore;
+            serializer.NullValueHandling = NullValueHandling.Ignore;
+            serializer.PreserveReferencesHandling = PreserveReferencesHandling.None;
+            return serializer;
+        }
         public object Deserialize(string json, Type type) => JsonConvert.DeserializeObject(json, type);
         public async Task<T> DeserializeAsync<T>(Stream json)
         {
@@ -27,20 +36,19 @@ namespace UiPath.CoreIpc
             {
                 jToken = await JToken.LoadAsync(reader, LoadSettings);
             }
-            return jToken.ToObject<T>();
+            return jToken.ToObject<T>(DefaultSerializer);
         }
         public object Deserialize(object json, Type type) => json switch
         {
-            JToken token => token.ToObject(type),
-            {} => type.IsAssignableFrom(json.GetType()) ? json : JToken.FromObject(json).ToObject(type),
+            JToken token => token.ToObject(type, DefaultSerializer),
+            {} => type.IsAssignableFrom(json.GetType()) ? json : JToken.FromObject(json, DefaultSerializer).ToObject(type, DefaultSerializer),
             null => null,
         };
         public string Serialize(object obj) => JsonConvert.SerializeObject(obj);
         public void Serialize(object obj, Stream stream)
         {
-            var serializer = JsonSerializer.CreateDefault();
             using var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this, CloseOutput = false };
-            serializer.Serialize(writer, obj);
+            DefaultSerializer.Serialize(writer, obj);
             writer.Flush();
         }
         public char[] Rent(int minimumLength) => ArrayPool<char>.Shared.Rent(minimumLength);
