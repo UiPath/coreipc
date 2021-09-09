@@ -18,15 +18,7 @@ namespace UiPath.CoreIpc
     class IpcJsonSerializer : ISerializer, IArrayPool<char>
     {
         static readonly JsonLoadSettings LoadSettings = new(){ LineInfoHandling = LineInfoHandling.Ignore };
-        static readonly JsonSerializer DefaultSerializer = CreateDefaultSerializer();
-        private static JsonSerializer CreateDefaultSerializer()
-        {
-            var serializer = JsonSerializer.CreateDefault();
-            serializer.DefaultValueHandling = DefaultValueHandling.Ignore;
-            serializer.NullValueHandling = NullValueHandling.Ignore;
-            serializer.PreserveReferencesHandling = PreserveReferencesHandling.None;
-            return serializer;
-        }
+        static readonly JsonSerializer DefaultSerializer = new(){ DefaultValueHandling = DefaultValueHandling.Ignore, NullValueHandling = NullValueHandling.Ignore };
         public async Task<T> DeserializeAsync<T>(Stream json)
         {
             JToken jToken;
