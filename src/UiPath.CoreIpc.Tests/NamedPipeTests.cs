@@ -20,7 +20,7 @@ namespace UiPath.CoreIpc.Tests
         public void PipeExists()
         {
             IOHelpers.PipeExists(System.Guid.NewGuid().ToString()).ShouldBeFalse();
-            IOHelpers.PipeExists("system"+GetHashCode(), 30).ShouldBeTrue();
+            IOHelpers.PipeExists("system"+GetHashCode(), 50).ShouldBeTrue();
         }
         [Fact]
         public Task ServerName() => SystemClientBuilder().ValidateAndBuild().GetGuid(System.Guid.Empty);
