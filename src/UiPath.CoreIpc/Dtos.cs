@@ -42,9 +42,6 @@ namespace UiPath.CoreIpc
         public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
         internal bool HasObjectParameters => ObjectParameters is not null;
         internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
-        internal int ParametersLength => HasObjectParameters ? ObjectParameters.Length : Parameters.Length;
-        public object DeserializeParameter(ISerializer serializer, int index, Type parameterType) =>
-            HasObjectParameters ? serializer.Deserialize(ObjectParameters[index], parameterType) : serializer.Deserialize(Parameters[index], parameterType);
     }
     class CancellationRequest
     {

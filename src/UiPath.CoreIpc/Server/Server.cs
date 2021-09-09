@@ -9,7 +9,6 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
-
 namespace UiPath.CoreIpc
 {
     using GetTaskResultFunc = Func<Task, object>;
@@ -62,7 +61,7 @@ namespace UiPath.CoreIpc
                     return;
                 }
                 var method = GetMethod(endpoint.Contract, request.MethodName);
-                if (!method.ReturnType.IsGenericType && request.HasObjectParameters)
+                if (request.HasObjectParameters && !method.ReturnType.IsGenericType)
                 {
                     await HandleRequest(method, endpoint, request, default);
                     return;
@@ -111,6 +110,7 @@ namespace UiPath.CoreIpc
         }
         async ValueTask<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
         {
+            var objectParameters = request.HasObjectParameters;
             var contract = endpoint.Contract;
             var arguments = GetArguments();
             var beforeCall = endpoint.BeforeCall;
@@ -148,12 +148,12 @@ namespace UiPath.CoreIpc
                     {
                         return Response.Success(request, downloadStream);
                     }
-                    return request.HasObjectParameters ? new Response(request.Id, objectData: returnValue) : Response.Success(request, Serializer.Serialize(returnValue));
+                    return objectParameters ? new Response(request.Id, objectData: returnValue) : Response.Success(request, Serializer.Serialize(returnValue));
                 }
                 else
                 {
                     (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method);
-                    return request.HasObjectParameters ? null : Response.Success(request, "");
+                    return objectParameters ? null : Response.Success(request, "");
                 }
                 Task MethodCall() => method.Invoke(service, arguments);
                 Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
@@ -161,7 +161,7 @@ namespace UiPath.CoreIpc
             object[] GetArguments()
             {
                 var parameters = method.Parameters;
-                var requestParametersLength = request.ParametersLength;
+                var requestParametersLength = objectParameters ? request.ObjectParameters.Length : request.Parameters.Length;
                 if (requestParametersLength > parameters.Length)
                 {
                     throw new ArgumentException("Too many parameters for " + method);
@@ -186,7 +186,9 @@ namespace UiPath.CoreIpc
                         }
                         else
                         {
-                            argument = request.DeserializeParameter(Serializer, index, parameterType);
+                            argument = objectParameters ? 
+                                Serializer.Deserialize(request.ObjectParameters[index], parameterType) :
+                                Serializer.Deserialize(request.Parameters[index], parameterType);
                             argument = CheckMessage(argument, parameterType);
                         }
                         allArguments[index] = argument;
@@ -202,7 +204,7 @@ namespace UiPath.CoreIpc
                     {
                         message.CallbackContract = endpoint.CallbackContract;
                         message.Client = _client;
-                        message.ObjectParameters = request.HasObjectParameters;
+                        message.ObjectParameters = objectParameters;
                     }
                     return argument;
                 }
