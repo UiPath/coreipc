@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Buffers;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -23,7 +24,7 @@ namespace UiPath.CoreIpc
         {
             JToken jToken;
             var streamReader = new StreamReader(json, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: Math.Min(4096, (int)json.Length));
-            using (var reader = new JsonTextReader(streamReader) { ArrayPool = this })
+            using (var reader = CreateReader(streamReader))
             {
                 jToken = await JToken.LoadAsync(reader, LoadSettings);
             }
@@ -35,15 +36,22 @@ namespace UiPath.CoreIpc
             {} => type.IsAssignableFrom(json.GetType()) ? json : JToken.FromObject(json, DefaultSerializer).ToObject(type, DefaultSerializer),
             null => null,
         };
-        public void Serialize(object obj, Stream stream)
+        public void Serialize(object obj, Stream stream) => Serialize(obj, new StreamWriter(stream));
+        private void Serialize(object obj, TextWriter streamWriter)
         {
-            using var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this, CloseOutput = false };
+            var writer = new JsonTextWriter(streamWriter) { ArrayPool = this, CloseOutput = false };
             DefaultSerializer.Serialize(writer, obj);
             writer.Flush();
         }
         public char[] Rent(int minimumLength) => ArrayPool<char>.Shared.Rent(minimumLength);
         public void Return(char[] array) => ArrayPool<char>.Shared.Return(array);
-        public string Serialize(object obj) => JsonConvert.SerializeObject(obj);
-        public object Deserialize(string json, Type type) => JsonConvert.DeserializeObject(json, type);
+        public string Serialize(object obj)
+        {
+            var stringWriter = new StringWriter(new StringBuilder(256), CultureInfo.InvariantCulture);
+            Serialize(obj, stringWriter);
+            return stringWriter.ToString();
+        }
+        public object Deserialize(string json, Type type) => DefaultSerializer.Deserialize(CreateReader(new StringReader(json)), type);
+        private JsonTextReader CreateReader(TextReader json) => new(json){ ArrayPool = this };
     }
 }
