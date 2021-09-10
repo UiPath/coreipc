@@ -40,7 +40,7 @@ namespace UiPath.CoreIpc
         public void Serialize(object obj, Stream stream) => Serialize(obj, new StreamWriter(stream));
         private void Serialize(object obj, TextWriter streamWriter)
         {
-            var writer = new JsonTextWriter(streamWriter) { ArrayPool = this, CloseOutput = false };
+            using var writer = new JsonTextWriter(streamWriter) { ArrayPool = this, CloseOutput = false };
             DefaultSerializer.Serialize(writer, obj);
             writer.Flush();
         }
