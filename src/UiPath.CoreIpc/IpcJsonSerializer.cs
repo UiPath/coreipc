@@ -48,7 +48,7 @@ namespace UiPath.CoreIpc
         public void Return(char[] array) => ArrayPool<char>.Shared.Return(array);
         public string Serialize(object obj)
         {
-            var stringWriter = new StringWriter(new StringBuilder(256), CultureInfo.InvariantCulture);
+            var stringWriter = new StringWriter(new StringBuilder(capacity: 256), CultureInfo.InvariantCulture);
             Serialize(obj, stringWriter);
             return stringWriter.ToString();
         }
