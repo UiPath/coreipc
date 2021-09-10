@@ -52,7 +52,11 @@ namespace UiPath.CoreIpc
             Serialize(obj, stringWriter);
             return stringWriter.ToString();
         }
-        public object Deserialize(string json, Type type) => DefaultSerializer.Deserialize(CreateReader(new StringReader(json)), type);
+        public object Deserialize(string json, Type type)
+        {
+            using var reader = CreateReader(new StringReader(json));
+            return DefaultSerializer.Deserialize(reader, type);
+        }
         private JsonTextReader CreateReader(TextReader json) => new(json){ ArrayPool = this };
     }
 }
