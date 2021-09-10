@@ -301,7 +301,7 @@ namespace UiPath.CoreIpc
                 throw;
             }
         }
-        private Task<T> Deserialize<T>() => Serializer.DeserializeAsync<T>(_nestedStream);
+        private ValueTask<T> Deserialize<T>() => Serializer.DeserializeAsync<T>(_nestedStream);
         private void OnCancellationReceived(string requestId)
         {
             try

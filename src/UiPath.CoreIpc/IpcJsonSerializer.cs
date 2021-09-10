@@ -10,7 +10,7 @@ namespace UiPath.CoreIpc
 {
     public interface ISerializer
     {
-        Task<T> DeserializeAsync<T>(Stream json);
+        ValueTask<T> DeserializeAsync<T>(Stream json);
         object Deserialize(object json, Type type);
         void Serialize(object obj, Stream stream);
         string Serialize(object obj);
@@ -21,7 +21,7 @@ namespace UiPath.CoreIpc
         static readonly JsonLoadSettings LoadSettings = new(){ LineInfoHandling = LineInfoHandling.Ignore };
         static readonly JsonSerializer DefaultSerializer = new(){ DefaultValueHandling = DefaultValueHandling.Ignore, NullValueHandling = NullValueHandling.Ignore, 
             CheckAdditionalContent = true };
-        public async Task<T> DeserializeAsync<T>(Stream json)
+        public async ValueTask<T> DeserializeAsync<T>(Stream json)
         {
             JToken jToken;
             var streamReader = new StreamReader(json, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: Math.Min(4096, (int)json.Length));
