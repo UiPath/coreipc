@@ -171,7 +171,11 @@ namespace UiPath.CoreIpc
             int remaining = length;
             while (remaining > 0)
             {
+#if NET461
                 var read = await Network.ReadAsync(_buffer, offset, remaining);
+#else
+                var read = await Network.ReadAsync(_buffer.AsMemory(offset, remaining));
+#endif
                 if (read == 0)
                 {
                     return false;

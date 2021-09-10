@@ -71,6 +71,22 @@ namespace UiPath.CoreIpc
             _remainingBytes -= bytesRead;
             return bytesRead;
         }
+#if !NET461
+        public async override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (buffer.Length > _remainingBytes)
+            {
+                buffer = buffer.Slice(0, (int)_remainingBytes);
+            }
+            if (buffer.Length <= 0)
+            {
+                return 0;
+            }
+            int bytesRead = await _underlyingStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            _remainingBytes -= bytesRead;
+            return bytesRead;
+        }
+#endif
         /// <inheritdoc />
         public override int Read(byte[] buffer, int offset, int count)
         {
