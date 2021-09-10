@@ -27,6 +27,7 @@ namespace UiPath.CoreIpc.NamedPipe
             public override async Task AcceptClient(CancellationToken cancellationToken)
             {
                 // on linux WaitForConnectionAsync has to be cancelled with Dispose
+                // fixed in 6.0 https://github.com/dotnet/runtime/pull/53340
                 using (cancellationToken.Register(Dispose))
                 {
                     await _server.WaitForConnectionAsync();
