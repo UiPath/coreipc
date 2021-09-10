@@ -307,7 +307,7 @@ namespace UiPath.CoreIpc
         public static TimeoutHelper Creaate(TimeSpan timeout, CancellationToken token) => new(timeout, token);
     }
 }
-#if !NET5_0
+#if NET461
 namespace System.Runtime.CompilerServices
 {
     internal static class IsExternalInit
