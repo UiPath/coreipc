@@ -4,6 +4,7 @@ scripts/
 artifacts/
 .dotnet
 TestResults/
+*.diagsession
 *.suo
 *.user
 bin
