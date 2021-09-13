@@ -20,8 +20,7 @@ namespace UiPath.CoreIpc.Tests
         //    GC.WaitForPendingFinalizers();
         //    GC.Collect();
         //}, null, 0, 3000);
-
-        static async Task _Main()
+        static async Task Main()
         {
             Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
             //GuiLikeSyncContext.Install();
@@ -32,7 +31,7 @@ namespace UiPath.CoreIpc.Tests
                 .UseNamedPipes(new NamedPipeSettings("test")
                 {
                     RequestTimeout = TimeSpan.FromSeconds(2),
-                    AccessControl = security => security.AllowCurrentUser(),
+                    //AccessControl = security => security.AllowCurrentUser(),
                 })
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .AddEndpoint<ISystemService>()

@@ -25,7 +25,7 @@ namespace UiPath.CoreIpc.Tests
         //    GC.Collect();
         //}, null, 0, 3000);
 
-        static async Task Main()
+        static async Task _Main()
         {
             Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
             //GuiLikeSyncContext.Install();

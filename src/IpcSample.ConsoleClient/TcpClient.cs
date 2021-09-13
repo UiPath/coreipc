@@ -15,7 +15,7 @@ namespace UiPath.CoreIpc.Tests
     class TcpClient
     {
         static readonly IPEndPoint SystemEndPoint = new(IPAddress.Loopback, 3131);
-        static async Task Main(string[] args)
+        static async Task _Main(string[] args)
         {
             Console.WriteLine(typeof(int).Assembly);
             Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
@@ -53,11 +53,12 @@ namespace UiPath.CoreIpc.Tests
                     .RequestTimeout(TimeSpan.FromSeconds(2))
                     .Logger(serviceProvider)
                     .ValidateAndBuild();
+                var watch = Stopwatch.StartNew();
                 //using (var file = File.OpenRead(@"C:\Windows\DPINST.log"))
                 //{
                 //    Console.WriteLine(await systemClient.Upload(file));
                 //}
-                for(int i =0; i<50;i++)
+                for (int i =0; i<50;i++)
                 {
                     // test 1: call IPC service method with primitive types
                     float result1 = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);
@@ -111,6 +112,8 @@ namespace UiPath.CoreIpc.Tests
                     //    //Console.WriteLineex.Message);
                     //}
                 }
+                watch.Stop();
+                Console.WriteLine(watch.ElapsedMilliseconds);
                 var callbackProxy = (IDisposable)computingClient;
                 callbackProxy.Dispose();
                 callbackProxy.Dispose();
