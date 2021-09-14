@@ -96,7 +96,7 @@ namespace UiPath.CoreIpc
         public Task Lock(CancellationToken cancellationToken = default) => _lock.WaitAsync(cancellationToken);
         public void Release() => _lock.Release();
         public bool TryLock() => _lock.Wait(millisecondsTimeout: 0);
-        public override string ToString() => _connection?.ToString() ?? base.ToString();
+        public override string ToString() => _connection?.Name ?? base.ToString();
         protected virtual void Dispose(bool disposing) => _lock.AssertDisposed();
         public void Dispose()
         {
