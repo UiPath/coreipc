@@ -4,6 +4,7 @@
     <TargetFrameworks>net461;net5.0;net5.0-windows</TargetFrameworks>
     <NoWarn>$(NoWarn);1998</NoWarn>
     <DefineConstants>$(DefineConstants);$(DefineConstantsEx)</DefineConstants>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>

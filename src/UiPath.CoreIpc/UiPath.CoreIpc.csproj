@@ -13,6 +13,7 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <NoWarn>CA1416</NoWarn>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup Condition="$(TargetFramework) == 'net461'">
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />

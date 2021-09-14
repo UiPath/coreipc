@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net5.0;net461;net5.0-windows</TargetFrameworks>
     <ApplicationManifest>app1.manifest</ApplicationManifest>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
