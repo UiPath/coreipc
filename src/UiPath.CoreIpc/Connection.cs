@@ -168,19 +168,18 @@ namespace UiPath.CoreIpc
         private async Task<bool> ReadBuffer(int length)
         {
             int offset = 0;
-            int remaining = length;
-            while (remaining > 0)
+            while (offset < length)
             {
+                var read = await Network.ReadAsync(
 #if NET461
-                var read = await Network.ReadAsync(_buffer, offset, remaining);
+                    _buffer, offset, length - offset);
 #else
-                var read = await Network.ReadAsync(_buffer.AsMemory(offset, remaining));
+                    _buffer.AsMemory(offset, length - offset));
 #endif
                 if (read == 0)
                 {
                     return false;
                 }
-                remaining -= read;
                 offset += read;
             }
             return true;
