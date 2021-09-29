@@ -152,7 +152,7 @@ namespace UiPath.CoreIpc
                 }
                 else
                 {
-                    (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method);
+                    (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method.MethodInfo);
                     return objectParameters ? null : Response.Success(request, "");
                 }
                 Task MethodCall() => method.Invoke(service, arguments);
@@ -164,7 +164,7 @@ namespace UiPath.CoreIpc
                 var requestParametersLength = objectParameters ? request.ObjectParameters.Length : request.Parameters.Length;
                 if (requestParametersLength > parameters.Length)
                 {
-                    throw new ArgumentException("Too many parameters for " + method);
+                    throw new ArgumentException("Too many parameters for " + method.MethodInfo);
                 }
                 var allArguments = new object[parameters.Length];
                 Deserialize();
