@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 namespace UiPath.CoreIpc
@@ -72,6 +73,7 @@ namespace UiPath.CoreIpc
             return bytesRead;
         }
 #if !NET461
+        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
         public async override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
             if (buffer.Length > _remainingBytes)

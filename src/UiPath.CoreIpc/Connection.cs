@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 namespace UiPath.CoreIpc
@@ -46,10 +47,13 @@ namespace UiPath.CoreIpc
         public override string ToString() => Name;
         public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
         public Task Listen() => _receiveLoop.Value;
-        internal event Func<Request, Task> RequestReceived;
+        internal event Func<Request, ValueTask> RequestReceived;
         internal event Action<string> CancellationReceived;
         public event EventHandler<EventArgs> Closed;
-        internal async Task<Response> RemoteCall(Request request, CancellationToken token)
+#if !NET461
+        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+#endif
+        internal async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
         {
             var requestCompletion = new RequestCompletionSource();
             _requests[request.Id] = requestCompletion;
@@ -66,7 +70,7 @@ namespace UiPath.CoreIpc
                 _requests.TryRemove(request.Id, out _);
             }
         }
-        internal Task Send(Request request, CancellationToken token)
+        internal ValueTask Send(Request request, CancellationToken token)
         {
             Debug.Assert(request.Parameters == null || request.ObjectParameters == null);
             var requestBytes = SerializeToStream(request);
@@ -79,8 +83,8 @@ namespace UiPath.CoreIpc
             CancelServerCall(requestId).LogException(Logger, this);
             TryCancelRequest(requestId);
             return;
-            Task CancelServerCall(string requestId) =>
-                SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default);
+            async Task CancelServerCall(string requestId) =>
+                await SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default);
         }
         void CancelUploadRequest(string requestId)
         {
@@ -94,7 +98,7 @@ namespace UiPath.CoreIpc
                 requestCompletion.TrySetCanceled();
             }
         }
-        internal Task Send(Response response, CancellationToken cancellationToken)
+        internal ValueTask Send(Response response, CancellationToken cancellationToken)
         {
             Debug.Assert(response.Data == null || response.ObjectData == null);
             var responseBytes = SerializeToStream(response);
@@ -102,14 +106,20 @@ namespace UiPath.CoreIpc
                 SendMessage(MessageType.Response, responseBytes, cancellationToken) :
                 SendDownloadStream(responseBytes, response.DownloadStream, cancellationToken);
         }
-        private async Task SendDownloadStream(MemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
+#if !NET461
+        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
+#endif
+        private async ValueTask SendDownloadStream(MemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
         {
             using (downloadStream)
             {
                 await SendStream(MessageType.DownloadResponse, responseBytes, downloadStream, cancellationToken);
             }
         }
-        private async Task SendStream(MessageType messageType, Stream data, Stream userStream, CancellationToken cancellationToken)
+#if !NET461
+        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
+#endif
+        private async ValueTask SendStream(MessageType messageType, Stream data, Stream userStream, CancellationToken cancellationToken)
         {
             await _sendLock.WaitAsync(cancellationToken);
             CancellationTokenRegistration tokenRegistration = default;
@@ -127,7 +137,10 @@ namespace UiPath.CoreIpc
                 tokenRegistration.Dispose();
             }
         }
-        private async Task SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken)
+#if !NET461
+        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
+#endif
+        private async ValueTask SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken)
         {
             await _sendLock.WaitAsync(cancellationToken);
             try
@@ -165,7 +178,10 @@ namespace UiPath.CoreIpc
                 completionSource.TrySetException(new IOException("Connection closed."));
             }
         }
-        private async Task<bool> ReadBuffer(int length)
+#if !NET461
+        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+#endif
+        private async ValueTask<bool> ReadBuffer(int length)
         {
             int offset = 0;
             int toRead = length;
@@ -213,7 +229,10 @@ namespace UiPath.CoreIpc
             }
             Dispose();
             return;
-            async Task HandleMessage()
+#if !NET461
+        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
+#endif
+            async ValueTask HandleMessage()
             {
                 var messageType = (MessageType)_buffer[0];
                 object state = null;
@@ -316,7 +335,7 @@ namespace UiPath.CoreIpc
             }
         }
         private void Log(Exception ex) => Logger.LogException(ex, Name);
-        private Task OnRequestReceived(Request request)
+        private ValueTask OnRequestReceived(Request request)
         {
             try
             {
@@ -326,7 +345,7 @@ namespace UiPath.CoreIpc
             {
                 Log(ex);
             }
-            return Task.CompletedTask;
+            return default;
         }
         private void OnResponseReceived(Response response)
         {
