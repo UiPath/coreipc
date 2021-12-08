@@ -83,8 +83,8 @@ namespace UiPath.CoreIpc
             CancelServerCall(requestId).LogException(Logger, this);
             TryCancelRequest(requestId);
             return;
-            async Task CancelServerCall(string requestId) =>
-                await SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default);
+            Task CancelServerCall(string requestId) =>
+                SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default).AsTask();
         }
         void CancelUploadRequest(string requestId)
         {
