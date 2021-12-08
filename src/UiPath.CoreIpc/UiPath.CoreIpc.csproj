@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net461;net5.0;net5.0-windows</TargetFrameworks>
+    <TargetFrameworks>net461;net6.0;net6.0-windows</TargetFrameworks>
     <RootNamespace>UiPath.CoreIpc</RootNamespace>
     <GeneratePackageOnBuild Condition="$(Configuration)=='Release'">true</GeneratePackageOnBuild>
     <Authors>UiPath</Authors>
