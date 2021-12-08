@@ -4,7 +4,6 @@ using System;
 using System.Buffers;
 using System.Globalization;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 namespace UiPath.CoreIpc
@@ -22,9 +21,6 @@ namespace UiPath.CoreIpc
         static readonly JsonLoadSettings LoadSettings = new(){ LineInfoHandling = LineInfoHandling.Ignore };
         static readonly JsonSerializer DefaultSerializer = new(){ DefaultValueHandling = DefaultValueHandling.Ignore, NullValueHandling = NullValueHandling.Ignore, 
             CheckAdditionalContent = true };
-#if !NET461
-        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-#endif
         public async ValueTask<T> DeserializeAsync<T>(Stream json)
         {
             JToken jToken;

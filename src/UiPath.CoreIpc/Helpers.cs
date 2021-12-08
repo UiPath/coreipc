@@ -128,7 +128,7 @@ namespace UiPath.CoreIpc
             return false;
         }
 
-        internal static ValueTask WriteMessage(this Stream stream, MessageType messageType, Stream data, CancellationToken cancellationToken = default)
+        internal static Task WriteMessage(this Stream stream, MessageType messageType, Stream data, CancellationToken cancellationToken = default)
         {
             var recyclableStream = (RecyclableMemoryStream)data;
             recyclableStream.Position = 0;
@@ -140,10 +140,7 @@ namespace UiPath.CoreIpc
             Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer.Slice(1)), payloadLength);
             return stream.WriteMessageCore(recyclableStream, cancellationToken);
         }
-#if !NET461
-        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
-#endif
-        private static async ValueTask WriteMessageCore(this Stream stream, RecyclableMemoryStream recyclableStream, CancellationToken cancellationToken)
+        private static async Task WriteMessageCore(this Stream stream, RecyclableMemoryStream recyclableStream, CancellationToken cancellationToken)
         {
             using (recyclableStream)
             {
