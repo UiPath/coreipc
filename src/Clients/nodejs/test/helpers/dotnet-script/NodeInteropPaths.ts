@@ -4,7 +4,7 @@ export class NodeInteropPaths {
     public static getDirectoryPath(): string {
         const relativePathTargetDir =
             process.env['NodeJS_NetCoreAppTargetDir_RelativePath']
-            ?? path.join('dotnet', 'UiPath.CoreIpc.NodeInterop', 'bin', 'Debug', 'net5.0');
+            ?? path.join('dotnet', 'UiPath.CoreIpc.NodeInterop', 'bin', 'Debug', 'net6.0');
         return path.join(process.cwd(), relativePathTargetDir);
     }
 

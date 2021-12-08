@@ -15,7 +15,7 @@ variables:
   NodeJS_ProjectPath: './src/Clients/nodejs'
   NodeJS_ArchivePath: './src/Clients/nodejs.zip'
   NodeJS_ArtifactName: 'NPM package'
-  NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.CoreIpc.NodeInterop/bin/Debug/net5.0'
+  NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.CoreIpc.NodeInterop/bin/Debug/net6.0'
   NodeJS_DotNetNodeInteropProject : './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop/UiPath.CoreIpc.NodeInterop.csproj'
   NodeJS_DotNetNodeInteropSolution: './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop.sln'
 
@@ -25,7 +25,7 @@ jobs:
   - job:
     displayName: '.NET on Windows'
     pool:
-      vmImage: 'windows-2019'
+      vmImage: 'windows-2022'
     steps:
       - template: azp-initialization.yaml
       - template: azp-dotnet.yaml
@@ -34,7 +34,7 @@ jobs:
   - job:
     displayName: 'node.js on Windows'
     pool:
-      vmImage: 'windows-2019'
+      vmImage: 'windows-2022'
     steps:
       - template: azp-initialization.yaml
       - template: azp-nodejs.yaml

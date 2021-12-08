@@ -1,15 +1,19 @@
 steps:
+  - task: UseDotNet@2
+    inputs:
+      version: 6.0.x
+    
   - task: DotNetCoreCLI@2
     displayName: '$(Label_NodeJS) Restore and build "UiPath.CoreIpc.csproj"'
     inputs:
       projects: '$(DotNet_MainProjectPath)'
-      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net5.0 -p:Version="$(FullVersion)"'
+      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net6.0 -p:Version="$(FullVersion)"'
 
   - task: DotNetCoreCLI@2
     displayName: '$(Label_NodeJS) Restore and build "UiPath.CoreIpc.NodeInterop.csproj"'
     inputs:
       projects: '$(NodeJS_DotNetNodeInteropProject)'
-      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net5.0 -p:Version="$(FullVersion)"'
+      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net6.0 -p:Version="$(FullVersion)"'
 
   - task: Npm@1
     displayName: '$(Label_NodeJS) Write $[FullVersion] to package.json'
