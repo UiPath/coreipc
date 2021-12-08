@@ -230,7 +230,7 @@ namespace UiPath.CoreIpc
             Dispose();
             return;
 #if !NET461
-        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
+            [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
             async ValueTask HandleMessage()
             {
