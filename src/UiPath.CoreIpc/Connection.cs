@@ -235,21 +235,16 @@ namespace UiPath.CoreIpc
             async ValueTask HandleMessage()
             {
                 var messageType = (MessageType)_buffer[0];
-                object state = null;
-                Action<object> callback = null;
                 switch (messageType)
                 {
                     case MessageType.Response:
-                        state = await Deserialize<Response>();
-                        callback = _onResponse;
+                        RunAsync(_onResponse, await Deserialize<Response>());
                         break;
                     case MessageType.Request:
-                        state = await Deserialize<Request>();
-                        callback = _onRequest;
+                        RunAsync(_onRequest, await Deserialize<Request>());
                         break;
                     case MessageType.CancellationRequest:
-                        state = (await Deserialize<CancellationRequest>()).RequestId;
-                        callback = _onCancellation;
+                        RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
                         break;
                     case MessageType.UploadRequest:
                         await OnUploadRequest();
@@ -264,12 +259,10 @@ namespace UiPath.CoreIpc
                         }
                         break;
                 };
-                if (callback != null)
-                {
-                    _=Task.Factory.StartNew(callback, state, default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
-                }
             }
         }
+        static void RunAsync(Action<object> callback, object state) =>
+            Task.Factory.StartNew(callback, state, default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
         private async Task OnDownloadResponse()
         {
             var response = await Deserialize<Response>();
