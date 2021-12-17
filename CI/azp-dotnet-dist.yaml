@@ -20,4 +20,4 @@ steps:
     inputs:
       command: push
       packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.*nupkg'
-      publishVstsFeed: 'Public.Feeds/UiPath.Internal'
+      publishVstsFeed: 'Public.Feeds/UiPath-Internal'
