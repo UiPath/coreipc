@@ -13,3 +13,11 @@ steps:
       ArtifactName: '$(DotNet_ArtifactName)'
       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
       ArtifactType: 'Container'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'dotnet push to UiPath-Internal'
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+    inputs:
+      command: push
+      packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.*nupkg'
+      publishVstsFeed: 'Public.Feeds/UiPath.Internal'
