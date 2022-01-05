@@ -6,6 +6,7 @@
     <Authors>UiPath</Authors>
     <Version>2.4.0</Version>
     <PackageProjectUrl>https://github.com/UiPath/CoreIpc/</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>json-rpc rpc ipc netcore wcf</PackageTags>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <Description>WCF-like service model API for communication over named pipes and TCP.</Description>
