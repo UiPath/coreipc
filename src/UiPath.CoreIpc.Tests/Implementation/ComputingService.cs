@@ -77,6 +77,14 @@ namespace UiPath.CoreIpc.Tests
         TitleCase,
         Upper
     }
+
+    public class ConvertTextArgs
+    {
+        public TextStyle TextStyle { get; set; } = TextStyle.Upper;
+
+        public string Text { get; set; } = string.Empty;
+    }
+
     public class ComputingService : IComputingService
     {
         private readonly ILogger<ComputingService> _logger;

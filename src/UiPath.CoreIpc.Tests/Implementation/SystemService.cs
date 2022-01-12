@@ -16,6 +16,7 @@ namespace UiPath.CoreIpc.Tests
         Task VoidSyncThrow(CancellationToken cancellationToken = default);
         Task<string> GetThreadName(CancellationToken cancellationToken = default);
         Task<string> ConvertText(string text, TextStyle style, CancellationToken cancellationToken = default);
+        Task<string> ConvertTextWithArgs(ConvertTextArgs args, CancellationToken cancellationToken = default);
         Task<Guid> GetGuid(Guid guid, CancellationToken cancellationToken = default);
         Task<byte[]> ReverseBytes(byte[] input, CancellationToken cancellationToken = default);
         Task<bool> SlowOperation(CancellationToken cancellationToken = default);
@@ -45,6 +46,8 @@ namespace UiPath.CoreIpc.Tests
             await Task.Delay(Timeout.Infinite, cancellationToken);
             return true;
         }
+        public async Task<string> ConvertTextWithArgs(ConvertTextArgs args, CancellationToken cancellationToken = default)
+            => await ConvertText(args.Text, args.TextStyle, cancellationToken);
 
         public async Task<string> ConvertText(string text, TextStyle style, CancellationToken cancellationToken = default)
         {

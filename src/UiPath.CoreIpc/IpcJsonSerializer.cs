@@ -20,7 +20,7 @@ namespace UiPath.CoreIpc
     class IpcJsonSerializer : ISerializer, IArrayPool<char>
     {
         static readonly JsonLoadSettings LoadSettings = new(){ LineInfoHandling = LineInfoHandling.Ignore };
-        static readonly JsonSerializer DefaultSerializer = new(){ DefaultValueHandling = DefaultValueHandling.Ignore, NullValueHandling = NullValueHandling.Ignore, 
+        static readonly JsonSerializer DefaultSerializer = new(){ DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore, 
             CheckAdditionalContent = true };
 #if !NET461
         [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
