@@ -95,6 +95,14 @@ namespace UiPath.CoreIpc.Tests
         }
 
         [Fact]
+        public async Task PropertyWithTypeDefaultValue()
+        {
+            var args = new ConvertTextArgs { Text = "hEllO woRd!", TextStyle = default };
+            var text = await _systemClient.ConvertTextWithArgs(args);
+            text.ShouldBe("Hello Word!");
+        }
+
+        [Fact]
         public async Task MaxMessageSize()
         {
             _systemClient.ReverseBytes(new byte[MaxReceivedMessageSizeInMegabytes * 1024 * 1024]).ShouldThrow<Exception>();
