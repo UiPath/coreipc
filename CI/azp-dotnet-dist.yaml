@@ -19,5 +19,13 @@ steps:
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
     inputs:
       command: push
-      packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.*nupkg'
+      packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg'
       publishVstsFeed: 'Public.Feeds/UiPath-Internal'
+
+  - task: PublishSymbols@2
+    displayName: 'Publish Symbols to UiPath Azure Artifacts Symbol Server'
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+    inputs:
+      symbolsFolder: $(Build.SourcesDirectory)
+      searchPattern: '**/UiPath.CoreIpc/bin/**/UiPath.CoreIpc.pdb'
+      symbolServerType: teamServices
