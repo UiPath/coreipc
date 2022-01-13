@@ -22,6 +22,7 @@ namespace UiPath.CoreIpc
         static readonly JsonLoadSettings LoadSettings = new(){ LineInfoHandling = LineInfoHandling.Ignore };
         static readonly JsonSerializer DefaultSerializer = new(){ DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore, 
             CheckAdditionalContent = true };
+        static readonly JsonSerializer StringArgsSerializer = new(){ NullValueHandling = NullValueHandling.Ignore, CheckAdditionalContent = true };
 #if !NET461
         [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
@@ -41,11 +42,11 @@ namespace UiPath.CoreIpc
             { } => type.IsAssignableFrom(json.GetType()) ? json : new JValue(json).ToObject(type),
             null => null,
         };
-        public void Serialize(object obj, Stream stream) => Serialize(obj, new StreamWriter(stream));
-        private void Serialize(object obj, TextWriter streamWriter)
+        public void Serialize(object obj, Stream stream) => Serialize(obj, new StreamWriter(stream), DefaultSerializer);
+        private void Serialize(object obj, TextWriter streamWriter, JsonSerializer serializer)
         {
             using var writer = new JsonTextWriter(streamWriter) { ArrayPool = this, CloseOutput = false };
-            DefaultSerializer.Serialize(writer, obj);
+            serializer.Serialize(writer, obj);
             writer.Flush();
         }
         public char[] Rent(int minimumLength) => ArrayPool<char>.Shared.Rent(minimumLength);
@@ -53,7 +54,7 @@ namespace UiPath.CoreIpc
         public string Serialize(object obj)
         {
             var stringWriter = new StringWriter(new StringBuilder(capacity: 256), CultureInfo.InvariantCulture);
-            Serialize(obj, stringWriter);
+            Serialize(obj, stringWriter, StringArgsSerializer);
             return stringWriter.ToString();
         }
         public object Deserialize(string json, Type type)
