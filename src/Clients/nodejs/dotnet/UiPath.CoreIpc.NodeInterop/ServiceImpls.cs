@@ -69,5 +69,10 @@ namespace UiPath.CoreIpc.NodeInterop
         {
             public Task<string?> Get(string variable) => Task.FromResult<string?>(Environment.GetEnvironmentVariable(variable));
         }
+
+        public class Dto : IDto
+        {
+            public Dto ReturnDto(Dto myDto) => myDto;
+        }
     }
 }

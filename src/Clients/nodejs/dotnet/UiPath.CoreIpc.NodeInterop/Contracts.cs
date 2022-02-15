@@ -1,6 +1,7 @@
 ﻿using System.Threading.Tasks;
 using System.Threading;
 using System;
+using static UiPath.CoreIpc.NodeInterop.ServiceImpls;
 
 namespace UiPath.CoreIpc.NodeInterop
 {
@@ -36,6 +37,11 @@ namespace UiPath.CoreIpc.NodeInterop
         public interface IEnvironmentVariableGetter
         {
             Task<string?> Get(string variable);
+        }
+
+        public interface IDto
+        {
+            public Dto ReturnDto(Dto myDto);
         }
     }
 }

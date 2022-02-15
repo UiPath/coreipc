@@ -30,10 +30,63 @@ describe(`surface`, () => {
             }
         }
 
+        @ipc.$service
+        class IDto {
+            constructor(args?: {
+                refresh: boolean,
+                refreshTimeout: number,
+                arguments: string | null,
+                dtoMessage: Message
+            }) {
+                this.Refresh = args?.refresh;
+                this.RefreshTimeout = args?.refreshTimeout;
+                this.Arguments = args?.arguments;
+                this.DtoMessage = args?.dtoMessage;
+            }
+        
+            public Refresh?: boolean;
+            public RefreshTimeout?: number;
+            public Arguments?: string | null;
+            public DtoMessage?: Message;
+
+            public async ReturnDto(myDto: IDto): Promise<IDto> { return myDto; }
+        }
+
         const pipeName = 'b87d1d64-0d84-4678-81a0-594028662385';
         ipc.config(pipeName, builder => builder.setRequestTimeout(BIG));
         ipc.callback.set(IArithmetics, pipeName, new IArithmetics());
+        ipc.callback.set(IDto, pipeName, new IDto());
 
+        context('default params', () => {
+            it('should work for default numeric params', async () => {
+                const algebra = ipc.proxy.get(pipeName, IAlgebra);
+                await CoreIpcServerRunner.host(pipeName, async () => {
+                    await algebra.MultiplySimple(0, 0)
+                        .should.eventually.be.fulfilled
+                        .and.be.eq(0);
+    
+                    await algebra.Multiply(0, 0)
+                        .should.eventually.be.fulfilled
+                        .and.be.eq(0);
+                    });
+                });
+
+            it('should work for default complex params', async () => {
+                const algebra = ipc.proxy.get(pipeName, IAlgebra);
+                await CoreIpcServerRunner.host(pipeName, async () => {
+                    await algebra.Sleep(0, new Message({ requestTimeout: TimeSpan.fromMilliseconds(0) }), CancellationToken.none)
+                    .should.eventually.be.rejectedWith(TimeoutError)
+                    });
+                });
+
+            it('should work for default dto params', async () => {
+                const dto = ipc.proxy.get(pipeName, IDto);
+                await CoreIpcServerRunner.host(pipeName, async () => {
+                    dto.ReturnDto(new IDto ({refresh: false, refreshTimeout: 0, arguments: null, dtoMessage: new Message({ requestTimeout: TimeSpan.fromMilliseconds(0) })}))
+                    .should.eventually.be.fulfilled.and.be.eq(new IDto ({refresh: false, refreshTimeout: 0, arguments: null, dtoMessage: new Message({ requestTimeout: TimeSpan.fromMilliseconds(0) })}));
+                    });
+                });           
+        });
         context(`the timeout`, () => {
             it(`should be configurable via config`, async () => {
                 const proxy = ipc.proxy.get(pipeName, IAlgebra);
