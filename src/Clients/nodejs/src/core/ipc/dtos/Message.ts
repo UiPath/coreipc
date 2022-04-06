@@ -2,7 +2,7 @@
 
 import { TimeSpan, Timeout } from '../../../foundation';
 
-export class Message<T = void> {
+export class Message<T = number> {
     constructor(args?: {
         payload?: T,
         requestTimeout?: TimeSpan,

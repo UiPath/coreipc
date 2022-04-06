@@ -3,6 +3,7 @@ import { CoreIpcServerRunner, waitAllAndPrintAnyErrors as waitAllAndPrintAnyErro
 import { CancellationToken, TimeSpan, TimeoutError, SocketStream, Trace } from '@foundation';
 import { ipc, Message } from '@core';
 import { performance } from 'perf_hooks';
+import { Dto } from './Dto';
 
 describe(`surface`, () => {
     describe(`end-to-end`, () => {
@@ -17,6 +18,7 @@ describe(`surface`, () => {
             public Sleep(milliseconds: number, message: Message, ct: CancellationToken): Promise<boolean> { throw null; }
             public Timeout(): Promise<boolean> { throw null; }
             public Echo(x: number): Promise<number> { throw null; }
+            public TestMessage(msg: Message): Promise<boolean> { throw null; }
         }
 
         @ipc.$service
@@ -24,15 +26,45 @@ describe(`surface`, () => {
             public Ping(): Promise<string> { throw null; }
         }
 
+        @ipc.$service
+        class IDtoService {
+            @ipc.$operation({returnsPromiseOf: Dto})
+            public async ReturnDto(x: Dto): Promise<Dto> { throw null; }
+        }
+        
         class IArithmetics {
             public async Sum(x: number, y: number): Promise<number> {
                 return x + y;
+            }
+            public async SendMessage(m: Message): Promise<boolean> {
+                m.Payload!.should.be.eql(0);
+                return true;
             }
         }
 
         const pipeName = 'b87d1d64-0d84-4678-81a0-594028662385';
         ipc.config(pipeName, builder => builder.setRequestTimeout(BIG));
         ipc.callback.set(IArithmetics, pipeName, new IArithmetics());
+
+        context('default params', () => {
+            it('should work for default message param', async () => {
+                const algebra = ipc.proxy.get(pipeName, IAlgebra);
+                await CoreIpcServerRunner.host(pipeName, async () => {
+                    await algebra.TestMessage(new Message({payload: 0})).
+                    should.eventually.be.fulfilled.and.be.eq(true)
+                    });
+                });
+
+            it('should work for default dto param', async () => {
+                const dto = ipc.proxy.get(pipeName, IDtoService);
+                await CoreIpcServerRunner.host(pipeName, async () => {
+                    const actual = await dto.ReturnDto(new Dto (false, 0, null));
+                    actual.BoolProperty.should.be.eq(false);
+                    actual.IntProperty.should.be.eq(0);
+                    (actual.StringProperty == null).should.be.true;
+                    });
+                });      
+        });
 
         context(`the timeout`, () => {
             it(`should be configurable via config`, async () => {

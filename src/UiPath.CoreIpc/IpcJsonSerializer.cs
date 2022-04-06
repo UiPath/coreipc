@@ -22,7 +22,7 @@ namespace UiPath.CoreIpc
         static readonly JsonLoadSettings LoadSettings = new(){ LineInfoHandling = LineInfoHandling.Ignore };
         static readonly JsonSerializer DefaultSerializer = new(){ DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore, 
             CheckAdditionalContent = true };
-        static readonly JsonSerializer StringArgsSerializer = new(){ NullValueHandling = NullValueHandling.Ignore, CheckAdditionalContent = true };
+        static readonly JsonSerializer StringArgsSerializer = new(){ CheckAdditionalContent = true };
 #if !NET461
         [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
