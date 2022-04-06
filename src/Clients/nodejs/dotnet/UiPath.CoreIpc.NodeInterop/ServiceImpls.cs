@@ -27,6 +27,11 @@ namespace UiPath.CoreIpc.NodeInterop
 
                 return result;
             }
+            public async Task<bool> TestMessage(Message<int> message)
+            {
+                var arithmetics = message.GetCallback<IArithmetics>();
+                return await arithmetics.SendMessage(message);
+            }
 
             public async Task<bool> Sleep(int milliseconds, Message message = default, CancellationToken ct = default)
             {
@@ -70,9 +75,12 @@ namespace UiPath.CoreIpc.NodeInterop
             public Task<string?> Get(string variable) => Task.FromResult<string?>(Environment.GetEnvironmentVariable(variable));
         }
 
-        public class Dto : IDto
+        public sealed class DtoService : IDtoService
         {
-            public Dto ReturnDto(Dto myDto) => myDto;
+            public Task<Dto> ReturnDto(Dto myDto)
+            {
+                return Task.FromResult(myDto);
+            }
         }
     }
 }
