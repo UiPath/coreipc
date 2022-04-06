@@ -41,6 +41,20 @@ namespace UiPath.CoreIpc.Tests
             base.Dispose();
         }
         [Fact]
+        public async Task JustRunAsyncAndDispose()
+        {
+            var count = 1000;
+            while (count-- > 0)
+            {
+                var systemHost = Configure(new ServiceHostBuilder(_serviceProvider))
+                               .AddEndpoint<ISystemService>()
+                               .ValidateAndBuild();
+                var runTask = systemHost.RunAsync(GuiScheduler);
+                systemHost.Dispose();
+                await runTask;
+            }
+        }
+        [Fact]
         public async Task ConcurrentRequests()
         {
             var infinite = _systemClient.Infinite();

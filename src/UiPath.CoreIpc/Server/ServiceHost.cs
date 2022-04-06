@@ -35,7 +35,8 @@ namespace UiPath.CoreIpc
             {
                 endpoint.Scheduler = taskScheduler;
             }
-            return Task.Run(() => Task.WhenAll(_listeners.Select(listener => listener.Listen(_cancellationTokenSource.Token))));
+            var ct = _cancellationTokenSource.Token;
+            return Task.Run(() => Task.WhenAll(_listeners.Select(listener => listener.Listen(ct))));
         }
     }
 }

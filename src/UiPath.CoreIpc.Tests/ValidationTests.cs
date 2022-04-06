@@ -27,6 +27,8 @@ namespace UiPath.CoreIpc.Tests
         }
         [Fact]
         public void SerializeDefaultValueToString() => new IpcJsonSerializer().Serialize(new Message<int>(0)).ShouldBe("{\"Payload\":0}");
+        [Fact]
+        public void SerializeNullToString() => new IpcJsonSerializer().Serialize(new Message<string>(null)).ShouldBe("{\"Payload\":null}");
 #if DEBUG
         [Fact]
         public void MethodsMustReturnTask() => new Action(() => new NamedPipeClientBuilder<IInvalid>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Method does not return Task!");
