@@ -6,6 +6,8 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using UiPath.CoreIpc.Telemetry;
+
 namespace UiPath.CoreIpc
 {
     using RequestCompletionSource = TaskCompletionSource<Response>;
@@ -24,6 +26,7 @@ namespace UiPath.CoreIpc
         private readonly Action<object> _cancelUploadRequest;
         private readonly byte[] _buffer = new byte[sizeof(long)];
         private readonly NestedStream _nestedStream;
+        public ITelemetryProvider TelemetryProvider { get; set; }
         public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
         {
             Network = network;
@@ -241,7 +244,23 @@ namespace UiPath.CoreIpc
                         RunAsync(_onResponse, await Deserialize<Response>());
                         break;
                     case MessageType.Request:
-                        RunAsync(_onRequest, await Deserialize<Request>());
+                        var request = await Deserialize<Request>();
+                        var action = _onRequest;
+                        var operation = TelemetryProvider?.CreateOperation($"Request {request.Endpoint} {request.MethodName}");
+                        if (operation != null)
+                        {
+                            operation.SetParentId(request.CorrelationId);
+                            action = (object state) =>
+                            {
+                                operation.Start();
+                                using (operation)
+                                {
+                                    _onRequest(state);
+                                    operation.End();
+                                }
+                            };
+                        }
+                        RunAsync(action, request);
                         break;
                     case MessageType.CancellationRequest:
                         RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);

@@ -23,10 +23,11 @@ namespace UiPath.CoreIpc
     }
     class Request
     {
-        public Request(string endpoint, string id, string methodName, string[] parameters, object[] objectParameters, double timeoutInSeconds)
+        public Request(string endpoint, string id, string correlationId, string methodName, string[] parameters, object[] objectParameters, double timeoutInSeconds)
         {
             Endpoint = endpoint;
             Id = id;
+            CorrelationId = correlationId;
             MethodName = methodName;
             Parameters = parameters;
             TimeoutInSeconds = timeoutInSeconds;
@@ -35,6 +36,7 @@ namespace UiPath.CoreIpc
         public double TimeoutInSeconds { get; }
         public string Endpoint { get; }
         public string Id { get; }
+        public string CorrelationId { get; }
         public string MethodName { get; }
         public string[] Parameters { get; }
         public object[] ObjectParameters { get; }

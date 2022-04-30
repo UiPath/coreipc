@@ -7,6 +7,8 @@ using System.IO;
 using System.Net.Security;
 using System.Threading;
 using System.Threading.Tasks;
+using UiPath.CoreIpc.Telemetry;
+
 namespace UiPath.CoreIpc
 {
     public interface IClient
@@ -26,6 +28,7 @@ namespace UiPath.CoreIpc
         public ListenerSettings Settings => _listener.Settings;
         public abstract Task AcceptClient(CancellationToken cancellationToken);
         protected abstract Stream Network { get; }
+        public ITelemetryProvider TelemetryProvider => _listener?.TelemetryProvider;
         public virtual void Impersonate(Action action) => action();
         TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract, bool objectParameters) where TCallbackInterface : class
         {
@@ -45,9 +48,9 @@ namespace UiPath.CoreIpc
                     _listener.Log($"Create callback {callbackContract} {_listener.Name}");
                 }
                 _connectionAsTask ??= Task.FromResult(_connection);
-                var serviceClient = new ServiceClient<TCallbackInterface>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, _) => _connectionAsTask)
+                var serviceClient = new ServiceClient<TCallbackInterface>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, _) => _connectionAsTask, telemetryProvider: TelemetryProvider)
                 {
-                    ObjectParameters = objectParameters
+                    ObjectParameters = objectParameters,
                 };
                 return serviceClient.CreateProxy();
             }
@@ -56,7 +59,7 @@ namespace UiPath.CoreIpc
         {
             var stream = await AuthenticateAsServer();
             var serializer = Settings.ServiceProvider.GetRequiredService<ISerializer>();
-            _connection = new(stream, serializer, Logger, _listener.Name, _listener.MaxMessageSize);
+            _connection = new(stream, serializer, Logger, _listener.Name, _listener.MaxMessageSize) { TelemetryProvider = TelemetryProvider };
             _server = new(Settings, _connection, this, cancellationToken);
             // close the connection when the service host closes
             using (cancellationToken.Register(_connection.Dispose))

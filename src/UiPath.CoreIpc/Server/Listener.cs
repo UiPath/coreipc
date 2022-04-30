@@ -6,6 +6,7 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
+using UiPath.CoreIpc.Telemetry;
 
 namespace UiPath.CoreIpc
 {
@@ -30,11 +31,13 @@ namespace UiPath.CoreIpc
         public string Name => Settings.Name;
         public ILogger Logger { get; private set; }
         public IServiceProvider ServiceProvider => Settings.ServiceProvider;
+        public ITelemetryProvider TelemetryProvider;
         public ListenerSettings Settings { get; }
         public int MaxMessageSize { get; }
         public Task Listen(CancellationToken token)
         {
             Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
+            TelemetryProvider = ServiceProvider.GetService<ITelemetryProvider>();
             if (LogEnabled)
             {
                 Log($"Starting listener {Name}...");

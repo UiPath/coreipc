@@ -5,6 +5,7 @@ using System;
 using System.Security.Principal;
 using Microsoft.Extensions.Logging;
 using System.IO;
+using UiPath.CoreIpc.Telemetry;
 
 namespace UiPath.CoreIpc.NamedPipe
 {
@@ -20,8 +21,10 @@ namespace UiPath.CoreIpc.NamedPipe
 
     class NamedPipeClient<TInterface> : ServiceClient<TInterface>, INamedPipeKey where TInterface : class
     {
-        public NamedPipeClient(string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint)
-            : base(serializer, requestTimeout, logger, connectionFactory, sslServer, beforeCall, serviceEndpoint)
+        public NamedPipeClient(
+            string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint,
+            ITelemetryProvider telemetryProvider)
+            : base(serializer, requestTimeout, logger, connectionFactory, sslServer, beforeCall, serviceEndpoint, telemetryProvider)
         {
             ServerName = serverName;
             PipeName = pipeName;

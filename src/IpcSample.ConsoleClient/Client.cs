@@ -7,6 +7,7 @@ using UiPath.CoreIpc.NamedPipe;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Linq;
+using UiPath.CoreIpc.Telemetry;
 
 namespace UiPath.CoreIpc.Tests
 {
@@ -41,10 +42,13 @@ namespace UiPath.CoreIpc.Tests
             int count = 0;
             try
             {
-                var computingClient = computingClientBuilder.ValidateAndBuild();
+                var computingClient = computingClientBuilder
+                    .TelemetryProvider(serviceProvider.GetService<ITelemetryProvider>())
+                    .ValidateAndBuild();
                 var systemClient =
                     new NamedPipeClientBuilder<ISystemService>("test")
                     .RequestTimeout(TimeSpan.FromSeconds(2))
+                    .TelemetryProvider(serviceProvider.GetService<ITelemetryProvider>())
                     .Logger(serviceProvider)
                     .AllowImpersonation()
                     .ValidateAndBuild();
@@ -125,6 +129,7 @@ namespace UiPath.CoreIpc.Tests
         private static IServiceProvider ConfigureServices() =>
             new ServiceCollection()
                 .AddIpcWithLogging()
+                .AddSingleton<ITelemetryProvider, TestTelemetryProvider>()
                 .BuildServiceProvider();
     }
 }

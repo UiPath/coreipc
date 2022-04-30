@@ -4,6 +4,7 @@ using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using UiPath.CoreIpc.Telemetry;
 
 namespace UiPath.CoreIpc
 {
@@ -21,6 +22,7 @@ namespace UiPath.CoreIpc
         protected object _callbackInstance;
         protected TaskScheduler _taskScheduler;
         protected string _sslServer;
+        protected ITelemetryProvider _telemetryProvider;
 
         protected ServiceClientBuilder(Type callbackContract, IServiceProvider serviceProvider)
         {
@@ -60,7 +62,12 @@ namespace UiPath.CoreIpc
             return (TDerived)this;
         }
 
-        public TDerived Logger(IServiceProvider serviceProvider) => Logger(serviceProvider.GetRequiredService<ILogger<TInterface>>());
+        public TDerived Logger(IServiceProvider serviceProvider)
+        {
+            Logger(serviceProvider.GetRequiredService<ILogger<TInterface>>());
+            TelemetryProvider(serviceProvider.GetService<ITelemetryProvider>());
+            return (TDerived) this;
+        }
 
         public TDerived Serializer(ISerializer serializer)
         {
@@ -74,10 +81,21 @@ namespace UiPath.CoreIpc
             return (TDerived) this;
         }
 
+        public TDerived TelemetryProvider(ITelemetryProvider telemetryProvider)
+        {
+            _telemetryProvider = telemetryProvider;
+            return (TDerived) this;
+        }
+
         protected abstract TInterface BuildCore(EndpointSettings serviceEndpoint);
 
         public TInterface Build()
         {
+            if (_telemetryProvider == null)
+            {
+                _telemetryProvider = new PocTelemetryProvider();
+            }
+
             if (CallbackContract == null)
             {
                 return BuildCore(null);

@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Net.Security;
 using System.Diagnostics;
+using UiPath.CoreIpc.Telemetry;
+
 namespace UiPath.CoreIpc
 {
     using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
@@ -31,8 +33,9 @@ namespace UiPath.CoreIpc
         private Connection _connection;
         private Server _server;
         private ClientConnection _clientConnection;
+        private readonly ITelemetryProvider _telemetryProvider;
 
-        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
+        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null, ITelemetryProvider telemetryProvider = null)
         {
             _serializer = serializer;
             _requestTimeout = requestTimeout;
@@ -41,6 +44,11 @@ namespace UiPath.CoreIpc
             SslServer = sslServer;
             _beforeCall = beforeCall;
             _serviceEndpoint = serviceEndpoint;
+            _telemetryProvider = telemetryProvider;
+            if (telemetryProvider == null)
+            {
+                System.Diagnostics.Debugger.Launch();
+            }
         }
         protected int HashCode { get; init; }
         public string SslServer { get; init; }
@@ -48,6 +56,7 @@ namespace UiPath.CoreIpc
         private bool LogEnabled => _logger.Enabled();
         Connection IServiceClient.Connection => _connection;
         public bool ObjectParameters { get; init; } = true;
+        
 
         public TInterface CreateProxy()
         {
@@ -67,6 +76,7 @@ namespace UiPath.CoreIpc
                 return;
             }
             connection.Logger ??= _logger;
+            connection.TelemetryProvider ??= _telemetryProvider;
             var endpoints = new ConcurrentDictionary<string, EndpointSettings> { [_serviceEndpoint.Name] = _serviceEndpoint };
             var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
             _server = new(listenerSettings, connection);
@@ -105,7 +115,9 @@ namespace UiPath.CoreIpc
                         await _beforeCall(new(newConnection, method, args), token);
                     }
                     var requestId = _connection.NewRequestId();
-                    var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds)
+                    using var operation = _connection.TelemetryProvider.CreateOperation($"Call {typeof(TInterface).Name} {methodName}");
+                    operation.Start();
+                    var request = new Request(typeof(TInterface).Name, requestId, _connection.TelemetryProvider?.CorrelationId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds)
                     {
                         UploadStream = uploadStream
                     };
@@ -116,6 +128,7 @@ namespace UiPath.CoreIpc
                     if (ObjectParameters && !method.ReturnType.IsGenericType)
                     {
                         await _connection.Send(request, token);
+                        operation.End();
                         return default;
                     }
                     var response = await _connection.RemoteCall(request, token);
@@ -123,7 +136,9 @@ namespace UiPath.CoreIpc
                     {
                         Log($"IpcClient called {methodName} {requestId} {Name}.");
                     }
-                    return response.Deserialize<TResult>(_serializer, ObjectParameters);
+                    var desResult = response.Deserialize<TResult>(_serializer, ObjectParameters);
+                    operation.End();
+                    return desResult;
                 }
                 catch (Exception ex)
                 {

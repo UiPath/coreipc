@@ -8,6 +8,7 @@ using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 using UiPath.CoreIpc.NamedPipe;
+using UiPath.CoreIpc.Telemetry;
 
 namespace UiPath.CoreIpc.Tests
 {
@@ -52,6 +53,7 @@ namespace UiPath.CoreIpc.Tests
                 .AddIpcWithLogging()
                 .AddSingleton<IComputingService, ComputingService>()
                 .AddSingleton<ISystemService, SystemService>()
+                .AddSingleton<ITelemetryProvider, TestTelemetryProvider>()
                 .BuildServiceProvider();
     }
 }
