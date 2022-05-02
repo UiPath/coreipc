@@ -4,9 +4,10 @@ namespace UiPath.CoreIpc.Telemetry
 {
     public interface ITelemetryOperation : IDisposable
     {
-        void SetParentId(string correlationId);
-        void Start();
+        public bool Success { get; set; }
 
-        void End();
+        public string Status { get; set; }
+
+        public void AddEvent(string name);
     }
 }

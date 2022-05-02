@@ -65,7 +65,6 @@ namespace UiPath.CoreIpc
         public TDerived Logger(IServiceProvider serviceProvider)
         {
             Logger(serviceProvider.GetRequiredService<ILogger<TInterface>>());
-            TelemetryProvider(serviceProvider.GetService<ITelemetryProvider>());
             return (TDerived) this;
         }
 
@@ -91,19 +90,23 @@ namespace UiPath.CoreIpc
 
         public TInterface Build()
         {
+            if (_logger == null && _serviceProvider != null)
+            {
+                TelemetryProvider(_serviceProvider.GetService<ITelemetryProvider>());
+            }
+
+            _telemetryProvider ??= Fix.Crap;
+
             if (_telemetryProvider == null)
             {
-                _telemetryProvider = new PocTelemetryProvider();
+                System.Diagnostics.Debugger.Launch();
             }
 
             if (CallbackContract == null)
             {
                 return BuildCore(null);
             }
-            if (_logger == null)
-            {
-                Logger(_serviceProvider);
-            }
+
             return BuildCore(new(CallbackContract, _callbackInstance) { Scheduler = _taskScheduler, ServiceProvider = _serviceProvider });
         }
     }

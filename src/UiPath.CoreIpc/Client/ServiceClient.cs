@@ -44,11 +44,11 @@ namespace UiPath.CoreIpc
             SslServer = sslServer;
             _beforeCall = beforeCall;
             _serviceEndpoint = serviceEndpoint;
-            _telemetryProvider = telemetryProvider;
             if (telemetryProvider == null)
             {
                 System.Diagnostics.Debugger.Launch();
             }
+            _telemetryProvider = telemetryProvider;
         }
         protected int HashCode { get; init; }
         public string SslServer { get; init; }
@@ -97,6 +97,17 @@ namespace UiPath.CoreIpc
                 var methodName = method.Name;
                 SerializeArguments();
                 var timeoutHelper = TimeoutHelper.Creaate(clientTimeout, cancellationToken);
+
+                if (_telemetryProvider == null)
+                {
+                    Debugger.Launch();
+                }
+
+                using var operation = _telemetryProvider.StartDependency(
+                    $"Call {typeof(TInterface).Name}.{methodName}",
+                    type: "IPC",
+                    target: Name,
+                    correlationId: _telemetryProvider.CorrelationId);
                 try
                 {
                     var token = timeoutHelper.Token;
@@ -115,9 +126,7 @@ namespace UiPath.CoreIpc
                         await _beforeCall(new(newConnection, method, args), token);
                     }
                     var requestId = _connection.NewRequestId();
-                    using var operation = _connection.TelemetryProvider.CreateOperation($"Call {typeof(TInterface).Name} {methodName}");
-                    operation.Start();
-                    var request = new Request(typeof(TInterface).Name, requestId, _connection.TelemetryProvider?.CorrelationId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds)
+                    var request = new Request(typeof(TInterface).Name, requestId, _telemetryProvider.CorrelationId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds)
                     {
                         UploadStream = uploadStream
                     };
@@ -128,7 +137,7 @@ namespace UiPath.CoreIpc
                     if (ObjectParameters && !method.ReturnType.IsGenericType)
                     {
                         await _connection.Send(request, token);
-                        operation.End();
+                        operation.Success = true;
                         return default;
                     }
                     var response = await _connection.RemoteCall(request, token);
@@ -137,11 +146,13 @@ namespace UiPath.CoreIpc
                         Log($"IpcClient called {methodName} {requestId} {Name}.");
                     }
                     var desResult = response.Deserialize<TResult>(_serializer, ObjectParameters);
-                    operation.End();
+                    operation.AddEvent($"Response {typeof(TInterface).Name}.{methodName}");
+                    operation.Success = true;
                     return desResult;
                 }
                 catch (Exception ex)
                 {
+                    operation.Status = ex.Message;
                     timeoutHelper.ThrowTimeout(ex, methodName);
                     throw;
                 }
@@ -205,6 +216,16 @@ namespace UiPath.CoreIpc
 
         private async Task<bool> Connect(CancellationToken cancellationToken)
         {
+            if (_telemetryProvider == null)
+            {
+                Debugger.Launch();
+            }
+
+            using var operation = _telemetryProvider.StartDependency(
+                "Connect",
+                type: "IPC",
+                target: Name,
+                correlationId: _telemetryProvider.CorrelationId);
             var clientConnection = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
             try
             {

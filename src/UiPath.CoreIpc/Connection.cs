@@ -245,22 +245,13 @@ namespace UiPath.CoreIpc
                         break;
                     case MessageType.Request:
                         var request = await Deserialize<Request>();
-                        var action = _onRequest;
-                        var operation = TelemetryProvider?.CreateOperation($"Request {request.Endpoint} {request.MethodName}");
-                        if (operation != null)
+                        RunAsync((object state) =>
                         {
-                            operation.SetParentId(request.CorrelationId);
-                            action = (object state) =>
-                            {
-                                operation.Start();
-                                using (operation)
-                                {
-                                    _onRequest(state);
-                                    operation.End();
-                                }
-                            };
-                        }
-                        RunAsync(action, request);
+                            using var operation = TelemetryProvider.StartOperation(
+                                $"Request {request.Endpoint}.{request.MethodName}",
+                                request.CorrelationId);
+                            _onRequest(state);
+                        }, request);
                         break;
                     case MessageType.CancellationRequest:
                         RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
@@ -280,8 +271,14 @@ namespace UiPath.CoreIpc
                 };
             }
         }
-        static void RunAsync(Action<object> callback, object state) =>
-            Task.Factory.StartNew(callback, state, default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
+        static void RunAsync(Action<object> callback, object state)
+        {
+            using (ExecutionContext.SuppressFlow())
+            {
+                Task.Factory.StartNew(callback, state, default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
+            }
+        }
+
         private async Task OnDownloadResponse()
         {
             var response = await Deserialize<Response>();
