@@ -105,7 +105,7 @@ namespace UiPath.CoreIpc
                         await _beforeCall(new(newConnection, method, args), token);
                     }
                     var requestId = _connection.NewRequestId();
-                    var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds)
+                    var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds, Activity.Current?.Id)
                     {
                         UploadStream = uploadStream
                     };

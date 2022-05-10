@@ -24,6 +24,8 @@ namespace UiPath.CoreIpc
         private readonly Action<object> _cancelUploadRequest;
         private readonly byte[] _buffer = new byte[sizeof(long)];
         private readonly NestedStream _nestedStream;
+        private readonly ActivitySource _activitySource;
+
         public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
         {
             Network = network;
@@ -38,6 +40,7 @@ namespace UiPath.CoreIpc
             _onCancellation = requestId => OnCancellationReceived((string)requestId);
             _cancelRequest = requestId => CancelRequest((string)requestId);
             _cancelUploadRequest = requestId => CancelUploadRequest((string)requestId);
+            _activitySource = new ActivitySource("UiPath.CoreIPC.Connection");
         }
         public Stream Network { get; }
         public ILogger Logger { get; internal set; }
@@ -241,7 +244,19 @@ namespace UiPath.CoreIpc
                         RunAsync(_onResponse, await Deserialize<Response>());
                         break;
                     case MessageType.Request:
-                        RunAsync(_onRequest, await Deserialize<Request>());
+                        RunAsync((object state) =>
+                        {
+                            using (ExecutionContext.SuppressFlow())
+                            {
+                                var request = (Request)state;
+                                ActivityContext.TryParse(request.ParentId, null, out var parentContext);
+                                using var operation = _activitySource.StartActivity(
+                                    $"{request.Endpoint}.{request.MethodName}",
+                                    ActivityKind.Server,
+                                    parentContext: parentContext);
+                                _onRequest(request);
+                            }
+                        }, await Deserialize<Request>());
                         break;
                     case MessageType.CancellationRequest:
                         RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);

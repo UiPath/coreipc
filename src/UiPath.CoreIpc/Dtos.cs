@@ -23,7 +23,7 @@ namespace UiPath.CoreIpc
     }
     class Request
     {
-        public Request(string endpoint, string id, string methodName, string[] parameters, object[] objectParameters, double timeoutInSeconds)
+        public Request(string endpoint, string id, string methodName, string[] parameters, object[] objectParameters, double timeoutInSeconds, string parentId)
         {
             Endpoint = endpoint;
             Id = id;
@@ -39,6 +39,9 @@ namespace UiPath.CoreIpc
         public string[] Parameters { get; }
         public object[] ObjectParameters { get; }
         internal Stream UploadStream { get; set; }
+
+        public string ParentId { get; set; }
+
         public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
         internal bool HasObjectParameters => ObjectParameters is not null;
         internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
