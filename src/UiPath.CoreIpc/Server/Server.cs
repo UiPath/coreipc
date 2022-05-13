@@ -26,6 +26,8 @@ namespace UiPath.CoreIpc
         private readonly CancellationTokenSource _connectionClosed = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new();
         private readonly CancellationToken _hostCancellationToken;
+        private readonly ActivitySource _activitySource = new ActivitySource(Connection.ActivitySourceName);
+
         public Server(ListenerSettings settings, Connection connection, IClient client = null, CancellationToken cancellationToken = default)
         {
             Settings = settings;
@@ -166,8 +168,27 @@ namespace UiPath.CoreIpc
                     (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method.MethodInfo);
                     return objectParameters ? null : Response.Success(request, "");
                 }
+
                 Task MethodCall() => method.Invoke(service, arguments);
-                Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
+                Task<Task> RunOnScheduler()
+                {
+                    Func<Task> action = MethodCall;
+                    var parentId = Activity.Current?.Id;
+
+                    if (!string.IsNullOrWhiteSpace(parentId))
+                    {
+                        action = () =>
+                        {
+                            using var activity = _activitySource.StartActivity(
+                                $"INVOKE {method.MethodInfo.DeclaringType.Name}.{method.MethodInfo.Name}",
+                                ActivityKind.Internal,
+                                parentId: parentId);
+                            return MethodCall();
+                        };
+                    }
+
+                    return Task.Factory.StartNew(action, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
+                }
             }
             object[] GetArguments()
             {

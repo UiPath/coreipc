@@ -31,6 +31,7 @@ namespace UiPath.CoreIpc
             Parameters = parameters;
             TimeoutInSeconds = timeoutInSeconds;
             ObjectParameters = objectParameters;
+            ParentId = parentId;
         }
         public double TimeoutInSeconds { get; }
         public string Endpoint { get; }

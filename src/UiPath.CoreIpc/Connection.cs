@@ -12,6 +12,8 @@ namespace UiPath.CoreIpc
     using static IOHelpers;
     public sealed class Connection : IDisposable
     {
+        public const string ActivitySourceName = "UiPath.CoreIPC.Connection";
+
         private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new();
         private long _requestCounter = -1;
         private readonly int _maxMessageSize;
@@ -40,7 +42,7 @@ namespace UiPath.CoreIpc
             _onCancellation = requestId => OnCancellationReceived((string)requestId);
             _cancelRequest = requestId => CancelRequest((string)requestId);
             _cancelUploadRequest = requestId => CancelUploadRequest((string)requestId);
-            _activitySource = new ActivitySource("UiPath.CoreIPC.Connection");
+            _activitySource = new ActivitySource(ActivitySourceName);
         }
         public Stream Network { get; }
         public ILogger Logger { get; internal set; }
@@ -249,11 +251,10 @@ namespace UiPath.CoreIpc
                             using (ExecutionContext.SuppressFlow())
                             {
                                 var request = (Request)state;
-                                ActivityContext.TryParse(request.ParentId, null, out var parentContext);
                                 using var operation = _activitySource.StartActivity(
-                                    $"{request.Endpoint}.{request.MethodName}",
-                                    ActivityKind.Server,
-                                    parentContext: parentContext);
+                                    $"REQUEST {request.Endpoint}.{request.MethodName}",
+                                    ActivityKind.Internal,
+                                    parentId: request.ParentId);
                                 _onRequest(request);
                             }
                         }, await Deserialize<Request>());

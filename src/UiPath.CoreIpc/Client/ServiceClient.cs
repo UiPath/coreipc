@@ -31,6 +31,7 @@ namespace UiPath.CoreIpc
         private Connection _connection;
         private Server _server;
         private ClientConnection _clientConnection;
+        private readonly ActivitySource _activitySource;
 
         internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
         {
@@ -41,6 +42,7 @@ namespace UiPath.CoreIpc
             SslServer = sslServer;
             _beforeCall = beforeCall;
             _serviceEndpoint = serviceEndpoint;
+            _activitySource = new ActivitySource(Connection.ActivitySourceName);
         }
         protected int HashCode { get; init; }
         public string SslServer { get; init; }
@@ -105,7 +107,15 @@ namespace UiPath.CoreIpc
                         await _beforeCall(new(newConnection, method, args), token);
                     }
                     var requestId = _connection.NewRequestId();
-                    var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds, Activity.Current?.Id)
+
+                    using var operation = _activitySource.StartActivity(
+                        $"PROXY {GetType().Name}.{methodName}",
+                        ActivityKind.Internal);
+
+                    // operation is null if no listeners active
+                    var traceId = operation?.Id ?? Activity.Current?.Id;
+
+                    var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds, traceId)
                     {
                         UploadStream = uploadStream
                     };
