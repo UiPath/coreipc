@@ -24,15 +24,7 @@ namespace UiPath.CoreIpc.NamedPipe
                 _server = IOHelpers.NewNamedPipeServerStream(Settings.Name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
                     PipeTransmissionMode.Byte, PipeOptions.Asynchronous, GetPipeSecurity);
             }
-            public override async Task AcceptClient(CancellationToken cancellationToken)
-            {
-                // on linux WaitForConnectionAsync has to be cancelled with Dispose
-                // fixed in 6.0 https://github.com/dotnet/runtime/pull/53340
-                using (cancellationToken.Register(Dispose))
-                {
-                    await _server.WaitForConnectionAsync();
-                }
-            }
+            public override Task AcceptClient(CancellationToken cancellationToken) => _server.WaitForConnectionAsync(cancellationToken);
             protected override Stream Network => _server;
             public override void Impersonate(Action action) => _server.RunAsClient(()=>action());
             protected override void Dispose(bool disposing)
