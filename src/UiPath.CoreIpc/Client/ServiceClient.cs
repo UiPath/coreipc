@@ -32,8 +32,9 @@ namespace UiPath.CoreIpc
         private Server _server;
         private ClientConnection _clientConnection;
 
-        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
+        internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, bool objectParameters = false, EndpointSettings serviceEndpoint = null)
         {
+            ObjectParameters = objectParameters;
             _serializer = serializer;
             _requestTimeout = requestTimeout;
             _logger = logger;
@@ -47,7 +48,7 @@ namespace UiPath.CoreIpc
         public virtual string Name => _connection?.Name;
         private bool LogEnabled => _logger.Enabled();
         Connection IServiceClient.Connection => _connection;
-        public bool ObjectParameters { get; init; } = true;
+        public bool ObjectParameters { get; init; }
 
         public TInterface CreateProxy()
         {

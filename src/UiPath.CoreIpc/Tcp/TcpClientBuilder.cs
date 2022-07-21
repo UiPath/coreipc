@@ -12,7 +12,7 @@ namespace UiPath.CoreIpc.Tcp
             _endPoint = endPoint;
 
         protected override TInterface BuildCore(EndpointSettings serviceEndpoint) =>
-            new TcpClient<TInterface>(_endPoint, _serializer, _requestTimeout, _logger, _connectionFactory, _sslServer, _beforeCall, serviceEndpoint).CreateProxy();
+            new TcpClient<TInterface>(_endPoint, _serializer, _requestTimeout, _logger, _connectionFactory, _sslServer, _beforeCall, _objectParameters, serviceEndpoint).CreateProxy();
     }
 
     public class TcpClientBuilder<TInterface> : TcpClientBuilderBase<TcpClientBuilder<TInterface>, TInterface> where TInterface : class

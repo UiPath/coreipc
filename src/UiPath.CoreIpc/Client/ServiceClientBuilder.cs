@@ -21,6 +21,7 @@ namespace UiPath.CoreIpc
         protected object _callbackInstance;
         protected TaskScheduler _taskScheduler;
         protected string _sslServer;
+        protected bool _objectParameters;
 
         protected ServiceClientBuilder(Type callbackContract, IServiceProvider serviceProvider)
         {
@@ -57,6 +58,12 @@ namespace UiPath.CoreIpc
         public TDerived Logger(ILogger logger)
         {
             _logger = logger;
+            return (TDerived)this;
+        }
+
+        public TDerived SerializeParametersAsObjects()
+        {
+            _objectParameters = true;
             return (TDerived)this;
         }
 

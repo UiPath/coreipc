@@ -20,8 +20,8 @@ namespace UiPath.CoreIpc.NamedPipe
 
     class NamedPipeClient<TInterface> : ServiceClient<TInterface>, INamedPipeKey where TInterface : class
     {
-        public NamedPipeClient(string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint)
-            : base(serializer, requestTimeout, logger, connectionFactory, sslServer, beforeCall, serviceEndpoint)
+        public NamedPipeClient(string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, bool objectParameters, EndpointSettings serviceEndpoint)
+            : base(serializer, requestTimeout, logger, connectionFactory, sslServer, beforeCall, objectParameters, serviceEndpoint)
         {
             ServerName = serverName;
             PipeName = pipeName;

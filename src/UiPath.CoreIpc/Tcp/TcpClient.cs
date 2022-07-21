@@ -16,7 +16,7 @@ namespace UiPath.CoreIpc.Tcp
     }
     class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterface : class
     {
-        public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, sslServer, beforeCall, serviceEndpoint)
+        public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, bool objectParameters, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, sslServer, beforeCall, objectParameters, serviceEndpoint)
         {
             EndPoint = endPoint;
             HashCode = (EndPoint, sslServer).GetHashCode();
