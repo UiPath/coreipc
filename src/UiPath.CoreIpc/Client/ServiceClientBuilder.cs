@@ -60,7 +60,12 @@ namespace UiPath.CoreIpc
             _logger = logger;
             return (TDerived)this;
         }
-
+        /// <summary>
+        /// By default, method parameters are serialized as string in the json. Setting this allows serialization as json objects.
+        /// This should improve performance, especially for large objects. But it breaks compatibility with older servers.
+        /// So a proxy with this setting will only be able to connect to servers that understand the new encoding.
+        /// </summary>
+        /// <returns>this</returns>
         public TDerived SerializeParametersAsObjects()
         {
             _objectParameters = true;
