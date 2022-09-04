@@ -7,82 +7,81 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace UiPath.CoreIpc
+namespace UiPath.CoreIpc;
+
+public class ListenerSettings
 {
-    public class ListenerSettings
+    public ListenerSettings(string name) => Name = name;
+    public byte ConcurrentAccepts { get; set; } = 5;
+    public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
+    public X509Certificate Certificate { get; set; }
+    public string Name { get; }
+    public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
+    internal IServiceProvider ServiceProvider { get; set; }
+    internal IDictionary<string, EndpointSettings> Endpoints { get; set; }
+}
+abstract class Listener : IDisposable
+{
+    protected Listener(ListenerSettings settings)
     {
-        public ListenerSettings(string name) => Name = name;
-        public byte ConcurrentAccepts { get; set; } = 5;
-        public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
-        public X509Certificate Certificate { get; set; }
-        public string Name { get; }
-        public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
-        internal IServiceProvider ServiceProvider { get; set; }
-        internal IDictionary<string, EndpointSettings> Endpoints { get; set; }
+        Settings = settings;
+        MaxMessageSize = settings.MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
     }
-    abstract class Listener : IDisposable
+    public string Name => Settings.Name;
+    public ILogger Logger { get; private set; }
+    public IServiceProvider ServiceProvider => Settings.ServiceProvider;
+    public ListenerSettings Settings { get; }
+    public int MaxMessageSize { get; }
+    public Task Listen(CancellationToken token)
     {
-        protected Listener(ListenerSettings settings)
+        Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
+        if (LogEnabled)
         {
-            Settings = settings;
-            MaxMessageSize = settings.MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
+            Log($"Starting listener {Name}...");
         }
-        public string Name => Settings.Name;
-        public ILogger Logger { get; private set; }
-        public IServiceProvider ServiceProvider => Settings.ServiceProvider;
-        public ListenerSettings Settings { get; }
-        public int MaxMessageSize { get; }
-        public Task Listen(CancellationToken token)
+        return Task.WhenAll(Enumerable.Range(1, Settings.ConcurrentAccepts).Select(async _ =>
         {
-            Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
-            if (LogEnabled)
+            while (!token.IsCancellationRequested)
             {
-                Log($"Starting listener {Name}...");
+                await AcceptConnection(token);
             }
-            return Task.WhenAll(Enumerable.Range(1, Settings.ConcurrentAccepts).Select(async _ =>
-            {
-                while (!token.IsCancellationRequested)
-                {
-                    await AcceptConnection(token);
-                }
-            }));
-        }
-        protected abstract ServerConnection CreateServerConnection();
-        async Task AcceptConnection(CancellationToken token)
-        {
-            var serverConnection = CreateServerConnection();
-            try
-            {
-                await serverConnection.AcceptClient(token);
-                serverConnection.Listen(token).LogException(Logger, Name);
-            }
-            catch (Exception ex)
-            {
-                serverConnection.Dispose();
-                if (!token.IsCancellationRequested)
-                {
-                    Logger.LogException(ex, Settings.Name);
-                }
-            }
-        }
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposing)
-            {
-                return;
-            }
-            Settings.Certificate?.Dispose();
-        }
-        public void Dispose()
-        {
-            if (LogEnabled)
-            {
-                Log($"Stopping listener {Name}...");
-            }
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
-        }
-        public void Log(string message) => Logger.LogInformation(message);
-        public bool LogEnabled => Logger.Enabled();
+        }));
     }
+    protected abstract ServerConnection CreateServerConnection();
+    async Task AcceptConnection(CancellationToken token)
+    {
+        var serverConnection = CreateServerConnection();
+        try
+        {
+            await serverConnection.AcceptClient(token);
+            serverConnection.Listen(token).LogException(Logger, Name);
+        }
+        catch (Exception ex)
+        {
+            serverConnection.Dispose();
+            if (!token.IsCancellationRequested)
+            {
+                Logger.LogException(ex, Settings.Name);
+            }
+        }
+    }
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+        Settings.Certificate?.Dispose();
+    }
+    public void Dispose()
+    {
+        if (LogEnabled)
+        {
+            Log($"Stopping listener {Name}...");
+        }
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+    public void Log(string message) => Logger.LogInformation(message);
+    public bool LogEnabled => Logger.Enabled();
 }

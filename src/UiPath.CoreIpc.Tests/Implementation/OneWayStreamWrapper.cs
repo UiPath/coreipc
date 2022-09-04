@@ -5,105 +5,104 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-namespace UiPath.CoreIpc.Tests
+namespace UiPath.CoreIpc.Tests;
+
+internal class OneWayStreamWrapper : Stream
 {
-    internal class OneWayStreamWrapper : Stream
+    private readonly Stream innerStream;
+    private readonly bool canRead;
+    private readonly bool canWrite;
+
+    internal OneWayStreamWrapper(Stream innerStream, bool canRead = false, bool canWrite = false)
     {
-        private readonly Stream innerStream;
-        private readonly bool canRead;
-        private readonly bool canWrite;
-
-        internal OneWayStreamWrapper(Stream innerStream, bool canRead = false, bool canWrite = false)
+        if (canRead == canWrite)
         {
-            if (canRead == canWrite)
-            {
-                throw new ArgumentException("Exactly one operation (read or write) must be true.");
-            }
-            this.innerStream = innerStream ?? throw new ArgumentNullException(nameof(innerStream));
-            this.canRead = canRead;
-            this.canWrite = canWrite;
+            throw new ArgumentException("Exactly one operation (read or write) must be true.");
         }
+        this.innerStream = innerStream ?? throw new ArgumentNullException(nameof(innerStream));
+        this.canRead = canRead;
+        this.canWrite = canWrite;
+    }
 
-        public override bool CanRead => this.canRead && this.innerStream.CanRead;
+    public override bool CanRead => this.canRead && this.innerStream.CanRead;
 
-        public override bool CanSeek => false;
+    public override bool CanSeek => false;
 
-        public override bool CanWrite => this.canWrite && this.innerStream.CanWrite;
+    public override bool CanWrite => this.canWrite && this.innerStream.CanWrite;
 
-        public override long Length => throw new NotSupportedException();
+    public override long Length => throw new NotSupportedException();
 
-        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
-        public override void Flush()
+    public override void Flush()
+    {
+        if (this.CanWrite)
         {
-            if (this.CanWrite)
-            {
-                this.innerStream.Flush();
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
+            this.innerStream.Flush();
         }
-
-        public override int Read(byte[] buffer, int offset, int count)
+        else
         {
-            if (this.CanRead)
-            {
-                return this.innerStream.Read(buffer, offset, count);
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
+            throw new NotSupportedException();
         }
+    }
 
-        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        if (this.CanRead)
         {
-            if (this.CanRead)
-            {
-                return this.innerStream.ReadAsync(buffer, offset, count, cancellationToken);
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
+            return this.innerStream.Read(buffer, offset, count);
         }
-
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-
-        public override void SetLength(long value) => throw new NotSupportedException();
-
-        public override void Write(byte[] buffer, int offset, int count)
+        else
         {
-            if (this.CanWrite)
-            {
-                this.innerStream.Write(buffer, offset, count);
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
+            throw new NotSupportedException();
         }
+    }
 
-        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+    {
+        if (this.CanRead)
         {
-            if (this.CanWrite)
-            {
-                return this.innerStream.WriteAsync(buffer, offset, count, cancellationToken);
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
+            return this.innerStream.ReadAsync(buffer, offset, count, cancellationToken);
         }
-
-        protected override void Dispose(bool disposing)
+        else
         {
-            if (disposing)
-            {
-                this.innerStream.Dispose();
-            }
+            throw new NotSupportedException();
+        }
+    }
+
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+    public override void SetLength(long value) => throw new NotSupportedException();
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        if (this.CanWrite)
+        {
+            this.innerStream.Write(buffer, offset, count);
+        }
+        else
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+    {
+        if (this.CanWrite)
+        {
+            return this.innerStream.WriteAsync(buffer, offset, count, cancellationToken);
+        }
+        else
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            this.innerStream.Dispose();
         }
     }
 }
