@@ -1,7 +1,5 @@
 ﻿using System;
-using System.IO;
 using System.IO.Pipes;
-using System.Security.Cryptography.X509Certificates;
 using System.Security.Principal;
 using System.Threading.Tasks;
 using Shouldly;

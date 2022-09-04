@@ -1,11 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace UiPath.CoreIpc;
+﻿namespace UiPath.CoreIpc;
 
 using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;

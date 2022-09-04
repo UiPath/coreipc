@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using UiPath.CoreIpc.NamedPipe;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using System.Linq;
 
 namespace UiPath.CoreIpc.Tests;

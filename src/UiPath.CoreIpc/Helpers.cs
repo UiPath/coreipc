@@ -1,20 +1,9 @@
-﻿using Microsoft.Extensions.Logging;
-using Microsoft.IO;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
+﻿using Microsoft.IO;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
-using System.IO;
 using System.IO.Pipes;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
-using System.Threading;
-using System.Threading.Tasks;
 namespace UiPath.CoreIpc;
 
 public static class Helpers

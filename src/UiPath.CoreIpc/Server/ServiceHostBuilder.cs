@@ -1,10 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace UiPath.CoreIpc;
+﻿namespace UiPath.CoreIpc;
 
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 public class ServiceHostBuilder

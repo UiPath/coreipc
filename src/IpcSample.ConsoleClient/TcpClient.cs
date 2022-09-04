@@ -5,10 +5,8 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using UiPath.CoreIpc.Tcp;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using System.Linq;
 using System.Net;
-using System.IO;
 
 namespace UiPath.CoreIpc.Tests;
 

@@ -1,12 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
-namespace UiPath.CoreIpc;
+﻿namespace UiPath.CoreIpc;
 
 using RequestCompletionSource = TaskCompletionSource<Response>;
 using static IOHelpers;
