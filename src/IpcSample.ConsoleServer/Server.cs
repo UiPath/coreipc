@@ -1,8 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using System;
 using System.Diagnostics;
-using System.Threading;
-using System.Threading.Tasks;
 using UiPath.CoreIpc.NamedPipe;
 
 namespace UiPath.CoreIpc.Tests;

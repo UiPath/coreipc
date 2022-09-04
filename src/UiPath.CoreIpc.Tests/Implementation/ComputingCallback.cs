@@ -1,8 +1,4 @@
-﻿using Shouldly;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace UiPath.CoreIpc.Tests;
+﻿namespace UiPath.CoreIpc.Tests;
 
 public interface IComputingCallback
 {

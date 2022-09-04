@@ -1,11 +1,7 @@
-﻿using System;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Text;
 using System.Diagnostics;
 using UiPath.CoreIpc.NamedPipe;
 using Microsoft.Extensions.DependencyInjection;
-using System.Linq;
 
 namespace UiPath.CoreIpc.Tests;
 

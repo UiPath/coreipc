@@ -1,10 +1,5 @@
-﻿using System;
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Security.Principal;
-using System.Threading.Tasks;
-using Shouldly;
-using UiPath.CoreIpc.NamedPipe;
-using Xunit;
 namespace UiPath.CoreIpc.Tests;
 
 public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemService>>

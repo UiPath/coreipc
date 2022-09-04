@@ -1,12 +1,4 @@
-﻿using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Shouldly;
-using Xunit;
-
-namespace UiPath.CoreIpc.Tests;
+﻿namespace UiPath.CoreIpc.Tests;
 
 public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : ServiceClientBuilder<TBuilder, IComputingService>
 {

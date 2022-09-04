@@ -1,13 +1,4 @@
-﻿using System;
-using System.Threading;
-using System.Linq;
-using System.Threading.Tasks;
-using UiPath.CoreIpc.NamedPipe;
-using Microsoft.Extensions.DependencyInjection;
-using Xunit;
-using Shouldly;
-
-namespace UiPath.CoreIpc.Tests;
+﻿namespace UiPath.CoreIpc.Tests;
 
 public class EndpointTests : IDisposable
 {

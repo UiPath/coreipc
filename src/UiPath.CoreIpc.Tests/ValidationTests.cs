@@ -1,10 +1,4 @@
-﻿using Shouldly;
-using System;
-using System.IO;
-using UiPath.CoreIpc.NamedPipe;
-using Xunit;
-
-namespace UiPath.CoreIpc.Tests;
+﻿namespace UiPath.CoreIpc.Tests;
 
 public class ValidationTests
 {

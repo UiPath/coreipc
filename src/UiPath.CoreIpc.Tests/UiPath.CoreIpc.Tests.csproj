@@ -5,6 +5,7 @@
     <NoWarn>$(NoWarn);1998</NoWarn>
     <DefineConstants>$(DefineConstants);$(DefineConstantsEx)</DefineConstants>
     <LangVersion>latest</LangVersion>
+    <ImplicitUsings>true</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,5 +19,12 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3" PrivateAssets="All" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.0.0" />
   </ItemGroup>
-
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Shouldly" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="System.Reflection" />
+    <Using Include="System.Diagnostics" />
+    <Using Include="UiPath.CoreIpc.NamedPipe" />
+  </ItemGroup>
 </Project>
