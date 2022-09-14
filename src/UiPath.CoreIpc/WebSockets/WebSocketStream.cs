@@ -1,5 +1,5 @@
 ﻿using System.Net.WebSockets;
-namespace Nerdbank.Streams;
+namespace UiPath.CoreIpc;
 /// <summary>
 /// Exposes a <see cref="WebSocket"/> as a <see cref="Stream"/>.
 /// https://github.com/AArnott/Nerdbank.Streams/blob/main/src/Nerdbank.Streams/WebSocketStream.cs
