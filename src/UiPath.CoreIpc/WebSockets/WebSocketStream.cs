@@ -48,7 +48,7 @@ public class WebSocketStream : Stream
         {
             return 0;
         }
-        var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer, offset, count), cancellationToken).ConfigureAwait(false);
+        var result = await _webSocket.ReceiveAsync(new(buffer, offset, count), cancellationToken).ConfigureAwait(false);
         return result.Count;
     }
     /// <inheritdoc />
@@ -57,7 +57,7 @@ public class WebSocketStream : Stream
     public override void SetLength(long value) => throw ThrowDisposedOr(new NotSupportedException());
     /// <inheritdoc />
     public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
-        _webSocket.SendAsync(new ArraySegment<byte>(buffer, offset, count), WebSocketMessageType.Binary, true, cancellationToken);
+        _webSocket.SendAsync(new(buffer, offset, count), WebSocketMessageType.Binary, endOfMessage: true, cancellationToken);
     /// <inheritdoc />
     public override int Read(byte[] buffer, int offset, int count) => ReadAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
     /// <inheritdoc />
@@ -69,5 +69,12 @@ public class WebSocketStream : Stream
         _webSocket.Dispose();
         base.Dispose(disposing);
     }
-    private static Exception ThrowDisposedOr(Exception ex) => throw ex;
+    private Exception ThrowDisposedOr(Exception ex)
+    {
+        if (IsDisposed)
+        {
+            throw new ObjectDisposedException(ToString());
+        }
+        throw ex;
+    }
 }
