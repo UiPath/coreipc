@@ -1,8 +1,6 @@
 ﻿using System.Net;
 using UiPath.CoreIpc.Tcp;
-
 namespace UiPath.CoreIpc.Tests;
-
 public class SystemTcpTests : SystemTests<TcpClientBuilder<ISystemService>>
 {
     int _port = 3131 + GetCount();
