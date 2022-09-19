@@ -30,7 +30,6 @@ class WebSocketClient<TInterface> : ServiceClient<TInterface>, IWebSocketsKey wh
         public override async Task<Stream> Connect(CancellationToken cancellationToken)
         {
             _clientWebSocket = new();
-            using var token = cancellationToken.Register(Dispose);
             var uri = ((IWebSocketsKey)ConnectionKey).Uri;
             await _clientWebSocket.ConnectAsync(uri, cancellationToken);
             return new WebSocketStream(_clientWebSocket);

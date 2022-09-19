@@ -1,7 +1,7 @@
 [![Build Status](https://uipath.visualstudio.com/CoreIpc/_apis/build/status/CI?branchName=master)](https://uipath.visualstudio.com/CoreIpc/_build/latest?definitionId=637&branchName=master)
 [![MyGet (dev)](https://img.shields.io/badge/CoreIpc-Preview-brightgreen)](https://uipath.visualstudio.com/Public.Feeds/_packaging?_a=package&feed=UiPath-Internal&view=versions&package=UiPath.CoreIpc&protocolType=NuGet)
 # CoreIpc
-WCF-like service model API for communication over named pipes and TCP. .NET and [Node.js](src/Clients/nodejs) clients.
+WCF-like service model API for communication over named pipes, TCP and web sockets. .NET and [Node.js](src/Clients/nodejs) clients.
 - async
 - json serialization
 - DI integration
