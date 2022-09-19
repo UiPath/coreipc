@@ -20,8 +20,11 @@ class NamedPipeListener : Listener
             _server = IOHelpers.NewNamedPipeServerStream(Settings.Name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
                 PipeTransmissionMode.Byte, PipeOptions.Asynchronous, GetPipeSecurity);
         }
-        public override Task AcceptClient(CancellationToken cancellationToken) => _server.WaitForConnectionAsync(cancellationToken);
-        protected override Stream Network => _server;
+        public override async Task<Stream> AcceptClient(CancellationToken cancellationToken)
+        {
+            await _server.WaitForConnectionAsync(cancellationToken);
+            return _server;
+        }
         public override void Impersonate(Action action) => _server.RunAsClient(()=>action());
         protected override void Dispose(bool disposing)
         {

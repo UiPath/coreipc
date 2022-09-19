@@ -46,8 +46,8 @@ abstract class Listener : IDisposable
         var serverConnection = CreateServerConnection();
         try
         {
-            await serverConnection.AcceptClient(token);
-            serverConnection.Listen(token).LogException(Logger, Name);
+            var network = await serverConnection.AcceptClient(token);
+            serverConnection.Listen(network, token).LogException(Logger, Name);
         }
         catch (Exception ex)
         {

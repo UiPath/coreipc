@@ -12,16 +12,9 @@ class WebSocketListener : Listener
     protected override ServerConnection CreateServerConnection() => new WebSocketConnection(this);
     class WebSocketConnection : ServerConnection
     {
-        WebSocketStream _webSocketStream;
         public WebSocketConnection(Listener listener) : base(listener){}
-        public override async Task AcceptClient(CancellationToken cancellationToken) =>
-            _webSocketStream = new(await ((WebSocketSettings)_listener.Settings).Accept(cancellationToken));
-        protected override void Dispose(bool disposing)
-        {
-            _webSocketStream?.Dispose();
-            base.Dispose(disposing);
-        }
-        protected override Stream Network => _webSocketStream;
+        public override async Task<Stream> AcceptClient(CancellationToken cancellationToken) => 
+            new WebSocketStream(await ((WebSocketSettings)_listener.Settings).Accept(cancellationToken));
     }
 }
 public static class WebSocketServiceExtensions

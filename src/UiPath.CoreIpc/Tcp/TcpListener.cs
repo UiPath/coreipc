@@ -29,14 +29,16 @@ class TcpListener : Listener
     {
         System.Net.Sockets.TcpClient _tcpClient;
         public TcpServerConnection(Listener listener) : base(listener){}
-        public override async Task AcceptClient(CancellationToken cancellationToken) =>
+        public override async Task<Stream> AcceptClient(CancellationToken cancellationToken)
+        {
             _tcpClient = await ((TcpListener)_listener).AcceptClient(cancellationToken);
+            return _tcpClient.GetStream();
+        }
         protected override void Dispose(bool disposing)
         {
             _tcpClient?.Dispose();
             base.Dispose(disposing);
         }
-        protected override Stream Network => _tcpClient.GetStream();
     }
 }
 public static class TcpServiceExtensions
