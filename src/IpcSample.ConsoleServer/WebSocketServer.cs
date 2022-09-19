@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.CoreIpc.NamedPipe;
-
+using System.Net;
+using System.Net.WebSockets;
+using UiPath.CoreIpc.WebSockets;
 namespace UiPath.CoreIpc.Tests;
-
-class Server
+class WebSocketServer
 {
     //private static readonly Timer _timer = new Timer(_ =>
     //{
@@ -13,31 +13,49 @@ class Server
     //    GC.WaitForPendingFinalizers();
     //    GC.Collect();
     //}, null, 0, 3000);
-    static async Task _Main()
+
+    static async Task Main()
     {
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
         //GuiLikeSyncContext.Install();
         Console.WriteLine(SynchronizationContext.Current);
         var serviceProvider = ConfigureServices();
+        var httpListener = new HttpListener();
+        httpListener.Prefixes.Add("http://localhost:1212/wsDemo/");
+        httpListener.Start();
         // build and run service host
+        //var data = File.ReadAllBytes(@"../../../../localhost.pfx");
         var host = new ServiceHostBuilder(serviceProvider)
-            .UseNamedPipes(new NamedPipeSettings("test")
+            .UseWebSockets(new(Accept)
             {
                 RequestTimeout = TimeSpan.FromSeconds(2),
-                //AccessControl = security => security.AllowCurrentUser(),
+                //Certificate = new X509Certificate(data, "1"),
             })
             .AddEndpoint<IComputingService, IComputingCallback>()
             .AddEndpoint<ISystemService>()
             .ValidateAndBuild();
-
         await await Task.WhenAny(host.RunAsync(), Task.Run(() =>
         {
             Console.WriteLine(typeof(int).Assembly);
             Console.ReadLine();
             host.Dispose();
         }));
-
         Console.WriteLine("Server stopped.");
+        return;
+        async Task<WebSocket> Accept(CancellationToken token)
+        {
+            while (true)
+            {
+                var listenerContext = await httpListener.GetContextAsync();
+                if (listenerContext.Request.IsWebSocketRequest)
+                {
+                    var webSocketContext = await listenerContext.AcceptWebSocketAsync(subProtocol: null);
+                    return webSocketContext.WebSocket;
+                }
+                listenerContext.Response.StatusCode = 400;
+                listenerContext.Response.Close();
+            }
+        }
     }
 
     private static IServiceProvider ConfigureServices() =>

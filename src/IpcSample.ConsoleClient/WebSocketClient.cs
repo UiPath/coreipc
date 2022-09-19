@@ -1,13 +1,11 @@
 ﻿using System.Text;
 using System.Diagnostics;
-using UiPath.CoreIpc.NamedPipe;
+using UiPath.CoreIpc.WebSockets;
 using Microsoft.Extensions.DependencyInjection;
-
 namespace UiPath.CoreIpc.Tests;
-
-class Client
+class WebSocketClient
 {
-    static async Task _Main(string[] args)
+    static async Task Main(string[] args)
     {
         Console.WriteLine(typeof(int).Assembly);
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
@@ -27,24 +25,31 @@ class Client
             Console.ReadLine();
         }
     }
+
     private static async Task RunTestsAsync(CancellationToken cancellationToken)
     {
+        Uri uri = new("ws://localhost:1212/wsDemo/");
         var serviceProvider = ConfigureServices();
         var callback = new ComputingCallback { Id = "custom made" };
-        var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>("test", serviceProvider).CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
+        var computingClientBuilder = new WebSocketClientBuilder<IComputingService, IComputingCallback>(uri, serviceProvider)
+            .CallbackInstance(callback)/*.EncryptAndSign("localhost")*/.RequestTimeout(TimeSpan.FromSeconds(2));
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
         try
         {
             var computingClient = computingClientBuilder.ValidateAndBuild();
             var systemClient =
-                new NamedPipeClientBuilder<ISystemService>("test")
+                new WebSocketClientBuilder<ISystemService>(uri)
+                //.EncryptAndSign("localhost")
                 .RequestTimeout(TimeSpan.FromSeconds(2))
                 .Logger(serviceProvider)
-                .AllowImpersonation()
                 .ValidateAndBuild();
             var watch = Stopwatch.StartNew();
-            for (int i = 0; i < 50; i++)
+            //using (var file = File.OpenRead(@"C:\Windows\DPINST.log"))
+            //{
+            //    Console.WriteLine(await systemClient.Upload(file));
+            //}
+            for (int i =0; i<50;i++)
             {
                 // test 1: call IPC service method with primitive types
                 float result1 = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);
@@ -104,6 +109,9 @@ class Client
             callbackProxy.Dispose();
             callbackProxy.Dispose();
             callbackProxy.Dispose();
+            //((IpcProxy)callbackProxy).CloseConnection();
+            ((IpcProxy)computingClient).CloseConnection();
+            ((IpcProxy)systemClient).CloseConnection();
         }
         finally
         {
