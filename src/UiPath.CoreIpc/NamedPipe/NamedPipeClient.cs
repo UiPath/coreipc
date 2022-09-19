@@ -40,12 +40,12 @@ class NamedPipeClient<TInterface> : ServiceClient<TInterface>, INamedPipeKey whe
             _pipe?.Dispose();
             base.Dispose(disposing);
         }
-        public override Stream Network => _pipe;
-        public override Task Connect(CancellationToken cancellationToken)
+        public override async Task<Stream> Connect(CancellationToken cancellationToken)
         {
             var key = (INamedPipeKey)ConnectionKey;
             _pipe = new(key.ServerName, key.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous, key.AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
-            return _pipe.ConnectAsync(cancellationToken);
+            await _pipe.ConnectAsync(cancellationToken);
+            return _pipe;
         }
     }
 }

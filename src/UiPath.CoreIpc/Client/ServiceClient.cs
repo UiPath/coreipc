@@ -192,16 +192,17 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 return false;
             }
             clientConnection.Dispose();
+            Stream network;
             try
             {
-                await clientConnection.Connect(cancellationToken);
+                network = await clientConnection.Connect(cancellationToken);
             }
             catch
             {
                 clientConnection.Dispose();
                 throw;
             }
-            var stream = SslServer == null ? clientConnection.Network : await AuthenticateAsClient(clientConnection.Network);
+            var stream = SslServer == null ? network : await AuthenticateAsClient(network);
             OnNewConnection(new(stream, _serializer, _logger, Name));
             if (LogEnabled)
             {

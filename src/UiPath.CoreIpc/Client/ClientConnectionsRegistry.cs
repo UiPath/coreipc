@@ -45,7 +45,6 @@ abstract class ClientConnection : IDisposable
     Connection _connection;
     protected ClientConnection(IConnectionKey connectionKey) => ConnectionKey = connectionKey;
     public abstract bool Connected { get; }
-    public abstract Stream Network { get; }
     public Connection Connection
     {
         get => _connection;
@@ -55,7 +54,7 @@ abstract class ClientConnection : IDisposable
             _connection.Closed += OnConnectionClosed;
         }
     }
-    public abstract Task Connect(CancellationToken cancellationToken);
+    public abstract Task<Stream> Connect(CancellationToken cancellationToken);
     private void OnConnectionClosed(object sender, EventArgs _)
     {
         var closedConnection = (Connection)sender;

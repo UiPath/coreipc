@@ -20,7 +20,6 @@ class WebSocketClient<TInterface> : ServiceClient<TInterface>, IWebSocketsKey wh
     class WebSocketClientConnection : ClientConnection
     {
         ClientWebSocket _clientWebSocket;
-        WebSocketStream _webSocketStream;
         public WebSocketClientConnection(IConnectionKey connectionKey) : base(connectionKey) {}
         public override bool Connected => _clientWebSocket?.State == WebSocketState.Open;
         protected override void Dispose(bool disposing)
@@ -28,14 +27,13 @@ class WebSocketClient<TInterface> : ServiceClient<TInterface>, IWebSocketsKey wh
             _clientWebSocket?.Dispose();
             base.Dispose(disposing);
         }
-        public override Stream Network => _webSocketStream;
-        public override async Task Connect(CancellationToken cancellationToken)
+        public override async Task<Stream> Connect(CancellationToken cancellationToken)
         {
             _clientWebSocket = new();
             using var token = cancellationToken.Register(Dispose);
             var uri = ((IWebSocketsKey)ConnectionKey).Uri;
             await _clientWebSocket.ConnectAsync(uri, cancellationToken);
-            _webSocketStream = new(_clientWebSocket);
+            return new WebSocketStream(_clientWebSocket);
         }
     }
 }

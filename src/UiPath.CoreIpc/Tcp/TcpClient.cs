@@ -31,13 +31,13 @@ class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterfac
             _tcpClient?.Dispose();
             base.Dispose(disposing);
         }
-        public override Stream Network => _tcpClient.GetStream();
-        public override async Task Connect(CancellationToken cancellationToken)
+        public override async Task<Stream> Connect(CancellationToken cancellationToken)
         {
             _tcpClient = new();
             using var token = cancellationToken.Register(Dispose);
             var endPoint = ((ITcpKey)ConnectionKey).EndPoint;
             await _tcpClient.ConnectAsync(endPoint.Address, endPoint.Port);
+            return _tcpClient.GetStream();
         }
     }
 }
