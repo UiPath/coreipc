@@ -16,8 +16,7 @@ abstract class ServerConnection : IClient, IDisposable
     protected ServerConnection(Listener listener) => _listener = listener;
     public ILogger Logger => _listener.Logger;
     public ListenerSettings Settings => _listener.Settings;
-    public abstract Task AcceptClient(CancellationToken cancellationToken);
-    protected abstract Stream Network { get; }
+    public abstract Task<Stream> AcceptClient(CancellationToken cancellationToken);
     public virtual void Impersonate(Action action) => action();
     TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract, bool objectParameters) where TCallbackInterface : class
     {
@@ -44,7 +43,7 @@ abstract class ServerConnection : IClient, IDisposable
             return serviceClient.CreateProxy();
         }
     }
-    public async Task Listen(CancellationToken cancellationToken)
+    public async Task Listen(Stream network, CancellationToken cancellationToken)
     {
         var stream = await AuthenticateAsServer();
         var serializer = Settings.ServiceProvider.GetRequiredService<ISerializer>();
@@ -61,9 +60,9 @@ abstract class ServerConnection : IClient, IDisposable
             var certificate = Settings.Certificate;
             if (certificate == null)
             {
-                return Network;
+                return network;
             }
-            var sslStream = new SslStream(Network);
+            var sslStream = new SslStream(network);
             try
             {
                 await sslStream.AuthenticateAsServerAsync(certificate);

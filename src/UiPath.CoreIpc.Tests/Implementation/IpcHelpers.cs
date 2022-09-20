@@ -1,4 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Net;
+using System.Net.WebSockets;
 using UiPath.CoreIpc.Tests;
 
 namespace UiPath.CoreIpc;
@@ -48,4 +50,28 @@ public static class IpcHelpers
         });
         return services.AddIpc();
     }
+}
+public class HttpSysWebSocketsListener : IDisposable
+{
+    HttpListener _httpListener = new();
+    public HttpSysWebSocketsListener(string uriPrefix)
+    {
+        _httpListener.Prefixes.Add(uriPrefix);
+        _httpListener.Start();
+    }
+    public async Task<WebSocket> Accept(CancellationToken token)
+    {
+        while (true)
+        {
+            var listenerContext = await _httpListener.GetContextAsync();
+            if (listenerContext.Request.IsWebSocketRequest)
+            {
+                var webSocketContext = await listenerContext.AcceptWebSocketAsync(subProtocol: null);
+                return webSocketContext.WebSocket;
+            }
+            listenerContext.Response.StatusCode = 400;
+            listenerContext.Response.Close();
+        }
+    }
+    public void Dispose() => _httpListener.Stop();
 }
