@@ -21,6 +21,8 @@ public class SystemWebSocketTests : SystemTests<WebSocketClientBuilder<ISystemSe
         _port++;
         base.BeforeCallServerSide();
     }
+    [Fact(Skip = "WebSocket.State is unreliable")]
+    public override Task UploadNoRead() => base.UploadNoRead();
     string GetEndPoint() => $"://localhost:{_port}/";
 }
 public class ComputingWebSocketsTests : ComputingTests<WebSocketClientBuilder<IComputingService, IComputingCallback>>
