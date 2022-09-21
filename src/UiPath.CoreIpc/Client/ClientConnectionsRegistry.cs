@@ -25,7 +25,7 @@ static class ClientConnectionsRegistry
         }
         return clientConnection;
     }
-    private static ClientConnection GetOrAdd(IConnectionKey key)=>Connections.GetOrAdd(key, key => key.CreateClientConnection(key));
+    private static ClientConnection GetOrAdd(IConnectionKey key) => Connections.GetOrAdd(key, key => key.CreateClientConnection());
     public static bool TryGet(IConnectionKey key, out ClientConnection connection) => Connections.TryGetValue(key, out connection);
     internal static ClientConnection Remove(IConnectionKey connectionKey)
     {
@@ -36,7 +36,7 @@ static class ClientConnectionsRegistry
 interface IConnectionKey : IEquatable<IConnectionKey>
 {
     string SslServer { get; }
-    ClientConnection CreateClientConnection(IConnectionKey key);
+    ClientConnection CreateClientConnection();
 }
 abstract class ClientConnection : IDisposable
 {

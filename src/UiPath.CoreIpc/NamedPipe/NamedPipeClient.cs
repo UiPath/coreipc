@@ -29,7 +29,7 @@ class NamedPipeClient<TInterface> : ServiceClient<TInterface>, INamedPipeKey whe
     public bool AllowImpersonation { get; }
     public override bool Equals(IConnectionKey other) => other == this || (other is INamedPipeKey otherClient &&
         otherClient.ServerName == ServerName && otherClient.PipeName == PipeName && otherClient.AllowImpersonation == AllowImpersonation && base.Equals(other));
-    public override ClientConnection CreateClientConnection(IConnectionKey key) => new NamedPipeClientConnection(key);
+    public override ClientConnection CreateClientConnection() => new NamedPipeClientConnection(this);
     class NamedPipeClientConnection : ClientConnection
     {
         private NamedPipeClientStream _pipe;

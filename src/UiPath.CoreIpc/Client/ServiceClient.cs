@@ -289,7 +289,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
 
     public virtual bool Equals(IConnectionKey other) => SslServer == other.SslServer;
 
-    public virtual ClientConnection CreateClientConnection(IConnectionKey key) => throw new NotImplementedException();
+    public virtual ClientConnection CreateClientConnection() => throw new NotImplementedException();
 }
 
 public class IpcProxy : DispatchProxy, IDisposable

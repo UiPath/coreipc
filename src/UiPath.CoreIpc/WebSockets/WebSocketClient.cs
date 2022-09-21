@@ -16,7 +16,7 @@ class WebSocketClient<TInterface> : ServiceClient<TInterface>, IWebSocketsKey wh
     public override string Name => base.Name ?? Uri.ToString();
     public Uri Uri { get; }
     public override bool Equals(IConnectionKey other) => other == this || (other is IWebSocketsKey otherClient && Uri.Equals(otherClient.Uri) && base.Equals(other));
-    public override ClientConnection CreateClientConnection(IConnectionKey key) => new WebSocketClientConnection(key);
+    public override ClientConnection CreateClientConnection() => new WebSocketClientConnection(this);
     class WebSocketClientConnection : ClientConnection
     {
         ClientWebSocket _clientWebSocket;

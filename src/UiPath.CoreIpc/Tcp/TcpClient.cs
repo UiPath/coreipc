@@ -20,7 +20,7 @@ class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterfac
     public IPEndPoint EndPoint { get; }
     public override bool Equals(IConnectionKey other) => other == this || (other is ITcpKey otherClient && EndPoint.Equals(otherClient.EndPoint) && 
         base.Equals(other));
-    public override ClientConnection CreateClientConnection(IConnectionKey key) => new TcpClientConnection(key);
+    public override ClientConnection CreateClientConnection() => new TcpClientConnection(this);
     class TcpClientConnection : ClientConnection
     {
         private TcpClient _tcpClient;
