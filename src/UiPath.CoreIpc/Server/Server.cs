@@ -8,8 +8,8 @@ using static Expression;
 class Server
 {
     private static readonly MethodInfo GetResultMethod = typeof(Server).GetStaticMethod(nameof(GetTaskResultImpl));
-    private static readonly ConcurrentDictionaryWrapper<(Type,string), Method> Methods = new(CreateMethod);
-    private static readonly ConcurrentDictionaryWrapper<Type, GetTaskResultFunc> GetTaskResultByType = new(GetTaskResultFunc);
+    private static readonly ConcurrentDictionary<(Type,string), Method> Methods = new();
+    private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
     private readonly Connection _connection;
     private readonly IClient _client;
     private readonly CancellationTokenSource _connectionClosed = new();
@@ -229,10 +229,10 @@ class Server
         _connectionClosed.IsCancellationRequested ? default : _connection.Send(response, responseCancellation);
     static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
     static object GetTaskResult(Type taskType, Task task) => 
-        GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0])(task);
-    static GetTaskResultFunc GetTaskResultFunc(Type resultType) => GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType);
-    static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName));
-    static Method CreateMethod((Type contract,string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName));
+        GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0], 
+            resultType => GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType))(task);
+    static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName), 
+        ((Type contract,string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
     readonly struct Method
     {
         static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");

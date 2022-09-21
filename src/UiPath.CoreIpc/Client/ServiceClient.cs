@@ -295,7 +295,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
 public class IpcProxy : DispatchProxy, IDisposable
 {
     private static readonly MethodInfo InvokeMethod = typeof(IpcProxy).GetStaticMethod(nameof(GenericInvoke));
-    private static readonly ConcurrentDictionaryWrapper<Type, InvokeDelegate> InvokeByType = new(CreateDelegate);
+    private static readonly ConcurrentDictionary<Type, InvokeDelegate> InvokeByType = new();
 
     internal IServiceClient ServiceClient { get; set; }
 
@@ -307,12 +307,11 @@ public class IpcProxy : DispatchProxy, IDisposable
 
     public void CloseConnection() => Connection?.Dispose();
 
-    private static InvokeDelegate GetInvoke(MethodInfo targetMethod) => InvokeByType.GetOrAdd(targetMethod.ReturnType);
-
-    private static InvokeDelegate CreateDelegate(Type taskType)
+    private static InvokeDelegate GetInvoke(MethodInfo targetMethod) => InvokeByType.GetOrAdd(targetMethod.ReturnType, taskType =>
     {
         var resultType = taskType.IsGenericType ? taskType.GenericTypeArguments[0] : typeof(object);
         return InvokeMethod.MakeGenericDelegate<InvokeDelegate>(resultType);
-    }
+    });
+
     private static object GenericInvoke<T>(IServiceClient serviceClient, MethodInfo method, object[] args) => serviceClient.Invoke<T>(method, args);
 }

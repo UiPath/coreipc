@@ -2,7 +2,7 @@
 
 static class ClientConnectionsRegistry
 {
-    private static readonly ConcurrentDictionaryWrapper<IConnectionKey, ClientConnection> Connections = new(CreateClientConnection);
+    private static readonly ConcurrentDictionary<IConnectionKey, ClientConnection> Connections = new();
     public static async Task<ClientConnection> GetOrCreate(IConnectionKey key, CancellationToken cancellationToken)
     {
         var clientConnection = GetOrAdd(key);
@@ -25,8 +25,7 @@ static class ClientConnectionsRegistry
         }
         return clientConnection;
     }
-    private static ClientConnection GetOrAdd(IConnectionKey key)=>Connections.GetOrAdd(key);
-    static ClientConnection CreateClientConnection(IConnectionKey key) => key.CreateClientConnection(key);
+    private static ClientConnection GetOrAdd(IConnectionKey key)=>Connections.GetOrAdd(key, key => key.CreateClientConnection(key));
     public static bool TryGet(IConnectionKey key, out ClientConnection connection) => Connections.TryGetValue(key, out connection);
     internal static ClientConnection Remove(IConnectionKey connectionKey)
     {

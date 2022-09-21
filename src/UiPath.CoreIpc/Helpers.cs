@@ -242,19 +242,6 @@ public static class Validator
         }
     }
 }
-public readonly struct ConcurrentDictionaryWrapper<TKey, TValue>
-{
-    private readonly ConcurrentDictionary<TKey, TValue> _dictionary;
-    private readonly Func<TKey, TValue> _valueFactory;
-    public ConcurrentDictionaryWrapper(Func<TKey, TValue> valueFactory, int capacity = 31)
-    {
-        _dictionary = new(Environment.ProcessorCount, capacity);
-        _valueFactory = valueFactory;
-    }
-    public TValue GetOrAdd(TKey key) => _dictionary.GetOrAdd(key, _valueFactory);
-    public bool TryGetValue(TKey key, out TValue value) => _dictionary.TryGetValue(key, out value);
-    public bool TryRemove(TKey key, out TValue value) => _dictionary.TryRemove(key, out value);
-}
 public readonly struct TimeoutHelper : IDisposable
 {
     private readonly CancellationTokenSource _timeoutCancellationSource;
