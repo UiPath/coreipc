@@ -1,14 +1,24 @@
 ﻿using Microsoft.IO;
 using System.Collections.ObjectModel;
 using System.IO.Pipes;
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 namespace UiPath.CoreIpc;
-
+using static CancellationTokenSourcePool;
 public static class Helpers
 {
     public const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly;
+#if NET461
+    public static CancellationTokenRegistration UnsafeRegister(this CancellationToken token, Action<object> callback, object state) => token.Register(callback, state);
+    public static async Task ConnectAsync(this TcpClient tcpClient, IPAddress address, int port, CancellationToken cancellationToken)
+    {
+        using var token = cancellationToken.Register(state => ((TcpClient)state).Dispose(), tcpClient);
+        await tcpClient.ConnectAsync(address, port);
+    }
+#endif
     public static bool Enabled(this ILogger logger) => logger != null && logger.IsEnabled(LogLevel.Information);
     [Conditional("DEBUG")]
     public static void AssertDisposed(this SemaphoreSlim semaphore) =>
@@ -244,22 +254,37 @@ public static class Validator
 }
 public readonly struct TimeoutHelper : IDisposable
 {
-    private readonly CancellationTokenSource _timeoutCancellationSource;
+    private static readonly Action<object> LinkedTokenCancelDelegate = static s => ((CancellationTokenSource)s).Cancel(throwOnFirstException: false);
+    private readonly PooledCancellationTokenSource _timeoutCancellationSource;
     private readonly CancellationTokenSource _linkedCancellationSource;
-    public TimeoutHelper(TimeSpan timeout, List<CancellationToken> cancellationTokens)
+    private readonly CancellationToken _cancellationToken = default;
+    private readonly CancellationTokenRegistration _linkedRegistration = default;
+    public TimeoutHelper(TimeSpan timeout, CancellationToken cancellationToken1, CancellationToken cancellationToken2)
     {
-        _timeoutCancellationSource = new CancellationTokenSource(timeout);
-        cancellationTokens.Add(_timeoutCancellationSource.Token);
-        _linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationTokens.ToArray());
+        _timeoutCancellationSource = Timeout(timeout);
+        _linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken1, cancellationToken2);
+        var timeoutToken = _timeoutCancellationSource.Token;
+        _linkedRegistration = timeoutToken.UnsafeRegister(LinkedTokenCancelDelegate, _linkedCancellationSource);
     }
-    private TimeoutHelper(TimeSpan timeout, CancellationToken token)
+    public TimeoutHelper(TimeSpan timeout, CancellationToken token)
     {
-        _timeoutCancellationSource = new CancellationTokenSource(timeout);
-        _linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(token, _timeoutCancellationSource.Token);
+        _timeoutCancellationSource = Timeout(timeout);
+        if (token.CanBeCanceled)
+        {
+            _cancellationToken = token;
+            _linkedRegistration = token.UnsafeRegister(LinkedTokenCancelDelegate, _timeoutCancellationSource);
+        }
+        _linkedCancellationSource = _timeoutCancellationSource;
+    }
+    static PooledCancellationTokenSource Timeout(TimeSpan timeout)
+    {
+        var source = Rent();
+        source.CancelAfter(timeout);
+        return source;
     }
     public Exception CheckTimeout(Exception exception, string message)
     {
-        if (_timeoutCancellationSource.IsCancellationRequested)
+        if (!_cancellationToken.IsCancellationRequested && _timeoutCancellationSource.IsCancellationRequested)
         {
             return new TimeoutException(message + " timed out.", exception);
         }
@@ -279,9 +304,12 @@ public readonly struct TimeoutHelper : IDisposable
     }
     public void Dispose()
     {
+        _linkedRegistration.Dispose();
         _timeoutCancellationSource.Dispose();
-        _linkedCancellationSource.Dispose();
+        if (_linkedCancellationSource != _timeoutCancellationSource)
+        {
+            _linkedCancellationSource.Dispose();
+        }
     }
     public CancellationToken Token => _linkedCancellationSource.Token;
-    public static TimeoutHelper Creaate(TimeSpan timeout, CancellationToken token) => new(timeout, token);
 }

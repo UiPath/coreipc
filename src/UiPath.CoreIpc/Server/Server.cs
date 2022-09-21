@@ -14,13 +14,11 @@ class Server
     private readonly IClient _client;
     private readonly CancellationTokenSource _connectionClosed = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new();
-    private readonly CancellationToken _hostCancellationToken;
-    public Server(ListenerSettings settings, Connection connection, IClient client = null, CancellationToken cancellationToken = default)
+    public Server(ListenerSettings settings, Connection connection, IClient client = null)
     {
         Settings = settings;
         _connection = connection;
         _client = client;
-        _hostCancellationToken = cancellationToken;
         connection.RequestReceived += OnRequestReceived;
         connection.CancellationReceived += requestId =>
         {
@@ -61,10 +59,10 @@ class Server
                 return;
             }
             Response response;
-            var requestCancellation = new CancellationTokenSource();
+            var requestCancellation = CancellationTokenSourcePool.Rent();
             _requests[request.Id] = requestCancellation;
             var timeout = request.GetTimeout(Settings.RequestTimeout);
-            var timeoutHelper = new TimeoutHelper(timeout, new() { _hostCancellationToken, requestCancellation.Token, _connectionClosed.Token });
+            var timeoutHelper = new TimeoutHelper(timeout, requestCancellation.Token, _connectionClosed.Token);
             try
             {
                 var token = timeoutHelper.Token;
@@ -100,7 +98,7 @@ class Server
     ValueTask OnError(Request request, Exception ex)
     {
         Logger.LogException(ex, $"{Name} {request}");
-        return SendResponse(Response.Fail(request, ex), _hostCancellationToken);
+        return SendResponse(Response.Fail(request, ex), _connectionClosed.Token);
     }
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]

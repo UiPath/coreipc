@@ -79,7 +79,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             string[] serializedArguments = null;
             var methodName = method.Name;
             SerializeArguments();
-            var timeoutHelper = TimeoutHelper.Creaate(clientTimeout, cancellationToken);
+            var timeoutHelper = new TimeoutHelper(clientTimeout, cancellationToken);
             try
             {
                 var token = timeoutHelper.Token;
