@@ -53,7 +53,7 @@ public sealed class Connection : IDisposable
         try
         {
             await Send(request, token);
-            tokenRegistration = token.Register(request.UploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
+            tokenRegistration = token.UnsafeRegister(request.UploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
             return await requestCompletion.Task;
         }
         finally
@@ -117,7 +117,7 @@ public sealed class Connection : IDisposable
         CancellationTokenRegistration tokenRegistration = default;
         try
         {
-            tokenRegistration = cancellationToken.Register(Dispose);
+            tokenRegistration = cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), this);
             await Network.WriteMessage(messageType, data, cancellationToken);
             await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
             const int DefaultCopyBufferSize = 81920;

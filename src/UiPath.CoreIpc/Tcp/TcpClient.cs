@@ -34,9 +34,8 @@ class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterfac
         public override async Task<Stream> Connect(CancellationToken cancellationToken)
         {
             _tcpClient = new();
-            using var token = cancellationToken.Register(Dispose);
             var endPoint = ((ITcpKey)ConnectionKey).EndPoint;
-            await _tcpClient.ConnectAsync(endPoint.Address, endPoint.Port);
+            await _tcpClient.ConnectAsync(endPoint.Address, endPoint.Port, cancellationToken);
             return _tcpClient.GetStream();
         }
     }

@@ -9,6 +9,7 @@ class WebSocketClient
     {
         Console.WriteLine(typeof(int).Assembly);
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
+        Thread.Sleep(1000);
         var source = new CancellationTokenSource();
         try
         {
