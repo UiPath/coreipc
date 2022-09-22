@@ -14,7 +14,7 @@ internal static class CancellationTokenSourcePool
             return cts;
         }
 #endif
-        return new PooledCancellationTokenSource();
+        return new();
     }
     private static bool Return(PooledCancellationTokenSource cts)
     {
@@ -34,13 +34,10 @@ internal static class CancellationTokenSourcePool
     {
         protected override void Dispose(bool disposing)
         {
-            if (disposing)
+            // If we failed to return to the pool then dispose
+            if (disposing && !Return(this))
             {
-                // If we failed to return to the pool then dispose
-                if (!Return(this))
-                {
-                    base.Dispose(disposing);
-                }
+                base.Dispose(disposing);
             }
         }
 #if NET461

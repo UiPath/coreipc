@@ -254,7 +254,7 @@ public static class Validator
 }
 public readonly struct TimeoutHelper : IDisposable
 {
-    private static readonly Action<object> LinkedTokenCancelDelegate = static s => ((CancellationTokenSource)s).Cancel(throwOnFirstException: false);
+    private static readonly Action<object> LinkedTokenCancelDelegate = static s => ((CancellationTokenSource)s).Cancel();
     private readonly PooledCancellationTokenSource _timeoutCancellationSource;
     private readonly CancellationTokenSource _linkedCancellationSource;
     private readonly CancellationToken _cancellationToken = default;
