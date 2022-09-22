@@ -3,7 +3,7 @@
 namespace UiPath.CoreIpc;
 
 using GetTaskResultFunc = Func<Task, object>;
-using MethodExecutor = Func<object, object[], Task>;
+using MethodExecutor = Func<object, object[], CancellationToken, Task>;
 using static Expression;
 class Server
 {
@@ -153,7 +153,7 @@ class Server
                 (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method.MethodInfo);
                 return objectParameters ? null : Response.Success(request, "");
             }
-            Task MethodCall() => method.Invoke(service, arguments);
+            Task MethodCall() => method.Invoke(service, arguments, cancellationToken);
             Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
         }
         object[] GetArguments()
@@ -176,7 +176,7 @@ class Server
                     var parameterType = parameters[index].ParameterType;
                     if (parameterType == typeof(CancellationToken))
                     {
-                        argument = cancellationToken;
+                        argument = null;
                     }
                     else if (parameterType == typeof(Stream))
                     {
@@ -234,6 +234,7 @@ class Server
     readonly struct Method
     {
         static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
+        static readonly ParameterExpression TokenParameter = Parameter(typeof(CancellationToken), "cancellationToken");
         static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
         readonly MethodExecutor _executor;
         public readonly MethodInfo MethodInfo;
@@ -250,18 +251,18 @@ class Server
             {
                 var parameter = parameters[index];
                 defaults[index] = parameter.GetDefaultValue();
-                var paramValue = ArrayIndex(ParametersParameter, Constant(index, typeof(int)));
-                callParameters[index] = Convert(paramValue, parameter.ParameterType);
+                callParameters[index] = parameter.ParameterType == typeof(CancellationToken) ? TokenParameter : 
+                    Convert(ArrayIndex(ParametersParameter, Constant(index, typeof(int))), parameter.ParameterType);
             }
             var instanceCast = Convert(TargetParameter, method.DeclaringType);
             var methodCall = Call(instanceCast, method, callParameters);
-            var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter);
+            var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter, TokenParameter);
             _executor = lambda.Compile();
             MethodInfo = method;
             Parameters = parameters;
             Defaults = defaults;
         }
-        public Task Invoke(object service, object[] arguments) => _executor.Invoke(service, arguments);
+        public Task Invoke(object service, object[] arguments, CancellationToken cancellationToken) => _executor.Invoke(service, arguments, cancellationToken);
         public override string ToString() => MethodInfo.ToString();
     }
 }
