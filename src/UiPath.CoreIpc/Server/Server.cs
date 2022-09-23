@@ -159,12 +159,13 @@ class Server
         object[] GetArguments()
         {
             var parameters = method.Parameters;
+            var allParametersLength = parameters.Length;
             var requestParametersLength = objectParameters ? request.ObjectParameters.Length : request.Parameters.Length;
-            if (requestParametersLength > parameters.Length)
+            if (requestParametersLength > allParametersLength)
             {
                 throw new ArgumentException("Too many parameters for " + method.MethodInfo);
             }
-            var allArguments = new object[parameters.Length];
+            var allArguments = objectParameters && requestParametersLength == allParametersLength ? request.ObjectParameters : new object[allParametersLength];
             Deserialize();
             SetOptionalArguments();
             return allArguments;
@@ -208,7 +209,7 @@ class Server
             }
             void SetOptionalArguments()
             {
-                for (int index = requestParametersLength; index < parameters.Length; index++)
+                for (int index = requestParametersLength; index < allParametersLength; index++)
                 {
                     allArguments[index] = CheckMessage(method.Defaults[index], parameters[index].ParameterType);
                 }
@@ -245,9 +246,10 @@ class Server
         {
             // https://github.com/dotnet/aspnetcore/blob/3f620310883092905ed6f13d784c908b5f4a9d7e/src/Shared/ObjectMethodExecutor/ObjectMethodExecutor.cs#L156
             var parameters = method.GetParameters();
-            var callParameters = new Expression[parameters.Length];
-            var defaults = new object[parameters.Length];
-            for (int index = 0; index < parameters.Length; index++)
+            var parametersLength = parameters.Length;
+            var callParameters = new Expression[parametersLength];
+            var defaults = new object[parametersLength];
+            for (int index = 0; index < parametersLength; index++)
             {
                 var parameter = parameters[index];
                 defaults[index] = parameter.GetDefaultValue();
