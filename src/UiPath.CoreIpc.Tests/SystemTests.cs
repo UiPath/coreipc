@@ -193,7 +193,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         await Guid();
     }
     protected abstract TBuilder CreateSystemClientBuilder();
-    protected TBuilder SystemClientBuilder() => CreateSystemClientBuilder().RequestTimeout(RequestTimeout).Logger(_serviceProvider);
+    protected TBuilder SystemClientBuilder() => CreateSystemClientBuilder().SerializeParametersAsObjects().RequestTimeout(RequestTimeout).Logger(_serviceProvider);
     [Fact]
     public async Task BeforeCall()
     {

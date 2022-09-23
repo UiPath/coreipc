@@ -8,13 +8,13 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
     protected readonly ComputingCallback _computingCallback;
     public ComputingTests()
     {
-        _computingCallback = new ComputingCallback { Id = System.Guid.NewGuid().ToString() };
+        _computingCallback = new ComputingCallback { Id = Guid.NewGuid().ToString() };
         _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
         _computingHost = Configure(new ServiceHostBuilder(_serviceProvider))
             .AddEndpoint<IComputingService, IComputingCallback>()
             .ValidateAndBuild();
         _computingHost.RunAsync(GuiScheduler);
-        _computingClient = ComputingClientBuilder(GuiScheduler).ValidateAndBuild();
+        _computingClient = ComputingClientBuilder(GuiScheduler).SerializeParametersAsObjects().ValidateAndBuild();
     }
     protected abstract TBuilder ComputingClientBuilder(TaskScheduler taskScheduler = null);
     [Fact]
@@ -58,7 +58,7 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
     [Fact]
     public async Task ClientTimeout()
     {
-        var proxy = ComputingClientBuilder().RequestTimeout(TimeSpan.FromMilliseconds(10)).ValidateAndBuild();
+        var proxy = ComputingClientBuilder().SerializeParametersAsObjects().RequestTimeout(TimeSpan.FromMilliseconds(10)).ValidateAndBuild();
         proxy.Infinite().ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.Infinite)} timed out.");
         await proxy.GetCallbackThreadName(new Message { RequestTimeout = RequestTimeout });
         ((IDisposable)proxy).Dispose();
