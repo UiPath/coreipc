@@ -45,22 +45,20 @@ public class WebSocketStream : Stream
     /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
-        IsDisposed = true;
         _webSocket.Dispose();
         base.Dispose(disposing);
     }
     /// <inheritdoc />
-    public bool IsDisposed { get; private set; }
-    /// <inheritdoc />
-    public override bool CanRead => !IsDisposed;
+    public override bool CanRead => true;
     /// <inheritdoc />
     public override bool CanSeek => false;
     /// <inheritdoc />
-    public override bool CanWrite => !IsDisposed;
+    public override bool CanWrite => true;
     /// <inheritdoc />
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
     /// <inheritdoc />
     public override void SetLength(long value) => throw new NotSupportedException();
+    /// <inheritdoc />
     public override long Length => throw new NotSupportedException();
     /// <inheritdoc />
     public override long Position
