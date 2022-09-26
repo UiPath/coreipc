@@ -19,13 +19,7 @@ class Server
         _connection = connection;
         _client = client;
         connection.RequestReceived += OnRequestReceived;
-        connection.CancellationReceived += requestId =>
-        {
-            if (_requests.TryGetValue(requestId, out var cancellation))
-            {
-                cancellation.Cancel();
-            }
-        };
+        connection.CancellationReceived += CancelRequest;
         connection.Closed += delegate
         {
             if (LogEnabled)
@@ -34,21 +28,25 @@ class Server
             }
             foreach (var requestId in _requests.Keys)
             {
-                if (!_requests.TryRemove(requestId, out var cancellation))
-                {
-                    continue;
-                }
-                try
-                {
-                    cancellation.Cancel();
-                    cancellation.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogException(ex, $"{Name}");
-                }
+                CancelRequest(requestId);
             }
         };
+    }
+    void CancelRequest(string requestId)
+    {
+        if (!_requests.TryRemove(requestId, out var cancellation))
+        {
+            return;
+        }
+        try
+        {
+            cancellation.Cancel();
+            cancellation.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogException(ex, $"{Name}");
+        }
     }
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
