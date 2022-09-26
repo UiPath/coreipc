@@ -32,11 +32,16 @@ class Server
             {
                 Log($"Server {Name} closed.");
             }
-            foreach (var cancellation in _requests.Values)
+            foreach (var requestId in _requests.Keys)
             {
+                if (!_requests.TryRemove(requestId, out var cancellation))
+                {
+                    continue;
+                }
                 try
                 {
                     cancellation.Cancel();
+                    cancellation.Dispose();
                 }
                 catch (Exception ex)
                 {
