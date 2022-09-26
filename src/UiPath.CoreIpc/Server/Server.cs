@@ -34,7 +34,14 @@ class Server
             }
             foreach (var cancellation in _requests.Values)
             {
-                cancellation.Cancel();
+                try
+                {
+                    cancellation.Cancel();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogException(ex, $"{Name}");
+                }
             }
         };
     }
