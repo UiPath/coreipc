@@ -256,31 +256,14 @@ public readonly struct TimeoutHelper : IDisposable
 {
     private static readonly Action<object> LinkedTokenCancelDelegate = static s => ((CancellationTokenSource)s).Cancel();
     private readonly PooledCancellationTokenSource _timeoutCancellationSource;
-    private readonly CancellationTokenSource _linkedCancellationSource;
-    private readonly CancellationToken _cancellationToken = default;
-    private readonly CancellationTokenRegistration _linkedRegistration = default;
-    public TimeoutHelper(TimeSpan timeout, CancellationToken cancellationToken1, CancellationToken cancellationToken2)
-    {
-        _timeoutCancellationSource = Timeout(timeout);
-        _linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken1, cancellationToken2);
-        var timeoutToken = _timeoutCancellationSource.Token;
-        _linkedRegistration = timeoutToken.UnsafeRegister(LinkedTokenCancelDelegate, _linkedCancellationSource);
-    }
+    private readonly CancellationToken _cancellationToken;
+    private readonly CancellationTokenRegistration _linkedRegistration;
     public TimeoutHelper(TimeSpan timeout, CancellationToken token)
     {
-        _timeoutCancellationSource = Timeout(timeout);
-        if (token.CanBeCanceled)
-        {
-            _cancellationToken = token;
-            _linkedRegistration = token.UnsafeRegister(LinkedTokenCancelDelegate, _timeoutCancellationSource);
-        }
-        _linkedCancellationSource = _timeoutCancellationSource;
-    }
-    static PooledCancellationTokenSource Timeout(TimeSpan timeout)
-    {
-        var source = Rent();
-        source.CancelAfter(timeout);
-        return source;
+        _timeoutCancellationSource = Rent();
+        _timeoutCancellationSource.CancelAfter(timeout);
+        _cancellationToken = token;
+        _linkedRegistration = token.UnsafeRegister(LinkedTokenCancelDelegate, _timeoutCancellationSource);
     }
     public Exception CheckTimeout(Exception exception, string message)
     {
@@ -288,7 +271,7 @@ public readonly struct TimeoutHelper : IDisposable
         {
             return new TimeoutException(message + " timed out.", exception);
         }
-        if (_linkedCancellationSource.IsCancellationRequested && exception is not TaskCanceledException)
+        if (_timeoutCancellationSource.IsCancellationRequested && exception is not TaskCanceledException)
         {
             return new TaskCanceledException(message, exception);
         }
@@ -306,10 +289,6 @@ public readonly struct TimeoutHelper : IDisposable
     {
         _linkedRegistration.Dispose();
         _timeoutCancellationSource.Dispose();
-        if (_linkedCancellationSource != _timeoutCancellationSource)
-        {
-            _linkedCancellationSource.Dispose();
-        }
     }
-    public CancellationToken Token => _linkedCancellationSource.Token;
+    public CancellationToken Token => _timeoutCancellationSource.Token;
 }

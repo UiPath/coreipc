@@ -12,7 +12,6 @@ class Server
     private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
     private readonly Connection _connection;
     private readonly IClient _client;
-    private readonly CancellationTokenSource _connectionClosed = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new();
     public Server(ListenerSettings settings, Connection connection, IClient client = null)
     {
@@ -33,7 +32,10 @@ class Server
             {
                 Log($"Server {Name} closed.");
             }
-            _connectionClosed.Cancel();
+            foreach (var cancellation in _requests.Values)
+            {
+                cancellation.Cancel();
+            }
         };
     }
 #if !NET461
@@ -58,11 +60,11 @@ class Server
                 await HandleRequest(method, endpoint, request, default);
                 return;
             }
-            Response response;
+            Response response = null;
             var requestCancellation = CancellationTokenSourcePool.Rent();
             _requests[request.Id] = requestCancellation;
             var timeout = request.GetTimeout(Settings.RequestTimeout);
-            var timeoutHelper = new TimeoutHelper(timeout, requestCancellation.Token, _connectionClosed.Token);
+            var timeoutHelper = new TimeoutHelper(timeout, requestCancellation.Token);
             try
             {
                 var token = timeoutHelper.Token;
@@ -73,7 +75,7 @@ class Server
                 }
                 await SendResponse(response, token);
             }
-            catch (Exception ex)
+            catch (Exception ex) when(response == null)
             {
                 await OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName));
             }
@@ -90,15 +92,11 @@ class Server
         {
             cancellation.Dispose();
         }
-        if (_connectionClosed.IsCancellationRequested)
-        {
-            _connectionClosed.Dispose();
-        }
     }
     ValueTask OnError(Request request, Exception ex)
     {
         Logger.LogException(ex, $"{Name} {request}");
-        return SendResponse(Response.Fail(request, ex), _connectionClosed.Token);
+        return SendResponse(Response.Fail(request, ex), default);
     }
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
@@ -224,8 +222,7 @@ class Server
     public ISerializer Serializer => _connection.Serializer;
     public string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
-    ValueTask SendResponse(Response response, CancellationToken responseCancellation) => 
-        _connectionClosed.IsCancellationRequested ? default : _connection.Send(response, responseCancellation);
+    ValueTask SendResponse(Response response, CancellationToken responseCancellation) => _connection.Send(response, responseCancellation);
     static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
     static object GetTaskResult(Type taskType, Task task) => 
         GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0], 

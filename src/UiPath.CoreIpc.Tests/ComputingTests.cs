@@ -70,7 +70,7 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
     {
         for (int i = 0; i < 20; i++)
         {
-            var request = new SystemMessage { RequestTimeout = TimeSpan.FromTicks(1), Delay = 100 };
+            var request = new SystemMessage { RequestTimeout = TimeSpan.FromTicks(10), Delay = 100 };
             Exception exception = null;
             try
             {
