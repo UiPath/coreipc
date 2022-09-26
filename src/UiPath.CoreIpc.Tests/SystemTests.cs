@@ -262,6 +262,17 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         }
     }
     [Fact]
+    public async Task ClosingTheHostShouldCloseTheConnection()
+    {
+        var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
+        var sendMessageResult = _systemClient.MissingCallback(request);
+        var newGuid = System.Guid.NewGuid();
+        (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
+        await Task.Delay(1);
+        _systemHost.Dispose();
+        sendMessageResult.ShouldThrow<Exception>();
+    }
+    [Fact]
     public virtual async void BeforeCallServerSide()
     {
         var newGuid = System.Guid.NewGuid();
