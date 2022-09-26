@@ -28,24 +28,23 @@ class Server
             }
             foreach (var requestId in _requests.Keys)
             {
-                CancelRequest(requestId);
+                try
+                {
+                    CancelRequest(requestId);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogException(ex, $"{Name}");
+                }
             }
         };
     }
     void CancelRequest(string requestId)
     {
-        if (!_requests.TryRemove(requestId, out var cancellation))
-        {
-            return;
-        }
-        try
+        if (_requests.TryRemove(requestId, out var cancellation))
         {
             cancellation.Cancel();
             cancellation.Dispose();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogException(ex, $"{Name}");
         }
     }
 #if !NET461
