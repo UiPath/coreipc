@@ -11,8 +11,8 @@ public class SystemWebSocketTests : SystemTests<WebSocketClientBuilder<ISystemSe
     }
     public override void Dispose()
     {
-        _listener?.Dispose();
         base.Dispose();
+        _listener?.Dispose();
     }
     protected override WebSocketClientBuilder<ISystemService> CreateSystemClientBuilder() => new(new("ws"+GetEndPoint()));
     [Fact]
@@ -43,7 +43,7 @@ public class ComputingWebSocketsTests : ComputingTests<WebSocketClientBuilder<IC
     }
     public override void Dispose()
     {
-        _listener?.Dispose();
         base.Dispose();
+        _listener?.Dispose();
     }
 }

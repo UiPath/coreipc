@@ -291,7 +291,7 @@ public readonly struct TimeoutHelper : IDisposable
     public void Dispose()
     {
         _linkedRegistration.Dispose();
-        _timeoutCancellationSource.Dispose();
+        _timeoutCancellationSource.Return();
     }
     public CancellationToken Token => _timeoutCancellationSource.Token;
 }

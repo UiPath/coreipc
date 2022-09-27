@@ -1,10 +1,9 @@
 ﻿using System.Linq.Expressions;
-
 namespace UiPath.CoreIpc;
-
 using GetTaskResultFunc = Func<Task, object>;
 using MethodExecutor = Func<object, object[], CancellationToken, Task>;
 using static Expression;
+using static CancellationTokenSourcePool;
 class Server
 {
     private static readonly MethodInfo GetResultMethod = typeof(Server).GetStaticMethod(nameof(GetTaskResultImpl));
@@ -12,7 +11,7 @@ class Server
     private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
     private readonly Connection _connection;
     private readonly IClient _client;
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _requests = new();
+    private readonly ConcurrentDictionary<string, PooledCancellationTokenSource> _requests = new();
     public Server(ListenerSettings settings, Connection connection, IClient client = null)
     {
         Settings = settings;
@@ -44,7 +43,7 @@ class Server
         if (_requests.TryRemove(requestId, out var cancellation))
         {
             cancellation.Cancel();
-            cancellation.Dispose();
+            cancellation.Return();
         }
     }
 #if !NET461
@@ -70,7 +69,7 @@ class Server
                 return;
             }
             Response response = null;
-            var requestCancellation = CancellationTokenSourcePool.Rent();
+            var requestCancellation = Rent();
             _requests[request.Id] = requestCancellation;
             var timeout = request.GetTimeout(Settings.RequestTimeout);
             var timeoutHelper = new TimeoutHelper(timeout, requestCancellation.Token);
@@ -99,7 +98,7 @@ class Server
         }
         if (_requests.TryRemove(request.Id, out var cancellation))
         {
-            cancellation.Dispose();
+            cancellation.Return();
         }
     }
     ValueTask OnError(Request request, Exception ex)
