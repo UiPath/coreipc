@@ -267,13 +267,16 @@ public readonly struct TimeoutHelper : IDisposable
     }
     public Exception CheckTimeout(Exception exception, string message)
     {
-        if (!_cancellationToken.IsCancellationRequested && _timeoutCancellationSource.IsCancellationRequested)
+        if (_timeoutCancellationSource.IsCancellationRequested)
         {
-            return new TimeoutException(message + " timed out.", exception);
-        }
-        if (_timeoutCancellationSource.IsCancellationRequested && exception is not TaskCanceledException)
-        {
-            return new TaskCanceledException(message, exception);
+            if (!_cancellationToken.IsCancellationRequested)
+            {
+                return new TimeoutException(message + " timed out.", exception);
+            }
+            if (exception is not TaskCanceledException)
+            {
+                return new TaskCanceledException(message, exception);
+            }
         }
         return exception;
     }
