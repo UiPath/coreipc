@@ -18,10 +18,6 @@ internal static class CancellationTokenSourcePool
     }
     private static bool Return(PooledCancellationTokenSource cts)
     {
-        if (!cts.TryReset())
-        {
-            return false;
-        }
         if (Interlocked.Increment(ref Count) > MaxQueueSize)
         {
             Interlocked.Decrement(ref Count);
@@ -32,16 +28,15 @@ internal static class CancellationTokenSourcePool
     }
     public sealed class PooledCancellationTokenSource : CancellationTokenSource
     {
-        protected override void Dispose(bool disposing)
+        public void Return()
         {
             // If we failed to return to the pool then dispose
-            if (disposing && !Return(this))
+#if !NET461
+            if (!TryReset() || !CancellationTokenSourcePool.Return(this))
+#endif
             {
-                base.Dispose(disposing);
+                Dispose();
             }
         }
-#if NET461
-        public bool TryReset() => false;
-#endif
     }
 }

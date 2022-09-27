@@ -175,6 +175,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
             (await _systemClient.UploadNoRead(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")))).ShouldBeEmpty();
         }
         catch (IOException) { }
+        catch (ObjectDisposedException) { }
         await Guid();
     }
 

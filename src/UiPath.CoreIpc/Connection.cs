@@ -1,10 +1,10 @@
 ﻿namespace UiPath.CoreIpc;
-
-using RequestCompletionSource = TaskCompletionSource<Response>;
+using static TaskCompletionPool<Response>;
 using static IOHelpers;
 public sealed class Connection : IDisposable
 {
-    private readonly ConcurrentDictionary<string, RequestCompletionSource> _requests = new();
+    private static readonly IOException ClosedException = new("Connection closed.");
+    private readonly ConcurrentDictionary<string, ManualResetValueTaskSource> _requests = new();
     private long _requestCounter = -1;
     private readonly int _maxMessageSize;
     private readonly Lazy<Task> _receiveLoop;
@@ -47,19 +47,20 @@ public sealed class Connection : IDisposable
 #endif
     internal async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
     {
-        var requestCompletion = new RequestCompletionSource();
+        var requestCompletion = Rent();
         _requests[request.Id] = requestCompletion;
         CancellationTokenRegistration tokenRegistration = default;
         try
         {
             await Send(request, token);
             tokenRegistration = token.UnsafeRegister(request.UploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
-            return await requestCompletion.Task;
+            return await requestCompletion.ValueTask();
         }
         finally
         {
-            tokenRegistration.Dispose();
             _requests.TryRemove(request.Id, out _);
+            tokenRegistration.Dispose();
+            requestCompletion.Return();
         }
     }
     internal ValueTask Send(Request request, CancellationToken token)
@@ -85,9 +86,9 @@ public sealed class Connection : IDisposable
     }
     private void TryCancelRequest(string requestId)
     {
-        if (_requests.TryGetValue(requestId, out var requestCompletion))
+        if (_requests.TryRemove(requestId, out var requestCompletion))
         {
-            requestCompletion.TrySetCanceled();
+            requestCompletion.SetCanceled();
         }
     }
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
@@ -165,9 +166,12 @@ public sealed class Connection : IDisposable
     }
     private void CompleteRequests()
     {
-        foreach (var completionSource in _requests.Values)
+        foreach (var requestId in _requests.Keys)
         {
-            completionSource.TrySetException(new IOException("Connection closed."));
+            if (_requests.TryRemove(requestId, out var requestCompletion))
+            {
+                requestCompletion.SetException(ClosedException);
+            }
         }
     }
 #if !NET461
@@ -287,7 +291,7 @@ public sealed class Connection : IDisposable
     {
         if (!await ReadBuffer(sizeof(long)))
         {
-            throw new IOException("Connection closed.");
+            throw ClosedException;
         }
         var userStreamLength = BitConverter.ToInt64(_buffer, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
@@ -340,9 +344,9 @@ public sealed class Connection : IDisposable
             {
                 Log($"Received response for request {response.RequestId} {Name}.");
             }
-            if (_requests.TryGetValue(response.RequestId, out var completionSource))
+            if (_requests.TryRemove(response.RequestId, out var completionSource))
             {
-                completionSource.TrySetResult(response);
+                completionSource.SetResult(response);
             }
         }
         catch (Exception ex)
