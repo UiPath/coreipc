@@ -48,17 +48,17 @@ public sealed class Connection : IDisposable
     internal async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
     {
         var requestCompletion = Rent();
-        _requests[request.Id] = requestCompletion;
-        CancellationTokenRegistration tokenRegistration = default;
+        var requestId = request.Id;
+        _requests[requestId] = requestCompletion;
+        var tokenRegistration = token.UnsafeRegister(request.UploadStream == null ? _cancelRequest : _cancelUploadRequest, requestId);
         try
         {
             await Send(request, token);
-            tokenRegistration = token.UnsafeRegister(request.UploadStream == null ? _cancelRequest : _cancelUploadRequest, request.Id);
             return await requestCompletion.ValueTask();
         }
         finally
         {
-            _requests.TryRemove(request.Id, out _);
+            _requests.TryRemove(requestId, out _);
             tokenRegistration.Dispose();
             requestCompletion.Return();
         }
@@ -66,10 +66,11 @@ public sealed class Connection : IDisposable
     internal ValueTask Send(Request request, CancellationToken token)
     {
         Debug.Assert(request.Parameters == null || request.ObjectParameters == null);
+        var uploadStream = request.UploadStream;
         var requestBytes = SerializeToStream(request);
-        return request.UploadStream == null ?
+        return uploadStream == null ?
             SendMessage(MessageType.Request, requestBytes, token) :
-            SendStream(MessageType.UploadRequest, requestBytes, request.UploadStream, token);
+            SendStream(MessageType.UploadRequest, requestBytes, uploadStream, token);
     }
     void CancelRequest(string requestId)
     {
