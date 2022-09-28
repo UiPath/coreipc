@@ -9,9 +9,9 @@ public sealed class Connection : IDisposable
     private readonly int _maxMessageSize;
     private readonly Lazy<Task> _receiveLoop;
     private readonly SemaphoreSlim _sendLock = new(1);
-    private readonly Action<object> _onResponse;
-    private readonly Action<object> _onRequest;
-    private readonly Action<object> _onCancellation;
+    private readonly WaitCallback _onResponse;
+    private readonly WaitCallback _onRequest;
+    private readonly WaitCallback _onCancellation;
     private readonly Action<object> _cancelRequest;
     private readonly Action<object> _cancelUploadRequest;
     private readonly byte[] _buffer = new byte[sizeof(long)];
@@ -260,8 +260,7 @@ public sealed class Connection : IDisposable
             };
         }
     }
-    static void RunAsync(Action<object> callback, object state) =>
-        Task.Factory.StartNew(callback, state, default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
+    static void RunAsync(WaitCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state);
     private async Task OnDownloadResponse()
     {
         var response = await Deserialize<Response>();
