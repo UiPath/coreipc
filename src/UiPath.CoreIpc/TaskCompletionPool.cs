@@ -2,28 +2,8 @@ using System.Threading.Tasks.Sources;
 namespace UiPath.CoreIpc;
 internal static class TaskCompletionPool<T>
 {
-    private const int MaxQueueSize = 1024;
-    private static readonly ConcurrentQueue<ManualResetValueTaskSource> Cache = new();
-    private static int Count;
-    public static ManualResetValueTaskSource Rent()
-    {
-        if (Cache.TryDequeue(out var source))
-        {
-            Interlocked.Decrement(ref Count);
-            return source;
-        }
-        return new();
-    }
-    private static void Return(ManualResetValueTaskSource source)
-    {
-        if (Interlocked.Increment(ref Count) > MaxQueueSize)
-        {
-            Interlocked.Decrement(ref Count);
-            return;
-        }
-        source.Reset();
-        Cache.Enqueue(source);
-    }
+    public static ManualResetValueTaskSource Rent() => BoundedConcurrentQueue<ManualResetValueTaskSource>.Rent();
+    static void Return(ManualResetValueTaskSource source) => BoundedConcurrentQueue<ManualResetValueTaskSource>.Return(source);
     public sealed class ManualResetValueTaskSource : IValueTaskSource<T>, IValueTaskSource
     {
         private ManualResetValueTaskSourceCore<T> _core; // mutable struct; do not make this readonly
@@ -38,6 +18,10 @@ internal static class TaskCompletionPool<T>
         void IValueTaskSource.GetResult(short token) => _core.GetResult(token);
         public ValueTaskSourceStatus GetStatus(short token) => _core.GetStatus(token);
         public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _core.OnCompleted(continuation, state, token, flags);
-        public void Return() => TaskCompletionPool<T>.Return(this);
+        public void Return()
+        {
+            Reset();
+            TaskCompletionPool<T>.Return(this);
+        }
     }
 }
