@@ -1,16 +1,14 @@
-using static UiPath.CoreIpc.CancellationTokenSourcePool;
 namespace UiPath.CoreIpc;
-using BoundedQueue = BoundedConcurrentQueue<PooledCancellationTokenSource>;
 // https://github.com/dotnet/aspnetcore/blob/main/src/Shared/CancellationTokenSourcePool.cs
 internal static class CancellationTokenSourcePool
 {
     public static PooledCancellationTokenSource Rent() =>
 #if !NET461
-        BoundedQueue.Rent();
+        ObjectPool<PooledCancellationTokenSource>.Rent();
 #else
         new();
 #endif
-    static bool Return(PooledCancellationTokenSource cts) => BoundedQueue.Return(cts);
+    static bool Return(PooledCancellationTokenSource cts) => ObjectPool<PooledCancellationTokenSource>.Return(cts);
     public sealed class PooledCancellationTokenSource : CancellationTokenSource
     {
         public void Return()
@@ -25,7 +23,7 @@ internal static class CancellationTokenSourcePool
         }
     }
 }
-static class BoundedConcurrentQueue<T> where T : new()
+static class ObjectPool<T> where T : new()
 {
     private const int MaxQueueSize = 1024;
     private static readonly ConcurrentQueue<T> Cache = new();

@@ -2,8 +2,8 @@ using System.Threading.Tasks.Sources;
 namespace UiPath.CoreIpc;
 internal static class TaskCompletionPool<T>
 {
-    public static ManualResetValueTaskSource Rent() => BoundedConcurrentQueue<ManualResetValueTaskSource>.Rent();
-    static void Return(ManualResetValueTaskSource source) => BoundedConcurrentQueue<ManualResetValueTaskSource>.Return(source);
+    public static ManualResetValueTaskSource Rent() => ObjectPool<ManualResetValueTaskSource>.Rent();
+    static void Return(ManualResetValueTaskSource source) => ObjectPool<ManualResetValueTaskSource>.Return(source);
     public sealed class ManualResetValueTaskSource : IValueTaskSource<T>, IValueTaskSource
     {
         private ManualResetValueTaskSourceCore<T> _core; // mutable struct; do not make this readonly
