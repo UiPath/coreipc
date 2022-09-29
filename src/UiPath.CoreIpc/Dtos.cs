@@ -1,7 +1,6 @@
 ﻿using System.Text;
 using Newtonsoft.Json;
 namespace UiPath.CoreIpc;
-
 public class Message
 {
     internal bool ObjectParameters { get; set; }
@@ -19,48 +18,18 @@ public class Message<TPayload> : Message
     public Message(TPayload payload) => Payload = payload;
     public TPayload Payload { get; }
 }
-class Request
+record Request(string Endpoint, string Id, string MethodName, string[] Parameters, object[] ObjectParameters, double TimeoutInSeconds)
 {
-    public Request(string endpoint, string id, string methodName, string[] parameters, object[] objectParameters, double timeoutInSeconds)
-    {
-        Endpoint = endpoint;
-        Id = id;
-        MethodName = methodName;
-        Parameters = parameters;
-        TimeoutInSeconds = timeoutInSeconds;
-        ObjectParameters = objectParameters;
-    }
-    public double TimeoutInSeconds { get; }
-    public string Endpoint { get; }
-    public string Id { get; }
-    public string MethodName { get; }
-    public string[] Parameters { get; }
-    public object[] ObjectParameters { get; }
     internal Stream UploadStream { get; set; }
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
     internal bool HasObjectParameters => ObjectParameters is not null;
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
-class CancellationRequest
+record CancellationRequest(string RequestId);
+record Response(string RequestId, string Data = null, object ObjectData = null, Error Error = null)
 {
-    public CancellationRequest(string requestId) => RequestId = requestId;
-    public string RequestId { get; }
-}
-class Response
-{
-    public Response(string requestId, string data = null, object objectData = null, Error error = null)
-    {
-        RequestId = requestId;
-        Data = data;
-        Error = error;
-        ObjectData = objectData;
-    }
-    public string RequestId { get; }
-    public string Data { get; }
-    public object ObjectData { get; }
-    public Error Error { get; }
     internal Stream DownloadStream { get; set; }
-    public static Response Fail(Request request, Exception ex) => new(request.Id, error: new(ex));
+    public static Response Fail(Request request, Exception ex) => new(request.Id, Error: Error.FromException(ex));
     public static Response Success(Request request, string data) => new(request.Id, data);
     public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
     public TResult Deserialize<TResult>(ISerializer serializer, bool objectParameters)
@@ -74,24 +43,10 @@ class Response
     }
 }
 [Serializable]
-public class Error
+public record Error(string Message, string StackTrace, string Type, Error InnerError)
 {
-    [JsonConstructor]
-    private Error(string message, string stackTrace, string type, Error innerError)
-    {
-        Message = message;
-        StackTrace = stackTrace;
-        Type = type;
-        InnerError = innerError;
-    }
-    public Error(Exception ex) : this(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace, GetExceptionType(ex),
-        ex.InnerException == null ? null : new(ex.InnerException))
-    {
-    }
-    public string Message { get; }
-    public string StackTrace { get; }
-    public string Type { get; }
-    public Error InnerError { get; }
+    public static Error FromException(Exception ex) => new(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace, GetExceptionType(ex),
+        ex.InnerException == null ? null : FromException(ex.InnerException));
     public override string ToString() => new RemoteException(this).ToString();
     private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
 }

@@ -152,7 +152,7 @@ class Server
                 {
                     return Response.Success(request, downloadStream);
                 }
-                return objectParameters ? new Response(request.Id, objectData: returnValue) : Response.Success(request, Serializer.Serialize(returnValue));
+                return objectParameters ? new Response(request.Id, ObjectData: returnValue) : Response.Success(request, Serializer.Serialize(returnValue));
             }
             else
             {
