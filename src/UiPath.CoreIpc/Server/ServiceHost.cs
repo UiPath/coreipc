@@ -1,6 +1,5 @@
 ﻿namespace UiPath.CoreIpc;
-
-public class ServiceHost : IDisposable
+public sealed class ServiceHost : IDisposable
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly IDictionary<string, EndpointSettings> _endpoints;
