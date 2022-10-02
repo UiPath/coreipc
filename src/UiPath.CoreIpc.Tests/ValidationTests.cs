@@ -12,8 +12,8 @@ public class ValidationTests
     [Fact]
     public void ErrorFromRemoteException()
     {
-        var innerError = Error.FromException(new InvalidDataException("invalid"));
-        var error = Error.FromException(new JobFailedException(innerError));
+        var innerError = new InvalidDataException("invalid").ToError();
+        var error = new JobFailedException(innerError).ToError();
         error.Type.ShouldBe(typeof(JobFailedException).FullName);
         error.Message.ShouldBe("Job has failed.");
         error.InnerError.Type.ShouldBe(typeof(InvalidDataException).FullName);

@@ -29,7 +29,7 @@ record CancellationRequest(string RequestId);
 record Response(string RequestId, string Data = null, object ObjectData = null, Error Error = null)
 {
     internal Stream DownloadStream { get; set; }
-    public static Response Fail(Request request, Exception ex) => new(request.Id, Error: Error.FromException(ex));
+    public static Response Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());
     public static Response Success(Request request, string data) => new(request.Id, data);
     public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
     public TResult Deserialize<TResult>(ISerializer serializer, bool objectParameters)
@@ -45,10 +45,7 @@ record Response(string RequestId, string Data = null, object ObjectData = null, 
 [Serializable]
 public record Error(string Message, string StackTrace, string Type, Error InnerError)
 {
-    public static Error FromException(Exception ex) => new(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace, GetExceptionType(ex),
-        ex.InnerException == null ? null : FromException(ex.InnerException));
     public override string ToString() => new RemoteException(this).ToString();
-    private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
 }
 [Serializable]
 public class RemoteException : Exception

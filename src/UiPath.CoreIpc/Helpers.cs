@@ -19,6 +19,8 @@ public static class Helpers
         await tcpClient.ConnectAsync(address, port);
     }
 #endif
+    public static Error ToError(this Exception ex) => new(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace, GetExceptionType(ex), ex.InnerException?.ToError());
+    private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
     public static bool Enabled(this ILogger logger) => logger != null && logger.IsEnabled(LogLevel.Information);
     [Conditional("DEBUG")]
     public static void AssertDisposed(this SemaphoreSlim semaphore) =>
