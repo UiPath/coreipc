@@ -4,7 +4,7 @@
     <RootNamespace>UiPath.CoreIpc</RootNamespace>
     <GeneratePackageOnBuild Condition="$(Configuration)=='Release'">true</GeneratePackageOnBuild>
     <Authors>UiPath</Authors>
-    <Version>2.4.1</Version>
+    <Version>2.5.0</Version>
     <PackageProjectUrl>https://github.com/UiPath/CoreIpc/</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>json-rpc rpc ipc netcore wcf</PackageTags>
