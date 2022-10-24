@@ -3,7 +3,7 @@ name: $(Date:yyyyMMdd)$(Rev:-rr)
 variables:
   Label_Initialization: 'Initialization:'
   Label_DotNet: '.NET:'
-  Label_NodeJS: 'node.js:'
+  Label_JS: 'JS (node, web):'
 
   DotNet_BuildConfiguration: 'Release'
   DotNet_SessionSolution: 'CoreIpc.sln'
@@ -11,13 +11,15 @@ variables:
   DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
   
-  NodeJS_DotNet_BuildConfiguration: 'Debug'
-  NodeJS_ProjectPath: './src/Clients/nodejs'
-  NodeJS_ArchivePath: './src/Clients/nodejs.zip'
-  NodeJS_ArtifactName: 'NPM package'
-  NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.CoreIpc.NodeInterop/bin/Debug/net6.0'
-  NodeJS_DotNetNodeInteropProject : './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop/UiPath.CoreIpc.NodeInterop.csproj'
-  NodeJS_DotNetNodeInteropSolution: './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop.sln'
+  JS_DotNet_BuildConfiguration: 'Debug'
+  JS_ProjectPath: './src/Clients/js'
+  JS_ArchivePath: './src/Clients/nodejs.zip'
+  JS_TestResultsFile: '$(JS_ProjectPath)/reports/test-results.xml'
+  JS_CoverageFile: '$(JS_ProjectPath)/reports/coverage/cobertura-coverage.xml'
+  JS_ArtifactName: 'NPM package'
+  JS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.CoreIpc.NodeInterop/bin/Debug/net6.0'
+  JS_DotNetNodeInteropProject : './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop/UiPath.CoreIpc.NodeInterop.csproj'
+  JS_DotNetNodeInteropSolution: './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop.sln'
 
 jobs:
   # The following 3 jobs will run in parallel:
@@ -32,19 +34,19 @@ jobs:
       - template: azp-dotnet-dist.yaml
 
   - job:
-    displayName: 'node.js on Windows'
+    displayName: 'JS (node, web) on Windows'
     pool:
       vmImage: 'windows-2022'
     steps:
       - template: azp-initialization.yaml
-      - template: azp-nodejs.yaml
-      - template: azp-nodejs-dist.yaml
+      - template: azp-js.yaml
+      - template: azp-js-dist.yaml
 
   - job:
-    displayName: 'node.js on Ubuntu'
+    displayName: 'JS (node, web) on Ubuntu'
     pool:
       vmImage: 'ubuntu-20.04'
     steps:
       - template: azp-initialization.yaml
-      - template: azp-nodejs.yaml
+      - template: azp-js.yaml
 

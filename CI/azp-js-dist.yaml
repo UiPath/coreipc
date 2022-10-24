@@ -1,0 +1,15 @@
+steps:
+  - task: ArchiveFiles@2
+    displayName: '$(Label_JS) Archive project directory'
+    inputs:
+      archiveType: 'zip'
+      includeRootFolder: false
+      rootFolderOrFile: '$(JS_ProjectPath)'
+      archiveFile: '$(JS_ArchivePath)'
+
+  - task: PublishBuildArtifacts@1
+    displayName: '$(Label_JS) Publish the $(JS_ArtifactName) to the pipeline instance'
+    inputs:
+      ArtifactName: '$(JS_ArtifactName)'
+      PathtoPublish: '$(JS_ArchivePath)'
+      ArtifactType: 'Container'

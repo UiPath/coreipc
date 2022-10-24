@@ -1,0 +1,63 @@
+steps:
+  - task: UseDotNet@2
+    inputs:
+      version: 6.0.x
+
+  - task: NodeTool@0 
+    inputs:
+      versionSpec: '14.18.2'
+    
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_JS) Restore and build "UiPath.CoreIpc.csproj"'
+    inputs:
+      projects: '$(DotNet_MainProjectPath)'
+      arguments: '--configuration $(JS_DotNet_BuildConfiguration) --framework net6.0 -p:Version="$(FullVersion)"'
+
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_JS) Restore and build "UiPath.CoreIpc.NodeInterop.csproj"'
+    inputs:
+      projects: '$(JS_DotNetNodeInteropProject)'
+      arguments: '--configuration $(JS_DotNet_BuildConfiguration) --framework net6.0 -p:Version="$(FullVersion)"'
+
+  - task: Npm@1
+    displayName: '$(Label_JS) Write $[FullVersion] to package.json'
+    inputs:
+      command: 'custom'
+      workingDir: '$(JS_ProjectPath)'
+      customCommand: 'version $(FullVersion) --allow-same-version'
+
+  - task: Npm@1
+    displayName: '$(Label_JS) Restore'
+    inputs:
+        command: 'install'
+        workingDir: $(JS_ProjectPath)
+        customRegistry: 'useFeed'
+        customFeed: '424ca518-1f12-456b-a4f6-888197fc15ee'
+    
+  - task: Npm@1
+    displayName: '$(Label_JS) Build'
+    inputs:
+        command: 'custom'
+        workingDir: $(JS_ProjectPath)
+        customCommand: 'run build'
+    
+  - task: Npm@1
+    displayName: '$(Label_JS) Run unit tests'
+    inputs:
+        command: 'custom'
+        workingDir: $(JS_ProjectPath)
+        customCommand: 'run test'
+
+  - task: PublishTestResults@2
+    displayName: '$(Label_JS) Publish test results'
+    condition: succeededOrFailed()
+    inputs:
+      testRunner: JUnit
+      workingDir: $(JS_ProjectPath)
+      testResultsFiles: $(JS_TestResultsFile)
+
+  - task: PublishCodeCoverageResults@1
+    displayName: '$(Label_JS) Publish code coverage results'
+    inputs:
+      codeCoverageTool: 'cobertura'
+      summaryFileLocation: $(JS_CoverageFile)
