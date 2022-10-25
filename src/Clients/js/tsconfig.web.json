@@ -1,10 +1,10 @@
 {
     "extends": "./tsconfig.common.json",
     "exclude": [
-        "**/*.web.ts"
+        "**/*.node.ts"
     ],
     "compilerOptions": {
-        "outDir": "./dist/node/",
+        "outDir": "./dist/web/",
         "declaration": true
     }
 }

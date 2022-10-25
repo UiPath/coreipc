@@ -1,6 +1,6 @@
 /.vs
 /.nyc_output
-node_modules
+/node_modules
 coverage
 yarn.lock
 dist

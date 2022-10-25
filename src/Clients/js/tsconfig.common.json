@@ -1,0 +1,53 @@
+{
+    "compileOnSave": true,
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "./node_modules/**/*",
+        "**/*.test.ts"
+    ],
+    "compilerOptions": {
+        "rootDir": "./src",
+        "baseUrl": "./",
+        "inlineSourceMap": true,
+        "declaration": false,
+        "downlevelIteration": true,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "esModuleInterop": true,
+        "moduleResolution": "Node",
+        "target": "es6",
+        "module": "es6",
+        "lib": [ "es5", "es6", "dom" ],
+        "noUnusedLocals": false,
+        "skipLibCheck": true,
+        "skipDefaultLibCheck": true,
+        "paths": {
+            "@foundation": [
+                "src/foundation"
+            ],
+            "@core": [
+                "src/core"
+            ],
+            "@core-rtti": [
+                "src/core/rtti"
+            ],
+            "@foundation-errors": [
+                "src/foundation/errors"
+            ],
+            "@foundation-threading": [
+                "src/foundation/threading"
+            ],
+            "@foundation-types": [
+                "src/foundation/types"
+            ],
+            "@test-helpers": [
+                "test/helpers"
+            ]
+        },
+        "strict": true,
+        "strictNullChecks": true,
+        "stripInternal": true
+    }
+}
