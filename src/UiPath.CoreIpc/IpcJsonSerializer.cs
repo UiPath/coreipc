@@ -15,7 +15,6 @@ public interface ISerializer
 }
 class IpcJsonSerializer : ISerializer, IArrayPool<char>
 {
-    static readonly JsonLoadSettings LoadSettings = new(){ LineInfoHandling = LineInfoHandling.Ignore };
     static readonly JsonSerializer DefaultSerializer = new(){ DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore, 
         CheckAdditionalContent = true };
     static readonly JsonSerializer StringArgsSerializer = new(){ CheckAdditionalContent = true };
@@ -24,13 +23,11 @@ class IpcJsonSerializer : ISerializer, IArrayPool<char>
 #endif
     public async ValueTask<T> DeserializeAsync<T>(Stream json)
     {
-        JToken jToken;
-        var streamReader = new StreamReader(json, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: Math.Min(4096, (int)json.Length));
-        using (var reader = CreateReader(streamReader))
-        {
-            jToken = await JToken.LoadAsync(reader, LoadSettings);
-        }
-        return jToken.ToObject<T>(DefaultSerializer);
+        using var stream = IOHelpers.GetStream((int)json.Length);
+        await json.CopyToAsync(stream);
+        stream.Position = 0;
+        using var reader = CreateReader(new StreamReader(stream));
+        return DefaultSerializer.Deserialize<T>(reader);
     }
     public object Deserialize(object json, Type type) => json switch
     {
