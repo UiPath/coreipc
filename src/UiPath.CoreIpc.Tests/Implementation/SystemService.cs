@@ -53,7 +53,7 @@ public class SystemService : ISystemService
 
     public SystemService()
     {
-        for (int index = 0; index < 10000; ++index)
+        for (int index = 0; index < 1000; ++index)
         {
             _addressDtos.Add(new AddressDto
             {

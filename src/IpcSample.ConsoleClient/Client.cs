@@ -24,8 +24,8 @@ class Client
         catch (Exception ex)
         {
             Console.WriteLine(ex.ToString());
-            Console.ReadLine();
         }
+        Console.ReadLine();
     }
     private static async Task RunTestsAsync(CancellationToken cancellationToken)
     {
@@ -34,18 +34,19 @@ class Client
         var systemClient =
             new NamedPipeClientBuilder<ISystemService>("test")
             .SerializeParametersAsObjects()
-            .RequestTimeout(TimeSpan.FromSeconds(2))
+            .RequestTimeout(TimeSpan.FromSeconds(12))
             .Logger(serviceProvider)
             .AllowImpersonation()
             .ValidateAndBuild();
 
         var watch = Stopwatch.StartNew();
+        JobResult jobResult;
         for (int i = 0; i < 30; i++)
         {
-            await systemClient.GetJobResult();
+            jobResult = await systemClient.GetJobResult();
         }
-
-        Console.WriteLine($"Elapsed {watch.ElapsedMilliseconds}");
+        watch.Stop();
+        Console.WriteLine($"{watch.ElapsedMilliseconds} {GC.CollectionCount(2)}  {GC.GetGCMemoryInfo().PauseTimePercentage}");
     }
 
     private static IServiceProvider ConfigureServices() =>
