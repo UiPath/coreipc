@@ -1,4 +1,6 @@
-﻿using System.Globalization;
+﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
+using System.Globalization;
 using System.Text;
 
 namespace UiPath.CoreIpc.Tests;
@@ -22,6 +24,22 @@ public interface ISystemService
     Task<Stream> Download(string text, CancellationToken cancellationToken = default);
     Task<Stream> Echo(Stream input, CancellationToken cancellationToken = default);
     Task<string> UploadNoRead(Stream memoryStream, int delay = 0, CancellationToken cancellationToken = default);
+
+    Task<JobResult> GetJobResult(CancellationToken cancellationToken = default);
+}
+
+public class JobResult : Message
+{
+    public Dictionary<string, object> Arguments {  get; set; }
+}
+
+public class AddressDto
+{
+    public int Id { get; set; }
+    public string City { get; set; }
+    public int Number { get; set; }
+    public string Country { get; set; }
+    public string ZipCode { get; set; }
 }
 
 public class SystemMessage : Message
@@ -31,8 +49,21 @@ public class SystemMessage : Message
 }
 public class SystemService : ISystemService
 {
+    private List<AddressDto> _addressDtos = new();
+
     public SystemService()
     {
+        for (int index = 0; index < 10000; ++index)
+        {
+            _addressDtos.Add(new AddressDto
+            {
+                Id = index,
+                City = Guid.NewGuid().ToString(),
+                Number = index,
+                Country = Guid.NewGuid().ToString(),
+                ZipCode = Guid.NewGuid().ToString(),
+            });
+        }
     }
 
     public async Task<bool> Infinite(CancellationToken cancellationToken = default)
@@ -171,5 +202,11 @@ public class SystemService : ISystemService
         await input.CopyToAsync(result);
         result.Position = 0;
         return result;
+    }
+
+    public Task<JobResult> GetJobResult(CancellationToken cancellationToken = default)
+    {
+        var jobResult = new JobResult() { Arguments = new Dictionary<string, object>() { { "arg", _addressDtos } } };
+        return Task.FromResult(jobResult);
     }
 }

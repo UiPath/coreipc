@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace UiPath.CoreIpc.Tests;
 class WebSocketClient
 {
-    static async Task Main(string[] args)
+    static async Task _Main(string[] args)
     {
         Console.WriteLine(typeof(int).Assembly);
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
