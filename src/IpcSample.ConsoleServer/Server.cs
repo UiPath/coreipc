@@ -13,7 +13,7 @@ class Server
     //    GC.WaitForPendingFinalizers();
     //    GC.Collect();
     //}, null, 0, 3000);
-    static async Task _Main()
+    static async Task Main()
     {
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
         //GuiLikeSyncContext.Install();
