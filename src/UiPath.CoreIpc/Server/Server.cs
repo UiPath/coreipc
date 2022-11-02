@@ -68,7 +68,7 @@ class Server
                 await HandleRequest(method, endpoint, request, default);
                 return;
             }
-            ResponseSend response = null;
+            Response response = null;
             var requestCancellation = Rent();
             _requests[request.Id] = requestCancellation;
             var timeout = request.GetTimeout(Settings.RequestTimeout);
@@ -104,12 +104,12 @@ class Server
     ValueTask OnError(Request request, Exception ex)
     {
         Logger.LogException(ex, $"{Name} {request}");
-        return SendResponse(ResponseSend.Fail(request, ex), default);
+        return SendResponse(Response.Fail(request, ex), default);
     }
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-    async ValueTask<ResponseSend> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
+    async ValueTask<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
     {
         var objectParameters = request.HasObjectParameters;
         var contract = endpoint.Contract;
@@ -137,7 +137,7 @@ class Server
 #if !NET461
         [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-        async ValueTask<ResponseSend> InvokeMethod()
+        async ValueTask<Response> InvokeMethod()
         {
             var returnTaskType = method.ReturnType;
             var scheduler = endpoint.Scheduler;
@@ -150,14 +150,14 @@ class Server
                 var returnValue = GetTaskResult(returnTaskType, methodResult);
                 if (returnValue is Stream downloadStream)
                 {
-                    return ResponseSend.Success(request, downloadStream);
+                    return Response.Success(request, downloadStream);
                 }
-                return objectParameters ? new(request.Id, ObjectData: returnValue) : ResponseSend.Success(request, Serializer.Serialize(returnValue));
+                return objectParameters ? new Response(request.Id, ObjectData: returnValue) : Response.Success(request, Serializer.Serialize(returnValue));
             }
             else
             {
                 (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method.MethodInfo);
-                return objectParameters ? null : ResponseSend.Success(request, "");
+                return objectParameters ? null : Response.Success(request, "");
             }
             Task MethodCall() => method.Invoke(service, arguments, cancellationToken);
             Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
@@ -230,7 +230,7 @@ class Server
     public ISerializer Serializer => _connection.Serializer;
     public string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
-    ValueTask SendResponse(ResponseSend response, CancellationToken responseCancellation) => _connection.Send(response, responseCancellation);
+    ValueTask SendResponse(Response response, CancellationToken responseCancellation) => _connection.Send(response, responseCancellation);
     static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
     static object GetTaskResult(Type taskType, Task task) => 
         GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0], 
