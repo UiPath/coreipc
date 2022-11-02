@@ -73,7 +73,7 @@ public class NestedStream : Stream
     {
         if (buffer.Length > _remainingBytes)
         {
-            buffer = buffer.Slice(0, (int)_remainingBytes);
+            buffer = buffer[..(int)_remainingBytes];
         }
         if (buffer.Length <= 0)
         {

@@ -55,7 +55,8 @@ public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterfac
     }
     /// <summary>
     /// By default, method parameters are serialized as json strings. Setting this allows serialization as json objects.
-    /// This should improve performance, especially for large objects. But it breaks compatibility with older servers.
+    /// This should improve performance for large strings, but decrease it for many small objects.
+    /// Setting it breaks compatibility with older servers.
     /// So a proxy with this setting will only be able to connect to servers that understand the new encoding.
     /// </summary>
     /// <returns>this</returns>
