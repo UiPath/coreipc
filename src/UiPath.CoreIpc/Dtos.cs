@@ -1,5 +1,7 @@
 ﻿using System.Text;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
 namespace UiPath.CoreIpc;
 public class Message
 {
@@ -26,12 +28,18 @@ record Request(string Endpoint, string Id, string MethodName, string[] Parameter
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
 record CancellationRequest(string RequestId);
-record Response(string RequestId, string Data = null, object ObjectData = null, Error Error = null)
+record Response(string RequestId, string Data = null, Error Error = null)
 {
     internal Stream DownloadStream { get; set; }
-    public static Response Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());
-    public static Response Success(Request request, string data) => new(request.Id, data);
-    public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
+}
+record ResponseSend(string RequestId, string Data = null, object ObjectData = null, Error Error = null) : Response(RequestId, Data, Error)
+{
+    public static ResponseSend Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());
+    public static ResponseSend Success(Request request, string data) => new(request.Id, data);
+    public static ResponseSend Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
+}
+record ResponseReceive(string RequestId, string Data = null, JRaw ObjectData = null, Error Error = null) : Response(RequestId, Data, Error)
+{
     public TResult Deserialize<TResult>(ISerializer serializer, bool objectParameters)
     {
         if (Error != null)

@@ -1,5 +1,5 @@
 ﻿namespace UiPath.CoreIpc;
-using static TaskCompletionPool<Response>;
+using static TaskCompletionPool<ResponseReceive>;
 using static IOHelpers;
 public sealed class Connection : IDisposable
 {
@@ -25,7 +25,7 @@ public sealed class Connection : IDisposable
         Name = $"{name} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
         _receiveLoop = new(ReceiveLoop);
-        _onResponse = response => OnResponseReceived((Response)response);
+        _onResponse = response => OnResponseReceived((ResponseReceive)response);
         _onRequest = request => OnRequestReceived((Request)request);
         _onCancellation = requestId => OnCancellationReceived((string)requestId);
         _cancelRequest = requestId => CancelRequest((string)requestId);
@@ -45,7 +45,7 @@ public sealed class Connection : IDisposable
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-    internal async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
+    internal async ValueTask<ResponseReceive> RemoteCall(Request request, CancellationToken token)
     {
         var requestCompletion = Rent();
         var requestId = request.Id;
@@ -94,7 +94,7 @@ public sealed class Connection : IDisposable
             requestCompletion.SetCanceled();
         }
     }
-    internal ValueTask Send(Response response, CancellationToken cancellationToken)
+    internal ValueTask Send(ResponseSend response, CancellationToken cancellationToken)
     {
         Debug.Assert(response.Data == null || response.ObjectData == null);
         var responseBytes = SerializeToStream(response);
@@ -237,7 +237,7 @@ public sealed class Connection : IDisposable
             switch (messageType)
             {
                 case MessageType.Response:
-                    RunAsync(_onResponse, await Deserialize<Response>());
+                    RunAsync(_onResponse, await Deserialize<ResponseReceive>());
                     break;
                 case MessageType.Request:
                     RunAsync(_onRequest, await Deserialize<Request>());
@@ -263,7 +263,7 @@ public sealed class Connection : IDisposable
     static void RunAsync(WaitCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state);
     private async Task OnDownloadResponse()
     {
-        var response = await Deserialize<Response>();
+        var response = await Deserialize<ResponseReceive>();
         await EnterStreamMode();
         var streamDisposed = new TaskCompletionSource<bool>();
         EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
@@ -338,7 +338,7 @@ public sealed class Connection : IDisposable
         }
         return default;
     }
-    private void OnResponseReceived(Response response)
+    private void OnResponseReceived(ResponseReceive response)
     {
         try
         {

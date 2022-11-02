@@ -40,19 +40,15 @@ class Client
             .ValidateAndBuild();
         while (true)
         {
-            var tasks = Enumerable.Repeat(1, 1).Select(_ => Task.Run(async() =>
+            var watch = Stopwatch.StartNew();
+            JobResult jobResult;
+            for (int i = 0; i < 30; i++)
             {
-                var watch = Stopwatch.StartNew();
-                JobResult jobResult;
-                for (int i = 0; i < 30; i++)
-                {
-                    jobResult = await systemClient.GetJobResult();
-                }
-                watch.Stop();
-                var gcStats = GC.GetGCMemoryInfo();
-                Console.WriteLine($"{watch.ElapsedMilliseconds} {gcStats.GenerationInfo[2].SizeAfterBytes/1_000_000}  {gcStats.PauseTimePercentage}");
-            }));
-            await Task.WhenAll(tasks);
+                jobResult = await systemClient.GetJobResult();
+            }
+            watch.Stop();
+            var gcStats = GC.GetGCMemoryInfo();
+            Console.WriteLine($"{watch.ElapsedMilliseconds} {gcStats.GenerationInfo[2].SizeAfterBytes/1_000_000}  {gcStats.PauseTimePercentage}");
         }
     }
 

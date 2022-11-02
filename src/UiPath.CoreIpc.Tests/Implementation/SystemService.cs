@@ -30,8 +30,8 @@ public interface ISystemService
 
 public class JobResult : Message
 {
-    public Dictionary<string, object> Arguments {  get; set; }
-    //public List<AddressDto> Arguments { get; set; }
+    //public Dictionary<string, object> Arguments {  get; set; }
+    public List<AddressDto> Arguments { get; set; }
 }
 
 public class AddressDto
@@ -207,8 +207,8 @@ public class SystemService : ISystemService
 
     public Task<JobResult> GetJobResult(CancellationToken cancellationToken = default)
     {
-        var jobResult = new JobResult() { Arguments = new Dictionary<string, object>() { { "arg", _addressDtos } } };
-        //var jobResult = new JobResult() { Arguments = _addressDtos };
+        //var jobResult = new JobResult() { Arguments = new Dictionary<string, object>() { { "arg", _addressDtos } } };
+        var jobResult = new JobResult() { Arguments = _addressDtos };
         return Task.FromResult(jobResult);
     }
 }
