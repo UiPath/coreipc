@@ -32,6 +32,7 @@ public class JobResult : Message
 {
     //public Dictionary<string, object> Arguments {  get; set; }
     public List<AddressDto> Arguments { get; set; }
+    public string Args { get; set; }
 }
 
 public class AddressDto
@@ -51,7 +52,7 @@ public class SystemMessage : Message
 public class SystemService : ISystemService
 {
     private List<AddressDto> _addressDtos = new();
-
+    string args;
     public SystemService()
     {
         for (int index = 0; index < 1000; ++index)
@@ -65,6 +66,7 @@ public class SystemService : ISystemService
                 ZipCode = Guid.NewGuid().ToString(),
             });
         }
+        args = JsonConvert.SerializeObject(_addressDtos);
     }
 
     public async Task<bool> Infinite(CancellationToken cancellationToken = default)
@@ -208,7 +210,8 @@ public class SystemService : ISystemService
     public Task<JobResult> GetJobResult(CancellationToken cancellationToken = default)
     {
         //var jobResult = new JobResult() { Arguments = new Dictionary<string, object>() { { "arg", _addressDtos } } };
-        var jobResult = new JobResult() { Arguments = _addressDtos };
+        //var jobResult = new JobResult() { Arguments = _addressDtos };
+        var jobResult = new JobResult() { Args = args };
         return Task.FromResult(jobResult);
     }
 }

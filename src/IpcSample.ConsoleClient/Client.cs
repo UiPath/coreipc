@@ -33,7 +33,7 @@ class Client
 
         var systemClient =
             new NamedPipeClientBuilder<ISystemService>("test")
-            .SerializeParametersAsObjects()
+            //.SerializeParametersAsObjects()
             .RequestTimeout(TimeSpan.FromSeconds(12))
             .Logger(serviceProvider)
             .AllowImpersonation()
@@ -42,7 +42,7 @@ class Client
         {
             var watch = Stopwatch.StartNew();
             JobResult jobResult;
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < 60; i++)
             {
                 jobResult = await systemClient.GetJobResult();
             }
