@@ -59,9 +59,9 @@ public class SystemService : ISystemService
         {
             _addressDtos.Add(new AddressDto
             {
-                Id = index,
+                //Id = index,
                 City = Guid.NewGuid().ToString(),
-                Number = index,
+                //Number = index,
                 Country = Guid.NewGuid().ToString(),
                 ZipCode = Guid.NewGuid().ToString(),
             });
@@ -210,8 +210,8 @@ public class SystemService : ISystemService
     public Task<JobResult> GetJobResult(CancellationToken cancellationToken = default)
     {
         //var jobResult = new JobResult() { Arguments = new Dictionary<string, object>() { { "arg", _addressDtos } } };
-        //var jobResult = new JobResult() { Arguments = _addressDtos };
-        var jobResult = new JobResult() { Args = args };
+        var jobResult = new JobResult() { Arguments = _addressDtos };
+        //var jobResult = new JobResult() { Args = args };
         return Task.FromResult(jobResult);
     }
 }
