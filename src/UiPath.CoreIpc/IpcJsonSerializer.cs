@@ -32,7 +32,7 @@ class IpcJsonSerializer : ISerializer, IArrayPool<char>
     public object Deserialize(object json, Type type) => json switch
     {
         JToken token => token.ToObject(type, DefaultSerializer),
-        { } => type.IsAssignableFrom(json.GetType()) ? json : new JValue(json).ToObject(type),
+        { } => type.IsAssignableFrom(json.GetType()) ? json : new JValue(json).ToObject(type, DefaultSerializer),
         null => null,
     };
     public void Serialize(object obj, Stream stream) => Serialize(obj, new StreamWriter(stream), DefaultSerializer);
@@ -53,7 +53,7 @@ class IpcJsonSerializer : ISerializer, IArrayPool<char>
     public object Deserialize(string json, Type type)
     {
         using var reader = CreateReader(new StringReader(json));
-        return DefaultSerializer.Deserialize(reader, type);
+        return StringArgsSerializer.Deserialize(reader, type);
     }
     private JsonTextReader CreateReader(TextReader json) => new(json){ ArrayPool = this };
 }
