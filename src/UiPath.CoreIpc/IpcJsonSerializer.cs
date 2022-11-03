@@ -32,7 +32,7 @@ class IpcJsonSerializer : ISerializer, IArrayPool<char>
     public object Deserialize(object json, Type type) => json switch
     {
         JToken token => token.ToObject(type, DefaultSerializer),
-        { } => type.IsAssignableFrom(json.GetType()) ? json : new JValue(json).ToObject(type, DefaultSerializer),
+        { } => type.IsAssignableFrom(json.GetType()) ? json : new JValue(json).ToObject(type),
         null => null,
     };
     public void Serialize(object obj, Stream stream) => Serialize(obj, new StreamWriter(stream), DefaultSerializer);
