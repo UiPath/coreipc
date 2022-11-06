@@ -15,7 +15,7 @@ public interface ISerializer
 }
 class IpcJsonSerializer : ISerializer, IArrayPool<char>
 {
-    static readonly JsonSerializer DefaultSerializer = new(){ DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore, 
+    static readonly JsonSerializer ObjectArgsSerializer = new(){ DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore, 
         CheckAdditionalContent = true };
     static readonly JsonSerializer StringArgsSerializer = new(){ CheckAdditionalContent = true };
 #if !NET461
@@ -27,15 +27,15 @@ class IpcJsonSerializer : ISerializer, IArrayPool<char>
         await json.CopyToAsync(stream);
         stream.Position = 0;
         using var reader = CreateReader(new StreamReader(stream));
-        return DefaultSerializer.Deserialize<T>(reader);
+        return ObjectArgsSerializer.Deserialize<T>(reader);
     }
     public object Deserialize(object json, Type type) => json switch
     {
-        JToken token => token.ToObject(type, DefaultSerializer),
+        JToken token => token.ToObject(type, ObjectArgsSerializer),
         { } => type.IsAssignableFrom(json.GetType()) ? json : new JValue(json).ToObject(type),
         null => null,
     };
-    public void Serialize(object obj, Stream stream) => Serialize(obj, new StreamWriter(stream), DefaultSerializer);
+    public void Serialize(object obj, Stream stream) => Serialize(obj, new StreamWriter(stream), ObjectArgsSerializer);
     private void Serialize(object obj, TextWriter streamWriter, JsonSerializer serializer)
     {
         using var writer = new JsonTextWriter(streamWriter) { ArrayPool = this, CloseOutput = false };
