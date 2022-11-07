@@ -1,0 +1,35 @@
+{
+    "compileOnSave": true,
+    "include": [],
+    "exclude": [
+        "./node_modules/**/*",
+        "**/*.test.ts"
+    ],
+    "compilerOptions": {
+        "rootDir": "./src",
+        "baseUrl": "src",
+        "outDir": "./dist",
+        "inlineSourceMap": false,
+        "sourceMap": false,
+        "declaration": false,
+        "moduleResolution": "Node",
+        "resolveJsonModule": true,
+        "target": "es6",
+        "module": "es6",
+        "lib": [
+            "es5",
+            "es6",
+            "dom"
+        ],
+        "downlevelIteration": true,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "esModuleInterop": true,
+        "noUnusedLocals": false,
+        "skipLibCheck": true,
+        "skipDefaultLibCheck": true,
+        "strict": true,
+        "strictNullChecks": true,
+        "stripInternal": true
+    }
+}

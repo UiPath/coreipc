@@ -1,0 +1,16 @@
+{
+    "extends": "./tsconfig.common.json",
+    "include": [
+        "src/std/**/*",
+        "src/node/**/*",
+        "src/web/**/*",
+    ],
+    "compilerOptions": {
+        "paths": {
+            "@foundation": [ "std/foundation" ],
+            "@foundation/*": [ "std/foundation/*" ],
+            "@core": [ "std/core" ],
+            "@core/*": [ "std/core/*" ]
+        }
+    }
+}

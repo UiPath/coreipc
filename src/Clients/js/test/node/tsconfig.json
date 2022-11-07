@@ -1,0 +1,37 @@
+{
+    "extends": "../../tsconfig.node.json",
+    "include": [
+        "./**/*",
+        "../../src/node/**/*",
+        "../../src/std/**/*"
+    ],
+    "exclude": [
+    ],
+    "compilerOptions": {
+        "rootDir": "../..",
+        "outDir": "../../dist/node.test/",
+        "declaration": true,
+        "baseUrl": ".",
+        "module": "es6",
+        "paths": {
+            "@foundation": [
+                "../../src/node/foundation"
+            ],
+            "@foundation/*": [
+                "../../src/node/foundation/*"
+            ],
+            "@core": [
+                "../../src/node/core"
+            ],
+            "@core/*": [
+                "../../src/node/core/*"
+            ],
+            "@helpers": [
+                "../helpers"
+            ],
+            "@helpers/*": [
+                "../helpers/*"
+            ]
+        }
+    }
+}
