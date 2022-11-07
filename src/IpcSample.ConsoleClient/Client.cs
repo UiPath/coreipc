@@ -8,25 +8,35 @@ namespace UiPath.CoreIpc.Tests;
 class Client
 {
     static List<AddressDto> _addressDtos = new();
+    static Response _response = new() { Data = _addressDtos };
     static IpcJsonSerializer Serializer = new();
     static MemoryStream _stream= new();
+    struct Response
+    {
+        public object Data { get; set; }
+    }
+    struct DocResponse
+    {
+        public JsonDocument Data { get; set; }
+    }
     static void SystemTextJson()
     {
         _stream.Position = 0;
-        JsonSerializer.Serialize(_stream, _addressDtos);
+        JsonSerializer.Serialize(_stream, _response);
         _stream.SetLength(_stream.Position);
         _stream.Position = 0;
-        using var element = JsonSerializer.Deserialize<JsonDocument>(_stream);
+        var response = JsonSerializer.Deserialize<DocResponse>(_stream);
+        using var element = response.Data;
         var obj = element.Deserialize<List<AddressDto>>();
     }
     static void WithNewtonsoft()
     {
         _stream.Position = 0;
-        Serializer.Serialize(_addressDtos, _stream);
+        Serializer.Serialize(_response, _stream);
         _stream.SetLength(_stream.Position);
         _stream.Position = 0;
-        var jtoken = Serializer.Deserialize<Newtonsoft.Json.Linq.JToken>(_stream);
-        var obj = jtoken.ToObject<List<AddressDto>>();
+        var response = Serializer.Deserialize<Response>(_stream);
+        var obj = ((Newtonsoft.Json.Linq.JToken)response.Data).ToObject<List<AddressDto>>();
     }
     static async Task Main(string[] args)
     {
@@ -51,8 +61,8 @@ class Client
             var stopWatch = Stopwatch.StartNew();
             for (int index = 0; index < 200; ++index)
             {
-                //WithNewtonsoft();
-                SystemTextJson();
+                WithNewtonsoft();
+                //SystemTextJson();
             }
             stopWatch.Stop();
             var gcStats = GC.GetGCMemoryInfo();
