@@ -13,7 +13,7 @@ public interface ISerializer
     string Serialize(object obj);
     object Deserialize(string json, Type type);
 }
-class IpcJsonSerializer : ISerializer, IArrayPool<char>
+public class IpcJsonSerializer : ISerializer, IArrayPool<char>
 {
     static readonly JsonSerializer ObjectArgsSerializer = new(){ DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore, 
         CheckAdditionalContent = true };
@@ -26,7 +26,11 @@ class IpcJsonSerializer : ISerializer, IArrayPool<char>
         using var stream = IOHelpers.GetStream((int)json.Length);
         await json.CopyToAsync(stream);
         stream.Position = 0;
-        using var reader = CreateReader(new StreamReader(stream));
+        return Deserialize<T>(stream);
+    }
+    public T Deserialize<T>(MemoryStream stream)
+    {
+        using var reader = CreateReader(new StreamReader(stream, leaveOpen: true));
         return ObjectArgsSerializer.Deserialize<T>(reader);
     }
     public object Deserialize(object json, Type type) => json switch
