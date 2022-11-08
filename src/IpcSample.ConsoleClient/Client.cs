@@ -61,8 +61,8 @@ class Client
             var stopWatch = Stopwatch.StartNew();
             for (int index = 0; index < 200; ++index)
             {
-                WithNewtonsoft();
-                //SystemTextJson();
+                //WithNewtonsoft();
+                SystemTextJson();
             }
             stopWatch.Stop();
             var gcStats = GC.GetGCMemoryInfo();
