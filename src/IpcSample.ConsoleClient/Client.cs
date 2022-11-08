@@ -4,6 +4,8 @@ using System.Diagnostics;
 using UiPath.CoreIpc.NamedPipe;
 using Microsoft.Extensions.DependencyInjection;
 using System.Buffers;
+using System.Text.Json.Serialization;
+
 namespace UiPath.CoreIpc.Tests;
 class Client
 {
@@ -11,13 +13,10 @@ class Client
     static Response _response = new() { Data = _addressDtos };
     static IpcJsonSerializer Serializer = new();
     static MemoryStream _stream= new();
+    static JsonSerializerOptions _options = new() { Converters = { new JsonDocumentConverter() } };
     struct Response
     {
         public object Data { get; set; }
-    }
-    struct DocResponse
-    {
-        public JsonDocument Data { get; set; }
     }
     static void SystemTextJson()
     {
@@ -25,8 +24,8 @@ class Client
         JsonSerializer.Serialize(_stream, _response);
         _stream.SetLength(_stream.Position);
         _stream.Position = 0;
-        var response = JsonSerializer.Deserialize<DocResponse>(_stream);
-        using var element = response.Data;
+        var response = JsonSerializer.Deserialize<Response>(_stream, _options);
+        using var element = (JsonDocument)response.Data;
         var obj = element.Deserialize<List<AddressDto>>();
     }
     static void WithNewtonsoft()
@@ -116,4 +115,9 @@ class Client
         new ServiceCollection()
             .AddIpcWithLogging()
             .BuildServiceProvider();
+    sealed class JsonDocumentConverter : JsonConverter<object>
+    {
+        public sealed override object Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => JsonDocument.ParseValue(ref reader);
+        public sealed override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options) => throw new NotImplementedException();
+    }
 }
