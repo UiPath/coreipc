@@ -18,6 +18,10 @@ class Client
     {
         public object Data { get; set; }
     }
+    struct ResponseDirect
+    {
+        public List<AddressDto> Data { get; set; }
+    }
     static void SystemTextJson()
     {
         _stream.Position = 0;
@@ -27,6 +31,14 @@ class Client
         var response = JsonSerializer.Deserialize<Response>(_stream, _options);
         using var element = (JsonDocument)response.Data;
         var obj = element.Deserialize<List<AddressDto>>();
+    }
+    static void DirectSystemTextJson()
+    {
+        _stream.Position = 0;
+        JsonSerializer.Serialize(_stream, _response);
+        _stream.SetLength(_stream.Position);
+        _stream.Position = 0;
+        var response = JsonSerializer.Deserialize<ResponseDirect>(_stream, _options);
     }
     static void WithNewtonsoft()
     {
@@ -52,6 +64,7 @@ class Client
         }
         SystemTextJson();
         WithNewtonsoft();
+        DirectSystemTextJson();
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
@@ -61,7 +74,8 @@ class Client
             for (int index = 0; index < 200; ++index)
             {
                 //WithNewtonsoft();
-                SystemTextJson();
+                //SystemTextJson();
+                DirectSystemTextJson();
             }
             stopWatch.Stop();
             var gcStats = GC.GetGCMemoryInfo();
