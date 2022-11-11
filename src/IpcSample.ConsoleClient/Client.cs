@@ -15,6 +15,7 @@ public class Client
     static IpcJsonSerializer Serializer = new();
     static MemoryStream _stream= new();
     static JsonSerializerOptions _options = new() { Converters = { new JsonDocumentConverter() } };
+    static MessagePackSerializerOptions ContractLess = MessagePack.Resolvers.ContractlessStandardResolver.Options;
     public struct Response
     {
         public object Data { get; set; }
@@ -26,10 +27,10 @@ public class Client
     static void MessagePackDirect()
     {
         _stream.Position = 0;
-        MessagePackSerializer.Serialize(_stream, _response, MessagePack.Resolvers.ContractlessStandardResolver.Options);
+        MessagePackSerializer.Serialize(_stream, _response, ContractLess);
         _stream.SetLength(_stream.Position);
         _stream.Position = 0;
-        var response = MessagePackSerializer.Deserialize<ResponseDirect>(_stream, MessagePack.Resolvers.ContractlessStandardResolver.Options);
+        var response = MessagePackSerializer.Deserialize<ResponseDirect>(_stream, ContractLess);
     }
     static void SystemTextJson()
     {
