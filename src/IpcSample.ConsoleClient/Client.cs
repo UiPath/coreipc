@@ -5,22 +5,31 @@ using UiPath.CoreIpc.NamedPipe;
 using Microsoft.Extensions.DependencyInjection;
 using System.Buffers;
 using System.Text.Json.Serialization;
+using MessagePack;
 
 namespace UiPath.CoreIpc.Tests;
-class Client
+public class Client
 {
     static List<AddressDto> _addressDtos = new();
     static Response _response = new() { Data = _addressDtos };
     static IpcJsonSerializer Serializer = new();
     static MemoryStream _stream= new();
     static JsonSerializerOptions _options = new() { Converters = { new JsonDocumentConverter() } };
-    struct Response
+    public struct Response
     {
         public object Data { get; set; }
     }
-    struct ResponseDirect
+    public struct ResponseDirect
     {
         public List<AddressDto> Data { get; set; }
+    }
+    static void MessagePackDirect()
+    {
+        _stream.Position = 0;
+        MessagePackSerializer.Serialize(_stream, _response, MessagePack.Resolvers.ContractlessStandardResolver.Options);
+        _stream.SetLength(_stream.Position);
+        _stream.Position = 0;
+        var response = MessagePackSerializer.Deserialize<ResponseDirect>(_stream, MessagePack.Resolvers.ContractlessStandardResolver.Options);
     }
     static void SystemTextJson()
     {
@@ -65,6 +74,7 @@ class Client
         SystemTextJson();
         WithNewtonsoft();
         DirectSystemTextJson();
+        MessagePackDirect();
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
@@ -75,7 +85,8 @@ class Client
             {
                 //WithNewtonsoft();
                 //SystemTextJson();
-                DirectSystemTextJson();
+                //DirectSystemTextJson();
+                MessagePackDirect();
             }
             stopWatch.Stop();
             var gcStats = GC.GetGCMemoryInfo();
