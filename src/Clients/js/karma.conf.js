@@ -26,8 +26,8 @@ module.exports = function (config) {
         coverageReporter: {
             reporters: [
                 { 'type': 'text' },
-                { 'type': 'html', dir: 'coverage' },
-                { 'type': 'lcov' }
+                { 'type': 'html', dir: 'coverage', subdir: 'web/html' },
+                { 'type': 'lcov', dir: 'coverage', subdir: 'web/lcov' }
             ]
         },
 
@@ -42,8 +42,8 @@ module.exports = function (config) {
 
         // list of files / patterns to load in the browser
         files: [
-            'dist/test/test/std/**/*.js',
-            'dist/test/test/web/**/*.js'
+            'dist/obj/test/test/std/**/*.js',
+            'dist/obj/test/test/web/**/*.js'
         ],
 
 
@@ -56,8 +56,8 @@ module.exports = function (config) {
         // preprocess matching files before serving them to the browser
         // available preprocessors: https://www.npmjs.com/search?q=keywords:karma-preprocessor
         preprocessors: {
-            'dist/test/test/std/**/*.js': ['browserify', 'coverage'],
-            'dist/test/test/web/**/*.js': ['browserify', 'coverage'],
+            'dist/obj/test/test/std/**/*.js': ['browserify', 'coverage'],
+            'dist/obj/test/test/web/**/*.js': ['browserify', 'coverage'],
         },
 
 

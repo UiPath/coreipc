@@ -7,8 +7,10 @@ describe('web', () => {
         }
     });
 
-    it('1 should equal 1', function () {
-        const act = () => eval(`new WebSocket('ws://localhost:1234', 'foobar')`)
+    it('new WebSocket should not throw', function () {
+        const act = () => eval(/* js */`
+            new WebSocket('ws://localhost:1234', 'foobar')
+        `);
         expect(act).not.to.throw();
     });
 

@@ -1,7 +1,7 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
-        "outDir": "./dist/test",
+        "outDir": "./dist/obj/test",
         "rootDir": ".", /* Specify the root folder within your source files. */
         "inlineSourceMap": true,
     },

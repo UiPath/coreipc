@@ -4,12 +4,18 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "build": "tsc",
-        "build:test": "npm run clean:test & npm run clean:coverage & tsc -p tsconfig.test.json",
-        "clean:test": "rimraf ./dist/test/**/*",
-        "clean:coverage": "rimraf ./coverage/**/*",
-        "test": "ts-mocha test/node/**/*.test.ts",
-        "test:web": "npm run build:test & karma start --single-run --browsers Chrome"
+        "build": "npm run clean & npm run build:webpack & npm run build:obj",
+        "build:webpack": "webpack --config webpack.dev.js",
+        "build:obj": "npm run build:obj:src & npm run build:obj:test",
+        "build:obj:src": "tsc",
+        "build:obj:test": "npm run clean:obj:test & tsc -p tsconfig.test.json",
+        "clean": "rimraf ./dist/**/*",
+        "clean:obj:test": "rimraf ./dist/obj/test/**/*",
+        "clean:coverage:node": "rimraf ./coverage/node/**/*",
+        "clean:coverage:web": "rimraf ./coverage/web/**/*",
+        "test": "npm run test:node & npm run test:web",
+        "test:node": "npm run clean:coverage:node & nyc ts-mocha test/node/**/*.test.ts",
+        "test:web": "npm run build:obj:test & npm run clean:coverage:web & karma start --single-run --browsers Chrome"
     },
     "repository": {
         "type": "git",
@@ -29,6 +35,8 @@
         "browserify": "^17.0.0",
         "browserify-istanbul": "^3.0.1",
         "chai": "^4.3.7",
+        "copy-webpack-plugin": "^11.0.0",
+        "generate-package-json-webpack-plugin": "^2.6.0",
         "istanbul": "^0.4.5",
         "karma": "^6.4.1",
         "karma-browserify": "^8.1.0",
@@ -40,11 +48,18 @@
         "karma-sinon-chai": "^2.0.2",
         "mocha": "^10.1.0",
         "nyc": "^15.1.0",
+        "remove-files-webpack-plugin": "^1.5.0",
         "rimraf": "^3.0.2",
         "sinon": "^14.0.2",
         "sinon-chai": "^3.7.0",
+        "ts-loader": "^9.4.1",
         "ts-mocha": "^10.0.0",
         "ts-node": "^10.9.1",
-        "typescript": "^4.8.4"
+        "tsconfig-paths-webpack-plugin": "^4.0.0",
+        "typescript": "^4.8.4",
+        "webpack": "^5.75.0",
+        "webpack-cli": "^4.10.0",
+        "webpack-preprocessor-loader": "^1.2.0",
+        "webpack-shell-plugin-next": "^2.3.1"
     }
 }

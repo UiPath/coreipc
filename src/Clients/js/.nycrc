@@ -1,0 +1,25 @@
+{
+    "include": [
+        "src/**/*.ts"
+    ],
+    "extension": [
+        ".ts",
+        ".tsx"
+    ],
+    "exclude": [
+        "**/*.spec.ts",
+        "**/*.d.ts",
+        "**/index.ts",
+        "**/test/**/*",
+        "**/testing/**/*"
+    ],
+    "reporter": [
+        "html",
+        "lcov",
+        "json",
+        "cobertura"
+    ],
+    "report-dir": "./coverage/node",
+    "cache": true,
+    "all": true
+}
