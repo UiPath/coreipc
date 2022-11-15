@@ -2,9 +2,13 @@
 using static TaskCompletionPool<Response>;
 using static IOHelpers;
 using Microsoft.IO;
+using Newtonsoft.Json;
+using System.Buffers;
+using Newtonsoft.Json.Linq;
 
-public sealed class Connection : IDisposable
+public sealed class Connection : IDisposable, IArrayPool<char>
 {
+    static readonly JsonSerializer ObjectArgsSerializer = new() { DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore };
     private static readonly IOException ClosedException = new("Connection closed.");
     private readonly ConcurrentDictionary<int, ManualResetValueTaskSource> _requests = new();
     private int _requestCounter = -1;
@@ -18,11 +22,10 @@ public sealed class Connection : IDisposable
     private readonly Action<object> _cancelUploadRequest;
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
-    public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
+    public Connection(Stream network, ILogger logger, string name, int maxMessageSize = int.MaxValue)
     {
         Network = network;
         _nestedStream = new NestedStream(network, 0);
-        Serializer = serializer;
         Logger = logger;
         Name = $"{name} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
@@ -37,7 +40,6 @@ public sealed class Connection : IDisposable
     public ILogger Logger { get; internal set; }
     public bool LogEnabled => Logger.Enabled();
     public string Name { get; }
-    public ISerializer Serializer { get; }
     public override string ToString() => Name;
     public int NewRequestId() => Interlocked.Increment(ref _requestCounter);
     public Task Listen() => _receiveLoop.Value;
@@ -70,7 +72,7 @@ public sealed class Connection : IDisposable
     internal ValueTask Send(Request request, CancellationToken token)
     {
         var uploadStream = request.UploadStream;
-        var requestBytes = MessageStream(request);
+        var requestBytes = MessageStream(new[] { request }.Concat(request.Parameters));
         return uploadStream == null ?
             SendMessage(MessageType.Request, requestBytes, token) :
             SendStream(MessageType.UploadRequest, requestBytes, uploadStream, token);
@@ -81,7 +83,7 @@ public sealed class Connection : IDisposable
         TryCancelRequest(requestId);
         return;
         Task CancelServerCall(int requestId) =>
-            SendMessage(MessageType.CancellationRequest, MessageStream(new CancellationRequest(requestId)), default).AsTask();
+            SendMessage(MessageType.CancellationRequest, MessageStream(new[] { new CancellationRequest(requestId) }), default).AsTask();
     }
     void CancelUploadRequest(int requestId)
     {
@@ -97,7 +99,7 @@ public sealed class Connection : IDisposable
     }
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
     {
-        var responseBytes = MessageStream(response);
+        var responseBytes = MessageStream(new[] { response, response.Data });
         return response.DownloadStream == null ?
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
             SendDownloadStream(responseBytes, response.DownloadStream, cancellationToken);
@@ -298,13 +300,16 @@ public sealed class Connection : IDisposable
         var userStreamLength = BitConverter.ToInt64(_buffer, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
     }
-    private RecyclableMemoryStream MessageStream(object value)
+    private RecyclableMemoryStream MessageStream(IEnumerable<object> values)
     {
         var stream = GetStream();
         try
         {
             stream.Position = HeaderLength;
-            Serializer.Serialize(value, stream);
+            foreach (var value in values)
+            {
+                Serialize(value, stream);
+            }
             return stream;
         }
         catch
@@ -313,7 +318,7 @@ public sealed class Connection : IDisposable
             throw;
         }
     }
-    private ValueTask<T> Deserialize<T>() => Serializer.DeserializeAsync<T>(_nestedStream);
+    private ValueTask<T> Deserialize<T>() => DeserializeAsync<T>(_nestedStream);
     private void OnCancellationReceived(int requestId)
     {
         try
@@ -357,4 +362,29 @@ public sealed class Connection : IDisposable
         }
     }
     public void Log(string message) => Logger.LogInformation(message);
+    char[] IArrayPool<char>.Rent(int minimumLength) => ArrayPool<char>.Shared.Rent(minimumLength);
+    void IArrayPool<char>.Return(char[] array) => ArrayPool<char>.Shared.Return(array);
+#if !NET461
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+#endif
+    async ValueTask<T> DeserializeAsync<T>(Stream json)
+    {
+        using var stream = GetStream((int)json.Length);
+        await json.CopyToAsync(stream);
+        stream.Position = 0;
+        using var reader = new JsonTextReader(new StreamReader(stream)) { ArrayPool = this, SupportMultipleContent = true };
+        return ObjectArgsSerializer.Deserialize<T>(reader);
+    }
+    object Deserialize(object json, Type type) => json switch
+    {
+        JToken token => token.ToObject(type, ObjectArgsSerializer),
+        { } => type.IsAssignableFrom(json.GetType()) ? json : new JValue(json).ToObject(type),
+        null => null,
+    };
+    void Serialize(object obj, Stream stream)
+    {
+        using var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this, CloseOutput = false };
+        ObjectArgsSerializer.Serialize(writer, obj);
+        writer.Flush();
+    }
 }

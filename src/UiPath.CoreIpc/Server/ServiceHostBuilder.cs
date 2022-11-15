@@ -39,11 +39,7 @@ public static class ServiceHostBuilderExtensions
 }
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddIpc(this IServiceCollection services)
-    {
-        services.AddSingleton<ISerializer, IpcJsonSerializer>();
-        return services;
-    }
+    public static IServiceCollection AddIpc(this IServiceCollection services) => services;
 }
 public class EndpointSettings
 {

@@ -6,7 +6,6 @@ using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
 {
     protected readonly IServiceProvider _serviceProvider;
-    protected ISerializer _serializer = new IpcJsonSerializer();
     protected TimeSpan _requestTimeout = Timeout.InfiniteTimeSpan;
     protected ILogger _logger;
     protected ConnectionFactory _connectionFactory;
@@ -54,12 +53,6 @@ public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterfac
     }
 
     public TDerived Logger(IServiceProvider serviceProvider) => Logger(serviceProvider.GetRequiredService<ILogger<TInterface>>());
-
-    public TDerived Serializer(ISerializer serializer)
-    {
-        _serializer = serializer;
-        return (TDerived) this;
-    }
 
     public TDerived RequestTimeout(TimeSpan timeout)
     {

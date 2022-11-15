@@ -223,7 +223,6 @@ class Server
     private bool LogEnabled => Logger.Enabled();
     private ListenerSettings Settings { get; }
     public IServiceProvider ServiceProvider => Settings.ServiceProvider;
-    public ISerializer Serializer => _connection.Serializer;
     public string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
     ValueTask SendResponse(Response response, CancellationToken responseCancellation) => _connection.Send(response, responseCancellation);

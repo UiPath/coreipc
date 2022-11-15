@@ -13,7 +13,6 @@ interface IServiceClient : IDisposable
 
 class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterface : class
 {
-    private readonly ISerializer _serializer;
     private readonly TimeSpan _requestTimeout;
     private readonly ILogger _logger;
     private readonly ConnectionFactory _connectionFactory;
@@ -24,9 +23,8 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     private Server _server;
     private ClientConnection _clientConnection;
 
-    internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
+    internal ServiceClient(TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
     {
-        _serializer = serializer;
         _requestTimeout = requestTimeout;
         _logger = logger;
         _connectionFactory = connectionFactory;
@@ -96,8 +94,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 var requestId = _connection.NewRequestId();
                 var request = new Request(typeof(TInterface).Name, requestId, methodName, messageTimeout.TotalSeconds)
                 {
-                    Parameters = args,
-                    UploadStream = uploadStream,
+                    Parameters = args, UploadStream = uploadStream, ResponseType = typeof(TResult)
                 };
                 if (LogEnabled)
                 {
@@ -113,7 +110,11 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 {
                     Log($"IpcClient called {methodName} {requestId} {Name}.");
                 }
-                return response.Deserialize<TResult>(_serializer);
+                if (response.Error != null)
+                {
+                    throw new RemoteException(response.Error);
+                }
+                return (TResult) response.Data;
             }
             catch (Exception ex)
             {
@@ -192,7 +193,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 throw;
             }
             var stream = SslServer == null ? network : await AuthenticateAsClient(network);
-            OnNewConnection(new(stream, _serializer, _logger, Name));
+            OnNewConnection(new(stream, _logger, Name));
             if (LogEnabled)
             {
                 Log($"CreateConnection {Name}.");
