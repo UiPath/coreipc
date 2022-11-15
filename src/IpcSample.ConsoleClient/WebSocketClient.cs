@@ -32,7 +32,7 @@ class WebSocketClient
         Uri uri = new("ws://localhost:1212/wsDemo/");
         var serviceProvider = ConfigureServices();
         var callback = new ComputingCallback { Id = "custom made" };
-        var computingClientBuilder = new WebSocketClientBuilder<IComputingService, IComputingCallback>(uri, serviceProvider).SerializeParametersAsObjects()
+        var computingClientBuilder = new WebSocketClientBuilder<IComputingService, IComputingCallback>(uri, serviceProvider)
             .CallbackInstance(callback)/*.EncryptAndSign("localhost")*/.RequestTimeout(TimeSpan.FromSeconds(2));
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
@@ -40,7 +40,7 @@ class WebSocketClient
         {
             var computingClient = computingClientBuilder.ValidateAndBuild();
             var systemClient =
-                new WebSocketClientBuilder<ISystemService>(uri).SerializeParametersAsObjects()
+                new WebSocketClientBuilder<ISystemService>(uri)
                 //.EncryptAndSign("localhost")
                 .RequestTimeout(TimeSpan.FromSeconds(2))
                 .Logger(serviceProvider)

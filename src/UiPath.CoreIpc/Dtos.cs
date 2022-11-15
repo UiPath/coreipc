@@ -3,14 +3,12 @@ using Newtonsoft.Json;
 namespace UiPath.CoreIpc;
 public class Message
 {
-    internal bool ObjectParameters { get; set; }
     internal Type CallbackContract { get; set; }
     [JsonIgnore]
     public IClient Client { get; set; }
     [JsonIgnore]
     public TimeSpan RequestTimeout { get; set; }
-    public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => 
-        Client.GetCallback<TCallbackInterface>(CallbackContract, ObjectParameters);
+    public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => Client.GetCallback<TCallbackInterface>(CallbackContract);
     public void ImpersonateClient(Action action) => Client.Impersonate(action);
 }
 public class Message<TPayload> : Message
@@ -18,28 +16,26 @@ public class Message<TPayload> : Message
     public Message(TPayload payload) => Payload = payload;
     public TPayload Payload { get; }
 }
-record Request(string Endpoint, int Id, string MethodName, string[] Parameters, object[] ObjectParameters, double TimeoutInSeconds)
+record Request(string Endpoint, int Id, string MethodName, object[] Parameters, double TimeoutInSeconds)
 {
     internal Stream UploadStream { get; set; }
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
-    internal bool HasObjectParameters => ObjectParameters is not null;
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
 record CancellationRequest(int RequestId);
-record Response(int RequestId, string Data = null, object ObjectData = null, Error Error = null)
+record Response(int RequestId, object Data = null, Error Error = null)
 {
     internal Stream DownloadStream { get; set; }
     public static Response Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());
     public static Response Success(Request request, string data) => new(request.Id, data);
     public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
-    public TResult Deserialize<TResult>(ISerializer serializer, bool objectParameters)
+    public TResult Deserialize<TResult>(ISerializer serializer)
     {
         if (Error != null)
         {
             throw new RemoteException(Error);
         }
-        return (TResult)(DownloadStream ?? (objectParameters ?
-            serializer.Deserialize(ObjectData, typeof(TResult)) : serializer.Deserialize(Data ?? "", typeof(TResult))));
+        return (TResult)(DownloadStream ?? serializer.Deserialize(Data, typeof(TResult)));
     }
 }
 [Serializable]

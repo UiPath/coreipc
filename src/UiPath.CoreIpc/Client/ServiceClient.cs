@@ -24,9 +24,8 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     private Server _server;
     private ClientConnection _clientConnection;
 
-    internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, bool objectParameters = false, EndpointSettings serviceEndpoint = null)
+    internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
     {
-        ObjectParameters = objectParameters;
         _serializer = serializer;
         _requestTimeout = requestTimeout;
         _logger = logger;
@@ -40,8 +39,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     public virtual string Name => _connection?.Name;
     private bool LogEnabled => _logger.Enabled();
     Connection IServiceClient.Connection => _connection;
-    public bool ObjectParameters { get; init; }
-
     public TInterface CreateProxy()
     {
         var proxy = DispatchProxy.Create<TInterface, IpcProxy>();
@@ -76,9 +73,8 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             TimeSpan messageTimeout = default;
             TimeSpan clientTimeout = _requestTimeout;
             Stream uploadStream = null;
-            string[] serializedArguments = null;
             var methodName = method.Name;
-            SerializeArguments();
+            WellKnownArguments();
             var timeoutHelper = new TimeoutHelper(clientTimeout, cancellationToken);
             try
             {
@@ -98,7 +94,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                     await _beforeCall(new(newConnection, method, args), token);
                 }
                 var requestId = _connection.NewRequestId();
-                var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds)
+                var request = new Request(typeof(TInterface).Name, requestId, methodName, args, messageTimeout.TotalSeconds)
                 {
                     UploadStream = uploadStream
                 };
@@ -106,7 +102,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 {
                     Log($"IpcClient calling {methodName} {requestId} {Name}.");
                 }
-                if (ObjectParameters && !method.ReturnType.IsGenericType)
+                if (!method.ReturnType.IsGenericType)
                 {
                     await _connection.Send(request, token);
                     return default;
@@ -116,7 +112,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 {
                     Log($"IpcClient called {methodName} {requestId} {Name}.");
                 }
-                return response.Deserialize<TResult>(_serializer, ObjectParameters);
+                return response.Deserialize<TResult>(_serializer);
             }
             catch (Exception ex)
             {
@@ -127,12 +123,8 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             {
                 timeoutHelper.Dispose();
             }
-            void SerializeArguments()
+            void WellKnownArguments()
             {
-                if (!ObjectParameters)
-                {
-                    serializedArguments = new string[args.Length];
-                }
                 for (int index = 0; index < args.Length; index++)
                 {
                     switch (args[index])
@@ -149,10 +141,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                             uploadStream = stream;
                             args[index] = "";
                             break;
-                    }
-                    if (!ObjectParameters)
-                    {
-                        serializedArguments[index] = _serializer.Serialize(args[index]);
                     }
                 }
             }
