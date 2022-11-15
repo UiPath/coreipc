@@ -1,6 +1,8 @@
 ﻿namespace UiPath.CoreIpc;
 using static TaskCompletionPool<Response>;
 using static IOHelpers;
+using Microsoft.IO;
+
 public sealed class Connection : IDisposable
 {
     private static readonly IOException ClosedException = new("Connection closed.");
@@ -68,7 +70,7 @@ public sealed class Connection : IDisposable
     internal ValueTask Send(Request request, CancellationToken token)
     {
         var uploadStream = request.UploadStream;
-        var requestBytes = SerializeToStream(request);
+        var requestBytes = MessageStream(request);
         return uploadStream == null ?
             SendMessage(MessageType.Request, requestBytes, token) :
             SendStream(MessageType.UploadRequest, requestBytes, uploadStream, token);
@@ -79,7 +81,7 @@ public sealed class Connection : IDisposable
         TryCancelRequest(requestId);
         return;
         Task CancelServerCall(int requestId) =>
-            SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default).AsTask();
+            SendMessage(MessageType.CancellationRequest, MessageStream(new CancellationRequest(requestId)), default).AsTask();
     }
     void CancelUploadRequest(int requestId)
     {
@@ -95,7 +97,7 @@ public sealed class Connection : IDisposable
     }
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
     {
-        var responseBytes = SerializeToStream(response);
+        var responseBytes = MessageStream(response);
         return response.DownloadStream == null ?
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
             SendDownloadStream(responseBytes, response.DownloadStream, cancellationToken);
@@ -103,7 +105,7 @@ public sealed class Connection : IDisposable
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    private async ValueTask SendDownloadStream(MemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
+    private async ValueTask SendDownloadStream(RecyclableMemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
     {
         using (downloadStream)
         {
@@ -113,7 +115,7 @@ public sealed class Connection : IDisposable
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    private async ValueTask SendStream(MessageType messageType, Stream data, Stream userStream, CancellationToken cancellationToken)
+    private async ValueTask SendStream(MessageType messageType, RecyclableMemoryStream data, Stream userStream, CancellationToken cancellationToken)
     {
         await _sendLock.WaitAsync(cancellationToken);
         CancellationTokenRegistration tokenRegistration = default;
@@ -134,7 +136,7 @@ public sealed class Connection : IDisposable
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    private async ValueTask SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken)
+    private async ValueTask SendMessage(MessageType messageType, RecyclableMemoryStream data, CancellationToken cancellationToken)
     {
         await _sendLock.WaitAsync(cancellationToken);
         try
@@ -296,7 +298,7 @@ public sealed class Connection : IDisposable
         var userStreamLength = BitConverter.ToInt64(_buffer, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
     }
-    private MemoryStream SerializeToStream(object value)
+    private RecyclableMemoryStream MessageStream(object value)
     {
         var stream = GetStream();
         try
