@@ -27,7 +27,6 @@ record Response(int RequestId, object Data = null, Error Error = null)
 {
     internal Stream DownloadStream { get; set; }
     public static Response Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());
-    public static Response Success(Request request, string data) => new(request.Id, data);
     public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
     public TResult Deserialize<TResult>(ISerializer serializer)
     {
