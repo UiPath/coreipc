@@ -18,15 +18,15 @@ public class Message<TPayload> : Message
     public Message(TPayload payload) => Payload = payload;
     public TPayload Payload { get; }
 }
-record Request(string Endpoint, string Id, string MethodName, string[] Parameters, object[] ObjectParameters, double TimeoutInSeconds)
+record Request(string Endpoint, int Id, string MethodName, string[] Parameters, object[] ObjectParameters, double TimeoutInSeconds)
 {
     internal Stream UploadStream { get; set; }
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
     internal bool HasObjectParameters => ObjectParameters is not null;
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
-record CancellationRequest(string RequestId);
-record Response(string RequestId, string Data = null, object ObjectData = null, Error Error = null)
+record CancellationRequest(int RequestId);
+record Response(int RequestId, string Data = null, object ObjectData = null, Error Error = null)
 {
     internal Stream DownloadStream { get; set; }
     public static Response Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());

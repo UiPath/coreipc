@@ -11,7 +11,7 @@ class Server
     private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
     private readonly Connection _connection;
     private readonly IClient _client;
-    private readonly ConcurrentDictionary<string, PooledCancellationTokenSource> _requests = new();
+    private readonly ConcurrentDictionary<int, PooledCancellationTokenSource> _requests = new();
     public Server(ListenerSettings settings, Connection connection, IClient client = null)
     {
         Settings = settings;
@@ -38,7 +38,7 @@ class Server
             }
         };
     }
-    void CancelRequest(string requestId)
+    void CancelRequest(int requestId)
     {
         if (_requests.TryRemove(requestId, out var cancellation))
         {

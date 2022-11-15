@@ -4,8 +4,8 @@ using static IOHelpers;
 public sealed class Connection : IDisposable
 {
     private static readonly IOException ClosedException = new("Connection closed.");
-    private readonly ConcurrentDictionary<string, ManualResetValueTaskSource> _requests = new();
-    private long _requestCounter = -1;
+    private readonly ConcurrentDictionary<int, ManualResetValueTaskSource> _requests = new();
+    private int _requestCounter = -1;
     private readonly int _maxMessageSize;
     private readonly Lazy<Task> _receiveLoop;
     private readonly SemaphoreSlim _sendLock = new(1);
@@ -27,9 +27,9 @@ public sealed class Connection : IDisposable
         _receiveLoop = new(ReceiveLoop);
         _onResponse = response => OnResponseReceived((Response)response);
         _onRequest = request => OnRequestReceived((Request)request);
-        _onCancellation = requestId => OnCancellationReceived((string)requestId);
-        _cancelRequest = requestId => CancelRequest((string)requestId);
-        _cancelUploadRequest = requestId => CancelUploadRequest((string)requestId);
+        _onCancellation = requestId => OnCancellationReceived((int)requestId);
+        _cancelRequest = requestId => CancelRequest((int)requestId);
+        _cancelUploadRequest = requestId => CancelUploadRequest((int)requestId);
     }
     public Stream Network { get; }
     public ILogger Logger { get; internal set; }
@@ -37,10 +37,10 @@ public sealed class Connection : IDisposable
     public string Name { get; }
     public ISerializer Serializer { get; }
     public override string ToString() => Name;
-    public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
+    public int NewRequestId() => Interlocked.Increment(ref _requestCounter);
     public Task Listen() => _receiveLoop.Value;
     internal event Func<Request, ValueTask> RequestReceived;
-    internal event Action<string> CancellationReceived;
+    internal event Action<int> CancellationReceived;
     public event EventHandler<EventArgs> Closed;
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
@@ -74,20 +74,20 @@ public sealed class Connection : IDisposable
             SendMessage(MessageType.Request, requestBytes, token) :
             SendStream(MessageType.UploadRequest, requestBytes, uploadStream, token);
     }
-    void CancelRequest(string requestId)
+    void CancelRequest(int requestId)
     {
         CancelServerCall(requestId).LogException(Logger, this);
         TryCancelRequest(requestId);
         return;
-        Task CancelServerCall(string requestId) =>
+        Task CancelServerCall(int requestId) =>
             SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default).AsTask();
     }
-    void CancelUploadRequest(string requestId)
+    void CancelUploadRequest(int requestId)
     {
         Dispose();
         TryCancelRequest(requestId);
     }
-    private void TryCancelRequest(string requestId)
+    private void TryCancelRequest(int requestId)
     {
         if (_requests.TryRemove(requestId, out var requestCompletion))
         {
@@ -314,7 +314,7 @@ public sealed class Connection : IDisposable
         }
     }
     private ValueTask<T> Deserialize<T>() => Serializer.DeserializeAsync<T>(_nestedStream);
-    private void OnCancellationReceived(string requestId)
+    private void OnCancellationReceived(int requestId)
     {
         try
         {
