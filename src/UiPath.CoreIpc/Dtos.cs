@@ -16,17 +16,19 @@ public class Message<TPayload> : Message
     public Message(TPayload payload) => Payload = payload;
     public TPayload Payload { get; }
 }
-record Request(string Endpoint, int Id, string MethodName, object[] Parameters, double TimeoutInSeconds)
+record Request(string Endpoint, int Id, string MethodName, double TimeoutInSeconds)
 {
+    internal object[] Parameters { get; init; }
     internal Stream UploadStream { get; set; }
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
 record CancellationRequest(int RequestId);
-record Response(int RequestId, object Data = null, Error Error = null)
+record Response(int RequestId, Error Error = null)
 {
+    internal object Data { get; init; }
     internal Stream DownloadStream { get; set; }
-    public static Response Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());
+    public static Response Fail(Request request, Exception ex) => new(request.Id, ex.ToError());
     public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
     public TResult Deserialize<TResult>(ISerializer serializer)
     {

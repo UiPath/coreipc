@@ -94,9 +94,10 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                     await _beforeCall(new(newConnection, method, args), token);
                 }
                 var requestId = _connection.NewRequestId();
-                var request = new Request(typeof(TInterface).Name, requestId, methodName, args, messageTimeout.TotalSeconds)
+                var request = new Request(typeof(TInterface).Name, requestId, methodName, messageTimeout.TotalSeconds)
                 {
-                    UploadStream = uploadStream
+                    Parameters = args,
+                    UploadStream = uploadStream,
                 };
                 if (LogEnabled)
                 {

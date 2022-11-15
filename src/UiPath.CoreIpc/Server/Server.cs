@@ -151,7 +151,7 @@ class Server
                 {
                     return Response.Success(request, downloadStream);
                 }
-                return new Response(request.Id, Data: returnValue);
+                return new Response(request.Id) { Data = returnValue };
             }
             else
             {
