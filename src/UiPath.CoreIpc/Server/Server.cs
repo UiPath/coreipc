@@ -171,10 +171,10 @@ class Server
                 throw new ArgumentException("Too many parameters for " + method.MethodInfo);
             }
             var allArguments = requestParametersLength == allParametersLength ? request.Parameters : new object[allParametersLength];
-            Deserialize();
+            WellKnownArguments();
             SetOptionalArguments();
             return allArguments;
-            void Deserialize()
+            void WellKnownArguments()
             {
                 object argument;
                 for (int index = 0; index < requestParametersLength; index++)
@@ -190,8 +190,7 @@ class Server
                     }
                     else
                     {
-                        argument = Serializer.Deserialize(request.Parameters[index], parameterType);
-                        argument = CheckMessage(argument, parameterType);
+                        argument = CheckMessage(request.Parameters[index], parameterType);
                     }
                     allArguments[index] = argument;
                 }
