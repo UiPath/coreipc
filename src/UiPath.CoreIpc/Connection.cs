@@ -328,9 +328,17 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     private async ValueTask<JsonTextReader> CreaterReader()
     {
         var stream = GetStream((int)_nestedStream.Length);
-        await _nestedStream.CopyToAsync(stream);
-        stream.Position = 0;
-        return new JsonTextReader(new StreamReader(stream)) { ArrayPool = this, SupportMultipleContent = true };
+        try
+        {
+            await _nestedStream.CopyToAsync(stream);
+            stream.Position = 0;
+            return new JsonTextReader(new StreamReader(stream)) { ArrayPool = this, SupportMultipleContent = true };
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
     }
     private async ValueTask<int> DeserializeCancellationRequest()
     {
