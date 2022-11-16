@@ -4,8 +4,6 @@ using static IOHelpers;
 using Microsoft.IO;
 using Newtonsoft.Json;
 using System.Buffers;
-using Newtonsoft.Json.Linq;
-
 public sealed class Connection : IDisposable, IArrayPool<char>
 {
     static readonly JsonSerializer ObjectArgsSerializer = new() { DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore };
@@ -318,6 +316,12 @@ public sealed class Connection : IDisposable, IArrayPool<char>
             stream.Dispose();
             throw;
         }
+        void Serialize(object obj, Stream stream)
+        {
+            using var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this, CloseOutput = false };
+            ObjectArgsSerializer.Serialize(writer, obj);
+            writer.Flush();
+        }
     }
     private ValueTask<T> Deserialize<T>() => DeserializeAsync<T>(_nestedStream);
     private void OnCancellationReceived(int requestId)
@@ -375,17 +379,5 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         stream.Position = 0;
         using var reader = new JsonTextReader(new StreamReader(stream)) { ArrayPool = this, SupportMultipleContent = true };
         return ObjectArgsSerializer.Deserialize<T>(reader);
-    }
-    object Deserialize(object json, Type type) => json switch
-    {
-        JToken token => token.ToObject(type, ObjectArgsSerializer),
-        { } => type.IsAssignableFrom(json.GetType()) ? json : new JValue(json).ToObject(type),
-        null => null,
-    };
-    void Serialize(object obj, Stream stream)
-    {
-        using var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this, CloseOutput = false };
-        ObjectArgsSerializer.Serialize(writer, obj);
-        writer.Flush();
     }
 }
