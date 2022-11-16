@@ -6,6 +6,7 @@
         "inlineSourceMap": true,
     },
     "include": [
-        "test/**/*.ts"
+        "test/**/*.ts",
+        "src/**/*.ts"
     ]
 }

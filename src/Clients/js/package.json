@@ -8,14 +8,20 @@
         "build:webpack": "webpack --config webpack.dev.js",
         "build:obj": "npm run build:obj:src & npm run build:obj:test",
         "build:obj:src": "tsc",
-        "build:obj:test": "npm run clean:obj:test & tsc -p tsconfig.test.json",
+        "build:obj:test": "npm run clean:obj:test & tsc -p tsconfig.test.json & npm run build:obj:dotnet",
+        "build:obj:dotnet": "npm run clean:obj:dotnet & tsc -p tsconfig.dotnet.json",
         "clean": "rimraf ./dist/**/*",
         "clean:obj:test": "rimraf ./dist/obj/test/**/*",
+        "clean:obj:dotnet": "rimraf ./dist/obj/dotnet/**/*",
         "clean:coverage:node": "rimraf ./coverage/node/**/*",
         "clean:coverage:web": "rimraf ./coverage/web/**/*",
         "test": "npm run test:node & npm run test:web",
         "test:node": "npm run clean:coverage:node & nyc ts-mocha test/node/**/*.test.ts",
-        "test:web": "npm run build:obj:test & npm run clean:coverage:web & karma start --single-run --browsers Chrome"
+        "test:web": "npm run start-websocket-server & npm run build:obj:test & npm run clean:coverage:web & npm run start:test:web",
+        "test:web2": "npm run build:obj:test & node ./dist/obj/dotnet/test/dotnet/index.js host --websocket-url ws://localhost:1234",
+        "start:test:web": "karma start --single-run --browsers Chrome & npm run stop-websocket-server",
+        "start-websocket-server": "node ./dist/obj/dotnet/test/dotnet/index.js --start",
+        "stop-websocket-server": "node ./dist/obj/dotnet/test/dotnet/index.js --stop"
     },
     "repository": {
         "type": "git",
@@ -29,12 +35,14 @@
     "homepage": "https://github.com/eduard-dumitru/js-multitargeting#readme",
     "devDependencies": {
         "@types/chai": "^4.3.4",
+        "@types/command-line-args": "^5.2.0",
         "@types/mocha": "^10.0.0",
         "babel-preset-es2015": "^6.24.1",
         "babelify": "^7.3.0",
         "browserify": "^17.0.0",
         "browserify-istanbul": "^3.0.1",
         "chai": "^4.3.7",
+        "command-line-args": "^5.2.1",
         "copy-webpack-plugin": "^11.0.0",
         "generate-package-json-webpack-plugin": "^2.6.0",
         "istanbul": "^0.4.5",
@@ -61,5 +69,9 @@
         "webpack-cli": "^4.10.0",
         "webpack-preprocessor-loader": "^1.2.0",
         "webpack-shell-plugin-next": "^2.3.1"
+    },
+    "dependencies": {
+        "rxjs": "^7.5.7",
+        "ts-simple-nameof": "^1.3.1"
     }
 }

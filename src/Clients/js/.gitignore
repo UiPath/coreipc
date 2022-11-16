@@ -3,5 +3,7 @@
 node_modules
 coverage
 yarn.lock
+dist-packages/**/*
 dist
 reports
+!dist-packages/.gitkeep
