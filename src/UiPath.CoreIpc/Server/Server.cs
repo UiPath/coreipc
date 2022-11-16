@@ -7,7 +7,6 @@ using static CancellationTokenSourcePool;
 class Server
 {
     private static readonly MethodInfo GetResultMethod = typeof(Server).GetStaticMethod(nameof(GetTaskResultImpl));
-    private static readonly ConcurrentDictionary<(Type,string), Method> Methods = new();
     private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
     private readonly Connection _connection;
     private readonly IClient _client;
@@ -47,20 +46,10 @@ class Server
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    public async ValueTask OnRequestReceived(Request request)
+    public async ValueTask OnRequestReceived(Request request, Method method, EndpointSettings endpoint)
     {
         try
         {
-            if (LogEnabled)
-            {
-                Log($"{Name} received request {request}");
-            }
-            if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
-            {
-                await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
-                return;
-            }
-            var method = GetMethod(endpoint.Contract, request.MethodName);
             if (!method.ReturnType.IsGenericType)
             {
                 await HandleRequest(method, endpoint, request, default);
@@ -79,11 +68,11 @@ class Server
                 {
                     Log($"{Name} sending response for {request}");
                 }
-                await SendResponse(response, token);
+                await _connection.Send(response, token);
             }
             catch (Exception ex) when(response == null)
             {
-                await OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName));
+                await _connection.OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName));
             }
             finally
             {
@@ -98,11 +87,6 @@ class Server
         {
             cancellation.Return();
         }
-    }
-    ValueTask OnError(Request request, Exception ex)
-    {
-        Logger.LogException(ex, $"{Name} {request}");
-        return SendResponse(Response.Fail(request, ex), default);
     }
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
@@ -222,46 +206,43 @@ class Server
     public IServiceProvider ServiceProvider => Settings.ServiceProvider;
     public string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
-    ValueTask SendResponse(Response response, CancellationToken responseCancellation) => _connection.Send(response, responseCancellation);
     static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
     static object GetTaskResult(Type taskType, Task task) => 
         GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0], 
             resultType => GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType))(task);
-    static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName), 
-        ((Type contract,string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
-    readonly struct Method
+}
+public readonly struct Method
+{
+    static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
+    static readonly ParameterExpression TokenParameter = Parameter(typeof(CancellationToken), "cancellationToken");
+    static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
+    readonly MethodExecutor _executor;
+    public readonly MethodInfo MethodInfo;
+    public readonly ParameterInfo[] Parameters;
+    public readonly object[] Defaults;
+    public Type ReturnType => MethodInfo.ReturnType;
+    public Method(MethodInfo method)
     {
-        static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
-        static readonly ParameterExpression TokenParameter = Parameter(typeof(CancellationToken), "cancellationToken");
-        static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
-        readonly MethodExecutor _executor;
-        public readonly MethodInfo MethodInfo;
-        public readonly ParameterInfo[] Parameters;
-        public readonly object[] Defaults;
-        public Type ReturnType => MethodInfo.ReturnType;
-        public Method(MethodInfo method)
+        // https://github.com/dotnet/aspnetcore/blob/3f620310883092905ed6f13d784c908b5f4a9d7e/src/Shared/ObjectMethodExecutor/ObjectMethodExecutor.cs#L156
+        var parameters = method.GetParameters();
+        var parametersLength = parameters.Length;
+        var callParameters = new Expression[parametersLength];
+        var defaults = new object[parametersLength];
+        for (int index = 0; index < parametersLength; index++)
         {
-            // https://github.com/dotnet/aspnetcore/blob/3f620310883092905ed6f13d784c908b5f4a9d7e/src/Shared/ObjectMethodExecutor/ObjectMethodExecutor.cs#L156
-            var parameters = method.GetParameters();
-            var parametersLength = parameters.Length;
-            var callParameters = new Expression[parametersLength];
-            var defaults = new object[parametersLength];
-            for (int index = 0; index < parametersLength; index++)
-            {
-                var parameter = parameters[index];
-                defaults[index] = parameter.GetDefaultValue();
-                callParameters[index] = parameter.ParameterType == typeof(CancellationToken) ? TokenParameter : 
-                    Convert(ArrayIndex(ParametersParameter, Constant(index, typeof(int))), parameter.ParameterType);
-            }
-            var instanceCast = Convert(TargetParameter, method.DeclaringType);
-            var methodCall = Call(instanceCast, method, callParameters);
-            var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter, TokenParameter);
-            _executor = lambda.Compile();
-            MethodInfo = method;
-            Parameters = parameters;
-            Defaults = defaults;
+            var parameter = parameters[index];
+            defaults[index] = parameter.GetDefaultValue();
+            callParameters[index] = parameter.ParameterType == typeof(CancellationToken) ? TokenParameter :
+                Convert(ArrayIndex(ParametersParameter, Constant(index, typeof(int))), parameter.ParameterType);
         }
-        public Task Invoke(object service, object[] arguments, CancellationToken cancellationToken) => _executor.Invoke(service, arguments, cancellationToken);
-        public override string ToString() => MethodInfo.ToString();
+        var instanceCast = Convert(TargetParameter, method.DeclaringType);
+        var methodCall = Call(instanceCast, method, callParameters);
+        var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter, TokenParameter);
+        _executor = lambda.Compile();
+        MethodInfo = method;
+        Parameters = parameters;
+        Defaults = defaults;
     }
+    public Task Invoke(object service, object[] arguments, CancellationToken cancellationToken) => _executor.Invoke(service, arguments, cancellationToken);
+    public override string ToString() => MethodInfo.ToString();
 }

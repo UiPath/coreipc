@@ -4,9 +4,12 @@ using static IOHelpers;
 using Microsoft.IO;
 using Newtonsoft.Json;
 using System.Buffers;
+using System.Net;
+
 public sealed class Connection : IDisposable, IArrayPool<char>
 {
-    static readonly JsonSerializer ObjectArgsSerializer = new() { DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore };
+    static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
+    static readonly JsonSerializer Serializer = new() { DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore };
     private static readonly IOException ClosedException = new("Connection closed.");
     private readonly ConcurrentDictionary<int, ManualResetValueTaskSource> _requests = new();
     private int _requestCounter = -1;
@@ -308,7 +311,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
             using var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this, CloseOutput = false };
             foreach (var value in values)
             {
-                ObjectArgsSerializer.Serialize(writer, value);
+                Serializer.Serialize(writer, value);
             }
             writer.Flush();
             return stream;
@@ -322,13 +325,17 @@ public sealed class Connection : IDisposable, IArrayPool<char>
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-    private async ValueTask<T> Deserialize<T>()
+    private async ValueTask<JsonTextReader> CreaterReader()
     {
         using var stream = GetStream((int)_nestedStream.Length);
         await _nestedStream.CopyToAsync(stream);
         stream.Position = 0;
-        using var reader = new JsonTextReader(new StreamReader(stream)) { ArrayPool = this, SupportMultipleContent = true };
-        return ObjectArgsSerializer.Deserialize<T>(reader);
+        return new JsonTextReader(new StreamReader(stream)) { ArrayPool = this, SupportMultipleContent = true };
+    }
+    private async ValueTask<T> Deserialize<T>()
+    {
+        using var reader = await CreaterReader();
+        return Serializer.Deserialize<T>(reader);
     }
     private void OnCancellationReceived(int requestId)
     {
@@ -346,13 +353,27 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     {
         try
         {
-            return Server.OnRequestReceived(request);
+            if (LogEnabled)
+            {
+                Log($"{Name} received request {request}");
+            }
+            if (!Server.Endpoints.TryGetValue(request.Endpoint, out var endpoint))
+            {
+                return OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
+            }
+            var method = GetMethod(endpoint.Contract, request.MethodName);
+            return Server.OnRequestReceived(request, method, endpoint);
         }
         catch (Exception ex)
         {
             Log(ex);
+            return default;
         }
-        return default;
+    }
+    internal ValueTask OnError(Request request, Exception ex)
+    {
+        Logger.LogException(ex, $"{Name} {request}");
+        return Send(Response.Fail(request, ex), default);
     }
     private void OnResponseReceived(Response response)
     {
@@ -375,4 +396,6 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     public void Log(string message) => Logger.LogInformation(message);
     char[] IArrayPool<char>.Rent(int minimumLength) => ArrayPool<char>.Shared.Rent(minimumLength);
     void IArrayPool<char>.Return(char[] array) => ArrayPool<char>.Shared.Return(array);
+    static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
+        ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
 }
