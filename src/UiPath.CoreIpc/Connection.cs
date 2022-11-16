@@ -383,7 +383,14 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         var args = new object[method.Parameters.Length];
         for (int index = 0; index < args.Length; index++)
         {
-            args[index] = Serializer.Deserialize(reader, method.Parameters[index].ParameterType);
+            reader.Read();
+            var type = method.Parameters[index].ParameterType;
+            if (type == typeof(CancellationToken))
+            {
+                reader.Read();
+                continue;
+            }
+            args[index] = Serializer.Deserialize(reader, type);
         }
         request.Parameters = args;
         return new(request, method, endpoint);
