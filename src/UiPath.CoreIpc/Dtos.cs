@@ -19,7 +19,7 @@ public class Message<TPayload> : Message
 record Request(string Endpoint, int Id, string MethodName, double TimeoutInSeconds)
 {
     internal Type ResponseType { get; init; }
-    internal object[] Parameters { get; init; }
+    internal object[] Parameters { get; set; }
     internal Stream UploadStream { get; set; }
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);

@@ -32,7 +32,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         _maxMessageSize = maxMessageSize;
         _receiveLoop = new(ReceiveLoop);
         _onResponse = response => OnResponseReceived((Response)response);
-        _onRequest = request => OnRequestReceived((Request)request);
+        _onRequest = request => OnRequestReceived((IncomingRequest)request);
         _onCancellation = requestId => OnCancellationReceived((int)requestId);
         _cancelRequest = requestId => CancelRequest((int)requestId);
         _cancelUploadRequest = requestId => CancelUploadRequest((int)requestId);
@@ -244,7 +244,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
                     RunAsync(_onResponse, await Deserialize<Response>());
                     break;
                 case MessageType.Request:
-                    RunAsync(_onRequest, await Deserialize<Request>());
+                    RunAsync(_onRequest, await DeserializeRequest());
                     break;
                 case MessageType.CancellationRequest:
                     RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
@@ -285,11 +285,11 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     }
     private async Task OnUploadRequest()
     {
-        var request = await Deserialize<Request>();
+        var request = await DeserializeRequest();
         await EnterStreamMode();
         using (_nestedStream)
         {
-            request.UploadStream = _nestedStream;
+            request.Request.UploadStream = _nestedStream;
             await OnRequestReceived(request);
         }
     }
@@ -349,20 +349,42 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         }
     }
     private void Log(Exception ex) => Logger.LogException(ex, Name);
-    private ValueTask OnRequestReceived(Request request)
+    private async ValueTask<Response> DeserializeResponse()
+    {
+        using var reader = await CreaterReader();
+        var response = Serializer.Deserialize<Response>(reader);
+        if (LogEnabled)
+        {
+            Log($"Received response for request {response.RequestId} {Name}.");
+        }
+        return response;
+    }
+    private async ValueTask<IncomingRequest> DeserializeRequest()
+    {
+        using var reader = await CreaterReader();
+        var request = Serializer.Deserialize<Request>(reader);
+        if (LogEnabled)
+        {
+            Log($"{Name} received request {request}");
+        }
+        if (!Server.Endpoints.TryGetValue(request.Endpoint, out var endpoint))
+        {
+            await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
+        }
+        var method = GetMethod(endpoint.Contract, request.MethodName);
+        var args = new object[method.Parameters.Length];
+        for (int index = 0; index < args.Length; index++)
+        {
+            args[index] = Serializer.Deserialize(reader, method.Parameters[index].ParameterType);
+        }
+        request.Parameters = args;
+        return new(request, method, endpoint);
+    }
+    private ValueTask OnRequestReceived(IncomingRequest request)
     {
         try
         {
-            if (LogEnabled)
-            {
-                Log($"{Name} received request {request}");
-            }
-            if (!Server.Endpoints.TryGetValue(request.Endpoint, out var endpoint))
-            {
-                return OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
-            }
-            var method = GetMethod(endpoint.Contract, request.MethodName);
-            return Server.OnRequestReceived(request, method, endpoint);
+            return Server.OnRequestReceived(request);
         }
         catch (Exception ex)
         {
@@ -379,10 +401,6 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     {
         try
         {
-            if (LogEnabled)
-            {
-                Log($"Received response for request {response.RequestId} {Name}.");
-            }
             if (_requests.TryRemove(response.RequestId, out var completionSource))
             {
                 completionSource.SetResult(response);
@@ -399,3 +417,4 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
 }
+record IncomingRequest(Request Request, Method Method, EndpointSettings Endpoint);

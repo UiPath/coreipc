@@ -46,8 +46,9 @@ class Server
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    public async ValueTask OnRequestReceived(Request request, Method method, EndpointSettings endpoint)
+    public async ValueTask OnRequestReceived(IncomingRequest incomingRequest)
     {
+        var (request, method, endpoint) = incomingRequest;
         try
         {
             if (!method.ReturnType.IsGenericType)
