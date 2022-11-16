@@ -36,6 +36,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         _cancelRequest = requestId => CancelRequest((int)requestId);
         _cancelUploadRequest = requestId => CancelUploadRequest((int)requestId);
     }
+    internal Server Server { get; private set; }
     public Stream Network { get; }
     public ILogger Logger { get; internal set; }
     public bool LogEnabled => Logger.Enabled();
@@ -43,9 +44,8 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     public override string ToString() => Name;
     public int NewRequestId() => Interlocked.Increment(ref _requestCounter);
     public Task Listen() => _receiveLoop.Value;
-    internal event Func<Request, ValueTask> RequestReceived;
-    internal event Action<int> CancellationReceived;
     public event EventHandler<EventArgs> Closed;
+    public void SetServer(ListenerSettings settings, IClient client = null) => Server = new(settings, this, client);
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
@@ -159,6 +159,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         }
         _sendLock.AssertDisposed();
         Network.Dispose();
+        Server.CancelRequests();
         try
         {
             closedHandler.Invoke(this, EventArgs.Empty);
@@ -323,7 +324,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     {
         try
         {
-            CancellationReceived(requestId);
+            Server.CancelRequest(requestId);
         }
         catch(Exception ex)
         {
@@ -335,7 +336,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     {
         try
         {
-            return RequestReceived(request);
+            return Server.OnRequestReceived(request);
         }
         catch (Exception ex)
         {

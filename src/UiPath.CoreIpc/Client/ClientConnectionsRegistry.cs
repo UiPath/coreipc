@@ -83,7 +83,6 @@ abstract class ClientConnection : IDisposable
             Release();
         }
     }
-    public Server Server { get; set; }
     protected IConnectionKey ConnectionKey { get; }
     public Task Lock(CancellationToken cancellationToken = default) => _lock.WaitAsync(cancellationToken);
     public void Release() => _lock.Release();

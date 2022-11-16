@@ -20,7 +20,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     private readonly EndpointSettings _serviceEndpoint;
     private readonly SemaphoreSlim _connectionLock = new(1);
     private Connection _connection;
-    private Server _server;
     private ClientConnection _clientConnection;
 
     internal ServiceClient(TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
@@ -46,18 +45,28 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     
     public override int GetHashCode() => HashCode;
 
-    private void OnNewConnection(Connection connection, bool alreadyHasServer = false)
+    private void OnNewConnection(Connection connection)
     {
         _connection?.Dispose();
         _connection = connection;
-        if (alreadyHasServer || _serviceEndpoint == null)
+        if (_serviceEndpoint == null)
         {
+            return;
+        }
+        var endPoints = connection.Server?.Endpoints;
+        if (endPoints != null)
+        {
+            if (endPoints.ContainsKey(_serviceEndpoint.Name))
+            {
+                throw new InvalidOperationException($"Duplicate callback proxy instance {Name} <{typeof(TInterface).Name}, {_serviceEndpoint.Contract.Name}>. Consider using a singleton callback proxy.");
+            }
+            endPoints.Add(_serviceEndpoint.Name, _serviceEndpoint);
             return;
         }
         connection.Logger ??= _logger;
         var endpoints = new ConcurrentDictionary<string, EndpointSettings> { [_serviceEndpoint.Name] = _serviceEndpoint };
         var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
-        _server = new(listenerSettings, connection);
+        connection.SetServer(listenerSettings);
     }
 
     public Task<TResult> Invoke<TResult>(MethodInfo method, object[] args)
@@ -225,25 +234,11 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     private void ReuseClientConnection(ClientConnection clientConnection)
     {
         _clientConnection = clientConnection;
-        var alreadyHasServer = clientConnection.Server != null;
         if (LogEnabled)
         {
             Log(nameof(ReuseClientConnection) + " " + clientConnection);
         }
-        OnNewConnection(clientConnection.Connection, alreadyHasServer);
-        if (!alreadyHasServer)
-        {
-            clientConnection.Server = _server;
-        }
-        else if (_serviceEndpoint != null)
-        {
-            _server = clientConnection.Server;
-            if (_server.Endpoints.ContainsKey(_serviceEndpoint.Name))
-            {
-                throw new InvalidOperationException($"Duplicate callback proxy instance {Name} <{typeof(TInterface).Name}, {_serviceEndpoint.Contract.Name}>. Consider using a singleton callback proxy.");
-            }
-            _server.Endpoints.Add(_serviceEndpoint.Name, _serviceEndpoint);
-        }
+        OnNewConnection(clientConnection.Connection);
     }
 
     public void Log(string message) => _logger.LogInformation(message);
@@ -252,7 +247,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     {
         _connection.Listen().LogException(_logger, Name);
         clientConnection.Connection = _connection;
-        clientConnection.Server = _server;
         _clientConnection = clientConnection;
     }
 
@@ -269,9 +263,9 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         {
             Log($"Dispose {Name}");
         }
-        if (disposing)
+        if (disposing && _serviceEndpoint != null)
         {
-            _server?.Endpoints.Remove(_serviceEndpoint.Name);
+            _connection?.Server.Endpoints.Remove(_serviceEndpoint.Name);
         }
     }
 

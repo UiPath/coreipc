@@ -12,33 +12,31 @@ class Server
     private readonly Connection _connection;
     private readonly IClient _client;
     private readonly ConcurrentDictionary<int, PooledCancellationTokenSource> _requests = new();
-    public Server(ListenerSettings settings, Connection connection, IClient client = null)
+    public Server(ListenerSettings settings, Connection connection, IClient client)
     {
         Settings = settings;
         _connection = connection;
         _client = client;
-        connection.RequestReceived += OnRequestReceived;
-        connection.CancellationReceived += CancelRequest;
-        connection.Closed += delegate
-        {
-            if (LogEnabled)
-            {
-                Log($"Server {Name} closed.");
-            }
-            foreach (var requestId in _requests.Keys)
-            {
-                try
-                {
-                    CancelRequest(requestId);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogException(ex, $"{Name}");
-                }
-            }
-        };
     }
-    void CancelRequest(int requestId)
+    public void CancelRequests()
+    {
+        if (LogEnabled)
+        {
+            Log($"Server {Name} closed.");
+        }
+        foreach (var requestId in _requests.Keys)
+        {
+            try
+            {
+                CancelRequest(requestId);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogException(ex, $"{Name}");
+            }
+        }
+    }
+    public void CancelRequest(int requestId)
     {
         if (_requests.TryRemove(requestId, out var cancellation))
         {
@@ -49,7 +47,7 @@ class Server
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    async ValueTask OnRequestReceived(Request request)
+    public async ValueTask OnRequestReceived(Request request)
     {
         try
         {

@@ -12,7 +12,6 @@ abstract class ServerConnection : IClient, IDisposable
     protected readonly Listener _listener;
     private Connection _connection;
     private Task<Connection> _connectionAsTask;
-    private Server _server;
     protected ServerConnection(Listener listener) => _listener = listener;
     public ILogger Logger => _listener.Logger;
     public ListenerSettings Settings => _listener.Settings;
@@ -44,7 +43,7 @@ abstract class ServerConnection : IClient, IDisposable
     {
         var stream = await AuthenticateAsServer();
         _connection = new(stream, Logger, _listener.Name, _listener.MaxMessageSize);
-        _server = new(Settings, _connection, this);
+        _connection.SetServer(Settings, this);
         // close the connection when the service host closes
         using (cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), _connection))
         {
