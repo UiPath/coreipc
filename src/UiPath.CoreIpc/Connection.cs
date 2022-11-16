@@ -11,7 +11,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
     static readonly JsonSerializer Serializer = new() { DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore };
     private static readonly IOException ClosedException = new("Connection closed.");
-    private readonly ConcurrentDictionary<int, ManualResetValueTaskSource> _requests = new();
+    private readonly ConcurrentDictionary<int, OutgoingRequest> _requests = new();
     private int _requestCounter = -1;
     private readonly int _maxMessageSize;
     private readonly Lazy<Task> _receiveLoop;
@@ -31,7 +31,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         Name = $"{name} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
         _receiveLoop = new(ReceiveLoop);
-        _onResponse = response => OnResponseReceived((Response)response);
+        _onResponse = response => OnResponseReceived((IncomingResponse)response);
         _onRequest = request => OnRequestReceived((IncomingRequest)request);
         _onCancellation = requestId => OnCancellationReceived((int)requestId);
         _cancelRequest = requestId => CancelRequest((int)requestId);
@@ -54,7 +54,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     {
         var requestCompletion = Rent();
         var requestId = request.Id;
-        _requests[requestId] = requestCompletion;
+        _requests[requestId] = new(requestCompletion, request.ResponseType);
         var cancelRequest = request.UploadStream == null ? _cancelRequest : _cancelUploadRequest;
         CancellationTokenRegistration tokenRegistration = default;
         try
@@ -91,13 +91,8 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         Dispose();
         TryCancelRequest(requestId);
     }
-    private void TryCancelRequest(int requestId)
-    {
-        if (_requests.TryRemove(requestId, out var requestCompletion))
-        {
-            requestCompletion.SetCanceled();
-        }
-    }
+    ManualResetValueTaskSource Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
+    private void TryCancelRequest(int requestId) => Completion(requestId)?.SetCanceled();
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
     {
         var responseBytes = Serialize(new[] { response, response.Data });
@@ -175,10 +170,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     {
         foreach (var requestId in _requests.Keys)
         {
-            if (_requests.TryRemove(requestId, out var requestCompletion))
-            {
-                requestCompletion.SetException(ClosedException);
-            }
+            Completion(requestId)?.SetException(ClosedException);
         }
     }
 #if !NET461
@@ -241,13 +233,17 @@ public sealed class Connection : IDisposable, IArrayPool<char>
             switch (messageType)
             {
                 case MessageType.Response:
-                    RunAsync(_onResponse, await Deserialize<Response>());
+                    var response = await DeserializeResponse();
+                    if (response != null)
+                    {
+                        RunAsync(_onResponse, response);
+                    }
                     break;
                 case MessageType.Request:
                     RunAsync(_onRequest, await DeserializeRequest());
                     break;
                 case MessageType.CancellationRequest:
-                    RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
+                    RunAsync(_onCancellation, await DeserializeCancellationRequest());
                     break;
                 case MessageType.UploadRequest:
                     await OnUploadRequest();
@@ -267,14 +263,18 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     static void RunAsync(WaitCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state);
     private async Task OnDownloadResponse()
     {
-        var response = await Deserialize<Response>();
+        var response = await DeserializeResponse();
+        if (response == null)
+        {
+            return;
+        }
         await EnterStreamMode();
         var streamDisposed = new TaskCompletionSource<bool>();
         EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
         _nestedStream.Disposed += disposedHandler;
         try
         {
-            response.DownloadStream = _nestedStream;
+            response.Response.DownloadStream = _nestedStream;
             OnResponseReceived(response);
             await streamDisposed.Task;
         }
@@ -332,10 +332,10 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         stream.Position = 0;
         return new JsonTextReader(new StreamReader(stream)) { ArrayPool = this, SupportMultipleContent = true };
     }
-    private async ValueTask<T> Deserialize<T>()
+    private async ValueTask<int> DeserializeCancellationRequest()
     {
         using var reader = await CreaterReader();
-        return Serializer.Deserialize<T>(reader);
+        return Serializer.Deserialize<CancellationRequest>(reader).RequestId;
     }
     private void OnCancellationReceived(int requestId)
     {
@@ -349,7 +349,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         }
     }
     private void Log(Exception ex) => Logger.LogException(ex, Name);
-    private async ValueTask<Response> DeserializeResponse()
+    private async ValueTask<IncomingResponse> DeserializeResponse()
     {
         using var reader = await CreaterReader();
         var response = Serializer.Deserialize<Response>(reader);
@@ -357,7 +357,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         {
             Log($"Received response for request {response.RequestId} {Name}.");
         }
-        return response;
+        return _requests.TryRemove(response.RequestId, out var outgoingRequest)? new(response, outgoingRequest.Completion) : null;
     }
     private async ValueTask<IncomingRequest> DeserializeRequest()
     {
@@ -397,14 +397,11 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         Logger.LogException(ex, $"{Name} {request}");
         return Send(Response.Fail(request, ex), default);
     }
-    private void OnResponseReceived(Response response)
+    private void OnResponseReceived(IncomingResponse incomingResponse)
     {
         try
         {
-            if (_requests.TryRemove(response.RequestId, out var completionSource))
-            {
-                completionSource.SetResult(response);
-            }
+            incomingResponse.Completion.SetResult(incomingResponse.Response);
         }
         catch (Exception ex)
         {
@@ -418,3 +415,5 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
 }
 record IncomingRequest(Request Request, Method Method, EndpointSettings Endpoint);
+record OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
+record IncomingResponse(Response Response, ManualResetValueTaskSource Completion);
