@@ -319,7 +319,17 @@ public sealed class Connection : IDisposable, IArrayPool<char>
             throw;
         }
     }
-    private ValueTask<T> Deserialize<T>() => DeserializeAsync<T>(_nestedStream);
+#if !NET461
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+#endif
+    private async ValueTask<T> Deserialize<T>()
+    {
+        using var stream = GetStream((int)_nestedStream.Length);
+        await _nestedStream.CopyToAsync(stream);
+        stream.Position = 0;
+        using var reader = new JsonTextReader(new StreamReader(stream)) { ArrayPool = this, SupportMultipleContent = true };
+        return ObjectArgsSerializer.Deserialize<T>(reader);
+    }
     private void OnCancellationReceived(int requestId)
     {
         try
@@ -365,15 +375,4 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     public void Log(string message) => Logger.LogInformation(message);
     char[] IArrayPool<char>.Rent(int minimumLength) => ArrayPool<char>.Shared.Rent(minimumLength);
     void IArrayPool<char>.Return(char[] array) => ArrayPool<char>.Shared.Return(array);
-#if !NET461
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-#endif
-    async ValueTask<T> DeserializeAsync<T>(Stream json)
-    {
-        using var stream = GetStream((int)json.Length);
-        await json.CopyToAsync(stream);
-        stream.Position = 0;
-        using var reader = new JsonTextReader(new StreamReader(stream)) { ArrayPool = this, SupportMultipleContent = true };
-        return ObjectArgsSerializer.Deserialize<T>(reader);
-    }
 }
