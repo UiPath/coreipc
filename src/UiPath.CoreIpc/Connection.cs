@@ -70,7 +70,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     internal ValueTask Send(Request request, CancellationToken token)
     {
         var uploadStream = request.UploadStream;
-        var requestBytes = MessageStream(new[] { request }.Concat(request.Parameters));
+        var requestBytes = Serialize(new[] { request }.Concat(request.Parameters));
         return uploadStream == null ?
             SendMessage(MessageType.Request, requestBytes, token) :
             SendStream(MessageType.UploadRequest, requestBytes, uploadStream, token);
@@ -81,7 +81,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         TryCancelRequest(requestId);
         return;
         Task CancelServerCall(int requestId) =>
-            SendMessage(MessageType.CancellationRequest, MessageStream(new[] { new CancellationRequest(requestId) }), default).AsTask();
+            SendMessage(MessageType.CancellationRequest, Serialize(new[] { new CancellationRequest(requestId) }), default).AsTask();
     }
     void CancelUploadRequest(int requestId)
     {
@@ -97,7 +97,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     }
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
     {
-        var responseBytes = MessageStream(new[] { response, response.Data });
+        var responseBytes = Serialize(new[] { response, response.Data });
         return response.DownloadStream == null ?
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
             SendDownloadStream(responseBytes, response.DownloadStream, cancellationToken);
@@ -299,7 +299,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         var userStreamLength = BitConverter.ToInt64(_buffer, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
     }
-    private RecyclableMemoryStream MessageStream(IEnumerable<object> values)
+    private RecyclableMemoryStream Serialize(IEnumerable<object> values)
     {
         var stream = GetStream();
         try
