@@ -167,7 +167,7 @@ class Server
             var parameters = method.Parameters;
             var allParametersLength = parameters.Length;
             var requestParametersLength = objectParameters ? request.ObjectParameters.Length : request.Parameters.Length;
-            if (requestParametersLength > allParametersLength)
+            if (requestParametersLength != allParametersLength)
             {
                 throw new ArgumentException("Too many parameters for " + method.MethodInfo);
             }
