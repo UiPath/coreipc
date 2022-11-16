@@ -305,22 +305,18 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         try
         {
             stream.Position = HeaderLength;
+            using var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this, CloseOutput = false };
             foreach (var value in values)
             {
-                Serialize(value, stream);
+                ObjectArgsSerializer.Serialize(writer, value);
             }
+            writer.Flush();
             return stream;
         }
         catch
         {
             stream.Dispose();
             throw;
-        }
-        void Serialize(object obj, Stream stream)
-        {
-            using var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this, CloseOutput = false };
-            ObjectArgsSerializer.Serialize(writer, obj);
-            writer.Flush();
         }
     }
     private ValueTask<T> Deserialize<T>() => DeserializeAsync<T>(_nestedStream);
