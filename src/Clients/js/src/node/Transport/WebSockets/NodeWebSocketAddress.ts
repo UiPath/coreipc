@@ -1,3 +1,4 @@
+import { NodeWebSocket } from '.';
 import {
     TimeSpan,
     CancellationToken,
@@ -15,12 +16,17 @@ export class NodeWebSocketAddress extends Address {
         return `websocket:${this.url}`;
     }
 
-    public override connect<TSelf extends Address>(
+    public override async connect<TSelf extends Address>(
         this: TSelf,
         helper: ConnectHelper<TSelf>,
         timeout: TimeSpan,
         ct: CancellationToken
     ): Promise<Socket> {
-        throw new Error('Method not implemented.');
+        return await NodeWebSocket.connectWithHelper(
+            helper as any,
+            (this as unknown as NodeWebSocketAddress).url,
+            timeout,
+            ct
+        );
     }
 }

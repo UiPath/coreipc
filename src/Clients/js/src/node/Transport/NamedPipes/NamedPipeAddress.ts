@@ -5,6 +5,7 @@ import {
     Socket,
     TimeSpan,
 } from '../../../std';
+import { NamedPipeSocket } from './NamedPipeSocket';
 
 export class NamedPipeAddress extends Address {
     constructor(public readonly name: string) {
@@ -15,12 +16,17 @@ export class NamedPipeAddress extends Address {
         return `namedpipe:${this.name}`;
     }
 
-    public override connect<TSelf extends Address>(
+    public override async connect<TSelf extends Address>(
         this: TSelf,
         helper: ConnectHelper<TSelf>,
         timeout: TimeSpan,
         ct: CancellationToken
     ): Promise<Socket> {
-        throw new Error('Method not implemented.');
+        return await NamedPipeSocket.connectWithHelper(
+            helper as any,
+            (this as unknown as NamedPipeAddress).name,
+            timeout,
+            ct
+        );
     }
 }

@@ -31,15 +31,19 @@ describe('web', () => {
         const x = 2;
         const y = 3;
         const expected = 5;
-        const actual = 5;
+        // const actual = 5;
 
-        // const proxy = ipc.proxy
-        //     .withAddress((x) => x.isWebSocket(url))
-        //     .withService(IArithmetics);
+        // await new Promise(resolve => {
+        //     setTimeout(resolve, 1000);
+        // });
 
-        // const actual = await proxy.Sum(x, y);
+        console.log(`🎂 Hello from the Browser!`);
 
-        // console.log(`🎂 Hello from the Browser!`);
+        const proxy = ipc.proxy
+            .withAddress((x) => x.isWebSocket(url))
+            .withService(IArithmetics);
+
+        const actual = await proxy.Sum(x, y);
 
         expect(actual).to.equal(expected);
     });

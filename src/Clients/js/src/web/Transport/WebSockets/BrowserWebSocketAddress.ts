@@ -5,6 +5,7 @@ import {
     ConnectHelper,
     Address,
 } from '../../../std';
+import { BrowserWebSocket } from './BrowserWebSocket';
 
 export class BrowserWebSocketAddress extends Address {
     constructor(public readonly url: string) {
@@ -15,12 +16,17 @@ export class BrowserWebSocketAddress extends Address {
         return `websocket:${this.url}`;
     }
 
-    public override connect<TSelf extends Address>(
+    public override async connect<TSelf extends Address>(
         this: TSelf,
         helper: ConnectHelper<TSelf>,
         timeout: TimeSpan,
         ct: CancellationToken
     ): Promise<Socket> {
-        throw new Error('Method not implemented.');
+        return await BrowserWebSocket.connectWithHelper(
+            helper as any,
+            (this as unknown as BrowserWebSocketAddress).url,
+            timeout,
+            ct
+        );
     }
 }
