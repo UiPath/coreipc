@@ -3,27 +3,6 @@ import { InvalidOperationError, IPlatform } from '../std';
 
 /* @internal */
 export module Platform {
-    export const current = create();
-
-    function create(): IPlatform<Id> {
-        switch (detect()) {
-            case Id.Windows:
-                return new Windows();
-            case Id.Linux:
-                return new Linux();
-            default:
-                throw new InvalidOperationError();
-        }
-    }
-
-    function detect(): Id {
-        if (process.platform === 'win32') {
-            return Id.Windows;
-        }
-
-        return Id.Linux;
-    }
-
     export enum Id {
         Windows,
         Linux,
@@ -61,4 +40,25 @@ export module Platform {
             return result;
         }
     }
+
+    function detect(): Id {
+        if (process.platform === 'win32') {
+            return Id.Windows;
+        }
+
+        return Id.Linux;
+    }
+
+    function create(): IPlatform<Id> {
+        switch (detect()) {
+            case Id.Windows:
+                return new Windows();
+            case Id.Linux:
+                return new Linux();
+            default:
+                throw new InvalidOperationError();
+        }
+    }
+
+    export const current = create();
 }

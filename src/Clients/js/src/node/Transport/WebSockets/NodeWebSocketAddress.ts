@@ -4,9 +4,9 @@ import {
     Socket,
     ConnectHelper,
     Address,
-} from '../std';
+} from '../../../std';
 
-export class BrowserWebSocketAddress extends Address {
+export class NodeWebSocketAddress extends Address {
     constructor(public readonly url: string) {
         super();
     }

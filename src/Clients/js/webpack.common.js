@@ -105,8 +105,6 @@ function createConfig(params) {
         copyAssets,
     ];
 
-    console.log('params.generatePackage === ', params.generatePackage);
-
     if (params.generatePackage) {
         const suffix = params.target === 'node' ? '' : '-web';
         const packageBase = JSON.parse(readFileSync('package.json'));
@@ -182,8 +180,6 @@ function createConfig(params) {
     if (params.name) {
         config.name = params.name;
     }
-
-    console.log('config.module.rules[0].use[1]', config.module.rules[0].use[1]);
 
     return config;
 }

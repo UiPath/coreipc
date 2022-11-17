@@ -1,4 +1,11 @@
 import { expect } from 'chai';
+import { ipc } from '../../src/web';
+
+class IArithmetics {
+    public Sum(x: number, y: number): Promise<number> {
+        throw void 0;
+    }
+}
 
 describe('web', () => {
     beforeEach(function () {
@@ -8,7 +15,8 @@ describe('web', () => {
     });
 
     it('new WebSocket should not throw', function () {
-        const act = () => eval(/* js */`
+        const act = () =>
+            eval(/* js */ `
             new WebSocket('ws://localhost:1234', 'foobar')
         `);
         expect(act).not.to.throw();
@@ -17,6 +25,22 @@ describe('web', () => {
     it('2 should equal 2', function () {
         expect(2).to.equal(2);
     });
+
+    it('should connect', async () => {
+        const url = 'ws://localhost:1234';
+        const x = 2;
+        const y = 3;
+        const expected = 5;
+        const actual = 5;
+
+        // const proxy = ipc.proxy
+        //     .withAddress((x) => x.isWebSocket(url))
+        //     .withService(IArithmetics);
+
+        // const actual = await proxy.Sum(x, y);
+
+        // console.log(`🎂 Hello from the Browser!`);
+
+        expect(actual).to.equal(expected);
+    });
 });
-
-

@@ -1,3 +1,5 @@
+import * as net from 'net';
+
 import { Observable, Subject } from 'rxjs';
 
 import {
@@ -12,30 +14,31 @@ import {
     Socket,
     ConnectHelper,
     UnknownError,
-} from '../std';
+} from '../../../std';
+
+import { Platform } from '../..';
 
 import {
-    BrowserWebSocketAddress,
-    BrowserWebSocketError,
-    BrowserWebSocketLike,
-    BrowserWebSocketLikeCtor,
+    NamedPipeAddress,
+    NamedPipeSocketLikeCtor,
+    NamedPipeSocketLike,
 } from '.';
 
 /* @internal */
-export class BrowserWebSocket extends Socket {
+export class NamedPipeSocket extends Socket {
     public static async connectWithHelper(
-        connectHelper: ConnectHelper<BrowserWebSocketAddress>,
-        url: string,
+        connectHelper: ConnectHelper<NamedPipeAddress>,
+        pipeName: string,
         timeout: TimeSpan,
         ct: CancellationToken,
-        socketLikeCtor?: BrowserWebSocketLikeCtor
+        socketLikeCtor?: NamedPipeSocketLikeCtor
     ) {
-        let socket: BrowserWebSocket | undefined;
+        let socket: NamedPipeSocket | undefined;
         const errors = new Array<Error>();
         let tryConnectCalled = false;
 
         await connectHelper({
-            address: new BrowserWebSocketAddress(url),
+            address: new NamedPipeAddress(pipeName),
             timeout,
             ct,
             async tryConnect() {
@@ -45,8 +48,8 @@ export class BrowserWebSocket extends Socket {
                 }
 
                 try {
-                    socket = await BrowserWebSocket.connect(
-                        url,
+                    socket = await NamedPipeSocket.connect(
+                        pipeName,
                         timeout,
                         ct,
                         socketLikeCtor
@@ -83,43 +86,39 @@ export class BrowserWebSocket extends Socket {
     }
 
     public static async connect(
-        url: string,
+        pipeName: string,
         timeout: TimeSpan,
         ct: CancellationToken,
-        socketLikeCtor?: BrowserWebSocketLikeCtor
-    ): Promise<BrowserWebSocket> {
-        assertArgument({ url }, 'string');
+        socketLikeCtor?: new () => NamedPipeSocketLike
+    ): Promise<NamedPipeSocket> {
+        assertArgument({ pipeName }, 'string');
         assertArgument({ timeout }, TimeSpan);
         assertArgument({ ct }, CancellationToken);
         assertArgument({ socketLikeCtor }, 'undefined', Function);
 
-        const WebSocketCtor = socketLikeCtor ?? WebSocket;
+        const path = Platform.current.getFullPipeName(pipeName);
 
         /* istanbul ignore next */
-        const socket = new WebSocketCtor(url, 'coreipc');
-        socket.binaryType = 'arraybuffer';
-
+        const socketLike = new (socketLikeCtor ?? net.Socket)();
         const pcs = new PromiseCompletionSource<void>();
 
-        socket.onerror = (event) => {
-            const error = new BrowserWebSocketError.ConnectFailure(socket);
-            pcs.trySetFaulted(error);
-        };
-
-        socket.onopen = (event) => {
-            pcs.trySetResult();
-        };
-
-        const ctReg = ct.register(() => pcs.trySetCanceled());
+        socketLike
+            .once('error', (error) => {
+                pcs.setFaulted(error);
+            })
+            .connect(path, () => {
+                pcs.setResult();
+            });
+        const ctReg = ct.register(() => pcs.setCanceled());
         timeout.bind(pcs);
 
         try {
             await pcs.promise;
-            return new BrowserWebSocket(socket);
+            return new NamedPipeSocket(socketLike);
         } catch (error) {
-            socket.onerror = null;
-            socket.onopen = null;
-            socket.close();
+            socketLike.removeAllListeners();
+            socketLike.unref();
+            socketLike.destroy();
 
             throw error;
         } finally {
@@ -135,16 +134,17 @@ export class BrowserWebSocket extends Socket {
         assertArgument({ ct }, CancellationToken);
 
         if (this._disposed) {
-            throw new ObjectDisposedError(BrowserWebSocket.name);
+            throw new ObjectDisposedError(NamedPipeSocket.name);
         }
 
         if (buffer.byteLength === 0) {
             return;
         }
 
-        return await new Promise<void>((resolve) => {
-            this._socket.send(buffer);
-            resolve();
+        return await new Promise<void>((resolve, reject) => {
+            this._socketLike.write(buffer, (error) =>
+                error ? reject(error) : resolve()
+            );
         });
     }
 
@@ -155,20 +155,15 @@ export class BrowserWebSocket extends Socket {
         this._disposed = true;
 
         this._$data.complete();
-        this._socket.onopen = null;
-        this._socket.onerror = null;
-        this._socket.onclose = null;
-        this._socket.onmessage = null;
-        this._socket.close();
+        this._socketLike.removeAllListeners();
+        this._socketLike.unref();
+        this._socketLike.destroy();
     }
 
-    private constructor(private readonly _socket: BrowserWebSocketLike) {
+    private constructor(private readonly _socketLike: NamedPipeSocketLike) {
         super();
-        _socket.onclose = () => this.dispose();
-        _socket.onmessage = (event) => {
-            const buffer = Buffer.from(event.data as ArrayBuffer);
-            this._$data.next(buffer);
-        };
+        _socketLike.on('end', () => this.dispose());
+        _socketLike.on('data', (data) => this._$data.next(data));
     }
 
     private readonly _$data = new Subject<Buffer>();

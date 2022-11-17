@@ -1,18 +1,18 @@
 import {
-    Address,
-    CancellationToken,
-    ConnectHelper,
-    Socket,
     TimeSpan,
-} from '../std';
+    CancellationToken,
+    Socket,
+    ConnectHelper,
+    Address,
+} from '../../../std';
 
-export class NamedPipeAddress extends Address {
-    constructor(public readonly name: string) {
+export class BrowserWebSocketAddress extends Address {
+    constructor(public readonly url: string) {
         super();
     }
 
     public override get key() {
-        return `namedpipe:${this.name}`;
+        return `websocket:${this.url}`;
     }
 
     public override connect<TSelf extends Address>(

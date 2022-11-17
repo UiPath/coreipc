@@ -26,7 +26,7 @@ describe('node', function () {
             .update((builder) =>
                 builder
                     .setConnectHelper(async (context) => {
-                        const x = context.address;
+                        const x = context.address.url;
                     })
                     .setRequestTimeout(100)
             );

@@ -6,21 +6,6 @@ import {
 
 /* @internal */
 export module Platform {
-    export const current = create();
-
-    function create(): IPlatform<Id> {
-        switch (detect()) {
-            case Id.Web:
-                return new Web();
-            default:
-                throw new InvalidOperationError();
-        }
-    }
-
-    function detect(): Id {
-        return Id.Web;
-    }
-
     export enum Id {
         Web,
     }
@@ -34,4 +19,19 @@ export module Platform {
             throw new PlatformNotSupportedError();
         }
     }
+
+    function detect(): Id {
+        return Id.Web;
+    }
+
+    function create(): IPlatform<Id> {
+        switch (detect()) {
+            case Id.Web:
+                return new Web();
+            default:
+                throw new InvalidOperationError();
+        }
+    }
+
+    export const current = create();
 }

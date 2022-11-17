@@ -50,7 +50,7 @@ async function main(args: string[]): Promise<number> {
             await CoreIpcServer.host(
                 new BrowserWebSocketAddress(websocketUrl),
                 async () => {
-                    await NpmProcess.runAsync(pathHome, script);
+                    await NpmProcess.runAsync('𝒏𝒑𝒎 𝒓𝒖𝒏', pathHome, script);
                 }
             );
         }

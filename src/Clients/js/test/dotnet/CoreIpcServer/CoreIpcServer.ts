@@ -2,7 +2,10 @@ import { AggregateError, UnknownError, Address } from '../../../src/std';
 import { DotNetProcess, Signal, Paths, InteropAddress } from '.';
 
 export class CoreIpcServer {
-    public static async host(address: Address, action: () => Promise<void>): Promise<void> {
+    public static async host(
+        address: Address,
+        action: () => Promise<void>
+    ): Promise<void> {
         const runner = await CoreIpcServer.start(address);
         try {
             let error: Error | undefined;
@@ -12,17 +15,22 @@ export class CoreIpcServer {
                 error = UnknownError.ensureError(err);
             }
 
-            console.log('**** RACE COMPLETE');
-
             await runner.disposeAsync();
             if (runner.processExitError && error) {
-                error = new AggregateError(undefined, runner.processExitError, error);
+                error = new AggregateError(
+                    undefined,
+                    runner.processExitError,
+                    error
+                );
             }
 
-            error = error ?? (runner.processExitCode ? runner.processExitError : undefined);
-            if (error) { throw error; }
+            error =
+                error ??
+                (runner.processExitCode ? runner.processExitError : undefined);
+            if (error) {
+                throw error;
+            }
         } finally {
-            console.log('***** Finished hosting');
         }
     }
 
@@ -30,19 +38,26 @@ export class CoreIpcServer {
         const interopAddress = InteropAddress.from(address);
 
         const dotNetScript = new DotNetProcess(
+            '𝒄𝒐𝒓𝒆𝒊𝒑𝒄 𝒔𝒆𝒓𝒗𝒆𝒓',
             Paths.absoluteTargetDir,
             Paths.entryPoint,
-            ...interopAddress.commandLineArgs(),
+            ...interopAddress.commandLineArgs()
         );
         await dotNetScript.waitForSignal(Signal.Kind.ReadyToConnect);
 
         return new CoreIpcServer(dotNetScript);
     }
 
-    private constructor(private readonly _dotNetScript: DotNetProcess) { }
+    private constructor(private readonly _dotNetScript: DotNetProcess) {}
 
-    public get processExitCode(): number | null { return this._dotNetScript.processExitCode; }
-    public get processExitError(): Error | undefined { return this._dotNetScript.processExitError; }
+    public get processExitCode(): number | null {
+        return this._dotNetScript.processExitCode;
+    }
+    public get processExitError(): Error | undefined {
+        return this._dotNetScript.processExitError;
+    }
 
-    private disposeAsync(): Promise<void> { return this._dotNetScript.disposeAsync(); }
+    private disposeAsync(): Promise<void> {
+        return this._dotNetScript.disposeAsync();
+    }
 }

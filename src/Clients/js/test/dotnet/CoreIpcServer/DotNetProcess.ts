@@ -1,6 +1,7 @@
 // tslint:disable: no-conditional-assignment no-namespace
 
 import * as fs from 'fs';
+import cliColor from 'cli-color';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { Readable, Writable } from 'stream';
 
@@ -55,6 +56,7 @@ export class DotNetProcess implements IAsyncDisposable {
     private readonly _args: string[];
 
     constructor(
+        private readonly _label: string,
         private readonly _cwd: string,
         private readonly _entryPath: string,
         ...args: string[]
@@ -68,23 +70,19 @@ export class DotNetProcess implements IAsyncDisposable {
             throw new Error(`Executable file "${this._entryPath}" not found.`);
         }
 
-        const spawnArgs = [
-            'dotnet',
-            [this._entryPath, ...this._args],
-            {
-                shell: true,
-                cwd: this._cwd,
-                stdio: 'pipe',
-            },
-        ];
-
-        console.log('****** SPAWNING DOTNET with args === ', spawnArgs);
+        console.group(`⚡ ${cliColor.blueBright(this._label)}`);
+        console.log(`⚡ ${cliColor.blueBright(this._label)}::Starting`);
 
         this._process = spawn('dotnet', [this._entryPath, ...this._args], {
-            shell: true,
+            shell: false,
             cwd: this._cwd,
             stdio: 'pipe',
         });
+
+        console.log(
+            `⚡ ${cliColor.blueBright(this._label)}::Started. PID === `,
+            this._process.pid
+        );
 
         this._process.once('close', (code) => {
             this._processExitCode = code;
@@ -95,12 +93,17 @@ export class DotNetProcess implements IAsyncDisposable {
                     `$STDOUT:\r\n\r\n${this._stdoutLog.join('\r\n')}`
             );
 
-            console.log(
-                '***** SPAWNED dotnet returned code ===',
-                code,
-                '\r\n\r\nprocessExitError is\r\n\r\n',
-                this.processExitError
-            );
+            if (this.processExitError) {
+                console.log(
+                    `⚡ ${cliColor.blueBright(this._label)}::Succeeded`
+                );
+            } else {
+                console.group(`⚡ ${cliColor.blueBright(this._label)}::Failed`);
+                console.log('exitcode === ', code);
+                console.log('error ===\r\n', this.processExitError);
+                console.groupEnd();
+            }
+            console.groupEnd();
 
             if (code) {
                 this._pcsExit.trySetFaulted(this._processExitError);
@@ -113,8 +116,23 @@ export class DotNetProcess implements IAsyncDisposable {
             }
         });
 
-        this._process.stderr.setEncoding('utf-8').observeLines(this._stderrLog);
+        this._process.stderr.setEncoding('utf-8').observeLines((line) => {
+            console.error(
+                cliColor.blueBright(this._label),
+                cliColor.redBright('.stderr:'),
+                line
+            );
+
+            this._stderrLog.push(line);
+        });
         this._process.stdout.setEncoding('utf-8').observeLines((line) => {
+            cliColor;
+            console.log(
+                cliColor.blueBright(this._label),
+                cliColor.greenBright('.stdout:'),
+                line
+            );
+
             this._stdoutLog.push(line);
 
             const prefix = '###';
@@ -201,13 +219,11 @@ export class DotNetProcess implements IAsyncDisposable {
 
     public async disposeAsync(): Promise<void> {
         if (this._process && !this._process.killed) {
-            console.log('**** DISPOSING');
             await new Promise<void>((resolve) => {
                 (this._process as ChildProcessWithoutNullStreams).kill();
                 (this._process as ChildProcessWithoutNullStreams).once(
                     'exit',
                     () => {
-                        console.log('**** RESOLVING DISPOSAL');
                         resolve();
                     }
                 );

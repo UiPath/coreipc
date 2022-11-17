@@ -7,7 +7,6 @@ import {
     UpdateConfigDelegate,
     AddressSelectionDelegate,
     ConfigStore,
-    BrowserWebSocketAddress,
 } from '.';
 
 export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> {
@@ -15,12 +14,6 @@ export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> {
         /* @internal */
         public readonly channelSelectorCtor: ParameterlessPublicCtor<TAddressBuilder>
     ) {}
-
-    public webSocket(
-        url: string
-    ): AddressSelectionDelegate<TAddressBuilder, BrowserWebSocketAddress> {
-        return (builder) => builder.isWebSocket(url);
-    }
 
     public readonly proxy: Ipc.ProxySource<TAddressBuilder> =
         new Ipc.ProxySource<TAddressBuilder>(this);

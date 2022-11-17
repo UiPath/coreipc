@@ -18,19 +18,19 @@
     "prettier.singleQuote": true,
     "editor.codeActionsOnSave": {
         "source.organizeImports": false,
-        "source.fixAll": true,
+        "source.fixAll": true
     },
 
-    "mochaExplorer.files": "test/**/*.ts",
-    "mochaExplorer.require": "ts-node/register",
-    "karmaTestExplorer.testFiles": [
-        "test/web/**/*.test.ts"
+    "mochaExplorer.files": [
+        "test/node/**/*.ts",
+        "test/std/**/*.ts",
+        "test/web/**/*.ts"
     ],
+    "mochaExplorer.require": "ts-node/register",
+    "mochaExplorer.logpanel": true,
+    "karmaTestExplorer.testFiles": ["test/web/**/*.test.ts"],
     "karmaTestExplorer.nonHeadlessModeEnabled": true,
     "karmaTestExplorer.testFramework": "mocha-bdd",
-    "karmaTestExplorer.enabledParserPlugins": [
-        "typescript",
-        "decorators"
-    ],
-    "karmaTestExplorer.logLevel": "trace",
+    "karmaTestExplorer.enabledParserPlugins": ["typescript", "decorators"],
+    "karmaTestExplorer.logLevel": "trace"
 }

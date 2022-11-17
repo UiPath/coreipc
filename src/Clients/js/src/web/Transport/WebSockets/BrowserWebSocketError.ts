@@ -1,4 +1,4 @@
-import { CoreIpcError } from '../std';
+import { CoreIpcError } from '../../../std';
 import { BrowserWebSocketLike } from '.';
 
 export class BrowserWebSocketError extends CoreIpcError {}
