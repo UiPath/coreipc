@@ -326,7 +326,7 @@ public sealed class Connection : IDisposable
     private async ValueTask<int> DeserializeCancellationRequest()
     {
         var reader = await _streamReader.ReadAsync(default);
-        return MessagePackSerializer.Deserialize<CancellationRequest>(reader.Value).RequestId;
+        return MessagePackSerializer.Deserialize<CancellationRequest>(reader.Value, Contractless).RequestId;
     }
     private void OnCancellationReceived(int requestId)
     {

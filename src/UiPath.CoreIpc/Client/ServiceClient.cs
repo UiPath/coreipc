@@ -53,19 +53,20 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         {
             return;
         }
+        var endpointName = _serviceEndpoint.Name;
         var endPoints = connection.Server?.Endpoints;
         if (endPoints != null)
         {
-            if (endPoints.ContainsKey(_serviceEndpoint.Name))
+            if (endPoints.ContainsKey(endpointName))
             {
-                throw new InvalidOperationException($"Duplicate callback proxy instance {Name} <{typeof(TInterface).Name}, {_serviceEndpoint.Contract.Name}>. Consider using a singleton callback proxy.");
+                throw new InvalidOperationException($"Duplicate callback proxy instance {Name} <{typeof(TInterface).Name}, {endpointName}>. Consider using a singleton callback proxy.");
             }
-            endPoints.Add(_serviceEndpoint.Name, _serviceEndpoint);
+            endPoints.Add(endpointName, _serviceEndpoint);
             return;
         }
         connection.Logger ??= _logger;
-        var endpoints = new ConcurrentDictionary<string, EndpointSettings> { [_serviceEndpoint.Name] = _serviceEndpoint };
-        var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
+        ConcurrentDictionary<string, EndpointSettings> endpoints = new(){ [endpointName] = _serviceEndpoint };
+        ListenerSettings listenerSettings = new(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
         connection.SetServer(listenerSettings);
     }
 
