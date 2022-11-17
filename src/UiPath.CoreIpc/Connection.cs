@@ -350,7 +350,12 @@ public sealed class Connection : IDisposable
         {
             Log($"Received response for request {response.RequestId} {Name}.");
         }
-        IncomingResponse result = _requests.TryRemove(response.RequestId, out var outgoingRequest)? new(response, outgoingRequest.Completion) : null;
+        IncomingResponse result;
+        if (!_requests.TryRemove(response.RequestId, out var outgoingRequest))
+        {
+            return null;
+        }
+        result = new(response, outgoingRequest.Completion);
         reader = await _streamReader.ReadAsync(default);
         var responseType = outgoingRequest.ResponseType;
         if (response.Error == null && responseType != typeof(Stream))
