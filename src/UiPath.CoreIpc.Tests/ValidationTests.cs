@@ -21,6 +21,12 @@ public class ValidationTests
         Roundtrip(request);
     }
     [Fact]
+    public void Response()
+    {
+        Response response = new(42, new("message", "stack", "type", new("innerMessage", "innerStack", "innerType", null)));
+        Roundtrip(response);
+    }
+    [Fact]
     public void ErrorFromRemoteException()
     {
         var innerError = new InvalidDataException("invalid").ToError();

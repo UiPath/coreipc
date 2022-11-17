@@ -26,8 +26,8 @@ public record Request(string Endpoint, int Id, string MethodName, double Timeout
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
-record CancellationRequest(int RequestId);
-record Response(int RequestId, Error Error = null)
+public record CancellationRequest(int RequestId);
+public record Response(int RequestId, Error Error = null)
 {
     internal object Data { get; set; }
     internal Stream DownloadStream { get; set; }
