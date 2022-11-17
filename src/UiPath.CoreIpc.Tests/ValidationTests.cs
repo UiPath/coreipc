@@ -1,4 +1,6 @@
-﻿namespace UiPath.CoreIpc.Tests;
+﻿using MessagePack;
+
+namespace UiPath.CoreIpc.Tests;
 
 public class ValidationTests
 {
@@ -8,7 +10,16 @@ public class ValidationTests
         {
         }
     }
-
+    static MessagePackSerializerOptions Contractless = MessagePack.Resolvers.ContractlessStandardResolver.Options;
+    static byte[] Serialize<T>(T value) => MessagePackSerializer.Serialize(value, Contractless);
+    static T Deserialize<T>(byte[] data) => MessagePackSerializer.Deserialize<T>(data, Contractless);
+    void Roundtrip<T>(T value) => Deserialize<T>(Serialize(value)).ShouldBe(value);
+    [Fact]
+    public void Request()
+    {
+        Request request = new("endpoint", 42, "method", 43);
+        Roundtrip(request);
+    }
     [Fact]
     public void ErrorFromRemoteException()
     {

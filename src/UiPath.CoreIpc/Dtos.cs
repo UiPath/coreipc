@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using System.Runtime.Serialization;
+using System.Text;
+using MessagePack;
 using Newtonsoft.Json;
 namespace UiPath.CoreIpc;
 public class Message
@@ -16,7 +18,7 @@ public class Message<TPayload> : Message
     public Message(TPayload payload) => Payload = payload;
     public TPayload Payload { get; }
 }
-record Request(string Endpoint, int Id, string MethodName, double TimeoutInSeconds)
+public record Request(string Endpoint, int Id, string MethodName, double TimeoutInSeconds)
 {
     internal Type ResponseType { get; init; }
     internal object[] Parameters { get; set; }
