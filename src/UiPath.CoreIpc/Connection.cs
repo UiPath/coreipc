@@ -214,6 +214,7 @@ public sealed class Connection : IDisposable
                     throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
                 }
                 _nestedStream.Reset(length);
+                _streamReader.DiscardBufferedData();
                 await HandleMessage();
             }
         }
@@ -304,6 +305,7 @@ public sealed class Connection : IDisposable
         }
         var userStreamLength = BitConverter.ToInt64(_buffer, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
+        _streamReader.DiscardBufferedData();
     }
     private RecyclableMemoryStream Serialize(IEnumerable<object> values)
     {
@@ -350,9 +352,10 @@ public sealed class Connection : IDisposable
         }
         IncomingResponse result = _requests.TryRemove(response.RequestId, out var outgoingRequest)? new(response, outgoingRequest.Completion) : null;
         reader = await _streamReader.ReadAsync(default);
-        if (response.Error == null)
+        var responseType = outgoingRequest.ResponseType;
+        if (response.Error == null && responseType != typeof(Stream))
         {
-            response.Data = MessagePackSerializer.Deserialize(outgoingRequest.ResponseType, reader.Value, Contractless);
+            response.Data = MessagePackSerializer.Deserialize(responseType, reader.Value, Contractless);
         }
         return result;
     }
@@ -372,11 +375,10 @@ public sealed class Connection : IDisposable
         var args = new object[method.Parameters.Length];
         for (int index = 0; index < args.Length; index++)
         {
-            reader = await _streamReader.ReadAsync(default);
             var type = method.Parameters[index].ParameterType;
-            if (type == typeof(CancellationToken))
+            reader = await _streamReader.ReadAsync(default);
+            if (type == typeof(CancellationToken) || type == typeof(Stream))
             {
-                reader = await _streamReader.ReadAsync(default);
                 continue;
             }
             args[index] = MessagePackSerializer.Deserialize(type, reader.Value, Contractless);

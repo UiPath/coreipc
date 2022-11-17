@@ -124,7 +124,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 {
                     throw new RemoteException(response.Error);
                 }
-                return (TResult) response.Data;
+                return (TResult) (response.DownloadStream ?? response.Data);
             }
             catch (Exception ex)
             {
@@ -147,11 +147,11 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                             break;
                         case CancellationToken token:
                             cancellationToken = token;
-                            args[index] = "";
+                            args[index] = null;
                             break;
                         case Stream stream:
                             uploadStream = stream;
-                            args[index] = "";
+                            args[index] = null;
                             break;
                     }
                 }
