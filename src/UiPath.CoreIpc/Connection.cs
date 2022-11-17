@@ -158,7 +158,7 @@ public sealed class Connection : IDisposable
         _sendLock.AssertDisposed();
         Network.Dispose();
         _streamReader.Dispose();
-        Server.CancelRequests();
+        Server?.CancelRequests();
         try
         {
             closedHandler.Invoke(this, EventArgs.Empty);
