@@ -343,7 +343,7 @@ public sealed class Connection : IDisposable
     private async ValueTask<IncomingResponse> DeserializeResponse()
     {
         var reader = await _streamReader.ReadAsync(default);
-        var response = MessagePackSerializer.Deserialize<Response>(reader.Value);
+        var response = MessagePackSerializer.Deserialize<Response>(reader.Value, Contractless);
         if (LogEnabled)
         {
             Log($"Received response for request {response.RequestId} {Name}.");
@@ -359,7 +359,7 @@ public sealed class Connection : IDisposable
     private async ValueTask<IncomingRequest> DeserializeRequest()
     {
         var reader = await _streamReader.ReadAsync(default);
-        var request = MessagePackSerializer.Deserialize<Request>(reader.Value);
+        var request = MessagePackSerializer.Deserialize<Request>(reader.Value, Contractless);
         if (LogEnabled)
         {
             Log($"{Name} received request {request}");
