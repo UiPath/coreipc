@@ -27,7 +27,7 @@ record Request(string Endpoint, int Id, string MethodName, double TimeoutInSecon
 record CancellationRequest(int RequestId);
 record Response(int RequestId, Error Error = null)
 {
-    internal object Data { get; init; }
+    internal object Data { get; set; }
     internal Stream DownloadStream { get; set; }
     public static Response Fail(Request request, Exception ex) => new(request.Id, ex.ToError());
     public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };

@@ -365,7 +365,13 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         {
             Log($"Received response for request {response.RequestId} {Name}.");
         }
-        return _requests.TryRemove(response.RequestId, out var outgoingRequest)? new(response, outgoingRequest.Completion) : null;
+        IncomingResponse result = _requests.TryRemove(response.RequestId, out var outgoingRequest)? new(response, outgoingRequest.Completion) : null;
+        if (response.Error == null)
+        {
+            reader.Read();
+            response.Data = Serializer.Deserialize(reader, outgoingRequest.ResponseType);
+        }
+        return result;
     }
     private async ValueTask<IncomingRequest> DeserializeRequest()
     {
