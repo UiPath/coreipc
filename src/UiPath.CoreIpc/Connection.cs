@@ -349,9 +349,9 @@ public sealed class Connection : IDisposable
             Log($"Received response for request {response.RequestId} {Name}.");
         }
         IncomingResponse result = _requests.TryRemove(response.RequestId, out var outgoingRequest)? new(response, outgoingRequest.Completion) : null;
+        reader = await _streamReader.ReadAsync(default);
         if (response.Error == null)
         {
-            reader = await _streamReader.ReadAsync(default);
             response.Data = MessagePackSerializer.Deserialize(outgoingRequest.ResponseType, reader.Value, Contractless);
         }
         return result;
