@@ -1,15 +1,15 @@
-﻿namespace UiPath.CoreIpc;
+﻿using MessagePack;
+using Microsoft.IO;
+using System.Buffers;
+using System.IO;
+
+namespace UiPath.CoreIpc;
 using static TaskCompletionPool<Response>;
 using static IOHelpers;
-using Microsoft.IO;
-using Newtonsoft.Json;
-using System.Buffers;
-using System.Net;
-
-public sealed class Connection : IDisposable, IArrayPool<char>
+public sealed class Connection : IDisposable
 {
+    static readonly MessagePackSerializerOptions Contractless = MessagePack.Resolvers.ContractlessStandardResolver.Options;
     static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
-    static readonly JsonSerializer Serializer = new() { DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate, NullValueHandling = NullValueHandling.Ignore };
     private static readonly IOException ClosedException = new("Connection closed.");
     private readonly ConcurrentDictionary<int, OutgoingRequest> _requests = new();
     private int _requestCounter = -1;
@@ -23,10 +23,12 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     private readonly Action<object> _cancelUploadRequest;
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
+    private readonly MessagePackStreamReader _streamReader;
     public Connection(Stream network, ILogger logger, string name, int maxMessageSize = int.MaxValue)
     {
         Network = network;
         _nestedStream = new NestedStream(network, 0);
+        _streamReader = new(_nestedStream);
         Logger = logger;
         Name = $"{name} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
@@ -155,6 +157,7 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         }
         _sendLock.AssertDisposed();
         Network.Dispose();
+        _streamReader.Dispose();
         Server.CancelRequests();
         try
         {
@@ -308,31 +311,11 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         try
         {
             stream.Position = HeaderLength;
-            using var writer = new JsonTextWriter(new StreamWriter(stream)) { ArrayPool = this, CloseOutput = false };
             foreach (var value in values)
             {
-                Serializer.Serialize(writer, value);
+                MessagePackSerializer.Serialize(value?.GetType() ?? typeof(object), (IBufferWriter<byte>)stream, value, Contractless);
             }
-            writer.Flush();
             return stream;
-        }
-        catch
-        {
-            stream.Dispose();
-            throw;
-        }
-    }
-#if !NET461
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-#endif
-    private async ValueTask<JsonTextReader> CreaterReader()
-    {
-        var stream = GetStream((int)_nestedStream.Length);
-        try
-        {
-            await _nestedStream.CopyToAsync(stream);
-            stream.Position = 0;
-            return new JsonTextReader(new StreamReader(stream)) { ArrayPool = this, SupportMultipleContent = true };
         }
         catch
         {
@@ -342,8 +325,8 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     }
     private async ValueTask<int> DeserializeCancellationRequest()
     {
-        using var reader = await CreaterReader();
-        return Serializer.Deserialize<CancellationRequest>(reader).RequestId;
+        var reader = await _streamReader.ReadAsync(default);
+        return MessagePackSerializer.Deserialize<CancellationRequest>(reader.Value).RequestId;
     }
     private void OnCancellationReceived(int requestId)
     {
@@ -359,8 +342,8 @@ public sealed class Connection : IDisposable, IArrayPool<char>
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     private async ValueTask<IncomingResponse> DeserializeResponse()
     {
-        using var reader = await CreaterReader();
-        var response = Serializer.Deserialize<Response>(reader);
+        var reader = await _streamReader.ReadAsync(default);
+        var response = MessagePackSerializer.Deserialize<Response>(reader.Value);
         if (LogEnabled)
         {
             Log($"Received response for request {response.RequestId} {Name}.");
@@ -368,15 +351,15 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         IncomingResponse result = _requests.TryRemove(response.RequestId, out var outgoingRequest)? new(response, outgoingRequest.Completion) : null;
         if (response.Error == null)
         {
-            reader.Read();
-            response.Data = Serializer.Deserialize(reader, outgoingRequest.ResponseType);
+            reader = await _streamReader.ReadAsync(default);
+            response.Data = MessagePackSerializer.Deserialize(outgoingRequest.ResponseType, reader.Value, Contractless);
         }
         return result;
     }
     private async ValueTask<IncomingRequest> DeserializeRequest()
     {
-        using var reader = await CreaterReader();
-        var request = Serializer.Deserialize<Request>(reader);
+        var reader = await _streamReader.ReadAsync(default);
+        var request = MessagePackSerializer.Deserialize<Request>(reader.Value);
         if (LogEnabled)
         {
             Log($"{Name} received request {request}");
@@ -389,14 +372,14 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         var args = new object[method.Parameters.Length];
         for (int index = 0; index < args.Length; index++)
         {
-            reader.Read();
+            reader = await _streamReader.ReadAsync(default);
             var type = method.Parameters[index].ParameterType;
             if (type == typeof(CancellationToken))
             {
-                reader.Read();
+                reader = await _streamReader.ReadAsync(default);
                 continue;
             }
-            args[index] = Serializer.Deserialize(reader, type);
+            args[index] = MessagePackSerializer.Deserialize(type, reader.Value, Contractless);
         }
         request.Parameters = args;
         return new(request, method, endpoint);
@@ -430,8 +413,6 @@ public sealed class Connection : IDisposable, IArrayPool<char>
         }
     }
     public void Log(string message) => Logger.LogInformation(message);
-    char[] IArrayPool<char>.Rent(int minimumLength) => ArrayPool<char>.Shared.Rent(minimumLength);
-    void IArrayPool<char>.Return(char[] array) => ArrayPool<char>.Shared.Return(array);
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
 }

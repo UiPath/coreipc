@@ -1,14 +1,12 @@
 ﻿using System.Runtime.Serialization;
 using System.Text;
-using MessagePack;
-using Newtonsoft.Json;
 namespace UiPath.CoreIpc;
 public class Message
 {
     internal Type CallbackContract { get; set; }
-    [JsonIgnore]
+    [IgnoreDataMember]
     public IClient Client { get; set; }
-    [JsonIgnore]
+    [IgnoreDataMember]
     public TimeSpan RequestTimeout { get; set; }
     public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => Client.GetCallback<TCallbackInterface>(CallbackContract);
     public void ImpersonateClient(Action action) => Client.Impersonate(action);
