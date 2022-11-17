@@ -47,7 +47,7 @@ public sealed class Connection : IDisposable
     public override string ToString() => Name;
     public int NewRequestId() => Interlocked.Increment(ref _requestCounter);
     public Task Listen() => _receiveLoop.Value;
-    public event EventHandler<EventArgs> Closed;
+    public event EventHandler<EventArgs> Closed = delegate{};
     public void SetServer(ListenerSettings settings, IClient client = null) => Server = new(settings, this, client);
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
