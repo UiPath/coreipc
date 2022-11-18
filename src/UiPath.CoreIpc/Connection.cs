@@ -176,7 +176,7 @@ public sealed class Connection : IDisposable
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-    private async ValueTask<bool> ReadBuffer(int length)
+    private async ValueTask<bool> ReadHeader(int length)
     {
         int offset = 0;
         int toRead = length;
@@ -202,7 +202,7 @@ public sealed class Connection : IDisposable
     {
         try
         {
-            while (await ReadBuffer(HeaderLength))
+            while (await ReadHeader(HeaderLength))
             {
                 Debug.Assert(SynchronizationContext.Current == null);
                 var length = BitConverter.ToInt32(_buffer, startIndex: 1);
@@ -294,7 +294,7 @@ public sealed class Connection : IDisposable
     }
     private async Task EnterStreamMode()
     {
-        if (!await ReadBuffer(sizeof(long)))
+        if (!await ReadHeader(sizeof(long)))
         {
             throw ClosedException;
         }
