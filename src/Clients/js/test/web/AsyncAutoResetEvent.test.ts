@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { AsyncAutoResetEvent, PromisePal, TimeSpan } from '../../src/std';
 
 describe(`web:AsyncAutoResetEvent`, function () {
-    this.timeout(60 * 1000);
+    // this.timeout(60 * 1000);
 
     it(`should work`, async () => {
         const x = new AsyncAutoResetEvent();

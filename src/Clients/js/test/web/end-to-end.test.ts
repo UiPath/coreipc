@@ -8,12 +8,6 @@ class IAlgebra {
 }
 
 describe('web:end-to-end', () => {
-    beforeEach(function () {
-        if (global.process?.versions?.node) {
-            this.skip();
-        }
-    });
-
     it('new WebSocket should not throw', function () {
         const act = () =>
             eval(/* js */ `
