@@ -136,19 +136,15 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             }
             void WellKnownArguments()
             {
-                for (int index = 0; index < args.Length; index++)
+                if (args is [Message { RequestTimeout: var requestTimeout }, ..] && requestTimeout != TimeSpan.Zero)
                 {
-                    switch (args[index])
-                    {
-                        case Message { RequestTimeout: var requestTimeout } when requestTimeout != TimeSpan.Zero:
-                            messageTimeout = requestTimeout;
-                            clientTimeout = requestTimeout;
-                            break;
-                        case CancellationToken token:
-                            cancellationToken = token;
-                            args[index] = null;
-                            break;
-                    }
+                    messageTimeout = requestTimeout;
+                    clientTimeout = requestTimeout;
+                }
+                if (args is [.., CancellationToken token])
+                {
+                    cancellationToken = token;
+                    args[^1] = null;
                 }
             }
         }
