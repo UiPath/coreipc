@@ -73,17 +73,13 @@ public sealed class Connection : IDisposable
     void CancelRequest(string requestId)
     {
         CancelServerCall(requestId).LogException(Logger, this);
-        TryCancelRequest(requestId);
-        return;
-        Task CancelServerCall(string requestId) =>
-            SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default).AsTask();
-    }
-    private void TryCancelRequest(string requestId)
-    {
         if (_requests.TryRemove(requestId, out var requestCompletion))
         {
             requestCompletion.SetCanceled();
         }
+        return;
+        Task CancelServerCall(string requestId) =>
+            SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default).AsTask();
     }
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
     {
