@@ -366,14 +366,33 @@ public sealed class Connection : IDisposable
         {
             var type = method.Parameters[index].ParameterType;
             var bytes = await ReadBytes();
-            if (type == typeof(CancellationToken) || type == typeof(Stream))
+            if (type == typeof(CancellationToken))
             {
                 continue;
             }
-            args[index] = MessagePackSerializer.Deserialize(type, bytes, Contractless);
+            else if (type == typeof(Stream))
+            {
+                args[index] = _nestedStream;
+                continue;
+            }
+            var arg = MessagePackSerializer.Deserialize(type, bytes, Contractless);
+            args[index] = CheckMessage(arg, type);
         }
         request.Parameters = args;
         return new(request, method, endpoint);
+        object CheckMessage(object argument, Type parameterType)
+        {
+            if (parameterType == typeof(Message) && argument == null)
+            {
+                argument = new Message();
+            }
+            if (argument is Message message)
+            {
+                message.CallbackContract = endpoint.CallbackContract;
+                message.Client = Server.Client;
+            }
+            return argument;
+        }
     }
     private ValueTask OnRequestReceived(IncomingRequest request)
     {

@@ -9,14 +9,14 @@ class Server
     private static readonly MethodInfo GetResultMethod = typeof(Server).GetStaticMethod(nameof(GetTaskResultImpl));
     private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
     private readonly Connection _connection;
-    private readonly IClient _client;
     private readonly ConcurrentDictionary<int, PooledCancellationTokenSource> _requests = new();
     public Server(ListenerSettings settings, Connection connection, IClient client)
     {
         Settings = settings;
         _connection = connection;
-        _client = client;
+        Client = client;
     }
+    public IClient Client { get; }
     public void CancelRequests()
     {
         if (LogEnabled)
@@ -95,11 +95,10 @@ class Server
     async ValueTask<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
     {
         var contract = endpoint.Contract;
-        var arguments = GetArguments();
         var beforeCall = endpoint.BeforeCall;
         if (beforeCall != null)
         {
-            await beforeCall(new(default, method.MethodInfo, arguments), cancellationToken);
+            await beforeCall(new(default, method.MethodInfo, request.Parameters), cancellationToken);
         }
         IServiceScope scope = null;
         var service = endpoint.ServiceInstance;
@@ -141,63 +140,8 @@ class Server
                 (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method.MethodInfo);
                 return null;
             }
-            Task MethodCall() => method.Invoke(service, arguments, cancellationToken);
+            Task MethodCall() => method.Invoke(service, request.Parameters, cancellationToken);
             Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
-        }
-        object[] GetArguments()
-        {
-            var parameters = method.Parameters;
-            var allParametersLength = parameters.Length;
-            var requestParametersLength = request.Parameters.Length;
-            if (requestParametersLength > allParametersLength)
-            {
-                throw new ArgumentException("Too many parameters for " + method.MethodInfo);
-            }
-            var allArguments = requestParametersLength == allParametersLength ? request.Parameters : new object[allParametersLength];
-            WellKnownArguments();
-            SetOptionalArguments();
-            return allArguments;
-            void WellKnownArguments()
-            {
-                object argument;
-                for (int index = 0; index < requestParametersLength; index++)
-                {
-                    var parameterType = parameters[index].ParameterType;
-                    if (parameterType == typeof(CancellationToken))
-                    {
-                        argument = null;
-                    }
-                    else if (parameterType == typeof(Stream))
-                    {
-                        argument = request.UploadStream;
-                    }
-                    else
-                    {
-                        argument = CheckMessage(request.Parameters[index], parameterType);
-                    }
-                    allArguments[index] = argument;
-                }
-            }
-            object CheckMessage(object argument, Type parameterType)
-            {
-                if (parameterType == typeof(Message) && argument == null)
-                {
-                    argument = new Message();
-                }
-                if (argument is Message message)
-                {
-                    message.CallbackContract = endpoint.CallbackContract;
-                    message.Client = _client;
-                }
-                return argument;
-            }
-            void SetOptionalArguments()
-            {
-                for (int index = requestParametersLength; index < allParametersLength; index++)
-                {
-                    allArguments[index] = CheckMessage(method.Defaults[index], parameters[index].ParameterType);
-                }
-            }
         }
     }
     private void Log(string message) => _connection.Log(message);
