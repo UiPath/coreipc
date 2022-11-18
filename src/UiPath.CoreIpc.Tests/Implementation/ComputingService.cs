@@ -36,11 +36,6 @@ public interface IDerivedStreamUpload
     Task<bool> Upload(MemoryStream stream);
 }
 
-public interface IMessageFirst
-{
-    Task Test(Message message1, int x);
-}
-
 public interface IInvalidCancellationToken
 {
     Task Test(CancellationToken token, int x);

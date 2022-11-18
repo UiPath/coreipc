@@ -204,7 +204,7 @@ public static class Validator
         {
             if (index != 0)
             {
-                throw new ArgumentException($"Only one Stream parameter is allowed and it must be the first! {method}");
+                throw new ArgumentException($"The stream must be the first parameter! {method}");
             }
             if (!method.ReturnType.IsGenericType)
             {
@@ -228,10 +228,9 @@ public static class Validator
         }
         void CheckMessageParameter(int index, ParameterInfo parameter)
         {
-            if (typeof(Message).IsAssignableFrom(parameter.ParameterType) && index != parameters.Length - 1 &&
-                parameters[parameters.Length - 1].ParameterType != typeof(CancellationToken))
+            if (typeof(Message).IsAssignableFrom(parameter.ParameterType) && index != 0)
             {
-                throw new ArgumentException($"The message must be the last parameter before the cancellation token! {method}");
+                throw new ArgumentException($"The message must be the first parameter! {method}");
             }
         }
         void CheckCancellationToken(int index, ParameterInfo parameter)
