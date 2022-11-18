@@ -211,8 +211,8 @@ public sealed class Connection : IDisposable
                     throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
                 }
                 _nestedStream.Reset(length);
-                _streamReader.DiscardBufferedData();
                 await HandleMessage();
+                _streamReader.DiscardBufferedData();
             }
         }
         catch (Exception ex)
@@ -300,7 +300,6 @@ public sealed class Connection : IDisposable
         }
         var userStreamLength = BitConverter.ToInt64(_buffer, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
-        _streamReader.DiscardBufferedData();
     }
     private RecyclableMemoryStream Serialize(IEnumerable<object> values)
     {
