@@ -18,7 +18,6 @@ public sealed class Connection : IDisposable
     private readonly WaitCallback _onRequest;
     private readonly WaitCallback _onCancellation;
     private readonly Action<object> _cancelRequest;
-    private readonly Action<object> _cancelUploadRequest;
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
     private readonly MessagePackStreamReader _streamReader;
@@ -35,7 +34,6 @@ public sealed class Connection : IDisposable
         _onRequest = request => OnRequestReceived((IncomingRequest)request);
         _onCancellation = requestId => OnCancellationReceived((int)requestId);
         _cancelRequest = requestId => CancelRequest((int)requestId);
-        _cancelUploadRequest = requestId => CancelUploadRequest((int)requestId);
     }
     internal Server Server { get; private set; }
     public Stream Network { get; }
@@ -56,8 +54,7 @@ public sealed class Connection : IDisposable
         var requestCompletion = Rent();
         var requestId = request.Id;
         _requests[requestId] = new(requestCompletion, request.ResponseType);
-        var cancelRequest = request.UploadStream == null ? _cancelRequest : _cancelUploadRequest;
-        var tokenRegistration = token.UnsafeRegister(cancelRequest, requestId);
+        var tokenRegistration = token.UnsafeRegister(_cancelRequest, requestId);
         try
         {
             return await requestCompletion.ValueTask();
@@ -84,11 +81,6 @@ public sealed class Connection : IDisposable
         return;
         Task CancelServerCall(int requestId) =>
             SendMessage(MessageType.CancellationRequest, Serialize(new[] { new CancellationRequest(requestId) }), default).AsTask();
-    }
-    void CancelUploadRequest(int requestId)
-    {
-        Dispose();
-        TryCancelRequest(requestId);
     }
     ManualResetValueTaskSource Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
     private void TryCancelRequest(int requestId) => Completion(requestId)?.SetCanceled();
