@@ -65,9 +65,11 @@ public sealed class Connection : IDisposable
         }
         finally
         {
-            _requests.TryRemove(requestId, out _);
+            if (_requests.TryRemove(requestId, out _))
+            {
+                requestCompletion.Return();
+            }
             tokenRegistration.Dispose();
-            requestCompletion.Return();
         }
     }
     internal ValueTask Send(Request request, CancellationToken token)
