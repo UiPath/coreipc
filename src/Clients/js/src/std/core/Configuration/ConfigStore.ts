@@ -1,4 +1,4 @@
-import { assertArgument, TimeSpan } from '../..';
+import { assertArgument, PublicCtor, TimeSpan } from '../..';
 import { Address, ServiceId } from '..';
 import { ConfigBuilder, ConnectHelper } from '.';
 
@@ -69,11 +69,50 @@ export class ConfigStore {
         return result as unknown as ConfigBuilder<TAddress>;
     }
 
+    public getConnectHelper<TAddress extends Address>(
+        address: TAddress
+    ): ConnectHelper<TAddress> | undefined {
+        const key = ConfigStore.computeCompositeKey(address, undefined);
+
+        return this._map.get(key)?.connectHelper;
+    }
+
+    public getRequestTimeout<TService, TAddress extends Address>(
+        service: PublicCtor<TService>,
+        address: TAddress
+    ): TimeSpan | undefined {
+        for (const key of enumerateCandidateKeys()) {
+            const cell = this._map.get(key);
+
+            const maybeValue = cell?.requestTimeout;
+
+            if (maybeValue) {
+                return maybeValue;
+            }
+        }
+
+        return undefined;
+
+        function* enumerateCandidateKeys() {
+            yield ConfigStore.computeCompositeKey(address, service);
+            yield ConfigStore.computeCompositeKey(address, undefined);
+            yield ConfigStore.computeCompositeKey(undefined, service);
+            yield ConfigStore.computeCompositeKey(undefined, undefined);
+        }
+    }
+
     private static computeCompositeKey(
         address: Address | undefined,
-        serviceId: ServiceId | undefined
+        serviceOrServiceId: ServiceId | PublicCtor | undefined
     ) {
-        const compositeKey = `[${address?.key ?? ''}][${serviceId?.key ?? ''}]`;
+        const serviceKey =
+            serviceOrServiceId === undefined
+                ? ''
+                : typeof serviceOrServiceId === 'function'
+                ? serviceOrServiceId.name
+                : serviceOrServiceId.key;
+
+        const compositeKey = `[${address?.key ?? ''}][${serviceKey}]`;
         return compositeKey;
     }
 

@@ -9,7 +9,19 @@ import {
     ConfigStore,
 } from '.';
 
-export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> {
+import {
+    ProxyId,
+    ProxyStore,
+    IProxiesDomain,
+    DispatchProxyStore,
+    ChannelManagerStore,
+    CallbackStore,
+} from './Proxies';
+import { IContractStore } from './Contract';
+
+export abstract class Ipc<TAddressBuilder extends AddressBuilder = any>
+    implements IProxiesDomain
+{
     constructor(
         /* @internal */
         public readonly channelSelectorCtor: ParameterlessPublicCtor<TAddressBuilder>
@@ -22,7 +34,23 @@ export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> {
         new Ipc.Configuration<TAddressBuilder>(this);
 
     /* @internal */
-    public readonly configStore: ConfigStore = new ConfigStore();
+    public readonly configStore = new ConfigStore();
+
+    /* @internal */
+    public readonly proxyStore: ProxyStore = new ProxyStore(this);
+
+    /* @internal */
+    public readonly dispatchProxyStore: DispatchProxyStore =
+        new DispatchProxyStore(this);
+
+    /* @internal */
+    public readonly channelStore: ChannelManagerStore = new ChannelManagerStore(this);
+
+    /* @internal */
+    public readonly contractStore: IContractStore = null!;
+
+    /* @internal */
+    public readonly callbackStore : CallbackStore = null!;
 }
 
 export module Ipc {
@@ -32,7 +60,7 @@ export module Ipc {
 
         public withAddress<TAddress extends Address>(
             configure: AddressSelectionDelegate<TAddressBuilder, TAddress>
-        ): ProxySourceWithAddress {
+        ): ProxySourceWithAddress<TAddress> {
             const builder = new this._ipc.channelSelectorCtor();
             const type = configure(builder);
             const address = builder.assertAddress<TAddress>(type);
@@ -41,18 +69,25 @@ export module Ipc {
         }
     }
 
-    export class ProxySourceWithAddress {
+    export class ProxySourceWithAddress<TAddress extends Address> {
         /* @internal */
         constructor(
             private readonly _ipc: Ipc,
-            private readonly _address: Address
+            private readonly _address: TAddress
         ) {}
 
         public withService<TService>(
-            ctor: PublicCtor<TService>,
+            service: PublicCtor<TService>,
             endpointName?: string
         ): TService {
-            return {} as unknown as TService;
+            const serviceId = new ServiceId<TService>(service, endpointName);
+            const proxyId = new ProxyId<TService, TAddress>(
+                serviceId,
+                this._address
+            );
+
+            const proxy = this._ipc.proxyStore.resolve(proxyId);
+            return proxy;
         }
     }
 
