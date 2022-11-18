@@ -1,10 +1,6 @@
 import { CancellationToken, CancellationTokenSource } from '.';
 
-import {
-    IDisposable,
-    assertArgument,
-    OperationCanceledError,
-} from '..';
+import { IDisposable, assertArgument, OperationCanceledError } from '..';
 
 /* @internal */
 export class RandomCancellationToken extends CancellationToken {

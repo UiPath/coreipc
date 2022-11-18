@@ -20,16 +20,8 @@ export class BitConverter {
         return buffer;
     }
 
-    public static getNumber(
-        buffer: Buffer,
-        type: 'int32le',
-        offset?: number
-    ): number;
-    public static getNumber(
-        buffer: Buffer,
-        type: 'uint8',
-        offset?: number
-    ): number;
+    public static getNumber(buffer: Buffer, type: 'int32le', offset?: number): number;
+    public static getNumber(buffer: Buffer, type: 'uint8', offset?: number): number;
 
     public static getNumber(buffer: Buffer, type: SupportedConversion): number {
         switch (type) {

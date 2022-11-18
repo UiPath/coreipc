@@ -1,10 +1,4 @@
-import {
-    CancellationToken,
-    Primitive,
-    PublicCtor,
-    Timeout,
-    TimeSpan,
-} from '../..';
+import { CancellationToken, Primitive, PublicCtor, Timeout, TimeSpan } from '../..';
 import { Address, Converter, Message, RpcMessage } from '..';
 import { IProxiesDomain, ProxyId } from '.';
 
@@ -16,25 +10,15 @@ export class RpcRequestFactory {
         address: TAddress;
         methodName: string;
         args: unknown[];
-    }): [
-        RpcMessage.Request,
-        PublicCtor | Primitive | undefined,
-        CancellationToken,
-        TimeSpan
-    ] {
-        const maybeServiceContract = params.domain.contractStore.maybeGet(
-            params.service
-        );
-        const maybeOperationContract =
-            maybeServiceContract?.operations.maybeGet(params.methodName);
+    }): [RpcMessage.Request, PublicCtor | Primitive | undefined, CancellationToken, TimeSpan] {
+        const maybeServiceContract = params.domain.contractStore.maybeGet(params.service);
+        const maybeOperationContract = maybeServiceContract?.operations.maybeGet(params.methodName);
 
         const endpoint = maybeServiceContract?.endpoint ?? params.service.name;
 
-        const operationName =
-            maybeOperationContract?.operationName ?? params.methodName;
+        const operationName = maybeOperationContract?.operationName ?? params.methodName;
 
-        const hasEndingCt =
-            maybeOperationContract?.hasEndingCancellationToken ?? false;
+        const hasEndingCt = maybeOperationContract?.hasEndingCancellationToken ?? false;
 
         const returnsPromiseOf = maybeOperationContract?.returnsPromiseOf;
 
@@ -54,10 +38,7 @@ export class RpcRequestFactory {
 
         const timeout =
             message?.RequestTimeout ??
-            params.domain.configStore.getRequestTimeout(
-                params.service,
-                params.address
-            ) ??
+            params.domain.configStore.getRequestTimeout(params.service, params.address) ??
             Timeout.infiniteTimeSpan;
 
         let args = params.args;
@@ -65,20 +46,12 @@ export class RpcRequestFactory {
         if (
             hasEndingCt &&
             (params.args.length === 0 ||
-                !(
-                    params.args[params.args.length - 1] instanceof
-                    CancellationToken
-                ))
+                !(params.args[params.args.length - 1] instanceof CancellationToken))
         ) {
             args = [...args, CancellationToken.none];
         }
 
-        const rpcRequest = Converter.toRpcRequest(
-            endpoint,
-            operationName,
-            args,
-            timeout
-        );
+        const rpcRequest = Converter.toRpcRequest(endpoint, operationName, args, timeout);
 
         return [rpcRequest, returnsPromiseOf, ct, timeout];
     }

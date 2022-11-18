@@ -1,10 +1,4 @@
-import {
-    TimeSpan,
-    CancellationToken,
-    Socket,
-    ConnectHelper,
-    Address,
-} from '../../../std';
+import { TimeSpan, CancellationToken, Socket, ConnectHelper, Address } from '../../../std';
 import { BrowserWebSocket } from './BrowserWebSocket';
 
 export class BrowserWebSocketAddress extends Address {
@@ -20,13 +14,13 @@ export class BrowserWebSocketAddress extends Address {
         this: TSelf,
         helper: ConnectHelper<TSelf>,
         timeout: TimeSpan,
-        ct: CancellationToken
+        ct: CancellationToken,
     ): Promise<Socket> {
         return await BrowserWebSocket.connectWithHelper(
             helper as any,
             (this as unknown as BrowserWebSocketAddress).url,
             timeout,
-            ct
+            ct,
         );
     }
 }

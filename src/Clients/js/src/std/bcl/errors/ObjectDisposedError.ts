@@ -10,10 +10,7 @@ export class ObjectDisposedError extends CoreIpcError {
 
     public readonly objectName: string | null;
 
-    private static computeFullMessage(
-        objectName?: string,
-        message?: string
-    ): string {
+    private static computeFullMessage(objectName?: string, message?: string): string {
         assertArgument({ objectName }, 'undefined', 'string');
         assertArgument({ message }, 'undefined', 'string');
 

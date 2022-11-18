@@ -10,6 +10,6 @@ export abstract class Address {
         this: TSelf,
         helper: ConnectHelper<TSelf>,
         timeout: TimeSpan,
-        ct: CancellationToken
+        ct: CancellationToken,
     ): Promise<Socket>;
 }

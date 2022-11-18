@@ -5,10 +5,7 @@ export class BrowserWebSocketError extends CoreIpcError {}
 
 export module BrowserWebSocketError {
     export class ConnectFailure extends BrowserWebSocketError {
-        constructor(
-            public readonly socket: BrowserWebSocketLike,
-            message?: string
-        ) {
+        constructor(public readonly socket: BrowserWebSocketLike, message?: string) {
             super(message ?? ConnectFailure.defaultMessage);
         }
 

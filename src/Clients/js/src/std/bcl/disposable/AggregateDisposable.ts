@@ -1,9 +1,4 @@
-import {
-    assertArgument,
-    AggregateError,
-    ArgumentError,
-    UnknownError,
-} from '..';
+import { assertArgument, AggregateError, ArgumentError, UnknownError } from '..';
 import { IDisposable } from '.';
 
 /* @internal */

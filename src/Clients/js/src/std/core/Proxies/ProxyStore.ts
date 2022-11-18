@@ -6,17 +6,15 @@ export class ProxyStore {
     constructor(private readonly _domain: IProxiesDomain) {}
 
     public resolve<TService, TAddress extends Address = Address>(
-        proxyId: ProxyId<TService, TAddress>
+        proxyId: ProxyId<TService, TAddress>,
     ): TService {
         return this.getOrCreateManager(proxyId).proxy;
     }
 
     private getOrCreateManager<TService, TAddress extends Address>(
-        proxyId: ProxyId<TService, TAddress>
+        proxyId: ProxyId<TService, TAddress>,
     ): ProxyManager<TService> {
-        let value = this._memo.get(proxyId.key) as
-            | ProxyManager<TService, TAddress>
-            | undefined;
+        let value = this._memo.get(proxyId.key) as ProxyManager<TService, TAddress> | undefined;
 
         if (value === undefined) {
             value = new ProxyManager<TService, TAddress>(this._domain, proxyId);

@@ -34,9 +34,7 @@ export class PromiseCompletionSourceInternal<T = unknown>
             _this._completer = new Completer(resolve, reject);
         };
 
-        this.promise = PromisePal.ensureObserved(
-            new Promise<T>(assignCompleter)
-        );
+        this.promise = PromisePal.ensureObserved(new Promise<T>(assignCompleter));
     }
 
     public readonly promise: Promise<T>;
@@ -46,12 +44,12 @@ export class PromiseCompletionSourceInternal<T = unknown>
             { finalState },
             FinalStateRanToCompletion,
             FinalStateFaulted,
-            FinalStateCanceled
+            FinalStateCanceled,
         );
 
         if (!this.trySetFinalStateUnchecked(finalState)) {
             throw new InvalidOperationError(
-                'An attempt was made to transition a task to a final state when it had already completed.'
+                'An attempt was made to transition a task to a final state when it had already completed.',
             );
         }
     }
@@ -61,7 +59,7 @@ export class PromiseCompletionSourceInternal<T = unknown>
             { finalState },
             FinalStateRanToCompletion,
             FinalStateFaulted,
-            FinalStateCanceled
+            FinalStateCanceled,
         );
 
         return this.trySetFinalStateUnchecked(finalState);
@@ -82,10 +80,7 @@ type Resolver<T> = (result: T) => void;
 type Rejecter = (error: Error) => void;
 
 class Completer<T> {
-    constructor(
-        private readonly _resolve: Resolver<T>,
-        private readonly _reject: Rejecter
-    ) {}
+    constructor(private readonly _resolve: Resolver<T>, private readonly _reject: Rejecter) {}
 
     public setFinalState(finalState: FinalState<T>): void {
         if (finalState.isRanToCompletion()) {

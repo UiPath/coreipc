@@ -21,10 +21,7 @@ function argumentIs<T>(
         throw new ArgumentNullError('paramName');
     }
     if (paramName === '') {
-        throw new ArgumentOutOfRangeError(
-            'paramName',
-            'Specified paramName was an empty string.'
-        );
+        throw new ArgumentOutOfRangeError('paramName', 'Specified paramName was an empty string.');
     }
 
     if (-1 === extendedTypes.indexOf('undefined') && arg == null) {
@@ -34,10 +31,7 @@ function argumentIs<T>(
         throw new ArgumentNullError(paramName);
     }
     if (extendedTypes.length === 0) {
-        throw new ArgumentError(
-            `Specified argument contained zero elements.`,
-            'extendedTypes'
-        );
+        throw new ArgumentError(`Specified argument contained zero elements.`, 'extendedTypes');
     }
 
     const invalidExtendedTypes = extendedTypes.filter((extendedType) => {
@@ -56,12 +50,10 @@ function argumentIs<T>(
     });
 
     if (invalidExtendedTypes.length > 0) {
-        const strInvalidExtendedTypes = invalidExtendedTypes
-            .map(describeExtendedType)
-            .join(', ');
+        const strInvalidExtendedTypes = invalidExtendedTypes.map(describeExtendedType).join(', ');
         throw new ArgumentError(
             `Specified argument contained invalid elements: [${strInvalidExtendedTypes}]`,
-            'extendedTypes'
+            'extendedTypes',
         );
     }
 
@@ -81,17 +73,17 @@ function argumentIs<T>(
         if (typeof extendedTypes[0] === 'string') {
             throw new ArgumentOutOfRangeError(
                 paramName,
-                `Specified argument was not of type '${extendedTypes[0]}'.`
+                `Specified argument was not of type '${extendedTypes[0]}'.`,
             );
         } else if (typeof arg !== 'object') {
             throw new ArgumentOutOfRangeError(
                 paramName,
-                `Specified argument was not of type 'object'.`
+                `Specified argument was not of type 'object'.`,
             );
         } else {
             throw new ArgumentOutOfRangeError(
                 paramName,
-                `Specified argument was an 'object' but not an instance of ${extendedTypes[0].name}.'`
+                `Specified argument was an 'object' but not an instance of ${extendedTypes[0].name}.'`,
             );
         }
     } else {
@@ -99,7 +91,7 @@ function argumentIs<T>(
             paramName,
             `Specified argument's type was neither of: ${extendedTypes
                 .map(describeExtendedType)
-                .join(', ')}.`
+                .join(', ')}.`,
         );
     }
 }

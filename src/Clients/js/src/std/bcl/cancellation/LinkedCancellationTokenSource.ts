@@ -8,7 +8,9 @@ export class LinkedCancellationTokenSource extends CancellationTokenSource {
     }
 
     public dispose(): void {
-        if (this._isDisposed) { return; }
+        if (this._isDisposed) {
+            return;
+        }
 
         super.dispose();
         this._registration.dispose();

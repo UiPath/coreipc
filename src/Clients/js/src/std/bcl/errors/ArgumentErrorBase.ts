@@ -6,11 +6,7 @@ export abstract class ArgumentErrorBase extends CoreIpcError {
         message?: string,
         public readonly paramName?: string,
     ) {
-        super(
-            ArgumentErrorBase.computeFullMessage(
-                fallbackMessage,
-                message,
-                paramName));
+        super(ArgumentErrorBase.computeFullMessage(fallbackMessage, message, paramName));
     }
 
     protected static computeFullMessage(

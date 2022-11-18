@@ -3,9 +3,7 @@ import { Address } from '.';
 
 export class AddressBuilder {
     /* @internal */
-    public assertAddress<TAddress extends Address>(
-        type: PublicCtor<TAddress>
-    ): TAddress {
+    public assertAddress<TAddress extends Address>(type: PublicCtor<TAddress>): TAddress {
         if (!(this._address instanceof type)) {
             throw new Error();
         }

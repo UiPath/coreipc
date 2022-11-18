@@ -10,7 +10,7 @@ export interface IRpcChannel extends IAsyncDisposable {
     call(
         request: RpcMessage.Request,
         timeout: TimeSpan,
-        ct: CancellationToken
+        ct: CancellationToken,
     ): Promise<RpcMessage.Response>;
 }
 
@@ -23,7 +23,7 @@ export module IRpcChannel {
             connectTimeout: TimeSpan,
             ct: CancellationToken,
             observer: Observer<RpcCallContext.Incomming>,
-            messageStreamFactory?: IMessageStream.Factory
+            messageStreamFactory?: IMessageStream.Factory,
         ): IRpcChannel;
     }
 }

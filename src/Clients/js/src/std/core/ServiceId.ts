@@ -3,7 +3,7 @@ import { PublicCtor } from '..';
 export class ServiceId<TService = unknown> {
     constructor(
         public readonly service: PublicCtor<TService>,
-        public readonly endpointName?: string
+        public readonly endpointName?: string,
     ) {}
 
     /* @internal */

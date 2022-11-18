@@ -14,31 +14,50 @@ export abstract class FinalStateBase<T = unknown> {
     }
 }
 
-export type FinalState<T> = FinalStateRanToCompletion<T> | FinalStateFaulted<T> | FinalStateCanceled<T>;
+export type FinalState<T> =
+    | FinalStateRanToCompletion<T>
+    | FinalStateFaulted<T>
+    | FinalStateCanceled<T>;
 
 // tslint:disable-next-line: no-namespace no-internal-module
 export module FinalState {
-    export function ranToCompletion<T>(result: T): FinalStateBase<T> { return new FinalStateRanToCompletion(result); }
+    export function ranToCompletion<T>(result: T): FinalStateBase<T> {
+        return new FinalStateRanToCompletion(result);
+    }
 
-    export function faulted<T>(error: Error): FinalStateBase<T> { return new FinalStateFaulted<T>(error); }
+    export function faulted<T>(error: Error): FinalStateBase<T> {
+        return new FinalStateFaulted<T>(error);
+    }
 
-    export function canceled<T>(): FinalStateBase<T> { return new FinalStateCanceled<T>(); }
+    export function canceled<T>(): FinalStateBase<T> {
+        return new FinalStateCanceled<T>();
+    }
 }
 
 export class FinalStateRanToCompletion<T = unknown> extends FinalStateBase<T> {
-    public constructor(public readonly result: T) { super(); }
+    public constructor(public readonly result: T) {
+        super();
+    }
 
-    public get kind(): FinalStateKind { return FinalStateKind.RanToCompletion; }
+    public get kind(): FinalStateKind {
+        return FinalStateKind.RanToCompletion;
+    }
 }
 
 export class FinalStateFaulted<T = unknown> extends FinalStateBase<T> {
-    public constructor(public readonly error: Error) { super(); }
+    public constructor(public readonly error: Error) {
+        super();
+    }
 
-    public get kind(): FinalStateKind { return FinalStateKind.Faulted; }
+    public get kind(): FinalStateKind {
+        return FinalStateKind.Faulted;
+    }
 }
 
 export class FinalStateCanceled<T = unknown> extends FinalStateBase<T> {
-    public get kind(): FinalStateKind { return FinalStateKind.Canceled; }
+    public get kind(): FinalStateKind {
+        return FinalStateKind.Canceled;
+    }
 }
 
 export enum FinalStateKind {

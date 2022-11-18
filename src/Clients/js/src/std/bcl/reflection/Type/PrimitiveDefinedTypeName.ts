@@ -2,5 +2,3 @@ import { PrimitiveDefinedNonObjectTypeName } from './PrimitiveDefinedNonObjectTy
 
 /* @internal */
 export type PrimitiveDefinedTypeName = PrimitiveDefinedNonObjectTypeName | 'object';
-
-

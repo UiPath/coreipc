@@ -2,13 +2,9 @@ import { Primitive, PublicCtor } from '../..';
 
 /* @internal */
 export interface IContractStore {
-    getOrCreate<TService>(
-        $class: PublicCtor<TService>
-    ): ServiceDescriptor<TService>;
+    getOrCreate<TService>($class: PublicCtor<TService>): ServiceDescriptor<TService>;
 
-    maybeGet<TService>(
-        $class: PublicCtor<TService>
-    ): ServiceDescriptor<TService> | undefined;
+    maybeGet<TService>($class: PublicCtor<TService>): ServiceDescriptor<TService> | undefined;
 }
 
 /* @internal */

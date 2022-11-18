@@ -2,9 +2,7 @@ import { assertArgument, PublicCtor } from '../../..';
 
 /* @internal */
 export class MethodNameEnumerator<T = void> {
-    public static enumerate<T2>(
-        ctor: PublicCtor<T2>
-    ): Array<string & keyof T2> {
+    public static enumerate<T2>(ctor: PublicCtor<T2>): Array<string & keyof T2> {
         assertArgument({ ctor }, 'function');
 
         const instance = new MethodNameEnumerator<T2>(ctor);
@@ -17,13 +15,11 @@ export class MethodNameEnumerator<T = void> {
     private _output: Array<string & keyof T> = null as any;
 
     private run(): void {
-        this._output = Reflect.ownKeys(this._ctor.prototype).filter(
-            this.refersToANamedMethod
-        );
+        this._output = Reflect.ownKeys(this._ctor.prototype).filter(this.refersToANamedMethod);
     }
 
     private readonly refersToANamedMethod = (
-        key: string | number | symbol
+        key: string | number | symbol,
     ): key is string & keyof T => {
         return (
             typeof key === 'string' &&

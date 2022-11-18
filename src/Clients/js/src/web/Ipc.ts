@@ -9,7 +9,7 @@ export class Ipc extends IpcBase<AddressBuilder> {
     }
 
     public webSocket(
-        url: string
+        url: string,
     ): AddressSelectionDelegate<AddressBuilder, BrowserWebSocketAddress> {
         return (builder) => builder.isWebSocket(url);
     }

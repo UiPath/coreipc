@@ -25,13 +25,13 @@ export class ChannelManager<TAddress extends Address = Address> {
         private readonly _domain: IProxiesDomain,
         private readonly _address: TAddress,
         private readonly _rpcChannelFactory: IRpcChannelFactory<TAddress>,
-        private readonly _messageStreamFactory?: IMessageStream.Factory
+        private readonly _messageStreamFactory?: IMessageStream.Factory,
     ) {}
 
     async invokeMethod<TService>(
         serviceId: ServiceId<TService>,
         methodName: string,
-        args: unknown[]
+        args: unknown[],
     ): Promise<unknown> {
         const [rpcRequest, returnsPromiseOf, ct, timeout] = RpcRequestFactory.create({
             domain: this._domain,
@@ -56,7 +56,8 @@ export class ChannelManager<TAddress extends Address = Address> {
 
     private async ensureConnection(timeout: TimeSpan, ct: CancellationToken): Promise<IRpcChannel> {
         if (!this._channel || this._channel.isDisposed) {
-            const connectHelper = this._domain.configStore.getConnectHelper(this._address) ?? defaultConnectHelper;
+            const connectHelper =
+                this._domain.configStore.getConnectHelper(this._address) ?? defaultConnectHelper;
 
             this._channel = this._rpcChannelFactory.create(
                 this._address,
@@ -64,7 +65,7 @@ export class ChannelManager<TAddress extends Address = Address> {
                 timeout,
                 ct,
                 this._incommingCallObserver,
-                this._messageStreamFactory
+                this._messageStreamFactory,
             );
         }
 
@@ -81,7 +82,7 @@ export class ChannelManager<TAddress extends Address = Address> {
         const method = callback[request.MethodName] as (...args: any[]) => Promise<unknown>;
         if (!(typeof method === 'function')) {
             throw new Error(
-                `The callback defined for endpoint "${request.Endpoint}" does not expose a method named "${request.MethodName}".`
+                `The callback defined for endpoint "${request.Endpoint}" does not expose a method named "${request.MethodName}".`,
             );
         }
 
@@ -99,12 +100,16 @@ export class ChannelManager<TAddress extends Address = Address> {
         return new RpcMessage.Response(request.Id, data, error);
     }
 
-    private readonly _incommingCallObserver = new (class implements Observer<RpcCallContext.Incomming> {
+    private readonly _incommingCallObserver = new (class
+        implements Observer<RpcCallContext.Incomming>
+    {
         constructor(private readonly _channelManager: ChannelManager<TAddress>) {}
 
         public closed?: boolean;
         public async next(incommingContext: RpcCallContext.Incomming): Promise<void> {
-            incommingContext.respond(await this._channelManager.invokeCallback(incommingContext.request));
+            incommingContext.respond(
+                await this._channelManager.invokeCallback(incommingContext.request),
+            );
         }
         public error(err: any): void {}
         public complete(): void {}

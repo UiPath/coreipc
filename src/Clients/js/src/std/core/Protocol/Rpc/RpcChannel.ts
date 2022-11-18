@@ -20,7 +20,7 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
         connectTimeout: TimeSpan,
         ct: CancellationToken,
         observer: Observer<RpcCallContext.Incomming>,
-        messageStreamFactory?: IMessageStream.Factory
+        messageStreamFactory?: IMessageStream.Factory,
     ): IRpcChannel {
         return new RpcChannel<TAddress>(
             address,
@@ -28,7 +28,7 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
             connectTimeout,
             ct,
             observer,
-            messageStreamFactory
+            messageStreamFactory,
         );
     }
 
@@ -39,7 +39,7 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
         ct: CancellationToken,
         private readonly _observer: Observer<RpcCallContext.Incomming>,
 
-        messageStreamFactory?: IMessageStream.Factory
+        messageStreamFactory?: IMessageStream.Factory,
     ) {
         this._$messageStream = RpcChannel.createMessageStream(
             address,
@@ -47,7 +47,7 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
             connectTimeout,
             ct,
             this._networkObserver,
-            MessageStream.Factory.orDefault(messageStreamFactory)
+            MessageStream.Factory.orDefault(messageStreamFactory),
         );
 
         this._$messageStream.catch((_) => {
@@ -68,12 +68,10 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
     public async call(
         request: RpcMessage.Request,
         timeout: TimeSpan,
-        ct: CancellationToken
+        ct: CancellationToken,
     ): Promise<RpcMessage.Response> {
         const promise = this._outgoingCalls.register(request, timeout, ct);
-        await (
-            await this._$messageStream
-        ).writeMessageAsync(request.toNetwork(), ct);
+        await (await this._$messageStream).writeMessageAsync(request.toNetwork(), ct);
         return await promise;
     }
 
@@ -89,7 +87,7 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
         connectTimeout: TimeSpan,
         ct: CancellationToken,
         networkObserver: Observer<Network.Message>,
-        messageStreamFactory: IMessageStream.Factory
+        messageStreamFactory: IMessageStream.Factory,
     ): Promise<IMessageStream> {
         const socket = await address.connect(connectHelper, connectTimeout, ct);
 
@@ -110,9 +108,7 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
     private readonly _$messageStream: Promise<IMessageStream>;
     private readonly _outgoingCalls = new RpcChannel.OutgoingCallTable();
 
-    private readonly _networkObserver = new (class
-        implements Observer<Network.Message>
-    {
+    private readonly _networkObserver = new (class implements Observer<Network.Message> {
         constructor(private readonly _owner: RpcChannel<TAddress>) {}
 
         public closed?: boolean;
@@ -142,8 +138,8 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
                 this._observer.error(
                     new ArgumentOutOfRangeError(
                         'message',
-                        `Expecting either one of Network.Message.Type.Request, Network.Message.Type.Response, Network.Message.Type.Cancel but got ${message.type}.`
-                    )
+                        `Expecting either one of Network.Message.Type.Request, Network.Message.Type.Response, Network.Message.Type.Cancel but got ${message.type}.`,
+                    ),
                 );
                 break;
         }
@@ -156,25 +152,17 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
     }
 
     private processIncommingResponse(message: Network.Message): void {
-        this._outgoingCalls.tryComplete(
-            RpcMessage.Response.fromNetwork(message)
-        );
+        this._outgoingCalls.tryComplete(RpcMessage.Response.fromNetwork(message));
     }
 
     private processIncommingRequest(message: Network.Message): void {
         const request = RpcMessage.Request.fromNetwork(message);
-        const context = new RpcCallContext.Incomming(
-            request,
-            async (response) => {
-                response.RequestId = request.Id;
-                await (
-                    await this._$messageStream
-                ).writeMessageAsync(
-                    response.toNetwork(),
-                    CancellationToken.none
-                );
-            }
-        );
+        const context = new RpcCallContext.Incomming(request, async (response) => {
+            response.RequestId = request.Id;
+            await (
+                await this._$messageStream
+            ).writeMessageAsync(response.toNetwork(), CancellationToken.none);
+        });
         try {
             this._observer.next(context);
         } catch (err) {
@@ -182,9 +170,7 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
         }
     }
 
-    private processIncommingCancellationRequest(
-        message: Network.Message
-    ): void {
+    private processIncommingCancellationRequest(message: Network.Message): void {
         throw new Error('Method not implemented.');
     }
 
@@ -195,7 +181,7 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
         public async register(
             request: RpcMessage.Request,
             timeout: TimeSpan,
-            ct: CancellationToken
+            ct: CancellationToken,
         ): Promise<RpcMessage.Response> {
             request.Id = this.generateId();
 

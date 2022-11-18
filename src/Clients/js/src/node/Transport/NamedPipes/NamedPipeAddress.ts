@@ -1,10 +1,4 @@
-import {
-    Address,
-    CancellationToken,
-    ConnectHelper,
-    Socket,
-    TimeSpan,
-} from '../../../std';
+import { Address, CancellationToken, ConnectHelper, Socket, TimeSpan } from '../../../std';
 import { NamedPipeSocket } from './NamedPipeSocket';
 
 export class NamedPipeAddress extends Address {
@@ -20,13 +14,13 @@ export class NamedPipeAddress extends Address {
         this: TSelf,
         helper: ConnectHelper<TSelf>,
         timeout: TimeSpan,
-        ct: CancellationToken
+        ct: CancellationToken,
     ): Promise<Socket> {
         return await NamedPipeSocket.connectWithHelper(
             helper as any,
             (this as unknown as NamedPipeAddress).name,
             timeout,
-            ct
+            ct,
         );
     }
 }

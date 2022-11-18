@@ -19,16 +19,15 @@ import {
 } from './Proxies';
 import { IContractStore } from './Contract';
 
-export abstract class Ipc<TAddressBuilder extends AddressBuilder = any>
-    implements IProxiesDomain
-{
+export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> implements IProxiesDomain {
     constructor(
         /* @internal */
-        public readonly channelSelectorCtor: ParameterlessPublicCtor<TAddressBuilder>
+        public readonly channelSelectorCtor: ParameterlessPublicCtor<TAddressBuilder>,
     ) {}
 
-    public readonly proxy: Ipc.ProxySource<TAddressBuilder> =
-        new Ipc.ProxySource<TAddressBuilder>(this);
+    public readonly proxy: Ipc.ProxySource<TAddressBuilder> = new Ipc.ProxySource<TAddressBuilder>(
+        this,
+    );
 
     public readonly config: Ipc.Configuration<TAddressBuilder> =
         new Ipc.Configuration<TAddressBuilder>(this);
@@ -40,8 +39,7 @@ export abstract class Ipc<TAddressBuilder extends AddressBuilder = any>
     public readonly proxyStore: ProxyStore = new ProxyStore(this);
 
     /* @internal */
-    public readonly dispatchProxyStore: DispatchProxyStore =
-        new DispatchProxyStore(this);
+    public readonly dispatchProxyStore: DispatchProxyStore = new DispatchProxyStore(this);
 
     /* @internal */
     public readonly channelStore: ChannelManagerStore = new ChannelManagerStore(this);
@@ -50,7 +48,7 @@ export abstract class Ipc<TAddressBuilder extends AddressBuilder = any>
     public readonly contractStore: IContractStore = null!;
 
     /* @internal */
-    public readonly callbackStore : CallbackStore = null!;
+    public readonly callbackStore: CallbackStore = null!;
 }
 
 export module Ipc {
@@ -59,7 +57,7 @@ export module Ipc {
         constructor(private readonly _ipc: Ipc<TAddressBuilder>) {}
 
         public withAddress<TAddress extends Address>(
-            configure: AddressSelectionDelegate<TAddressBuilder, TAddress>
+            configure: AddressSelectionDelegate<TAddressBuilder, TAddress>,
         ): ProxySourceWithAddress<TAddress> {
             const builder = new this._ipc.channelSelectorCtor();
             const type = configure(builder);
@@ -71,20 +69,14 @@ export module Ipc {
 
     export class ProxySourceWithAddress<TAddress extends Address> {
         /* @internal */
-        constructor(
-            private readonly _ipc: Ipc,
-            private readonly _address: TAddress
-        ) {}
+        constructor(private readonly _ipc: Ipc, private readonly _address: TAddress) {}
 
         public withService<TService>(
             service: PublicCtor<TService>,
-            endpointName?: string
+            endpointName?: string,
         ): TService {
             const serviceId = new ServiceId<TService>(service, endpointName);
-            const proxyId = new ProxyId<TService, TAddress>(
-                serviceId,
-                this._address
-            );
+            const proxyId = new ProxyId<TService, TAddress>(serviceId, this._address);
 
             const proxy = this._ipc.proxyStore.resolve(proxyId);
             return proxy;
@@ -100,7 +92,7 @@ export module Ipc {
         }
 
         public forAddress<TAddress extends Address>(
-            configure: AddressSelectionDelegate<TAddressBuilder, TAddress>
+            configure: AddressSelectionDelegate<TAddressBuilder, TAddress>,
         ): ConfigurationWithAddress<TAddress> {
             const builder = new this._ipc.channelSelectorCtor();
             const type = configure(builder);
@@ -112,33 +104,25 @@ export module Ipc {
 
     export class ConfigurationWithAddress<TAddress extends Address = Address> {
         /* @internal */
-        constructor(
-            private readonly _ipc: Ipc,
-            private readonly _address?: TAddress
-        ) {}
+        constructor(private readonly _ipc: Ipc, private readonly _address?: TAddress) {}
 
         public forAnyService(): ConfigurationWithAddressService<TAddress> {
-            return new ConfigurationWithAddressService(
-                this._ipc,
-                this._address
-            );
+            return new ConfigurationWithAddressService(this._ipc, this._address);
         }
     }
 
-    export class ConfigurationWithAddressService<
-        TAddress extends Address = Address
-    > {
+    export class ConfigurationWithAddressService<TAddress extends Address = Address> {
         /* @internal */
         constructor(
             private readonly _ipc: Ipc,
             private readonly _address: TAddress | undefined,
-            private readonly _serviceId?: ServiceId
+            private readonly _serviceId?: ServiceId,
         ) {}
 
         public update(updateAction: UpdateConfigDelegate<TAddress>) {
             const builder = this._ipc.configStore.getBuilder<TAddress>(
                 this._address,
-                this._serviceId
+                this._serviceId,
             );
 
             updateAction(builder);

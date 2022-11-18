@@ -19,13 +19,10 @@ export class MessageStream implements IMessageStream {
     constructor(stream: Stream, observer: Observer<Network.Message>);
     constructor(
         private readonly _stream: Stream,
-        private readonly _observer: Observer<Network.Message>
+        private readonly _observer: Observer<Network.Message>,
     ) {}
 
-    public async writeMessageAsync(
-        message: Network.Message,
-        ct: CancellationToken
-    ): Promise<void> {
+    public async writeMessageAsync(message: Network.Message, ct: CancellationToken): Promise<void> {
         const bytes = Buffer.from([
             ...BitConverter.getBytes(message.type, 'uint8'),
             ...BitConverter.getBytes(message.data.byteLength, 'int32le'),
@@ -33,8 +30,8 @@ export class MessageStream implements IMessageStream {
         ]);
         MessageStream._trace.log(
             `Writing ${MessageStream.toMessageTypeString(
-                message.type
-            )} with data: ${message.data.toString()}`
+                message.type,
+            )} with data: ${message.data.toString()}`,
         );
         await this._stream.write(bytes, ct);
     }
@@ -45,9 +42,7 @@ export class MessageStream implements IMessageStream {
         this._stream.dispose();
     }
 
-    private static toMessageTypeString(
-        messageType: Network.Message.Type
-    ): string {
+    private static toMessageTypeString(messageType: Network.Message.Type): string {
         switch (messageType) {
             case Network.Message.Type.Request:
                 return 'Request';
@@ -63,7 +58,7 @@ export class MessageStream implements IMessageStream {
     private static async readFully(
         stream: Stream,
         length: number,
-        ct: CancellationToken
+        ct: CancellationToken,
     ): Promise<Buffer> {
         const buffer = Buffer.alloc(length);
         let soFar = 0;
@@ -73,16 +68,14 @@ export class MessageStream implements IMessageStream {
         return buffer;
     }
 
-    private async readMessageAsync(
-        ct: CancellationToken
-    ): Promise<Network.Message> {
+    private async readMessageAsync(ct: CancellationToken): Promise<Network.Message> {
         const type: Network.Message.Type = BitConverter.getNumber(
             await MessageStream.readFully(this._stream, 1, ct),
-            'uint8'
+            'uint8',
         );
         const length = BitConverter.getNumber(
             await MessageStream.readFully(this._stream, 4, ct),
-            'int32le'
+            'int32le',
         );
         const data = await MessageStream.readFully(this._stream, length, ct);
 
@@ -122,15 +115,12 @@ export class MessageStream implements IMessageStream {
 export module MessageStream {
     export class Factory implements IMessageStream.Factory {
         public static orDefault(
-            factory: IMessageStream.Factory | undefined
+            factory: IMessageStream.Factory | undefined,
         ): IMessageStream.Factory {
             return factory ?? new Factory();
         }
 
-        public create(
-            stream: Stream,
-            observer: Observer<Network.Message>
-        ): IMessageStream {
+        public create(stream: Stream, observer: Observer<Network.Message>): IMessageStream {
             return new MessageStream(stream, observer);
         }
     }

@@ -19,17 +19,13 @@ import {
 } from '.';
 
 export class CancellationTokenSource implements IDisposable {
-    public static createLinkedTokenSource(
-        ...tokens: CancellationToken[]
-    ): CancellationTokenSource {
+    public static createLinkedTokenSource(...tokens: CancellationToken[]): CancellationTokenSource {
         if (tokens.length === 0) {
             throw new ArgumentError('No tokens were supplied.');
         }
-        if (
-            tokens.filter((x) => !(x instanceof CancellationToken)).length > 0
-        ) {
+        if (tokens.filter((x) => !(x instanceof CancellationToken)).length > 0) {
             throw new ArgumentError(
-                'Some supplied arguments were not instances of CancellationToken.'
+                'Some supplied arguments were not instances of CancellationToken.',
             );
         }
 
@@ -39,15 +35,14 @@ export class CancellationTokenSource implements IDisposable {
         }
 
         const disposable = new AggregateDisposable(
-            ...tokens.map((token) => token.register(onCancellation))
+            ...tokens.map((token) => token.register(onCancellation)),
         );
 
         const result = new LinkedCancellationTokenSource(disposable);
         return result;
     }
 
-    private readonly _token: RandomCancellationToken =
-        new RandomCancellationToken(this);
+    private readonly _token: RandomCancellationToken = new RandomCancellationToken(this);
 
     protected _isDisposed = false;
     private _isCancellationRequested = false;
@@ -59,8 +54,7 @@ export class CancellationTokenSource implements IDisposable {
     constructor(millisecondsDelay: number);
     constructor(delay: TimeSpan);
     constructor(arg0?: number | TimeSpan) {
-        const paramName: string =
-            typeof arg0 === 'number' ? 'millisecondsDelay' : 'delay';
+        const paramName: string = typeof arg0 === 'number' ? 'millisecondsDelay' : 'delay';
         if (arg0 != null) {
             arg0 = TimeSpan.toTimeSpan(arg0);
         }
@@ -69,7 +63,7 @@ export class CancellationTokenSource implements IDisposable {
             if (arg0.isNegative) {
                 throw new ArgumentOutOfRangeError(
                     paramName,
-                    'Specified argument represented a negative interval.'
+                    'Specified argument represented a negative interval.',
                 );
             }
 
@@ -99,8 +93,7 @@ export class CancellationTokenSource implements IDisposable {
 
         this.assertNotDisposed();
 
-        const paramName =
-            typeof arg0 === 'number' ? 'millisecondsDelay' : 'delay';
+        const paramName = typeof arg0 === 'number' ? 'millisecondsDelay' : 'delay';
         arg0 = TimeSpan.toTimeSpan(arg0);
         if (arg0.isNegative && !arg0.isInfinite) {
             throw new ArgumentOutOfRangeError(paramName);
@@ -120,9 +113,7 @@ export class CancellationTokenSource implements IDisposable {
         this.ensureTimeoutCleared();
     }
 
-    /* @internal */ public registerUnchecked(
-        callback: () => void
-    ): CancellationTokenRegistration {
+    /* @internal */ public registerUnchecked(callback: () => void): CancellationTokenRegistration {
         if (this._isCancellationRequested) {
             callback();
         } else {
@@ -144,10 +135,7 @@ export class CancellationTokenSource implements IDisposable {
 
     private cancelAfterUnchecked(delay: TimeSpan): void {
         this.ensureTimeoutCleared();
-        this._nodeJsTimeout = setTimeout(
-            this.onTimeout,
-            delay.totalMilliseconds
-        );
+        this._nodeJsTimeout = setTimeout(this.onTimeout, delay.totalMilliseconds);
     }
 
     private readonly onTimeout = () => {
@@ -184,7 +172,7 @@ export class CancellationTokenSource implements IDisposable {
         if (this._isDisposed) {
             throw new ObjectDisposedError(
                 undefined,
-                'The CancellationTokenSource has been disposed.'
+                'The CancellationTokenSource has been disposed.',
             );
         }
     }

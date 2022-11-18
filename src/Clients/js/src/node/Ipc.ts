@@ -7,9 +7,7 @@ export class Ipc extends IpcBase<AddressBuilder> {
         super(AddressBuilder);
     }
 
-    public namedPipe(
-        name: string
-    ): AddressSelectionDelegate<AddressBuilder, NamedPipeAddress> {
+    public namedPipe(name: string): AddressSelectionDelegate<AddressBuilder, NamedPipeAddress> {
         return (builder) => builder.isPipe(name);
     }
 }

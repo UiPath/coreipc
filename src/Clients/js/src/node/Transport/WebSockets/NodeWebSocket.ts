@@ -28,7 +28,7 @@ export class NodeWebSocket extends Socket {
         url: string,
         timeout: TimeSpan,
         ct: CancellationToken,
-        socketLikeCtor?: NodeWebSocketLikeCtor
+        socketLikeCtor?: NodeWebSocketLikeCtor,
     ) {
         let socket: NodeWebSocket | undefined;
         const errors = new Array<Error>();
@@ -45,12 +45,7 @@ export class NodeWebSocket extends Socket {
                 }
 
                 try {
-                    socket = await NodeWebSocket.connect(
-                        url,
-                        timeout,
-                        ct,
-                        socketLikeCtor
-                    );
+                    socket = await NodeWebSocket.connect(url, timeout, ct, socketLikeCtor);
                     return true;
                 } catch (error) {
                     errors.push(UnknownError.ensureError(error));
@@ -75,7 +70,7 @@ export class NodeWebSocket extends Socket {
 
         if (!tryConnectCalled) {
             throw new InvalidOperationError(
-                `The specified ConnectHelper didn't call the provided tryConnect function.`
+                `The specified ConnectHelper didn't call the provided tryConnect function.`,
             );
         }
 
@@ -86,7 +81,7 @@ export class NodeWebSocket extends Socket {
         url: string,
         timeout: TimeSpan,
         ct: CancellationToken,
-        socketLikeCtor?: NodeWebSocketLikeCtor
+        socketLikeCtor?: NodeWebSocketLikeCtor,
     ): Promise<NodeWebSocket> {
         assertArgument({ url }, 'string');
         assertArgument({ timeout }, TimeSpan);

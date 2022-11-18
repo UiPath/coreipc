@@ -11,10 +11,7 @@ export class Trace {
         (unit: Error | string | object, category?: string) => void
     >();
     public static addListener(
-        listener: (
-            errorOrText: Error | string | object,
-            category?: string
-        ) => void
+        listener: (errorOrText: Error | string | object, category?: string) => void,
     ): IDisposable {
         if (!listener) {
             throw new ArgumentNullError('listener');
@@ -61,8 +58,7 @@ export class Trace {
         return new Trace.traceCategory(name);
     }
 
-    private static readonly _promiseTrace =
-        Trace.category('promise.traceError');
+    private static readonly _promiseTrace = Trace.category('promise.traceError');
 
     private static _cachedEmptyActionOfT<T = unknown>(value: T) {}
 
@@ -70,9 +66,7 @@ export class Trace {
         assertArgument({ promise }, Promise);
 
         promise.then(Trace._cachedEmptyActionOfT, (reason: any) => {
-            Trace._promiseTrace.log(
-                `\r\n\tpromise: ${promise}\r\n\treason: ${reason}`
-            );
+            Trace._promiseTrace.log(`\r\n\tpromise: ${promise}\r\n\treason: ${reason}`);
         });
     }
 }

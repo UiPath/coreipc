@@ -9,9 +9,6 @@ export class InvalidOperationError extends CoreIpcError {
     private static computeFullMessage(message?: string): string {
         assertArgument({ message }, 'undefined', 'string');
 
-        return (
-            message ??
-            'Operation is not valid due to the current state of the object.'
-        );
+        return message ?? 'Operation is not valid due to the current state of the object.';
     }
 }

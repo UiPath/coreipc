@@ -1,5 +1,7 @@
-function emptyOnFulfilled<T>(result: T): T { return result; }
-function emptyOnRejected(reason: any) { }
+function emptyOnFulfilled<T>(result: T): T {
+    return result;
+}
+function emptyOnRejected(reason: any) {}
 
 /* @internal */
 export class PromisePal {

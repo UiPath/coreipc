@@ -12,6 +12,6 @@ export interface IRpcChannelFactory {
         connectTimeout: TimeSpan,
         ct: CancellationToken,
         observer: Observer<RpcCallContext.Incomming>,
-        messageStreamFactory?: IMessageStream.Factory
+        messageStreamFactory?: IMessageStream.Factory,
     ): IRpcChannel;
 }

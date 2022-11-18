@@ -1,9 +1,5 @@
 import { assertArgument } from '../helpers';
-import {
-    FinalState,
-    PromiseCompletionSourceInternal,
-    IPromiseCompletionSourceInternal,
-} from '.';
+import { FinalState, PromiseCompletionSourceInternal, IPromiseCompletionSourceInternal } from '.';
 
 export interface IPromiseCompletionSource<T = unknown> {
     setResult(result: T): void | never;

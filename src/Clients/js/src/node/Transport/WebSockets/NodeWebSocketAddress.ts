@@ -1,11 +1,5 @@
 import { NodeWebSocket } from '.';
-import {
-    TimeSpan,
-    CancellationToken,
-    Socket,
-    ConnectHelper,
-    Address,
-} from '../../../std';
+import { TimeSpan, CancellationToken, Socket, ConnectHelper, Address } from '../../../std';
 
 export class NodeWebSocketAddress extends Address {
     constructor(public readonly url: string) {
@@ -20,13 +14,13 @@ export class NodeWebSocketAddress extends Address {
         this: TSelf,
         helper: ConnectHelper<TSelf>,
         timeout: TimeSpan,
-        ct: CancellationToken
+        ct: CancellationToken,
     ): Promise<Socket> {
         return await NodeWebSocket.connectWithHelper(
             helper as any,
             (this as unknown as NodeWebSocketAddress).url,
             timeout,
-            ct
+            ct,
         );
     }
 }

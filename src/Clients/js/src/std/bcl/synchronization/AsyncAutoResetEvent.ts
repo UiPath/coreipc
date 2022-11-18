@@ -18,9 +18,7 @@ export class AsyncAutoResetEvent {
         const _ = this._awaiters.pop()?.signal() ?? (this._signalled = true);
     }
 
-    public async waitOne(
-        ct: CancellationToken = CancellationToken.none
-    ): Promise<void> {
+    public async waitOne(ct: CancellationToken = CancellationToken.none): Promise<void> {
         if (this._signalled) {
             this._signalled = false;
             return;

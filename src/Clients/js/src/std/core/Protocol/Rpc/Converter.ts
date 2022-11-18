@@ -17,7 +17,7 @@ export class Converter {
         endpoint: string,
         methodName: string,
         args: unknown[],
-        timeout: TimeSpan
+        timeout: TimeSpan,
     ): RpcMessage.Request {
         let serializedArgs: string[] | undefined;
         let result: RpcMessage.Request | undefined;
@@ -29,7 +29,7 @@ export class Converter {
                 timeout.totalSeconds,
                 endpoint,
                 methodName,
-                serializedArgs
+                serializedArgs,
             );
             trace();
             return result;
@@ -64,7 +64,7 @@ export class Converter {
 
     public static fromRpcResponse(
         response: RpcMessage.Response,
-        request: RpcMessage.Request
+        request: RpcMessage.Request,
     ): unknown {
         if (response.Error) {
             throw Converter.createRemoteError(request, response.Error);
@@ -76,7 +76,7 @@ export class Converter {
                     return JSON.parse(response.Data);
                 } catch (err) {
                     const ioe = new InvalidOperationError(
-                        `Failed to parse JSON data for response of request ${request.MethodName}. Data was:\r\n${response.Data}`
+                        `Failed to parse JSON data for response of request ${request.MethodName}. Data was:\r\n${response.Data}`,
                     );
                     throw ioe;
                 }
@@ -84,19 +84,12 @@ export class Converter {
         }
     }
 
-    public static createRemoteError(
-        request: RpcMessage.Request,
-        error: IpcError
-    ): Error {
+    public static createRemoteError(request: RpcMessage.Request, error: IpcError): Error {
         if (error.Type === 'System.TimeoutException') {
             return new TimeoutError({ reportedByServer: true });
         }
 
-        return new RemoteError(
-            request.Endpoint,
-            request.MethodName,
-            createException(error)
-        );
+        return new RemoteError(request.Endpoint, request.MethodName, createException(error));
 
         function createException(x: IpcError): Exception {
             return {

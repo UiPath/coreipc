@@ -1,8 +1,4 @@
-import {
-    PromiseCompletionSource,
-    CancellationToken,
-    TimeSpan,
-} from '../../../bcl';
+import { PromiseCompletionSource, CancellationToken, TimeSpan } from '../../../bcl';
 
 import { RpcMessage, RpcCallContextBase } from '.';
 
@@ -14,17 +10,14 @@ export module RpcCallContext {
     export class Incomming extends RpcCallContextBase {
         constructor(
             public readonly request: RpcMessage.Request,
-            public readonly respond: (
-                response: RpcMessage.Response
-            ) => Promise<void>
+            public readonly respond: (response: RpcMessage.Response) => Promise<void>,
         ) {
             super();
         }
     }
 
     export class Outgoing extends RpcCallContextBase {
-        private readonly _pcs =
-            new PromiseCompletionSource<RpcMessage.Response>();
+        private readonly _pcs = new PromiseCompletionSource<RpcMessage.Response>();
 
         constructor(timeout: TimeSpan, ct: CancellationToken) {
             super();

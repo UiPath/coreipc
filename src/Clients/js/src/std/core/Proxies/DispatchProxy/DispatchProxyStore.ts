@@ -8,16 +8,13 @@ export class DispatchProxyStore {
 
     private readonly _symbolofWeavedProxy = Symbol('WeavedProxy');
 
-    public get<TService>(
-        service: PublicCtor<TService>
-    ): DispatchProxy<TService> {
+    public get<TService>(service: PublicCtor<TService>): DispatchProxy<TService> {
         assertArgument({ service }, 'function');
 
-        const accessor = new Accessor<
-            PublicCtor<TService>,
-            symbol,
-            DispatchProxy<TService>
-        >(service, this._symbolofWeavedProxy);
+        const accessor = new Accessor<PublicCtor<TService>, symbol, DispatchProxy<TService>>(
+            service,
+            this._symbolofWeavedProxy,
+        );
 
         if (!accessor.value) {
             accessor.value = Weaver.weave(service);

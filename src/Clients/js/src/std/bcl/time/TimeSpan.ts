@@ -22,14 +22,10 @@ export class TimeSpan {
     }
 
     public add(other: TimeSpan): TimeSpan {
-        return TimeSpan.fromMilliseconds(
-            this._milliseconds + other._milliseconds
-        );
+        return TimeSpan.fromMilliseconds(this._milliseconds + other._milliseconds);
     }
     public subtract(other: TimeSpan): TimeSpan {
-        return TimeSpan.fromMilliseconds(
-            this._milliseconds - other._milliseconds
-        );
+        return TimeSpan.fromMilliseconds(this._milliseconds - other._milliseconds);
     }
     public static readonly zero = TimeSpan.fromMilliseconds(0);
     public get isZero(): boolean {
@@ -105,27 +101,20 @@ export class TimeSpan {
     public get hours(): number {
         return (
             Math.sign(this._milliseconds) *
-            Math.floor(
-                (this.absoluteMilliseconds % MillisecondsInA.day) /
-                    MillisecondsInA.hour
-            )
+            Math.floor((this.absoluteMilliseconds % MillisecondsInA.day) / MillisecondsInA.hour)
         );
     }
     public get minutes(): number {
         return (
             Math.sign(this._milliseconds) *
-            Math.floor(
-                (this.absoluteMilliseconds % MillisecondsInA.hour) /
-                    MillisecondsInA.minute
-            )
+            Math.floor((this.absoluteMilliseconds % MillisecondsInA.hour) / MillisecondsInA.minute)
         );
     }
     public get seconds(): number {
         return (
             Math.sign(this._milliseconds) *
             Math.floor(
-                (this.absoluteMilliseconds % MillisecondsInA.minute) /
-                    MillisecondsInA.second
+                (this.absoluteMilliseconds % MillisecondsInA.minute) / MillisecondsInA.second,
             )
         );
     }
@@ -165,10 +154,7 @@ export class TimeSpan {
         return result;
     }
     public toString(): string {
-        return (
-            this._maybeToString ||
-            (this._maybeToString = this.computeToString())
-        );
+        return this._maybeToString || (this._maybeToString = this.computeToString());
     }
     public toJSON(): any {
         return this.toString();
@@ -200,7 +186,7 @@ export class TimeSpan {
                 } finally {
                     clearTimeout(reg);
                 }
-            })()
+            })(),
         );
     }
 }

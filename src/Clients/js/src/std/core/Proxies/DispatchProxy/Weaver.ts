@@ -10,9 +10,7 @@ import {
 
 /* @internal */
 export class Weaver<TService> {
-    public static weave<TService>(
-        service: PublicCtor<TService>
-    ): DispatchProxy<TService> {
+    public static weave<TService>(service: PublicCtor<TService>): DispatchProxy<TService> {
         const instance = new Weaver<TService>(service);
 
         return instance.run();
@@ -26,7 +24,7 @@ export class Weaver<TService> {
         // 1.1. Weaving the constructor: receive the ICallInterceptor and assign it to this.<symbol>
         function EmittedClass(
             this: ICallInterceptorContainer<TService>,
-            callInterceptor: ICallInterceptor<TService>
+            callInterceptor: ICallInterceptor<TService>,
         ) {
             this[symbolofCallInterceptor] = callInterceptor;
         }
@@ -45,7 +43,9 @@ export class Weaver<TService> {
         for (const methodName of methodNames) {
             // 1.4.i Call the ICallInterceptor feeding it all arguments and return whatever is getting returned.
 
-            dispatchProxy.prototype[methodName] = function(this: ICallInterceptorContainer<TService>){
+            dispatchProxy.prototype[methodName] = function (
+                this: ICallInterceptorContainer<TService>,
+            ) {
                 const callInterceptor = this[symbolofCallInterceptor];
                 const args = [...arguments];
                 const result = callInterceptor.invokeMethod(methodName, args);

@@ -1,8 +1,4 @@
-import {
-    InvalidOperationError,
-    PlatformNotSupportedError,
-    IPlatform,
-} from '../std';
+import { InvalidOperationError, PlatformNotSupportedError, IPlatform } from '../std';
 
 /* @internal */
 export module Platform {

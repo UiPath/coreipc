@@ -3,10 +3,7 @@ import { Network, IpcError } from '..';
 import { RpcMessageBase } from '.';
 
 /* @internal */
-export type RpcMessage =
-    | RpcMessage.Request
-    | RpcMessage.Response
-    | RpcMessage.CancellationRequest;
+export type RpcMessage = RpcMessage.Request | RpcMessage.Response | RpcMessage.CancellationRequest;
 
 /* @internal */
 export module RpcMessage {
@@ -15,7 +12,7 @@ export module RpcMessage {
             public readonly TimeoutInSeconds: number,
             public readonly Endpoint: string,
             public readonly MethodName: string,
-            public readonly Parameters: string[]
+            public readonly Parameters: string[],
         ) {
             super();
         }
@@ -30,25 +27,19 @@ export module RpcMessage {
         }
 
         public static fromNetwork(message: Network.Message): Request {
-            return JsonConvert.deserializeObject(
-                message.data.toString(),
-                Request
-            );
+            return JsonConvert.deserializeObject(message.data.toString(), Request);
         }
     }
 
     export class Response extends RpcMessageBase {
         public static fromNetwork(message: Network.Message): Response {
-            return JsonConvert.deserializeObject(
-                message.data.toString(),
-                Response
-            );
+            return JsonConvert.deserializeObject(message.data.toString(), Response);
         }
 
         public constructor(
             public RequestId: string,
             public readonly Data: string | null,
-            public readonly Error: IpcError | null
+            public readonly Error: IpcError | null,
         ) {
             super();
         }
@@ -62,13 +53,8 @@ export module RpcMessage {
     }
 
     export class CancellationRequest extends RpcMessageBase {
-        public static fromNetwork(
-            message: Network.Message
-        ): CancellationRequest {
-            return JsonConvert.deserializeObject(
-                message.data.toString(),
-                CancellationRequest
-            );
+        public static fromNetwork(message: Network.Message): CancellationRequest {
+            return JsonConvert.deserializeObject(message.data.toString(), CancellationRequest);
         }
 
         public constructor(public readonly RequestId: string) {

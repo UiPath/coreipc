@@ -4,5 +4,3 @@ export interface PublicCtor<T = unknown> {
 
     new (...args: any[]): T;
 }
-
-

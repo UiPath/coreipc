@@ -10,7 +10,7 @@ export class ProperCancellationTokenRegistration extends CancellationTokenRegist
     constructor(source: CancellationTokenSource, callback: () => void);
     constructor(
         private readonly _source: CancellationTokenSource,
-        private readonly _callback: () => void
+        private readonly _callback: () => void,
     ) {
         super();
         assertArgument({ _source }, CancellationTokenSource);

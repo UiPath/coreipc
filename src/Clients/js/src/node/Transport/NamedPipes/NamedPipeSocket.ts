@@ -18,11 +18,7 @@ import {
 
 import { Platform } from '../..';
 
-import {
-    NamedPipeAddress,
-    NamedPipeSocketLikeCtor,
-    NamedPipeSocketLike,
-} from '.';
+import { NamedPipeAddress, NamedPipeSocketLikeCtor, NamedPipeSocketLike } from '.';
 
 /* @internal */
 export class NamedPipeSocket extends Socket {
@@ -31,7 +27,7 @@ export class NamedPipeSocket extends Socket {
         pipeName: string,
         timeout: TimeSpan,
         ct: CancellationToken,
-        socketLikeCtor?: NamedPipeSocketLikeCtor
+        socketLikeCtor?: NamedPipeSocketLikeCtor,
     ) {
         let socket: NamedPipeSocket | undefined;
         const errors = new Array<Error>();
@@ -48,12 +44,7 @@ export class NamedPipeSocket extends Socket {
                 }
 
                 try {
-                    socket = await NamedPipeSocket.connect(
-                        pipeName,
-                        timeout,
-                        ct,
-                        socketLikeCtor
-                    );
+                    socket = await NamedPipeSocket.connect(pipeName, timeout, ct, socketLikeCtor);
                     return true;
                 } catch (error) {
                     errors.push(UnknownError.ensureError(error));
@@ -78,7 +69,7 @@ export class NamedPipeSocket extends Socket {
 
         if (!tryConnectCalled) {
             throw new InvalidOperationError(
-                `The specified ConnectHelper didn't call the provided tryConnect function.`
+                `The specified ConnectHelper didn't call the provided tryConnect function.`,
             );
         }
 
@@ -89,7 +80,7 @@ export class NamedPipeSocket extends Socket {
         pipeName: string,
         timeout: TimeSpan,
         ct: CancellationToken,
-        socketLikeCtor?: new () => NamedPipeSocketLike
+        socketLikeCtor?: new () => NamedPipeSocketLike,
     ): Promise<NamedPipeSocket> {
         assertArgument({ pipeName }, 'string');
         assertArgument({ timeout }, TimeSpan);
@@ -142,9 +133,7 @@ export class NamedPipeSocket extends Socket {
         }
 
         return await new Promise<void>((resolve, reject) => {
-            this._socketLike.write(buffer, (error) =>
-                error ? reject(error) : resolve()
-            );
+            this._socketLike.write(buffer, (error) => (error ? reject(error) : resolve()));
         });
     }
 

@@ -3,6 +3,6 @@ export class IpcError {
         public readonly Message: string,
         public readonly StackTrace: string,
         public readonly Type: string,
-        public readonly InnerError: IpcError | null
+        public readonly InnerError: IpcError | null,
     ) {}
 }

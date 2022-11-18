@@ -1,6 +1,4 @@
 import { RpcMessage } from '.';
 
 /* @internal */
-export type IncommingInitiatingRpcMessage =
-    | RpcMessage.Request
-    | RpcMessage.CancellationRequest;
+export type IncommingInitiatingRpcMessage = RpcMessage.Request | RpcMessage.CancellationRequest;

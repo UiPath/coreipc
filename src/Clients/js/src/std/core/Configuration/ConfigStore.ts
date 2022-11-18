@@ -9,7 +9,7 @@ class ConfigCell implements ConfigBuilder<Address> {
 
     setConnectHelper<T>(
         this: T,
-        connectHelper: ConnectHelper<Address>
+        connectHelper: ConnectHelper<Address>,
     ): Omit<T, keyof ConfigBuilder.SetConnectHelper<Address>> {
         assertArgument({ connectHelper }, 'function');
 
@@ -17,13 +17,10 @@ class ConfigCell implements ConfigBuilder<Address> {
         return this;
     }
 
+    setRequestTimeout<T>(this: T, value: TimeSpan): Omit<T, keyof ConfigBuilder.SetRequestTimeout>;
     setRequestTimeout<T>(
         this: T,
-        value: TimeSpan
-    ): Omit<T, keyof ConfigBuilder.SetRequestTimeout>;
-    setRequestTimeout<T>(
-        this: T,
-        milliseconds: number
+        milliseconds: number,
     ): Omit<T, keyof ConfigBuilder.SetRequestTimeout>;
     setRequestTimeout(value: TimeSpan | number): any {
         let newValue: TimeSpan;
@@ -50,12 +47,9 @@ class ConfigCell implements ConfigBuilder<Address> {
 export class ConfigStore {
     public getBuilder<TAddress extends Address>(
         address: Address | undefined,
-        serviceId: ServiceId | undefined
+        serviceId: ServiceId | undefined,
     ): ConfigBuilder<TAddress> {
-        const compositeKey = ConfigStore.computeCompositeKey(
-            address,
-            serviceId
-        );
+        const compositeKey = ConfigStore.computeCompositeKey(address, serviceId);
 
         let result = this._map.get(compositeKey);
 
@@ -70,7 +64,7 @@ export class ConfigStore {
     }
 
     public getConnectHelper<TAddress extends Address>(
-        address: TAddress
+        address: TAddress,
     ): ConnectHelper<TAddress> | undefined {
         const key = ConfigStore.computeCompositeKey(address, undefined);
 
@@ -79,7 +73,7 @@ export class ConfigStore {
 
     public getRequestTimeout<TService, TAddress extends Address>(
         service: PublicCtor<TService>,
-        address: TAddress
+        address: TAddress,
     ): TimeSpan | undefined {
         for (const key of enumerateCandidateKeys()) {
             const cell = this._map.get(key);
@@ -103,7 +97,7 @@ export class ConfigStore {
 
     private static computeCompositeKey(
         address: Address | undefined,
-        serviceOrServiceId: ServiceId | PublicCtor | undefined
+        serviceOrServiceId: ServiceId | PublicCtor | undefined,
     ) {
         const serviceKey =
             serviceOrServiceId === undefined

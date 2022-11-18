@@ -28,7 +28,7 @@ export class BrowserWebSocket extends Socket {
         url: string,
         timeout: TimeSpan,
         ct: CancellationToken,
-        socketLikeCtor?: BrowserWebSocketLikeCtor
+        socketLikeCtor?: BrowserWebSocketLikeCtor,
     ) {
         let socket: BrowserWebSocket | undefined;
         const errors = new Array<Error>();
@@ -45,12 +45,7 @@ export class BrowserWebSocket extends Socket {
                 }
 
                 try {
-                    socket = await BrowserWebSocket.connect(
-                        url,
-                        timeout,
-                        ct,
-                        socketLikeCtor
-                    );
+                    socket = await BrowserWebSocket.connect(url, timeout, ct, socketLikeCtor);
                     return true;
                 } catch (error) {
                     errors.push(UnknownError.ensureError(error));
@@ -75,7 +70,7 @@ export class BrowserWebSocket extends Socket {
 
         if (!tryConnectCalled) {
             throw new InvalidOperationError(
-                `The specified ConnectHelper didn't call the provided tryConnect function.`
+                `The specified ConnectHelper didn't call the provided tryConnect function.`,
             );
         }
 
@@ -86,7 +81,7 @@ export class BrowserWebSocket extends Socket {
         url: string,
         timeout: TimeSpan,
         ct: CancellationToken,
-        socketLikeCtor?: BrowserWebSocketLikeCtor
+        socketLikeCtor?: BrowserWebSocketLikeCtor,
     ): Promise<BrowserWebSocket> {
         assertArgument({ url }, 'string');
         assertArgument({ timeout }, TimeSpan);

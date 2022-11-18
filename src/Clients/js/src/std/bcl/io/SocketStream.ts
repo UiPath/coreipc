@@ -40,11 +40,11 @@ export class SocketStream implements Stream {
         buffer: Buffer,
         offset: number,
         length: number,
-        ct: CancellationToken
+        ct: CancellationToken,
     ): Promise<number> {
         if (this._reading) {
             throw new InvalidOperationError(
-                'An asynchronous read operation is already in progress.'
+                'An asynchronous read operation is already in progress.',
             );
         }
 
@@ -55,7 +55,7 @@ export class SocketStream implements Stream {
             assertArgument({ ct }, CancellationToken);
             if (offset + length > buffer.byteLength) {
                 throw new ArgumentError(
-                    'Offset and length overflow outside the destination buffer.'
+                    'Offset and length overflow outside the destination buffer.',
                 );
             }
 
@@ -83,8 +83,7 @@ export class SocketStream implements Stream {
                     buffer,
                     offset,
                     this._oldestBufferCursor,
-                    this._oldestBufferCursor +
-                        Math.max(cbRemaining, cbRemainingInOldestBuffer)
+                    this._oldestBufferCursor + Math.max(cbRemaining, cbRemainingInOldestBuffer),
                 );
                 if (cbRemainingInOldestBuffer <= cbRemaining) {
                     this._buffers.splice(0, 1);
@@ -110,7 +109,7 @@ export class SocketStream implements Stream {
     private get cbAvailable(): number {
         return this._buffers.reduce(
             (sum, buffer) => sum + buffer.byteLength,
-            -this._oldestBufferCursor
+            -this._oldestBufferCursor,
         );
     }
 
