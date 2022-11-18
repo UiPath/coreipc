@@ -245,7 +245,7 @@ public sealed class Connection : IDisposable
                     RunAsync(_onRequest, await DeserializeRequest());
                     break;
                 case MessageType.CancellationRequest:
-                    RunAsync(_onCancellation, await DeserializeCancellationRequest());
+                    RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
                     break;
                 case MessageType.UploadRequest:
                     await OnUploadRequest();
@@ -323,11 +323,8 @@ public sealed class Connection : IDisposable
             throw;
         }
     }
-    private async ValueTask<int> DeserializeCancellationRequest()
-    {
-        var reader = await _streamReader.ReadAsync(default);
-        return MessagePackSerializer.Deserialize<CancellationRequest>(reader.Value, Contractless).RequestId;
-    }
+    private async ValueTask<T> Deserialize<T>() => MessagePackSerializer.Deserialize<T>(await ReadBytes(), Contractless);
+    private async ValueTask<ReadOnlySequence<byte>> ReadBytes() => await _streamReader.ReadAsync(default) ?? throw ClosedException;
     private void OnCancellationReceived(int requestId)
     {
         try
@@ -342,8 +339,7 @@ public sealed class Connection : IDisposable
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     private async ValueTask<IncomingResponse> DeserializeResponse()
     {
-        var reader = await _streamReader.ReadAsync(default);
-        var response = MessagePackSerializer.Deserialize<Response>(reader.Value, Contractless);
+        var response = await Deserialize<Response>();
         if (LogEnabled)
         {
             Log($"Received response for request {response.RequestId} {Name}.");
@@ -354,18 +350,17 @@ public sealed class Connection : IDisposable
             return null;
         }
         result = new(response, outgoingRequest.Completion);
-        reader = await _streamReader.ReadAsync(default);
+        var bytes = await ReadBytes();
         var responseType = outgoingRequest.ResponseType;
         if (response.Error == null && responseType != typeof(Stream))
         {
-            response.Data = MessagePackSerializer.Deserialize(responseType, reader.Value, Contractless);
+            response.Data = MessagePackSerializer.Deserialize(responseType, bytes, Contractless);
         }
         return result;
     }
     private async ValueTask<IncomingRequest> DeserializeRequest()
     {
-        var reader = await _streamReader.ReadAsync(default);
-        var request = MessagePackSerializer.Deserialize<Request>(reader.Value, Contractless);
+        var request = await Deserialize<Request>();
         if (LogEnabled)
         {
             Log($"{Name} received request {request}");
@@ -379,12 +374,12 @@ public sealed class Connection : IDisposable
         for (int index = 0; index < args.Length; index++)
         {
             var type = method.Parameters[index].ParameterType;
-            reader = await _streamReader.ReadAsync(default);
+            var bytes = await ReadBytes();
             if (type == typeof(CancellationToken) || type == typeof(Stream))
             {
                 continue;
             }
-            args[index] = MessagePackSerializer.Deserialize(type, reader.Value, Contractless);
+            args[index] = MessagePackSerializer.Deserialize(type, bytes, Contractless);
         }
         request.Parameters = args;
         return new(request, method, endpoint);
