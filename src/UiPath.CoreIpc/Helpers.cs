@@ -186,7 +186,6 @@ public static class Validator
         var returnType = method.ReturnType;
         CheckMethod();
         var parameters = method.GetParameters();
-        int streamCount = 0;
         for (int index = 0; index < parameters.Length; index++)
         {
             var parameter = parameters[index];
@@ -194,19 +193,18 @@ public static class Validator
             CheckCancellationToken(index, parameter);
             if (parameter.ParameterType == typeof(Stream))
             {
-                CheckStreamParameter();
+                CheckStreamParameter(index);
             }
             else
             {
                 CheckDerivedStream(method, parameter.ParameterType);
             }
         }
-        void CheckStreamParameter()
+        void CheckStreamParameter(int index)
         {
-            streamCount++;
-            if (streamCount > 1)
+            if (index != 0)
             {
-                throw new ArgumentException($"Only one Stream parameter is allowed! {method}");
+                throw new ArgumentException($"Only one Stream parameter is allowed and it must be the first! {method}");
             }
             if (!method.ReturnType.IsGenericType)
             {

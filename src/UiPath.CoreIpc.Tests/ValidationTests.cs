@@ -48,7 +48,9 @@ public class ValidationTests
     [Fact]
     public void UploadMustReturn() => new Action(() => new NamedPipeClientBuilder<IUploadNotification>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Upload methods must return a value!");
     [Fact]
-    public void DuplicateStreams() => new Action(() => new NamedPipeClientBuilder<IDuplicateStreams>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Only one Stream parameter is allowed!");
+    public void DuplicateStreams() => new Action(() => new NamedPipeClientBuilder<IDuplicateStreams>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Only one Stream parameter is allowed and it must be the first!");
+    [Fact]
+    public void StreamMustBeFirst() => new Action(() => new NamedPipeClientBuilder<IStreamFirst>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Only one Stream parameter is allowed and it must be the first!");
     [Fact]
     public void UploadDerivedStream() => new Action(() => new NamedPipeClientBuilder<IDerivedStreamUpload>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Stream parameters must be typed as Stream!");
     [Fact]

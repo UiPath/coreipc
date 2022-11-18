@@ -11,6 +11,11 @@ public interface IDuplicateMessage
     Task Test(Message message1, Message message2);
 }
 
+public interface IStreamFirst
+{
+    Task<int> Upload(int test, Stream stream);
+}
+
 public interface IUploadNotification
 {
     Task Upload(Stream stream);
