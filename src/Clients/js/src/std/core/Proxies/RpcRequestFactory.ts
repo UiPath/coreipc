@@ -1,14 +1,14 @@
 import { CancellationToken, Primitive, PublicCtor, Timeout, TimeSpan } from '../..';
 import { Address, Converter, Message, RpcMessage } from '..';
-import { IProxiesDomain, ProxyId } from '.';
+import { IServiceProvider, ProxyId } from '.';
 
 /* @internal */
 export class RpcRequestFactory {
     public static create<TService, TAddress extends Address>(params: {
-        domain: IProxiesDomain;
+        domain: IServiceProvider;
         service: PublicCtor<TService>;
         address: TAddress;
-        methodName: string;
+        methodName: keyof TService & string;
         args: unknown[];
     }): [RpcMessage.Request, PublicCtor | Primitive | undefined, CancellationToken, TimeSpan] {
         const maybeServiceContract = params.domain.contractStore.maybeGet(params.service);

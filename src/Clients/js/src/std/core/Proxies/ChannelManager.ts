@@ -1,7 +1,7 @@
 import { CancellationToken, Timeout, TimeSpan } from '../..';
 
 import {
-    IProxiesDomain,
+    IServiceProvider,
     ServiceId,
     Address,
     Converter,
@@ -22,15 +22,15 @@ export class ChannelManager<TAddress extends Address = Address> {
     private _channel: IRpcChannel | undefined;
 
     constructor(
-        private readonly _domain: IProxiesDomain,
+        private readonly _domain: IServiceProvider,
         private readonly _address: TAddress,
-        private readonly _rpcChannelFactory: IRpcChannelFactory<TAddress>,
+        private readonly _rpcChannelFactory: IRpcChannelFactory,
         private readonly _messageStreamFactory?: IMessageStream.Factory,
     ) {}
 
     async invokeMethod<TService>(
         serviceId: ServiceId<TService>,
-        methodName: string,
+        methodName: keyof TService & string,
         args: unknown[],
     ): Promise<unknown> {
         const [rpcRequest, returnsPromiseOf, ct, timeout] = RpcRequestFactory.create({

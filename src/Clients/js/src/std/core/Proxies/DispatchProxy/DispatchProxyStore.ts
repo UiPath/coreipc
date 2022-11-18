@@ -1,10 +1,10 @@
 import { assertArgument, PublicCtor } from '../../..';
-import { IProxiesDomain } from '..';
+import { IServiceProvider } from '..';
 import { DispatchProxy, Accessor, Weaver } from '.';
 
 /* @internal */
 export class DispatchProxyStore {
-    constructor(private readonly _domain: IProxiesDomain) {}
+    constructor(private readonly _domain: IServiceProvider) {}
 
     private readonly _symbolofWeavedProxy = Symbol('WeavedProxy');
 

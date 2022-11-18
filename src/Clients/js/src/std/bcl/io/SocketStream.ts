@@ -10,7 +10,7 @@ import { Stream, Socket } from '.';
 
 /* @internal */
 export class SocketStream implements Stream {
-    private readonly _signal = new AsyncAutoResetEvent();
+    private readonly _signal = new AsyncAutoResetEvent(false);
     private _buffers = new Array<Buffer>();
     private _oldestBufferCursor = 0;
     private _completed = false;

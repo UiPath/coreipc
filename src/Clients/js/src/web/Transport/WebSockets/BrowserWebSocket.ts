@@ -96,12 +96,12 @@ export class BrowserWebSocket extends Socket {
 
         const pcs = new PromiseCompletionSource<void>();
 
-        socket.onerror = (event) => {
+        socket.onerror = event => {
             const error = new BrowserWebSocketError.ConnectFailure(socket);
             pcs.trySetFaulted(error);
         };
 
-        socket.onopen = (event) => {
+        socket.onopen = event => {
             pcs.trySetResult();
         };
 
@@ -137,7 +137,7 @@ export class BrowserWebSocket extends Socket {
             return;
         }
 
-        return await new Promise<void>((resolve) => {
+        return await new Promise<void>(resolve => {
             this._socket.send(buffer);
             resolve();
         });
@@ -160,8 +160,9 @@ export class BrowserWebSocket extends Socket {
     private constructor(private readonly _socket: BrowserWebSocketLike) {
         super();
         _socket.onclose = () => this.dispose();
-        _socket.onmessage = (event) => {
+        _socket.onmessage = event => {
             const buffer = Buffer.from(event.data as ArrayBuffer);
+
             this._$data.next(buffer);
         };
     }

@@ -1,11 +1,11 @@
 import { Address } from '..';
 import { ICallInterceptor } from './DispatchProxy';
-import { IProxiesDomain, ProxyId } from '.';
+import { IServiceProvider, ProxyId } from '.';
 
 /* @internal */
 export class ProxyManager<TService = unknown, TAddress extends Address = Address> {
     constructor(
-        private readonly _domain: IProxiesDomain,
+        private readonly _domain: IServiceProvider,
         public readonly proxyId: ProxyId<TService, TAddress>,
     ) {
         this.proxy = this.createProxy();
@@ -17,7 +17,7 @@ export class ProxyManager<TService = unknown, TAddress extends Address = Address
         const _this = this;
 
         const EmittedInterceptorClass = class implements ICallInterceptor<TService> {
-            invokeMethod(methodName: string & keyof TService, args: unknown[]): Promise<unknown> {
+            invokeMethod(methodName: keyof TService & string, args: unknown[]): Promise<unknown> {
                 const result = _this._domain.channelStore.invokeMethod(
                     _this.proxyId,
                     methodName,

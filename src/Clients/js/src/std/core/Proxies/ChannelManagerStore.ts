@@ -1,11 +1,11 @@
 import { Address, IMessageStream, IRpcChannelFactory } from '..';
-import { ChannelManager, IProxiesDomain, ProxyId } from '.';
+import { ChannelManager, IServiceProvider, ProxyId } from '.';
 
 /* @internal */
 export class ChannelManagerStore {
     invokeMethod<TService, TAddress extends Address>(
         proxyId: ProxyId<TService, TAddress>,
-        methodName: string,
+        methodName: keyof TService & string,
         args: unknown[],
     ): Promise<unknown> {
         const channel = this.getOrCreateChannel<TAddress>(proxyId.address);
@@ -16,7 +16,7 @@ export class ChannelManagerStore {
     }
 
     constructor(
-        private readonly _domain: IProxiesDomain,
+        private readonly _domain: IServiceProvider,
         private readonly _rpcChannelFactory: IRpcChannelFactory,
         private readonly _messageStreamFactory: IMessageStream.Factory,
     ) {}
@@ -25,7 +25,12 @@ export class ChannelManagerStore {
         let channel = this._map.get(address.key);
 
         if (channel === undefined) {
-            channel = new ChannelManager<TAddress>(this._domain, address, this._rpcChannelFactory);
+            channel = new ChannelManager<TAddress>(
+                this._domain,
+                address,
+                this._rpcChannelFactory,
+                this._messageStreamFactory,
+            );
             this._map.set(address.key, channel);
         }
 

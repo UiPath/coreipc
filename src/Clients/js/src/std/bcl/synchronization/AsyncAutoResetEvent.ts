@@ -21,12 +21,14 @@ export class AsyncAutoResetEvent {
     public async waitOne(ct: CancellationToken = CancellationToken.none): Promise<void> {
         if (this._signalled) {
             this._signalled = false;
+
             return;
-        } else {
-            const awaiter = new Awaiter(ct);
-            this._awaiters.splice(0, 0, awaiter);
-            return awaiter.promise;
         }
+
+        const awaiter = new Awaiter(ct);
+        this._awaiters.splice(0, 0, awaiter);
+
+        return awaiter.promise;
     }
 }
 

@@ -1,9 +1,9 @@
 import { Address } from '..';
-import { IProxiesDomain, ProxyId, ProxyManager } from '.';
+import { IServiceProvider, ProxyId, ProxyManager } from '.';
 
 /* @internal */
 export class ProxyStore {
-    constructor(private readonly _domain: IProxiesDomain) {}
+    constructor(private readonly _domain: IServiceProvider) {}
 
     public resolve<TService, TAddress extends Address = Address>(
         proxyId: ProxyId<TService, TAddress>,

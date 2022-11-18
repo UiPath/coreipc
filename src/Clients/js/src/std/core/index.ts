@@ -5,3 +5,4 @@ export * from './ServiceId';
 export * from './Proxies';
 export * from './Protocol';
 export * from './Contract';
+export * from './Annotations';

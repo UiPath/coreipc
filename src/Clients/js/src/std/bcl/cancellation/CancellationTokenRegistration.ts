@@ -14,7 +14,7 @@ export class ProperCancellationTokenRegistration extends CancellationTokenRegist
     ) {
         super();
         assertArgument({ _source }, CancellationTokenSource);
-        assertArgument({ _source }, 'function');
+        assertArgument({ _callback }, 'function');
     }
 
     public dispose(): void {

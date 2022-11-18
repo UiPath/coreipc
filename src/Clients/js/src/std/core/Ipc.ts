@@ -7,19 +7,21 @@ import {
     UpdateConfigDelegate,
     AddressSelectionDelegate,
     ConfigStore,
+    RpcChannel,
+    MessageStream,
 } from '.';
 
 import {
     ProxyId,
     ProxyStore,
-    IProxiesDomain,
+    IServiceProvider,
     DispatchProxyStore,
     ChannelManagerStore,
     CallbackStore,
 } from './Proxies';
-import { IContractStore } from './Contract';
+import { ContractStore, IContractStore } from './Contract';
 
-export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> implements IProxiesDomain {
+export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> implements IServiceProvider {
     constructor(
         /* @internal */
         public readonly channelSelectorCtor: ParameterlessPublicCtor<TAddressBuilder>,
@@ -42,10 +44,14 @@ export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> implemen
     public readonly dispatchProxyStore: DispatchProxyStore = new DispatchProxyStore(this);
 
     /* @internal */
-    public readonly channelStore: ChannelManagerStore = new ChannelManagerStore(this);
+    public readonly channelStore: ChannelManagerStore = new ChannelManagerStore(
+        this,
+        RpcChannel,
+        new MessageStream.Factory(),
+    );
 
     /* @internal */
-    public readonly contractStore: IContractStore = null!;
+    public readonly contractStore: IContractStore = new ContractStore();
 
     /* @internal */
     public readonly callbackStore: CallbackStore = null!;

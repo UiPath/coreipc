@@ -1,9 +1,14 @@
-import { CallbackStore, ChannelManagerStore, ProxyStore } from '.';
-import { ConfigStore, IContractStore } from '..';
-import { DispatchProxyStore } from './DispatchProxy';
+import {
+    ConfigStore,
+    IContractStore,
+    DispatchProxyStore,
+    CallbackStore,
+    ChannelManagerStore,
+    ProxyStore,
+} from '.';
 
 /* @internal */
-export interface IProxiesDomain {
+export interface IServiceProvider {
     readonly configStore: ConfigStore;
     readonly proxyStore: ProxyStore;
     readonly dispatchProxyStore: DispatchProxyStore;

@@ -30,8 +30,6 @@ class Program
         string? mutex = null,
         int? delay = null)
     {
-        Debugger.Launch();
-
         if ((pipe, websocket) is (null, null))
         {
             Console.Error.WriteLine($"Expecting either a non-null pipe name or a non-null websocket url.");
@@ -156,7 +154,7 @@ internal static class Extensions
                 var listenerContext = await _httpListener.GetContextAsync();
                 if (listenerContext.Request.IsWebSocketRequest)
                 {
-                    var webSocketContext = await listenerContext.AcceptWebSocketAsync(subProtocol: null);
+                    var webSocketContext = await listenerContext.AcceptWebSocketAsync(subProtocol: "coreipc");
                     return webSocketContext.WebSocket;
                 }
                 listenerContext.Response.StatusCode = 400;

@@ -1,6 +1,6 @@
 export * from './ProxyStore';
 export * from './ProxyId';
-export * from './IProxiesDomain';
+export * from '../IServiceProvider';
 export * from './DispatchProxy';
 export * from './ProxyManager';
 export * from './ChannelManagerStore';
