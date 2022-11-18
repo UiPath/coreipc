@@ -422,5 +422,5 @@ public sealed class Connection : IDisposable
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
 }
 record IncomingRequest(Request Request, Method Method, EndpointSettings Endpoint);
-record OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
+readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
 record IncomingResponse(Response Response, ManualResetValueTaskSource Completion);
