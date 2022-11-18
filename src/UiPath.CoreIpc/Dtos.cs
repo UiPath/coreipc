@@ -20,7 +20,7 @@ public record Request(string Endpoint, int Id, string MethodName, double Timeout
 {
     internal Type ResponseType { get; init; }
     internal object[] Parameters { get; set; }
-    internal Stream UploadStream { get; set; }
+    internal Stream UploadStream { get; init; }
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
@@ -28,9 +28,7 @@ public record CancellationRequest(int RequestId);
 public record Response(int RequestId, Error Error = null)
 {
     internal object Data { get; set; }
-    internal Stream DownloadStream { get; set; }
     public static Response Fail(Request request, Exception ex) => new(request.Id, ex.ToError());
-    public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
 }
 [Serializable]
 public record Error(string Message, string StackTrace, string Type, Error InnerError)

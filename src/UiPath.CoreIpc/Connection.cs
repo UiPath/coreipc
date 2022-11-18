@@ -86,10 +86,11 @@ public sealed class Connection : IDisposable
     private void TryCancelRequest(int requestId) => Completion(requestId)?.SetCanceled();
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
     {
-        var responseBytes = Serialize(new[] { response, response.Data });
-        return response.DownloadStream == null ?
+        var downloadStream = response.Data as Stream;
+        var responseBytes = Serialize(new[] { response, downloadStream == null ? response.Data : null});
+        return downloadStream == null ?
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
-            SendDownloadStream(responseBytes, response.DownloadStream, cancellationToken);
+            SendDownloadStream(responseBytes, downloadStream, cancellationToken);
     }
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
@@ -267,7 +268,6 @@ public sealed class Connection : IDisposable
         _nestedStream.Disposed += disposedHandler;
         try
         {
-            response.Response.DownloadStream = _nestedStream;
             OnResponseReceived(response);
             await streamDisposed.Task;
         }
@@ -282,7 +282,6 @@ public sealed class Connection : IDisposable
         await EnterStreamMode();
         using (_nestedStream)
         {
-            request.Request.UploadStream = _nestedStream;
             await OnRequestReceived(request);
         }
     }
@@ -343,9 +342,9 @@ public sealed class Connection : IDisposable
         result = new(response, outgoingRequest.Completion);
         var bytes = await ReadBytes();
         var responseType = outgoingRequest.ResponseType;
-        if (response.Error == null && responseType != typeof(Stream))
+        if (response.Error == null)
         {
-            response.Data = MessagePackSerializer.Deserialize(responseType, bytes, Contractless);
+            response.Data = responseType == typeof(Stream) ? _nestedStream : MessagePackSerializer.Deserialize(responseType, bytes, Contractless);
         }
         return result;
     }

@@ -129,10 +129,6 @@ class Server
                 var methodResult = defaultScheduler ? MethodCall() : await RunOnScheduler();
                 await methodResult;
                 var returnValue = GetTaskResult(returnTaskType, methodResult);
-                if (returnValue is Stream downloadStream)
-                {
-                    return Response.Success(request, downloadStream);
-                }
                 return new Response(request.Id) { Data = returnValue };
             }
             else

@@ -124,7 +124,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 {
                     throw new RemoteException(response.Error);
                 }
-                return (TResult) (response.DownloadStream ?? response.Data);
+                return (TResult) response.Data;
             }
             catch (Exception ex)
             {
