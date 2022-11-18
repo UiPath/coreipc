@@ -55,9 +55,9 @@ public sealed class Connection : IDisposable
         await Send(request, token);
         var requestCompletion = Rent();
         var requestId = request.Id;
+        _requests[requestId] = new(requestCompletion, request.ResponseType);
         var cancelRequest = request.UploadStream == null ? _cancelRequest : _cancelUploadRequest;
         var tokenRegistration = token.UnsafeRegister(cancelRequest, requestId);
-        _requests[requestId] = new(requestCompletion, request.ResponseType);
         try
         {
             return await requestCompletion.ValueTask();
