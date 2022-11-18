@@ -20,7 +20,6 @@ public record Request(string Endpoint, int Id, string MethodName, double Timeout
 {
     internal Type ResponseType { get; init; }
     internal object[] Parameters { get; set; }
-    internal Stream UploadStream { get; init; }
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
 }

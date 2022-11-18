@@ -80,7 +80,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             CancellationToken cancellationToken = default;
             TimeSpan messageTimeout = default;
             TimeSpan clientTimeout = _requestTimeout;
-            Stream uploadStream = null;
             var methodName = method.Name;
             WellKnownArguments();
             var timeoutHelper = new TimeoutHelper(clientTimeout, cancellationToken);
@@ -104,7 +103,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 var requestId = _connection.NewRequestId();
                 var request = new Request(typeof(TInterface).Name, requestId, methodName, messageTimeout.TotalSeconds)
                 {
-                    Parameters = args, UploadStream = uploadStream, ResponseType = typeof(TResult)
+                    Parameters = args, ResponseType = typeof(TResult)
                 };
                 if (LogEnabled)
                 {
@@ -147,10 +146,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                             break;
                         case CancellationToken token:
                             cancellationToken = token;
-                            args[index] = null;
-                            break;
-                        case Stream stream:
-                            uploadStream = stream;
                             args[index] = null;
                             break;
                     }

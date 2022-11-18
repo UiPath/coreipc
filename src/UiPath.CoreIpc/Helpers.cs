@@ -137,7 +137,7 @@ public static class IOHelpers
         buffer[0] = (byte)messageType;
         var payloadLength = totalLength - HeaderLength;
         // https://github.com/dotnet/runtime/blob/85441ce69b81dfd5bf57b9d00ba525440b7bb25d/src/libraries/System.Private.CoreLib/src/System/BitConverter.cs#L133
-        Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer.Slice(1)), payloadLength);
+        Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer[1..]), payloadLength);
         return stream.WriteMessageCore(data, cancellationToken);
     }
 #if !NET461

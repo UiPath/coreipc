@@ -68,7 +68,14 @@ public sealed class Connection : IDisposable
     }
     internal ValueTask Send(Request request, CancellationToken token)
     {
-        var uploadStream = request.UploadStream;
+        if (request.Parameters is [Stream uploadStream, ..])
+        {
+            request.Parameters[0] = null;
+        }
+        else
+        {
+            uploadStream = null;
+        }
         var requestBytes = Serialize(new[] { request }.Concat(request.Parameters));
         return uploadStream == null ?
             SendMessage(MessageType.Request, requestBytes, token) :
