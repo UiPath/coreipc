@@ -13,7 +13,6 @@ public sealed class Connection : IDisposable
     private readonly WaitCallback _onRequest;
     private readonly WaitCallback _onCancellation;
     private readonly Action<object> _cancelRequest;
-    private readonly Action<object> _cancelUploadRequest;
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
     public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
@@ -29,7 +28,6 @@ public sealed class Connection : IDisposable
         _onRequest = request => OnRequestReceived((Request)request);
         _onCancellation = requestId => OnCancellationReceived((string)requestId);
         _cancelRequest = requestId => CancelRequest((string)requestId);
-        _cancelUploadRequest = requestId => CancelUploadRequest((string)requestId);
     }
     public Stream Network { get; }
     public ILogger Logger { get; internal set; }
@@ -51,8 +49,7 @@ public sealed class Connection : IDisposable
         var requestCompletion = Rent();
         var requestId = request.Id;
         _requests[requestId] = requestCompletion;
-        var cancelRequest = request.UploadStream == null ? _cancelRequest : _cancelUploadRequest;
-        var tokenRegistration = token.UnsafeRegister(cancelRequest, requestId);
+        var tokenRegistration = token.UnsafeRegister(_cancelRequest, requestId);
         try
         {
             return await requestCompletion.ValueTask();
@@ -80,11 +77,6 @@ public sealed class Connection : IDisposable
         return;
         Task CancelServerCall(string requestId) =>
             SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default).AsTask();
-    }
-    void CancelUploadRequest(string requestId)
-    {
-        Dispose();
-        TryCancelRequest(requestId);
     }
     private void TryCancelRequest(string requestId)
     {
