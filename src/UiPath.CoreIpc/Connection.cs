@@ -106,7 +106,7 @@ public sealed class Connection : IDisposable
     {
         using (downloadStream)
         {
-            await SendStream(MessageType.DownloadResponse, responseBytes, downloadStream, cancellationToken);
+            await SendStream(MessageType.Response, responseBytes, downloadStream, cancellationToken);
         }
     }
 #if !NET461
@@ -234,11 +234,7 @@ public sealed class Connection : IDisposable
             switch (messageType)
             {
                 case MessageType.Response:
-                    var response = await DeserializeResponse();
-                    if (response != null)
-                    {
-                        RunAsync(_onResponse, response);
-                    }
+                    await OnResponse();
                     break;
                 case MessageType.Request:
                     await OnRequest();
@@ -246,9 +242,6 @@ public sealed class Connection : IDisposable
                 case MessageType.CancellationRequest:
                     RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
                     break;
-                case MessageType.DownloadResponse:
-                    await OnDownloadResponse();
-                    return;
                 default:
                     if (LogEnabled)
                     {
@@ -259,31 +252,38 @@ public sealed class Connection : IDisposable
         }
     }
     static void RunAsync(WaitCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state);
-    private async Task OnDownloadResponse()
+    private async ValueTask OnResponse()
     {
         var response = await DeserializeResponse();
         if (response == null)
         {
             return;
         }
-        await EnterStreamMode();
-        var streamDisposed = new TaskCompletionSource<bool>();
-        EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
-        _nestedStream.Disposed += disposedHandler;
-        try
+        if (response.Response.Data == _nestedStream)
         {
-            OnResponseReceived(response);
-            await streamDisposed.Task;
+            await EnterStreamMode();
+            var streamDisposed = new TaskCompletionSource<bool>();
+            EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
+            _nestedStream.Disposed += disposedHandler;
+            try
+            {
+                OnResponseReceived(response);
+                await streamDisposed.Task;
+            }
+            finally
+            {
+                _nestedStream.Disposed -= disposedHandler;
+            }
         }
-        finally
+        else
         {
-            _nestedStream.Disposed -= disposedHandler;
+            RunAsync(_onResponse, response);
         }
     }
     private async ValueTask OnRequest()
     {
         var request = await DeserializeRequest();
-        if (request.Upload)
+        if (request.Request.Parameters is [Stream,..])
         {
             await EnterStreamMode();
             using (_nestedStream)
@@ -369,7 +369,6 @@ public sealed class Connection : IDisposable
         }
         var method = GetMethod(endpoint.Contract, request.MethodName);
         var args = new object[method.Parameters.Length];
-        bool upload = false;
         for (int index = 0; index < args.Length; index++)
         {
             var type = method.Parameters[index].ParameterType;
@@ -380,7 +379,6 @@ public sealed class Connection : IDisposable
             }
             else if (type == typeof(Stream))
             {
-                upload = true;
                 args[index] = _nestedStream;
                 continue;
             }
@@ -388,7 +386,7 @@ public sealed class Connection : IDisposable
             args[index] = CheckMessage(arg, type);
         }
         request.Parameters = args;
-        return new(request, method, endpoint, upload);
+        return new(request, method, endpoint);
         object CheckMessage(object argument, Type parameterType)
         {
             if (parameterType == typeof(Message) && argument == null)
@@ -435,6 +433,6 @@ public sealed class Connection : IDisposable
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
 }
-record IncomingRequest(Request Request, Method Method, EndpointSettings Endpoint, bool Upload);
+record IncomingRequest(Request Request, Method Method, EndpointSettings Endpoint);
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
 record IncomingResponse(Response Response, ManualResetValueTaskSource Completion);

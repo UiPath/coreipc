@@ -48,7 +48,7 @@ class Server
 #endif
     public async ValueTask OnRequestReceived(IncomingRequest incomingRequest)
     {
-        var (request, method, endpoint, _) = incomingRequest;
+        var (request, method, endpoint) = incomingRequest;
         try
         {
             if (!method.ReturnType.IsGenericType)
