@@ -79,7 +79,7 @@ public sealed class Connection : IDisposable
         var requestBytes = Serialize(new[] { request }.Concat(request.Parameters));
         return uploadStream == null ?
             SendMessage(MessageType.Request, requestBytes, token) :
-            SendStream(MessageType.UploadRequest, requestBytes, uploadStream, token);
+            SendStream(MessageType.Request, requestBytes, uploadStream, token);
     }
     void CancelRequest(int requestId)
     {
@@ -241,14 +241,11 @@ public sealed class Connection : IDisposable
                     }
                     break;
                 case MessageType.Request:
-                    RunAsync(_onRequest, await DeserializeRequest());
+                    await OnRequest();
                     break;
                 case MessageType.CancellationRequest:
                     RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
                     break;
-                case MessageType.UploadRequest:
-                    await OnUploadRequest();
-                    return;
                 case MessageType.DownloadResponse:
                     await OnDownloadResponse();
                     return;
@@ -283,13 +280,20 @@ public sealed class Connection : IDisposable
             _nestedStream.Disposed -= disposedHandler;
         }
     }
-    private async Task OnUploadRequest()
+    private async ValueTask OnRequest()
     {
         var request = await DeserializeRequest();
-        await EnterStreamMode();
-        using (_nestedStream)
+        if (request.Upload)
         {
-            await OnRequestReceived(request);
+            await EnterStreamMode();
+            using (_nestedStream)
+            {
+                await OnRequestReceived(request);
+            }
+        }
+        else
+        {
+            RunAsync(_onRequest, request);
         }
     }
     private async Task EnterStreamMode()
@@ -365,6 +369,7 @@ public sealed class Connection : IDisposable
         }
         var method = GetMethod(endpoint.Contract, request.MethodName);
         var args = new object[method.Parameters.Length];
+        bool upload = false;
         for (int index = 0; index < args.Length; index++)
         {
             var type = method.Parameters[index].ParameterType;
@@ -375,6 +380,7 @@ public sealed class Connection : IDisposable
             }
             else if (type == typeof(Stream))
             {
+                upload = true;
                 args[index] = _nestedStream;
                 continue;
             }
@@ -382,7 +388,7 @@ public sealed class Connection : IDisposable
             args[index] = CheckMessage(arg, type);
         }
         request.Parameters = args;
-        return new(request, method, endpoint);
+        return new(request, method, endpoint, upload);
         object CheckMessage(object argument, Type parameterType)
         {
             if (parameterType == typeof(Message) && argument == null)
@@ -429,6 +435,6 @@ public sealed class Connection : IDisposable
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
 }
-record IncomingRequest(Request Request, Method Method, EndpointSettings Endpoint);
+record IncomingRequest(Request Request, Method Method, EndpointSettings Endpoint, bool Upload);
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
 record IncomingResponse(Response Response, ManualResetValueTaskSource Completion);
