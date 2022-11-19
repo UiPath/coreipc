@@ -2,17 +2,11 @@ import { spawn } from 'child_process';
 import { Writable } from 'stream';
 import cliColor from 'cli-color';
 
-import {
-    InvalidOperationError,
-    PromiseCompletionSource,
-} from '../../../src/std';
+import { InvalidOperationError, PromiseCompletionSource } from '../../../src/std';
+import { NonZeroExitError } from './NonZeroExitError';
 
 export class NpmProcess {
-    public static runAsync(
-        label: string,
-        pathCwd: string,
-        script: string
-    ): Promise<void> {
+    public static runAsync(label: string, pathCwd: string, script: string): Promise<void> {
         const stderrLog = new Array<string>();
         const stdoutLog = new Array<string>();
         let stdin: Writable | null = null;
@@ -22,8 +16,8 @@ export class NpmProcess {
         let processExitCode: number | null;
         let processExitError: Error | undefined;
 
-        console.group(`⚡ ${cliColor.magenta(label)}`, script);
-        console.log(`⚡ ${cliColor.magenta(label)}::Starting`);
+        console.group(`⚡ ${cliColor.magentaBright(label)}`, script);
+        console.log(`⚡ ${cliColor.magentaBright(label)}::Starting`);
 
         const process = spawn('npm', ['run', script], {
             shell: true,
@@ -31,29 +25,31 @@ export class NpmProcess {
             stdio: 'inherit',
         });
 
-        console.log(
-            `⚡ ${cliColor.magenta(label)}::Started. PID === `,
-            process.pid
-        );
+        console.log(`⚡ ${cliColor.magentaBright(label)}::Started. PID === `, process.pid);
 
-        process.once('close', (code) => {
+        process.once('close', code => {
             processExitCode = code;
 
             if (code) {
-                processExitError = new InvalidOperationError(
-                    `Process ${process?.pid} exited with code ${code}\r\n\r\n` +
-                        `$STDERR:\r\n\r\n${stderrLog.join('\r\n')}\r\n\r\n` +
-                        `$STDOUT:\r\n\r\n${stdoutLog.join('\r\n')}`
+                processExitError = new NonZeroExitError(
+                    process,
+                    stderrLog.join('\r\n'),
+                    stderrLog.join('\r\n'),
                 );
+                // processExitError = new InvalidOperationError(
+                //     `Process ${process?.pid} exited with code ${code}\r\n` +
+                //         `$STDERR:\r\n${stderrLog.join('\r\n')}\r\n` +
+                //         `$STDOUT:\r\n${stdoutLog.join('\r\n')}`,
+                // );
             }
 
             if (!processExitError) {
-                console.log(`⚡ ${cliColor.magenta(label)}::Succeeded`);
+                console.log(`⚡ ${cliColor.magentaBright(label)}::Succeeded`);
             } else {
-                console.group(`⚡ ${cliColor.magenta(label)}::Failed`);
-                console.log('exitcode === ', code);
-                console.log('error ===\r\n', processExitError);
-                console.groupEnd();
+                console.log(
+                    `⚡ ${cliColor.magentaBright(label)}::Failed with exit code`,
+                    cliColor.redBright(code),
+                );
             }
             console.groupEnd();
 
@@ -66,7 +62,7 @@ export class NpmProcess {
 
         // process.stderr.setEncoding('utf-8').observeLines((line) => {
         //     console.error(
-        //         cliColor.magenta(label),
+        //         cliColor.magentaBright(label),
         //         cliColor.redBright('.stdout:'),
         //         line
         //     );
@@ -75,7 +71,7 @@ export class NpmProcess {
         // });
         // process.stdout.setEncoding('utf-8').observeLines((line) => {
         //     console.log(
-        //         cliColor.magenta(label),
+        //         cliColor.magentaBright(label),
         //         cliColor.greenBright('.stdout:'),
         //         line
         //     );

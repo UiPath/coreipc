@@ -2,17 +2,20 @@ import {
     ConfigStore,
     IContractStore,
     DispatchProxyStore,
-    CallbackStore,
+    CallbackStoreImpl,
     ChannelManagerStore,
     ProxyStore,
+    AddressBuilder,
 } from '.';
 
 /* @internal */
-export interface IServiceProvider {
+export interface IServiceProvider<TAddressBuilder extends AddressBuilder = any> {
     readonly configStore: ConfigStore;
     readonly proxyStore: ProxyStore;
     readonly dispatchProxyStore: DispatchProxyStore;
     readonly channelStore: ChannelManagerStore;
     readonly contractStore: IContractStore;
-    readonly callbackStore: CallbackStore;
+    readonly callbackStore: CallbackStoreImpl;
+
+    createAddressBuilder(): TAddressBuilder;
 }

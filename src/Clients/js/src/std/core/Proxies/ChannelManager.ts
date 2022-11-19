@@ -86,7 +86,7 @@ export class ChannelManager<TAddress extends Address = Address> {
             );
         }
 
-        const args = request.Parameters.map((jsonArg) => JSON.parse(jsonArg));
+        const args = request.Parameters.map(jsonArg => JSON.parse(jsonArg));
         let data: string | null = null;
         let error: IpcError | null = null;
 

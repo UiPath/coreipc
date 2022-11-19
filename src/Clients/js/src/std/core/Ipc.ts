@@ -17,15 +17,22 @@ import {
     IServiceProvider,
     DispatchProxyStore,
     ChannelManagerStore,
-    CallbackStore,
+    CallbackStoreImpl,
 } from './Proxies';
 import { ContractStore, IContractStore } from './Contract';
+import { Callback, CallbackImpl } from './Callbacks';
 
-export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> implements IServiceProvider {
+export abstract class Ipc<TAddressBuilder extends AddressBuilder = any>
+    implements IServiceProvider<TAddressBuilder>
+{
     constructor(
         /* @internal */
         public readonly addressBuilder: ParameterlessPublicCtor<TAddressBuilder>,
     ) {}
+
+    createAddressBuilder(): TAddressBuilder {
+        return new this.addressBuilder();
+    }
 
     public readonly proxy: Ipc.ProxySource<TAddressBuilder> = new Ipc.ProxySource<TAddressBuilder>(
         this,
@@ -33,6 +40,8 @@ export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> implemen
 
     public readonly config: Ipc.Configuration<TAddressBuilder> =
         new Ipc.Configuration<TAddressBuilder>(this);
+
+    public readonly callback: Callback<TAddressBuilder> = new CallbackImpl<TAddressBuilder>(this);
 
     /* @internal */
     public readonly configStore = new ConfigStore();
@@ -54,7 +63,7 @@ export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> implemen
     public readonly contractStore: IContractStore = new ContractStore();
 
     /* @internal */
-    public readonly callbackStore: CallbackStore = null!;
+    public readonly callbackStore = new CallbackStoreImpl();
 }
 
 export module Ipc {

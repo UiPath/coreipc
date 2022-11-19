@@ -6,4 +6,4 @@ export * from './ProxyManager';
 export * from './ChannelManagerStore';
 export * from './ChannelManager';
 export * from './RpcRequestFactory';
-export * from './CallbackStore';
+export * from './CallbackStoreImpl';

@@ -92,10 +92,10 @@ export class DotNetProcess implements IAsyncDisposable {
             if (!this.processExitError) {
                 console.log(`⚡ ${cliColor.blueBright(this._label)}::Succeeded`);
             } else {
-                console.group(`⚡ ${cliColor.blueBright(this._label)}::Failed`);
-                console.log('exitcode === ', code);
-                console.log('error ===\r\n', this.processExitError);
-                console.groupEnd();
+                console.log(
+                    `⚡ ${cliColor.blueBright(this._label)}::Failed with exit code`,
+                    cliColor.redBright(code),
+                );
             }
             console.groupEnd();
 

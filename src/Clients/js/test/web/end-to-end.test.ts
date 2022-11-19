@@ -1,31 +1,86 @@
 import { expect } from 'chai';
+import { Message, PromisePal } from '../../src/std';
 import { ipc } from '../../src/web';
+import { IAlgebra, IArithmetics } from './Contracts';
+import { algebraProxyFactory, serverUrl } from './Fixtures';
 
-class IAlgebra {
-    public MultiplySimple(x: number, y: number): Promise<number> {
-        throw void 0;
-    }
-}
-
-describe('web:end-to-end', () => {
-    it('new WebSocket should not throw', function () {
+describe('web:the browser built-in WebSocket class', () => {
+    it('should be instantiable', () => {
         const act = () =>
             eval(/* js */ `
             new WebSocket('ws://localhost:1234', 'foobar')
         `);
-        expect(act).not.to.throw();
+        expect(act).not.to.throw().and.to.be.instanceOf(WebSocket);
     });
+});
 
-    it('calling MultiplySimple(2, 3) should return 6', async () => {
-        const url = 'ws://localhost:1234';
-        const x = 2;
-        const y = 3;
-        const expected = 6;
+describe('web:end-to-end', () => {
+    describe('remote procedure calling', () => {
+        let algebraProxy: IAlgebra = null!;
 
-        const proxy = ipc.proxy.withAddress(x => x.isWebSocket(url)).withService(IAlgebra);
+        beforeAll(() => {
+            algebraProxy = algebraProxyFactory();
+        });
 
-        const actual = await proxy.MultiplySimple(x, y);
+        it('should work', async () => {
+            const x = 2;
+            const y = 3;
+            const expected = 6;
 
-        expect(actual).to.equal(expected);
+            const actual = await algebraProxy.MultiplySimple(x, y);
+
+            expect(actual).to.equal(expected);
+        });
+
+        it('should work concurrently', async () => {
+            const span1 = 30;
+            const span2 = 1;
+
+            let call1Completed = false;
+
+            async function call1() {
+                try {
+                    await algebraProxy.Sleep(span1);
+                } finally {
+                    call1Completed = true;
+                }
+            }
+
+            const call1Wrapper = call1();
+
+            await PromisePal.delay(1);
+            await algebraProxy.Sleep(span2);
+            expect(call1Completed).to.equal(false);
+            await call1Wrapper;
+        });
+
+        it('should work with callbacks', async () => {
+            const x = 7;
+            const originalMessage = new Message<number>({ payload: x });
+            const expected = true;
+
+            let receivedMessage: Message<number> | undefined;
+
+            const arithmetics = new (class implements IArithmetics {
+                Sum(x: number, y: number): Promise<number> {
+                    throw new Error('Method not implemented.');
+                }
+                async SendMessage(message: Message<number>): Promise<boolean> {
+                    receivedMessage = message;
+                    return true;
+                }
+            })();
+
+            ipc.callback
+                .forAddress(x => x.isWebSocket(serverUrl))
+                .forService<IArithmetics>('IArithmetics')
+                .is(arithmetics);
+
+            const actual = await algebraProxy.TestMessage(originalMessage);
+
+            expect(actual).to.equal(expected);
+            expect(receivedMessage).not.to.be.undefined.and.not.to.be.null;
+            expect(receivedMessage?.Payload).to.equal(originalMessage.Payload);
+        });
     });
 });
