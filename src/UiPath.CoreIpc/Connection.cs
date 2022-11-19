@@ -228,29 +228,27 @@ public sealed class Connection : IDisposable
 #if !NET461
         [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-        async ValueTask HandleMessage()
+        ValueTask HandleMessage()
         {
             var messageType = (MessageType)_buffer[0];
             switch (messageType)
             {
                 case MessageType.Response:
-                    await OnResponse();
-                    break;
+                    return OnResponse();
                 case MessageType.Request:
-                    await OnRequest();
-                    break;
+                    return OnRequest();
                 case MessageType.CancellationRequest:
-                    RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
-                    break;
+                    return OnCancel();
                 default:
                     if (LogEnabled)
                     {
                         Log("Unknown message type " + messageType);
                     }
-                    break;
+                    return default;
             };
         }
     }
+    private async ValueTask OnCancel() => RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
     static void RunAsync(WaitCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state);
     private async ValueTask OnResponse()
     {
