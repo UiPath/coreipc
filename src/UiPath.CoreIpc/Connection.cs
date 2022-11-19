@@ -340,19 +340,17 @@ public sealed class Connection : IDisposable
         {
             Log($"Received response for request {response.RequestId} {Name}.");
         }
-        IncomingResponse result;
         if (!_requests.TryRemove(response.RequestId, out var outgoingRequest))
         {
             return null;
         }
-        result = new(response, outgoingRequest.Completion);
         var bytes = await ReadBytes();
         var responseType = outgoingRequest.ResponseType;
         if (response.Error == null)
         {
             response.Data = responseType == typeof(Stream) ? _nestedStream : MessagePackSerializer.Deserialize(responseType, bytes, Contractless);
         }
-        return result;
+        return new(response, outgoingRequest.Completion); ;
     }
     private async ValueTask<IncomingRequest> DeserializeRequest()
     {
