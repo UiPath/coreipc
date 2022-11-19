@@ -24,7 +24,7 @@ import { ContractStore, IContractStore } from './Contract';
 export abstract class Ipc<TAddressBuilder extends AddressBuilder = any> implements IServiceProvider {
     constructor(
         /* @internal */
-        public readonly channelSelectorCtor: ParameterlessPublicCtor<TAddressBuilder>,
+        public readonly addressBuilder: ParameterlessPublicCtor<TAddressBuilder>,
     ) {}
 
     public readonly proxy: Ipc.ProxySource<TAddressBuilder> = new Ipc.ProxySource<TAddressBuilder>(
@@ -65,7 +65,7 @@ export module Ipc {
         public withAddress<TAddress extends Address>(
             configure: AddressSelectionDelegate<TAddressBuilder, TAddress>,
         ): ProxySourceWithAddress<TAddress> {
-            const builder = new this._ipc.channelSelectorCtor();
+            const builder = new this._ipc.addressBuilder();
             const type = configure(builder);
             const address = builder.assertAddress<TAddress>(type);
 
@@ -100,7 +100,7 @@ export module Ipc {
         public forAddress<TAddress extends Address>(
             configure: AddressSelectionDelegate<TAddressBuilder, TAddress>,
         ): ConfigurationWithAddress<TAddress> {
-            const builder = new this._ipc.channelSelectorCtor();
+            const builder = new this._ipc.addressBuilder();
             const type = configure(builder);
             const address = builder.assertAddress<TAddress>(type);
 

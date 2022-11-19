@@ -152,7 +152,9 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
     }
 
     private processIncommingResponse(message: Network.Message): void {
-        this._outgoingCalls.tryComplete(RpcMessage.Response.fromNetwork(message));
+        const rpcResponse = RpcMessage.Response.fromNetwork(message);
+
+        this._outgoingCalls.tryComplete(rpcResponse);
     }
 
     private processIncommingRequest(message: Network.Message): void {

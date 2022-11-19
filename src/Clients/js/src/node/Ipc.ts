@@ -1,14 +1,14 @@
 import { Ipc as IpcBase, AddressSelectionDelegate } from '../std';
+import { NodeAddressBuilder } from './NodeAddressBuilder';
+import { NamedPipeAddress } from '.';
 
-import { NamedPipeAddress, AddressBuilder } from '.';
-
-export class Ipc extends IpcBase<AddressBuilder> {
+export class Ipc extends IpcBase<NodeAddressBuilder> {
     constructor() {
-        super(AddressBuilder);
+        super(NodeAddressBuilder);
     }
 
-    public namedPipe(name: string): AddressSelectionDelegate<AddressBuilder, NamedPipeAddress> {
-        return (builder) => builder.isPipe(name);
+    public namedPipe(name: string): AddressSelectionDelegate<NodeAddressBuilder, NamedPipeAddress> {
+        return builder => builder.isPipe(name);
     }
 }
 

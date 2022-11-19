@@ -1,7 +1,8 @@
-import { AddressBuilder as AddressBuilderBase, PublicCtor } from '../std';
-import { BrowserWebSocketAddress } from '.';
+import { AddressBuilder, PublicCtor } from '../std';
+import { BrowserWebSocketAddress } from './Transport';
 
-export class AddressBuilder extends AddressBuilderBase {
+/* @internal */
+export class WebAddressBuilder extends AddressBuilder {
     public isWebSocket(url: string): PublicCtor<BrowserWebSocketAddress> {
         super._address = new BrowserWebSocketAddress(url);
         return BrowserWebSocketAddress;

@@ -8,18 +8,16 @@ async function main(args: string[]): Promise<number> {
     const pathNpmPackageJson = process.env[keyPathNpmPackagejson];
 
     if (!pathNpmPackageJson) {
-        console.error(
-            `Expecting the "${keyPathNpmPackagejson}" environment variable to be set.`
-        );
+        console.error(`Expecting the "${keyPathNpmPackagejson}" environment variable to be set.`);
         return 1;
     }
 
     const pathHome = path.dirname(pathNpmPackageJson);
 
-    const headOptions = commandLineArgs(
-        [{ name: 'command', defaultOption: true }],
-        { argv: args, stopAtFirstUnknown: true }
-    );
+    const headOptions = commandLineArgs([{ name: 'command', defaultOption: true }], {
+        argv: args,
+        stopAtFirstUnknown: true,
+    });
 
     const tailArgs = headOptions._unknown ?? [];
 
@@ -41,18 +39,20 @@ async function main(args: string[]): Promise<number> {
                         type: String,
                     },
                 ],
-                { argv: tailArgs }
+                { argv: tailArgs },
             );
 
             const websocketUrl = hostOptions[keyWebsocketUrl] as string;
             const script = hostOptions[keyScript] as string;
 
-            await CoreIpcServer.host(
-                new BrowserWebSocketAddress(websocketUrl),
-                async () => {
+            try {
+                await CoreIpcServer.host(new BrowserWebSocketAddress(websocketUrl), async () => {
                     await NpmProcess.runAsync('𝒏𝒑𝒎 𝒓𝒖𝒏', pathHome, script);
-                }
-            );
+                });
+            } catch (error) {
+                console.error(error);
+                process.exit(2);
+            }
         }
         default: {
             return 2;
@@ -65,4 +65,3 @@ async function bootstrapper() {
 }
 
 bootstrapper();
-

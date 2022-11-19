@@ -1,37 +1,37 @@
 import { ipc } from '../../src/node';
 import { expect } from 'chai';
 
-class IArithmetics {
-    sumAsync(x: number, y: number): Promise<number> {
+class IAlgebra {
+    public MultiplySimple(x: number, y: number): Promise<number> {
         throw void 0;
     }
 }
 
 describe('node', function () {
     it('should work 2', async () => {
-        let arithmetics: IArithmetics | undefined = undefined;
+        let proxy: IAlgebra | undefined = undefined;
 
         const act = () => {
-            arithmetics = ipc.proxy
-                .withAddress((builder) => builder.isWebSocket('ws://foobar'))
-                .withService(IArithmetics);
+            proxy = ipc.proxy
+                .withAddress(builder => builder.isWebSocket('ws://localhost:1234'))
+                .withService(IAlgebra);
         };
 
         expect(act).not.to.throw();
-        expect(arithmetics!).to.be.instanceOf(Object);
+        expect(proxy!).to.be.instanceOf(Object);
 
         ipc.config
-            .forAddress((x) => x.isWebSocket('ws://foobar.com'))
+            .forAddress(x => x.isWebSocket('ws://localhost:1234'))
             .forAnyService()
-            .update((builder) =>
+            .update(builder =>
                 builder
-                    .setConnectHelper(async (context) => {
-                        const x = context.address.url;
+                    .setConnectHelper(async context => {
+                        await context.tryConnectAsync();
                     })
-                    .setRequestTimeout(100)
+                    .setRequestTimeout(100),
             );
 
-        const actual = await arithmetics!.sumAsync(2, 3);
-        expect(actual).to.equal(5);
+        const actual = await proxy!.MultiplySimple(2, 3);
+        expect(actual).to.equal(6);
     });
 });

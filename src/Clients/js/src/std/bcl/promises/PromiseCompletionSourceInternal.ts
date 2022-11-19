@@ -7,7 +7,6 @@ import {
     FinalStateCanceled,
     PromisePal,
 } from '.';
-import { assert } from 'chai';
 
 /* @internal */
 export interface IPromiseCompletionSourceInternal<T = unknown> {
@@ -30,7 +29,7 @@ export class PromiseCompletionSourceInternal<T = unknown>
 
     constructor() {
         const _this = this as unknown as CompleterContainer<T>;
-        const assignCompleter = (resolve: Resolver<T>, reject: Rejecter) => {
+        const assignCompleter = (resolve: Resolver<T>, reject: Rejector) => {
             _this._completer = new Completer(resolve, reject);
         };
 
@@ -77,10 +76,10 @@ export class PromiseCompletionSourceInternal<T = unknown>
 }
 
 type Resolver<T> = (result: T) => void;
-type Rejecter = (error: Error) => void;
+type Rejector = (error: Error) => void;
 
 class Completer<T> {
-    constructor(private readonly _resolve: Resolver<T>, private readonly _reject: Rejecter) {}
+    constructor(private readonly _resolve: Resolver<T>, private readonly _reject: Rejector) {}
 
     public setFinalState(finalState: FinalState<T>): void {
         if (finalState.isRanToCompletion()) {

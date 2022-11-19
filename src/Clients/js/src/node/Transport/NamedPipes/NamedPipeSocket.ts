@@ -37,7 +37,7 @@ export class NamedPipeSocket extends Socket {
             address: new NamedPipeAddress(pipeName),
             timeout,
             ct,
-            async tryConnect() {
+            async tryConnectAsync() {
                 tryConnectCalled = true;
                 if (socket) {
                     return true;

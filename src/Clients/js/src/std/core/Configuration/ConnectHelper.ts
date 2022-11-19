@@ -9,5 +9,5 @@ export type ConnectHelper<TAddress extends Address> = (
 export const defaultConnectHelper: ConnectHelper<Address> = async (
     context: ConnectContext<Address>,
 ): Promise<void> => {
-    await context.tryConnect();
+    await context.tryConnectAsync();
 };

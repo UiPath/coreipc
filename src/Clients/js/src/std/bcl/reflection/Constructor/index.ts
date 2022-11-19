@@ -1,3 +1,3 @@
-export * from './Public';
+export * from './PublicCtor';
 export * from './UnnamedPublicCtor';
 export * from './ParameterlessPublic';

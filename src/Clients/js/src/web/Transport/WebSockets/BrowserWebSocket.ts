@@ -38,7 +38,7 @@ export class BrowserWebSocket extends Socket {
             address: new BrowserWebSocketAddress(url),
             timeout,
             ct,
-            async tryConnect() {
+            async tryConnectAsync() {
                 tryConnectCalled = true;
                 if (socket) {
                     return true;

@@ -1,4 +1,5 @@
 import { Observable, Subject } from 'rxjs';
+import WebSocket from 'ws';
 
 import {
     assertArgument,
@@ -38,18 +39,21 @@ export class NodeWebSocket extends Socket {
             address: new NodeWebSocketAddress(url),
             timeout,
             ct,
-            async tryConnect() {
-                tryConnectCalled = true;
-                if (socket) {
-                    return true;
-                }
-
+            async tryConnectAsync() {
                 try {
-                    socket = await NodeWebSocket.connect(url, timeout, ct, socketLikeCtor);
-                    return true;
-                } catch (error) {
-                    errors.push(UnknownError.ensureError(error));
-                    return false;
+                    if (socket) {
+                        return true;
+                    }
+
+                    try {
+                        socket = await NodeWebSocket.connect(url, timeout, ct, socketLikeCtor);
+                        return true;
+                    } catch (error) {
+                        errors.push(UnknownError.ensureError(error));
+                        return false;
+                    }
+                } finally {
+                    tryConnectCalled = true;
                 }
             },
         });
@@ -88,7 +92,8 @@ export class NodeWebSocket extends Socket {
         assertArgument({ ct }, CancellationToken);
         assertArgument({ socketLikeCtor }, 'undefined', Function);
 
-        const WebSocketCtor = socketLikeCtor ?? WebSocket;
+        // const WebSocketCtor = socketLikeCtor ?? WebSocket;
+        const WebSocketCtor = WebSocket;
 
         /* istanbul ignore next */
         const socket = new WebSocketCtor(url, 'coreipc');
@@ -96,12 +101,12 @@ export class NodeWebSocket extends Socket {
 
         const pcs = new PromiseCompletionSource<void>();
 
-        socket.onerror = (event) => {
-            const error = new NodeWebSocketError.ConnectFailure(socket);
+        socket.onerror = event => {
+            const error = new NodeWebSocketError.ConnectFailure(socket, event.error);
             pcs.trySetFaulted(error);
         };
 
-        socket.onopen = (event) => {
+        socket.onopen = event => {
             pcs.trySetResult();
         };
 
@@ -137,7 +142,7 @@ export class NodeWebSocket extends Socket {
             return;
         }
 
-        return await new Promise<void>((resolve) => {
+        return await new Promise<void>(resolve => {
             this._socket.send(buffer);
             resolve();
         });
@@ -160,7 +165,7 @@ export class NodeWebSocket extends Socket {
     private constructor(private readonly _socket: NodeWebSocketLike) {
         super();
         _socket.onclose = () => this.dispose();
-        _socket.onmessage = (event) => {
+        _socket.onmessage = event => {
             const buffer = Buffer.from(event.data as ArrayBuffer);
             this._$data.next(buffer);
         };

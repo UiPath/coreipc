@@ -34,10 +34,7 @@ export class DotNetProcess implements IAsyncDisposable {
     private _stderrLog = new Array<string>();
     private _stdoutLog = new Array<string>();
 
-    private _awaiterMap = new Map<
-        Signal.Kind,
-        PromiseCompletionSource<unknown>
-    >();
+    private _awaiterMap = new Map<Signal.Kind, PromiseCompletionSource<unknown>>();
     private _disposed = false;
     private _error?: Error;
 
@@ -79,24 +76,21 @@ export class DotNetProcess implements IAsyncDisposable {
             stdio: 'pipe',
         });
 
-        console.log(
-            `⚡ ${cliColor.blueBright(this._label)}::Started. PID === `,
-            this._process.pid
-        );
+        console.log(`⚡ ${cliColor.blueBright(this._label)}::Started. PID === `, this._process.pid);
 
-        this._process.once('close', (code) => {
+        this._process.once('close', code => {
             this._processExitCode = code;
 
-            this._processExitError = new InvalidOperationError(
-                `Process ${this._process?.pid} exited with code ${code}\r\n\r\n` +
-                    `$STDERR:\r\n\r\n${this._stderrLog.join('\r\n')}\r\n\r\n` +
-                    `$STDOUT:\r\n\r\n${this._stdoutLog.join('\r\n')}`
-            );
-
-            if (this.processExitError) {
-                console.log(
-                    `⚡ ${cliColor.blueBright(this._label)}::Succeeded`
+            if (code) {
+                this._processExitError = new InvalidOperationError(
+                    `Process ${this._process?.pid} exited with code ${code}\r\n\r\n` +
+                        `$STDERR:\r\n\r\n${this._stderrLog.join('\r\n')}\r\n\r\n` +
+                        `$STDOUT:\r\n\r\n${this._stdoutLog.join('\r\n')}`,
                 );
+            }
+
+            if (!this.processExitError) {
+                console.log(`⚡ ${cliColor.blueBright(this._label)}::Succeeded`);
             } else {
                 console.group(`⚡ ${cliColor.blueBright(this._label)}::Failed`);
                 console.log('exitcode === ', code);
@@ -105,33 +99,24 @@ export class DotNetProcess implements IAsyncDisposable {
             }
             console.groupEnd();
 
-            if (code) {
+            if (this._processExitError) {
                 this._pcsExit.trySetFaulted(this._processExitError);
+                for (const awaiter of this._awaiterMap.values()) {
+                    awaiter.trySetFaulted(this._processExitError);
+                }
             } else {
                 this._pcsExit.trySetResult();
             }
-
-            for (const awaiter of this._awaiterMap.values()) {
-                awaiter.trySetFaulted(this._processExitError);
-            }
         });
 
-        this._process.stderr.setEncoding('utf-8').observeLines((line) => {
-            console.error(
-                cliColor.blueBright(this._label),
-                cliColor.redBright('.stderr:'),
-                line
-            );
+        this._process.stderr.setEncoding('utf-8').observeLines(line => {
+            console.error(cliColor.blueBright(this._label), cliColor.redBright('.stderr:'), line);
 
             this._stderrLog.push(line);
         });
-        this._process.stdout.setEncoding('utf-8').observeLines((line) => {
+        this._process.stdout.setEncoding('utf-8').observeLines(line => {
             cliColor;
-            console.log(
-                cliColor.blueBright(this._label),
-                cliColor.greenBright('.stdout:'),
-                line
-            );
+            console.log(cliColor.blueBright(this._label), cliColor.greenBright('.stdout:'), line);
 
             this._stdoutLog.push(line);
 
@@ -142,18 +127,13 @@ export class DotNetProcess implements IAsyncDisposable {
                 if (signal.Kind === Signal.Kind.Throw) {
                     const details = signal.Details as Signal.ExceptionDetails;
                     this._error =
-                        this._error ??
-                        new DotNetScriptError(details.Type, details.Message);
+                        this._error ?? new DotNetScriptError(details.Type, details.Message);
                     for (const signalKind of this._awaiterMap.keys()) {
-                        this._awaiterMap
-                            .get(signalKind)
-                            ?.trySetFaulted(this._error);
+                        this._awaiterMap.get(signalKind)?.trySetFaulted(this._error);
                     }
                 }
 
-                this.getCompletionSource(signal.Kind).trySetResult(
-                    signal.Details
-                );
+                this.getCompletionSource(signal.Kind).trySetResult(signal.Details);
             }
         });
 
@@ -173,13 +153,13 @@ export class DotNetProcess implements IAsyncDisposable {
             if (this._disposed) {
                 reject(
                     new Error(
-                        `Cannot access a disposed object.\r\nObject name: ${DotNetProcess.name}.`
-                    )
+                        `Cannot access a disposed object.\r\nObject name: ${DotNetProcess.name}.`,
+                    ),
                 );
                 return;
             }
 
-            (this._stdin as Writable).write(`${line}\r\n`, (maybeError) => {
+            (this._stdin as Writable).write(`${line}\r\n`, maybeError => {
                 if (maybeError == null) {
                     resolve();
                 } else {
@@ -189,9 +169,7 @@ export class DotNetProcess implements IAsyncDisposable {
         });
     }
 
-    private getCompletionSource<T = unknown>(
-        signalKind: Signal.Kind
-    ): PromiseCompletionSource<T> {
+    private getCompletionSource<T = unknown>(signalKind: Signal.Kind): PromiseCompletionSource<T> {
         let result = this._awaiterMap.get(signalKind);
         if (!result) {
             result = new PromiseCompletionSource<T>();
@@ -204,10 +182,7 @@ export class DotNetProcess implements IAsyncDisposable {
         const process = this._process as ChildProcessWithoutNullStreams;
 
         if (this._disposed || process.killed) {
-            throw (
-                this._processExitError ??
-                new ObjectDisposedError('DotNetScript')
-            );
+            throw this._processExitError ?? new ObjectDisposedError('DotNetScript');
         }
 
         if (this._error) {
@@ -219,14 +194,11 @@ export class DotNetProcess implements IAsyncDisposable {
 
     public async disposeAsync(): Promise<void> {
         if (this._process && !this._process.killed) {
-            await new Promise<void>((resolve) => {
+            await new Promise<void>(resolve => {
                 (this._process as ChildProcessWithoutNullStreams).kill();
-                (this._process as ChildProcessWithoutNullStreams).once(
-                    'exit',
-                    () => {
-                        resolve();
-                    }
-                );
+                (this._process as ChildProcessWithoutNullStreams).once('exit', () => {
+                    resolve();
+                });
             });
         }
     }
@@ -241,7 +213,7 @@ declare module 'stream' {
 
 Readable.prototype.observeLines = function (
     this: Readable,
-    arg0: string[] | ((line: string) => void)
+    arg0: string[] | ((line: string) => void),
 ): IDisposable {
     if (typeof arg0 === 'function') {
         const observer = arg0;
@@ -266,6 +238,6 @@ Readable.prototype.observeLines = function (
     } else {
         const destination = arg0;
 
-        return this.observeLines((line) => destination.push(line));
+        return this.observeLines(line => destination.push(line));
     }
 };

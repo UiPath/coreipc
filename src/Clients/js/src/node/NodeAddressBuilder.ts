@@ -1,7 +1,8 @@
-import { AddressBuilder as AddressBuilderBase, PublicCtor } from '../std';
-import { NamedPipeAddress, NodeWebSocketAddress } from '.';
+import { AddressBuilder, PublicCtor } from '../std';
+import { NamedPipeAddress, NodeWebSocketAddress } from './Transport';
 
-export class AddressBuilder extends AddressBuilderBase {
+/* @internal */
+export class NodeAddressBuilder extends AddressBuilder {
     public isPipe(name: string): PublicCtor<NamedPipeAddress> {
         super._address = new NamedPipeAddress(name);
         return NamedPipeAddress;

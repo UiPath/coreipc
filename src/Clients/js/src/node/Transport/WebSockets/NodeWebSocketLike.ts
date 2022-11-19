@@ -1,12 +1,14 @@
+import WebSocket from 'ws';
+
 /* @internal */
 export interface NodeWebSocketLike {
-    binaryType: 'blob' | 'arraybuffer';
+    binaryType: 'nodebuffer' | 'arraybuffer' | 'fragments';
 
     send(data: string | ArrayBufferLike | Blob | ArrayBufferView): void;
     close(code?: number, reason?: string): void;
 
-    onopen: ((this: WebSocket, ev: Event) => any) | null;
-    onclose: ((this: WebSocket, ev: CloseEvent) => any) | null;
-    onerror: ((this: WebSocket, ev: Event) => any) | null;
-    onmessage: ((this: WebSocket, ev: MessageEvent) => any) | null;
+    onopen: ((event: WebSocket.Event) => void) | null;
+    onerror: ((event: WebSocket.ErrorEvent) => void) | null;
+    onclose: ((event: WebSocket.CloseEvent) => void) | null;
+    onmessage: ((event: WebSocket.MessageEvent) => void) | null;
 }

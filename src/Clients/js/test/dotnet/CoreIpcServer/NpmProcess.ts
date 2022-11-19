@@ -47,7 +47,7 @@ export class NpmProcess {
                 );
             }
 
-            if (processExitError) {
+            if (!processExitError) {
                 console.log(`⚡ ${cliColor.magenta(label)}::Succeeded`);
             } else {
                 console.group(`⚡ ${cliColor.magenta(label)}::Failed`);

@@ -5,7 +5,11 @@ export class NodeWebSocketError extends CoreIpcError {}
 
 export module NodeWebSocketError {
     export class ConnectFailure extends NodeWebSocketError {
-        constructor(public readonly socket: NodeWebSocketLike, message?: string) {
+        constructor(
+            public readonly socket: NodeWebSocketLike,
+            public readonly innerError: any,
+            message?: string,
+        ) {
             super(message ?? ConnectFailure.defaultMessage);
         }
 
