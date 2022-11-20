@@ -23,7 +23,7 @@ export class CancellationTokenSource implements IDisposable {
         if (tokens.length === 0) {
             throw new ArgumentError('No tokens were supplied.');
         }
-        if (tokens.filter((x) => !(x instanceof CancellationToken)).length > 0) {
+        if (tokens.filter(x => !(x instanceof CancellationToken)).length > 0) {
             throw new ArgumentError(
                 'Some supplied arguments were not instances of CancellationToken.',
             );
@@ -35,7 +35,7 @@ export class CancellationTokenSource implements IDisposable {
         }
 
         const disposable = new AggregateDisposable(
-            ...tokens.map((token) => token.register(onCancellation)),
+            ...tokens.map(token => token.register(onCancellation)),
         );
 
         const result = new LinkedCancellationTokenSource(disposable);
@@ -53,21 +53,25 @@ export class CancellationTokenSource implements IDisposable {
     constructor();
     constructor(millisecondsDelay: number);
     constructor(delay: TimeSpan);
-    constructor(arg0?: number | TimeSpan) {
-        const paramName: string = typeof arg0 === 'number' ? 'millisecondsDelay' : 'delay';
-        if (arg0 != null) {
-            arg0 = TimeSpan.toTimeSpan(arg0);
+    constructor(millisecondsDelayOrDelay?: number | TimeSpan) {
+        assertArgument({ arg0: millisecondsDelayOrDelay }, 'number', TimeSpan, 'undefined');
+
+        const paramName: string =
+            typeof millisecondsDelayOrDelay === 'number' ? 'millisecondsDelay' : 'delay';
+
+        if (millisecondsDelayOrDelay != null) {
+            millisecondsDelayOrDelay = TimeSpan.toTimeSpan(millisecondsDelayOrDelay);
         }
 
-        if (arg0 && !arg0.isInfinite) {
-            if (arg0.isNegative) {
+        if (millisecondsDelayOrDelay && !millisecondsDelayOrDelay.isInfinite) {
+            if (millisecondsDelayOrDelay.isNegative) {
                 throw new ArgumentOutOfRangeError(
                     paramName,
                     'Specified argument represented a negative interval.',
                 );
             }
 
-            this.cancelAfterUnchecked(arg0);
+            this.cancelAfterUnchecked(millisecondsDelayOrDelay);
         }
     }
 

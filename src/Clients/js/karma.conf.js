@@ -1,13 +1,17 @@
 module.exports = function (config) {
     config.set({
+        client: {
+            jasmine: {
+                random: false,
+            },
+        },
+
         frameworks: ['jasmine', 'karma-typescript'],
 
         karmaTypescriptConfig: {
             bundlerOptions: {
                 entrypoints: /\.test\.ts$/,
-                exclude:[
-                    'webpack'
-                ]
+                exclude: ['webpack'],
             },
             compilerOptions: {
                 esModuleInterop: true,
@@ -34,7 +38,12 @@ module.exports = function (config) {
                     subdirectory: () => '',
                 },
             },
-            include: ['./src/**/*.ts', './test/std/**/*.ts', './test/web/**/*.ts'],
+            include: [
+                './src/**/*.ts',
+                './test/infrastructure/**/*.ts',
+                './test/std/**/*.ts',
+                './test/web/**/*.ts',
+            ],
             exclude: ['./node_modules/**/*'],
         },
 
@@ -49,7 +58,9 @@ module.exports = function (config) {
             '**/*.ts': ['karma-typescript'],
         },
 
-        reporters: ['dots', 'karma-typescript', 'progress', 'coverage'],
+        // plugins: ['karma-verbose-reporter'],
+
+        reporters: ['dots', 'karma-typescript', 'progress', 'coverage', 'verbose'],
 
         browsers: ['Chrome'],
 

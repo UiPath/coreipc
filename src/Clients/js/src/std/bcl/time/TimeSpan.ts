@@ -176,7 +176,7 @@ export class TimeSpan {
             trySetFaulted();
         }
 
-        const _ = PromisePal.ensureObserved(
+        const _ = PromisePal.traceError(
             (async () => {
                 const reg = setTimeout(() => {
                     trySetFaulted();

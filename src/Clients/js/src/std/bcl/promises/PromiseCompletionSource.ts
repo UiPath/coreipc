@@ -12,7 +12,8 @@ export interface IPromiseCompletionSource<T = unknown> {
 }
 
 export class PromiseCompletionSource<T = unknown> {
-    private readonly _internal: IPromiseCompletionSourceInternal<T>;
+    /* @internal */
+    public readonly _internal: IPromiseCompletionSourceInternal<T>;
 
     public constructor(internal?: any) {
         assertArgument({ internal }, 'undefined', 'object');

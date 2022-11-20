@@ -6,12 +6,7 @@ import {
     TimeSpan,
 } from '..';
 
-function emptyOnFulfilled<T>(result: T): T {
-    return result;
-}
-function emptyOnRejected(reason: any) {
-    throw reason;
-}
+function emptyOnRejected(reason: any) {}
 
 const promiseNever: Promise<never> = {
     [Symbol.toStringTag]: 'promiseNever',
@@ -32,9 +27,8 @@ const promiseNever: Promise<never> = {
 
 /* @internal */
 export class PromisePal {
-    public static ensureObserved<T>(promise: Promise<T>): Promise<T> {
-        // return promise;
-        return promise.then(emptyOnFulfilled, emptyOnRejected) as any;
+    public static traceError<T>(promise: Promise<T>): void {
+        promise.catch(emptyOnRejected);
     }
 
     public get never(): Promise<never> {

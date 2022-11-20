@@ -16,13 +16,14 @@ export abstract class CancellationToken {
     public bind<T>(pcs: PromiseCompletionSource<T>): void {
         if (this.isCancellationRequested) {
             pcs.trySetCanceled();
+            return;
         }
         if (!this.canBeCanceled) {
             return;
         }
 
         const reg = this.register(() => pcs.trySetCanceled());
-        const _ = PromisePal.ensureObserved(
+        PromisePal.traceError(
             (async () => {
                 try {
                     await pcs.promise;

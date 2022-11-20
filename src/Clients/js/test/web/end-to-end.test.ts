@@ -33,7 +33,7 @@ describe('web:end-to-end', () => {
         });
 
         it('should work concurrently', async () => {
-            const span1 = 30;
+            const span1 = 500;
             const span2 = 1;
 
             let call1Completed = false;

@@ -10,6 +10,7 @@ import {
 
 /* @internal */
 export interface IPromiseCompletionSourceInternal<T = unknown> {
+    readonly _reachedFinalState: boolean;
     readonly promise: Promise<T>;
 
     setFinalState(finalState: FinalState<T>): void | never;
@@ -24,7 +25,7 @@ export class PromiseCompletionSourceInternal<T = unknown>
         return new PromiseCompletionSourceInternal<T>();
     }
 
-    private _reachedFinalState = false;
+    public _reachedFinalState = false;
     private readonly _completer: Completer<T> = null as never;
 
     constructor() {
@@ -33,7 +34,8 @@ export class PromiseCompletionSourceInternal<T = unknown>
             _this._completer = new Completer(resolve, reject);
         };
 
-        this.promise = PromisePal.ensureObserved(new Promise<T>(assignCompleter));
+        this.promise = new Promise<T>(assignCompleter);
+        PromisePal.traceError(this.promise);
     }
 
     public readonly promise: Promise<T>;
