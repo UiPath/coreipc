@@ -206,7 +206,7 @@ public sealed class Connection : IDisposable
                     throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
                 }
                 _nestedStream.Reset(length);
-                await HandleMessage();
+                await HandleMessage((MessageType)_buffer[0]);
                 _streamReader.DiscardBufferedData();
             }
         }
@@ -220,24 +220,20 @@ public sealed class Connection : IDisposable
         }
         Dispose();
         return;
-        ValueTask HandleMessage()
+        ValueTask HandleMessage(MessageType messageType) => messageType switch
         {
-            var messageType = (MessageType)_buffer[0];
-            switch (messageType)
+            MessageType.Response => OnResponse(),
+            MessageType.Request => OnRequest(),
+            MessageType.CancellationRequest => OnCancel(),
+            _ => Unknown(messageType),
+        };
+        ValueTask Unknown(MessageType messageType)
+        {
+            if (LogEnabled)
             {
-                case MessageType.Response:
-                    return OnResponse();
-                case MessageType.Request:
-                    return OnRequest();
-                case MessageType.CancellationRequest:
-                    return OnCancel();
-                default:
-                    if (LogEnabled)
-                    {
-                        Log("Unknown message type " + messageType);
-                    }
-                    return default;
-            };
+                Log("Unknown message type " + messageType);
+            }
+            return default;
         }
     }
     private async ValueTask OnCancel() => RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
