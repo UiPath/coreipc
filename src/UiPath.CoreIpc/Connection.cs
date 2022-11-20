@@ -98,9 +98,6 @@ public sealed class Connection : IDisposable
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
             SendDownloadStream(responseBytes, downloadStream, cancellationToken);
     }
-#if !NET461
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
-#endif
     private async ValueTask SendDownloadStream(RecyclableMemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
     {
         using (downloadStream)
@@ -108,9 +105,6 @@ public sealed class Connection : IDisposable
             await SendStream(MessageType.Response, responseBytes, downloadStream, cancellationToken);
         }
     }
-#if !NET461
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
-#endif
     private async ValueTask SendStream(MessageType messageType, RecyclableMemoryStream data, Stream userStream, CancellationToken cancellationToken)
     {
         await _sendLock.WaitAsync(cancellationToken);
