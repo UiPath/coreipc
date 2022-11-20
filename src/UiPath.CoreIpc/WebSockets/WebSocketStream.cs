@@ -20,8 +20,10 @@ public class WebSocketStream : Stream
         (await _webSocket.ReceiveAsync(new(buffer, offset, count), cancellationToken).ConfigureAwait(false)).Count;
 #if !NET461
     /// <inheritdoc />
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
         (await _webSocket.ReceiveAsync(buffer, cancellationToken).ConfigureAwait(false)).Count;
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
         _webSocket.SendAsync(buffer, WebSocketMessageType.Binary, endOfMessage: true, cancellationToken);
 #endif
