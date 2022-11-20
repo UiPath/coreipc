@@ -220,9 +220,6 @@ public sealed class Connection : IDisposable
         }
         Dispose();
         return;
-#if !NET461
-        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
-#endif
         ValueTask HandleMessage()
         {
             var messageType = (MessageType)_buffer[0];
