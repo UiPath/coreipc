@@ -84,13 +84,12 @@ public sealed class Connection : IDisposable
     void CancelRequest(int requestId)
     {
         CancelServerCall(requestId).LogException(Logger, this);
-        TryCancelRequest(requestId);
+        Completion(requestId)?.SetCanceled();
         return;
         Task CancelServerCall(int requestId) =>
             SendMessage(MessageType.CancellationRequest, Serialize(new[] { new CancellationRequest(requestId) }), default).AsTask();
     }
     ManualResetValueTaskSource Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
-    private void TryCancelRequest(int requestId) => Completion(requestId)?.SetCanceled();
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
     {
         var downloadStream = response.Data as Stream;
