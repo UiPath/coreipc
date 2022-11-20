@@ -163,10 +163,6 @@ public sealed class Connection : IDisposable
         {
             Logger.LogException(ex, this);
         }
-        CompleteRequests();
-    }
-    private void CompleteRequests()
-    {
         foreach (var requestId in _requests.Keys)
         {
             Completion(requestId)?.SetException(ClosedException);
