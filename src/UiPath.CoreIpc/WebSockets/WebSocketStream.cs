@@ -16,15 +16,13 @@ public class WebSocketStream : Stream
     /// <param name="webSocket">The web socket to wrap in a stream.</param>
     public WebSocketStream(WebSocket webSocket) => _webSocket = webSocket ?? throw new ArgumentNullException(nameof(webSocket));
     /// <inheritdoc />
-    public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-    {
-        if (_webSocket.CloseStatus.HasValue)
-        {
-            return 0;
-        }
-        var result = await _webSocket.ReceiveAsync(new(buffer, offset, count), cancellationToken).ConfigureAwait(false);
-        return result.Count;
-    }
+    public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+        (await _webSocket.ReceiveAsync(new(buffer, offset, count), cancellationToken).ConfigureAwait(false)).Count;
+#if !NET461
+    /// <inheritdoc />
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+        (await _webSocket.ReceiveAsync(buffer, cancellationToken).ConfigureAwait(false)).Count;
+#endif
     /// <inheritdoc />
     public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
         _webSocket.SendAsync(new(buffer, offset, count), WebSocketMessageType.Binary, endOfMessage: true, cancellationToken);
