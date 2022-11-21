@@ -10,13 +10,19 @@ public sealed class Connection : IDisposable
     static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
     private static readonly IOException ClosedException = new("Connection closed.");
     private readonly ConcurrentDictionary<int, OutgoingRequest> _requests = new();
-    private int _requestCounter = -1;
+    private int _requestCounter;
     private readonly int _maxMessageSize;
     private readonly Lazy<Task> _receiveLoop;
     private readonly SemaphoreSlim _sendLock = new(1);
+#if NET461
     private readonly WaitCallback _onResponse;
     private readonly WaitCallback _onRequest;
     private readonly WaitCallback _onCancellation;
+#else
+    private readonly Action<IncomingResponse> _onResponse;
+    private readonly Action<IncomingRequest> _onRequest;
+    private readonly Action<int> _onCancellation;
+#endif
     private readonly Action<object> _cancelRequest;
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
@@ -246,15 +252,20 @@ public sealed class Connection : IDisposable
         }
     }
     private async ValueTask OnCancel() => RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
+#if NET461
     static void RunAsync(WaitCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state);
+#else
+    static void RunAsync<T>(Action<T> callback, T state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state, preferLocal: true);
+#endif
     private async ValueTask OnResponse()
     {
-        var response = await DeserializeResponse();
-        if (response == null)
+        var incomingResponse = await DeserializeResponse();
+        var response = incomingResponse.Response;
+        if (response.Empty)
         {
             return;
         }
-        if (response.Response.Data == _nestedStream)
+        if (response.Data == _nestedStream)
         {
             await EnterStreamMode();
             var streamDisposed = new TaskCompletionSource<bool>();
@@ -262,7 +273,7 @@ public sealed class Connection : IDisposable
             _nestedStream.Disposed += disposedHandler;
             try
             {
-                OnResponseReceived(response);
+                OnResponseReceived(incomingResponse);
                 await streamDisposed.Task;
             }
             finally
@@ -272,7 +283,7 @@ public sealed class Connection : IDisposable
         }
         else
         {
-            RunAsync(_onResponse, response);
+            RunAsync(_onResponse, incomingResponse);
         }
     }
     private async ValueTask OnRequest()
@@ -339,7 +350,7 @@ public sealed class Connection : IDisposable
         }
         if (!_requests.TryRemove(response.RequestId, out var outgoingRequest))
         {
-            return null;
+            return default;
         }
         var bytes = await ReadBytes();
         var responseType = outgoingRequest.ResponseType;
@@ -426,6 +437,6 @@ public sealed class Connection : IDisposable
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
 }
-record IncomingRequest(Request Request, Method Method, EndpointSettings Endpoint);
+readonly record struct IncomingRequest(Request Request, Method Method, EndpointSettings Endpoint);
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
-record IncomingResponse(Response Response, ManualResetValueTaskSource Completion);
+readonly record struct IncomingResponse(Response Response, ManualResetValueTaskSource Completion);
