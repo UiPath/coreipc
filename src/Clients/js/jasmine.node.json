@@ -1,0 +1,16 @@
+{
+    "reporters": [
+        {
+            "name": "jasmine-console-reporter",
+            "options": {
+                "colors": true,
+                "listStyle": "indent"
+            }
+        }
+    ],
+    "spec_dir": "test",
+    "spec_files": ["std/**/*test.ts", "node/**/*test.ts"],
+    "env": {
+        "random": false
+    }
+}

@@ -15,6 +15,7 @@
         "module": "commonjs", /* Specify what module code is generated. */
         "resolveJsonModule": true, /* Enable importing .json files. */
         "esModuleInterop": true, /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
+        "allowSyntheticDefaultImports": true,
         "forceConsistentCasingInFileNames": true, /* Ensure that casing is correct in imports. */
         "strict": true, /* Enable all strict type-checking options. */
         // "alwaysStrict": true, /* Ensure 'use strict' is always emitted. */

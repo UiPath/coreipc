@@ -8,7 +8,15 @@ class IAlgebra {
 }
 
 describe('node', function () {
-    it('should work 2', async () => {
+    // beforeAll(() => {
+    //     console.log(`🎂 BEFORE ALL`)
+    // });
+
+    // afterAll(()=>{
+    //     console.log(`🎂 AFTER ALL`)
+    // });
+
+    it('test 1', async () => {
         let proxy: IAlgebra | undefined = undefined;
 
         const act = () => {
