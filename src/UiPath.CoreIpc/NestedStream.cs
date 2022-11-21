@@ -1,5 +1,5 @@
-﻿namespace UiPath.CoreIpc;
-
+﻿using System.Buffers;
+namespace UiPath.CoreIpc;
 /// <summary>
 /// A stream that allows for reading from another stream up to a given number of bytes.
 /// https://github.com/AArnott/Nerdbank.Streams/blob/3303c541c29b979f61c86c3c2ed5c0e7372d7a55/src/Nerdbank.Streams/NestedStream.cs#L18
@@ -23,16 +23,17 @@ public class NestedStream : Stream
     /// </summary>
     /// <param name="underlyingStream">The stream to read from.</param>
     /// <param name="length">The number of bytes to read from the parent stream.</param>
+    ReadOnlySequence<byte> _prefix;
     public NestedStream(Stream underlyingStream, long length)
     {
         _underlyingStream = underlyingStream;
         Reset(length);
     }
-
-    public void Reset(long length)
+    public void Reset(long length, ReadOnlySequence<byte> prefix = default)
     {
-        _remainingBytes = length;
-        _length = length;
+        _length = length + prefix.Length;
+        _remainingBytes = _length;
+        _prefix = prefix;
     }
 
     public event EventHandler Disposed;
@@ -63,6 +64,14 @@ public class NestedStream : Stream
         {
             return 0;
         }
+        var prefixLength = (int)_prefix.Length;
+        if (Position < prefixLength)
+        {
+            _prefix.Slice(Position).CopyTo(new Span<byte>(buffer, offset, count));
+            _remainingBytes -= prefixLength;
+            count -= prefixLength;
+            offset += prefixLength;
+        }
         int bytesRead = await _underlyingStream.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
         _remainingBytes -= bytesRead;
         return bytesRead;
@@ -78,6 +87,13 @@ public class NestedStream : Stream
         if (buffer.Length <= 0)
         {
             return 0;
+        }
+        var prefixLength = (int)_prefix.Length;
+        if (Position < prefixLength)
+        {
+            _prefix.Slice(Position).CopyTo(buffer.Span);
+            _remainingBytes -= prefixLength;
+            buffer = buffer[prefixLength..];
         }
         int bytesRead = await _underlyingStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         _remainingBytes -= bytesRead;

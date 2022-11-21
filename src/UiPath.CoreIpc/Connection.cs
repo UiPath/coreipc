@@ -277,7 +277,7 @@ public sealed class Connection : IDisposable
     private async Task EnterStreamMode()
     {
         var userStreamLength = await Deserialize<long>();
-        _nestedStream.Reset(userStreamLength);
+        _nestedStream.Reset(userStreamLength, _streamReader.RemainingBytes);
     }
     static RecyclableMemoryStream Serialize<T>(MessageType messageType, T value, Action<T, IBufferWriter<byte>> serializer)
     {
