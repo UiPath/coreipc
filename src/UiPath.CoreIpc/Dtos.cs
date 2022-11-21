@@ -16,16 +16,17 @@ public class Message<TPayload> : Message
     public Message(TPayload payload) => Payload = payload;
     public TPayload Payload { get; }
 }
-public record Request(string Endpoint, int Id, string MethodName, double TimeoutInSeconds)
+public record struct Request(string Endpoint, int Id, string MethodName, double TimeoutInSeconds)
 {
     internal Type ResponseType { get; init; }
     internal object[] Parameters { get; set; }
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
-public record CancellationRequest(int RequestId);
-public record Response(int RequestId, Error Error = null)
+public readonly record struct CancellationRequest(int RequestId);
+public record struct Response(int RequestId, Error Error = null)
 {
+    internal bool Empty => RequestId == 0;
     internal object Data { get; set; }
     public static Response Fail(Request request, Exception ex) => new(request.Id, ex.ToError());
 }

@@ -53,7 +53,7 @@ class Server
                 await HandleRequest(method, endpoint, request, default);
                 return;
             }
-            Response response = null;
+            Response response = new();
             var requestCancellation = Rent();
             _requests[request.Id] = requestCancellation;
             var timeout = request.GetTimeout(Settings.RequestTimeout);
@@ -68,7 +68,7 @@ class Server
                 }
                 await _connection.Send(response, token);
             }
-            catch (Exception ex) when(response == null)
+            catch (Exception ex) when(response.Empty)
             {
                 await _connection.OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName));
             }
@@ -128,7 +128,7 @@ class Server
             else
             {
                 (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method.MethodInfo);
-                return null;
+                return default;
             }
             Task MethodCall() => method.Invoke(service, request.Parameters, cancellationToken);
             Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);

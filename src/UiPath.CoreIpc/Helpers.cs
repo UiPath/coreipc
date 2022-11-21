@@ -1,4 +1,5 @@
 ﻿using Microsoft.IO;
+using System.Buffers;
 using System.Collections.ObjectModel;
 using System.IO.Pipes;
 using System.Net;
