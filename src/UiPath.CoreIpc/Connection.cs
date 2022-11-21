@@ -112,12 +112,12 @@ public sealed class Connection : IDisposable
         return downloadStream == null ?
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
             SendDownloadStream(responseBytes, downloadStream, cancellationToken);
-    }
-    private async ValueTask SendDownloadStream(RecyclableMemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
-    {
-        using (downloadStream)
+        async ValueTask SendDownloadStream(RecyclableMemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
         {
-            await SendStream(MessageType.Response, responseBytes, downloadStream, cancellationToken);
+            using (downloadStream)
+            {
+                await SendStream(MessageType.Response, responseBytes, downloadStream, cancellationToken);
+            }
         }
     }
     private async ValueTask SendStream(MessageType messageType, RecyclableMemoryStream data, Stream userStream, CancellationToken cancellationToken)
