@@ -50,6 +50,7 @@ module.exports = function (config) {
         files: [
             { pattern: 'src/std/**/*.ts' },
             { pattern: 'src/web/**/*.ts' },
+            { pattern: 'test/infrastructure/**/*.ts' },
             { pattern: 'test/std/**/*.ts' },
             { pattern: 'test/web/**/*.ts' },
         ],

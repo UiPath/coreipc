@@ -1,11 +1,9 @@
 import {
     AggregateError,
-    ArgumentError,
     ArgumentNullError,
     ArgumentOutOfRangeError,
     CancellationToken,
     CancellationTokenSource,
-    nameof,
     ObjectDisposedError,
     PromisePal,
     Timeout,
@@ -13,13 +11,18 @@ import {
 } from '../../../src/std';
 
 import { expect } from 'chai';
+import { __members } from '../../infrastructure';
 
 import pluralize from 'pluralize';
 
 const _nameof = <T>(name: keyof T) => name;
 
 describe(`${CancellationTokenSource.name}'s`, () => {
-    const __ = (name: keyof CancellationTokenSource) => name;
+    const method = function (name: string) {
+        return `📞 ${name}`;
+    };
+
+    const __CancellationTokenSource = __members(CancellationTokenSource);
 
     describe('ctor', () => {
         function act(arg?: any) {
@@ -55,7 +58,7 @@ describe(`${CancellationTokenSource.name}'s`, () => {
         });
     });
 
-    describe(`"${__('cancel')}" method`, () => {
+    describe(__CancellationTokenSource.cancel, () => {
         let cts: CancellationTokenSource = undefined!;
 
         beforeEach(() => {
@@ -147,7 +150,7 @@ describe(`${CancellationTokenSource.name}'s`, () => {
         });
     });
 
-    describe(`"${__('cancelAfter')}" method`, () => {
+    describe(__CancellationTokenSource.cancelAfter, () => {
         let cts: CancellationTokenSource = undefined!;
 
         beforeEach(() => {
@@ -270,6 +273,51 @@ describe(`${CancellationTokenSource.name}'s`, () => {
                     await PromisePal.delay(100);
 
                     expect(allHaveBeenInvoked()).to.equal(true);
+                });
+            }
+        });
+    });
+
+    describe(__CancellationTokenSource.createLinkedTokenSource, () => {
+        describe(`should throw when called with invalid args`, () => {
+            const cases = [[], [123], [true, 123]] as any as Parameters<
+                typeof CancellationTokenSource.createLinkedTokenSource
+            >[];
+
+            for (const _case of cases) {
+                it(`when called with ${JSON.stringify(_case)}`, () => {
+                    const act = () => CancellationTokenSource.createLinkedTokenSource(..._case);
+
+                    expect(act).to.throw();
+                });
+            }
+        });
+
+        describe(`should not throw when called with valid args`, () => {
+            const cts = {
+                first: new CancellationTokenSource(),
+                second: new CancellationTokenSource(),
+            };
+
+            const cases = [
+                [CancellationToken.none],
+                [CancellationToken.none, CancellationToken.none],
+                [cts.first.token],
+                [cts.first.token, cts.second.token],
+            ] as Parameters<typeof CancellationTokenSource.createLinkedTokenSource>[];
+
+            afterAll(() => {
+                Object.values(cts).forEach(cts => cts.dispose());
+            });
+
+            for (const _case of cases) {
+                it(`when called with ${JSON.stringify(_case.map(x => x.toString()))}`, () => {
+                    const act = () => {
+                        const linked = CancellationTokenSource.createLinkedTokenSource(..._case);
+                        linked.dispose();
+                    };
+
+                    expect(act).not.to.throw();
                 });
             }
         });

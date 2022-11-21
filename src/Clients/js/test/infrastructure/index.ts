@@ -1,43 +1,45 @@
-import { PublicCtor } from '../../src/std';
-import { expect } from 'chai';
+export * from './__members';
 
-export function _<T>(sut: () => Promise<T>): _.IAsyncFunc<T> {
-    return new AsyncFunc<T>(sut);
-}
+// import { PublicCtor } from '../../src/std';
+// import { expect } from 'chai';
 
-export module _ {
-    export type IAsyncFunc<T> = {
-        readonly should: IAsyncFuncShould<T>;
-    };
+// export function _<T>(sut: () => Promise<T>): _.IAsyncFunc<T> {
+//     return new AsyncFunc<T>(sut);
+// }
 
-    export type IAsyncFuncShould<T> = {
-        throwAsync(): Promise<void>;
-        throwAsync<TError>(ctor: PublicCtor<TError>): Promise<void>;
-    };
-}
+// export module _ {
+//     export type IAsyncFunc<T> = {
+//         readonly should: IAsyncFuncShould<T>;
+//     };
 
-class AsyncFunc<T> implements _.IAsyncFunc<T>, _.IAsyncFuncShould<T> {
-    constructor(private readonly _sut: () => Promise<T>) {}
+//     export type IAsyncFuncShould<T> = {
+//         throwAsync(): Promise<void>;
+//         throwAsync<TError>(ctor: PublicCtor<TError>): Promise<void>;
+//     };
+// }
 
-    get should(): _.IAsyncFuncShould<T> {
-        return this;
-    }
+// class AsyncFunc<T> implements _.IAsyncFunc<T>, _.IAsyncFuncShould<T> {
+//     constructor(private readonly _sut: () => Promise<T>) {}
 
-    throwAsync(): Promise<void>;
-    throwAsync<TError>(ctor: PublicCtor<TError>): Promise<void>;
-    async throwAsync<TError>(ctor?: PublicCtor<TError>): Promise<void> {
-        let actual = undefined;
-        try {
-            await this._sut();
-        } catch (error) {
-            actual = error;
-        }
+//     get should(): _.IAsyncFuncShould<T> {
+//         return this;
+//     }
 
-        if (ctor) {
-            expect(actual).to.be.instanceOf(ctor);
-            return;
-        }
+//     throwAsync(): Promise<void>;
+//     throwAsync<TError>(ctor: PublicCtor<TError>): Promise<void>;
+//     async throwAsync<TError>(ctor?: PublicCtor<TError>): Promise<void> {
+//         let actual = undefined;
+//         try {
+//             await this._sut();
+//         } catch (error) {
+//             actual = error;
+//         }
 
-        expect(actual).not.to.be.undefined;
-    }
-}
+//         if (ctor) {
+//             expect(actual).to.be.instanceOf(ctor);
+//             return;
+//         }
+
+//         expect(actual).not.to.be.undefined;
+//     }
+// }
