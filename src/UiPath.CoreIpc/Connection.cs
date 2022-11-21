@@ -45,9 +45,6 @@ public sealed class Connection : IDisposable
     public Task Listen() => _receiveLoop.Value;
     public event EventHandler<EventArgs> Closed = delegate{};
     public void SetServer(ListenerSettings settings, IClient client = null) => Server = new(settings, this, client);
-#if !NET461
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-#endif
     internal async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
     {
         await Send(request, token);

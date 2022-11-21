@@ -43,9 +43,6 @@ class Server
             cancellation.Return();
         }
     }
-#if !NET461
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
-#endif
     public async ValueTask OnRequestReceived(IncomingRequest incomingRequest)
     {
         var (request, method, endpoint) = incomingRequest;
@@ -89,9 +86,6 @@ class Server
             cancellation.Return();
         }
     }
-#if !NET461
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-#endif
     async ValueTask<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
     {
         var contract = endpoint.Contract;
