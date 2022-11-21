@@ -32,7 +32,6 @@ public abstract class TestBase : IDisposable
     protected virtual TSettings Configure<TSettings>(TSettings listenerSettings) where TSettings : ListenerSettings
     {
         listenerSettings.RequestTimeout = RequestTimeout;
-        listenerSettings.MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes;
         return listenerSettings;
     }
     protected abstract ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder);

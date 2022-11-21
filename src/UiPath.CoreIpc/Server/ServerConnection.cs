@@ -42,7 +42,7 @@ abstract class ServerConnection : IClient, IDisposable
     public async Task Listen(Stream network, CancellationToken cancellationToken)
     {
         var stream = await AuthenticateAsServer();
-        _connection = new(stream, Logger, _listener.Name, _listener.MaxMessageSize);
+        _connection = new(stream, Logger, _listener.Name);
         _connection.SetServer(Settings, this);
         // close the connection when the service host closes
         using (cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), _connection))

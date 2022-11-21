@@ -68,7 +68,6 @@ public static class IOHelpers
     const int MaxBytes = 100 * 1024 * 1024;
     private static readonly RecyclableMemoryStreamManager Pool = new(MaxBytes, MaxBytes);
     internal static RecyclableMemoryStream GetStream(int size = 0) => (RecyclableMemoryStream)Pool.GetStream("IpcMessage", size);
-    internal const int HeaderLength = sizeof(int) + 1;
     internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity> pipeSecurity)
     {
 #if NET461
@@ -129,26 +128,14 @@ public static class IOHelpers
         }
         return false;
     }
-
-    internal static ValueTask WriteMessage(this Stream stream, MessageType messageType, RecyclableMemoryStream data, CancellationToken cancellationToken = default)
-    {
-        data.Position = 0;
-        var buffer = data.GetSpan(HeaderLength);
-        var totalLength = (int)data.Length;
-        buffer[0] = (byte)messageType;
-        var payloadLength = totalLength - HeaderLength;
-        // https://github.com/dotnet/runtime/blob/85441ce69b81dfd5bf57b9d00ba525440b7bb25d/src/libraries/System.Private.CoreLib/src/System/BitConverter.cs#L133
-        Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer[1..]), payloadLength);
-        return stream.WriteMessageCore(data, cancellationToken);
-    }
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    private static async ValueTask WriteMessageCore(this Stream stream, RecyclableMemoryStream recyclableStream, CancellationToken cancellationToken)
+    internal async static ValueTask WriteMessage(this Stream stream, RecyclableMemoryStream data, CancellationToken cancellationToken)
     {
-        using (recyclableStream)
+        using (data)
         {
-            await recyclableStream.CopyToAsync(stream, 0, cancellationToken);
+            await data.CopyToAsync(stream, 0, cancellationToken);
         }
     }
     internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 

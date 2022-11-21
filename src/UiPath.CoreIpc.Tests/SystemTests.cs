@@ -93,13 +93,6 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
-    public async Task MaxMessageSize()
-    {
-        _systemClient.ReverseBytes(new byte[MaxReceivedMessageSizeInMegabytes * 1024 * 1024]).ShouldThrow<Exception>();
-        await Guid();
-    }
-
-    [Fact]
     public async Task Guid()
     {
         var newGuid = System.Guid.NewGuid();

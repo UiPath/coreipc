@@ -11,7 +11,6 @@ public sealed class Connection : IDisposable
     private static readonly IOException ClosedException = new("Connection closed.");
     private readonly ConcurrentDictionary<int, OutgoingRequest> _requests = new();
     private int _requestCounter;
-    private readonly int _maxMessageSize;
     private readonly Lazy<Task> _receiveLoop;
     private readonly SemaphoreSlim _sendLock = new(1);
 #if NET461
@@ -27,14 +26,13 @@ public sealed class Connection : IDisposable
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
     private readonly MessagePackStreamReader _streamReader;
-    public Connection(Stream network, ILogger logger, string name, int maxMessageSize = int.MaxValue)
+    public Connection(Stream network, ILogger logger, string name)
     {
         Network = network;
         _nestedStream = new NestedStream(network, 0);
         _streamReader = new(_nestedStream);
         Logger = logger;
         Name = $"{name} {GetHashCode()}";
-        _maxMessageSize = maxMessageSize;
         _receiveLoop = new(ReceiveLoop);
         _onResponse = response => OnResponseReceived((IncomingResponse)response);
         _onRequest = request => OnRequestReceived((IncomingRequest)request);
@@ -79,7 +77,7 @@ public sealed class Connection : IDisposable
         {
             uploadStream = null;
         }
-        var requestBytes = Serialize(request, static(request, writer)=>
+        var requestBytes = Serialize(MessageType.Request, request, static(request, writer)=>
         {
             Serialize(request, writer);
             foreach (var arg in request.Parameters)
@@ -88,8 +86,8 @@ public sealed class Connection : IDisposable
             }
         });
         return uploadStream == null ?
-            SendMessage(MessageType.Request, requestBytes, token) :
-            SendStream(MessageType.Request, requestBytes, uploadStream, token);
+            SendMessage(requestBytes, token) :
+            SendStream(requestBytes, uploadStream, token);
     }
     void CancelRequest(int requestId)
     {
@@ -97,7 +95,7 @@ public sealed class Connection : IDisposable
         Completion(requestId)?.SetCanceled();
         return;
         Task CancelServerCall(int requestId) =>
-            SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId), Serialize), default).AsTask();
+            SendMessage(Serialize(MessageType.CancellationRequest, new CancellationRequest(requestId), Serialize), default).AsTask();
     }
     ManualResetValueTaskSource Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
@@ -110,30 +108,30 @@ public sealed class Connection : IDisposable
         {
             downloadStream = null;
         }
-        var responseBytes = Serialize(response, static(response, writer)=>
+        var responseBytes = Serialize(MessageType.Response, response, static(response, writer)=>
         {
             Serialize(response, writer);
             Serialize(response.Data, writer);
         });
         return downloadStream == null ?
-            SendMessage(MessageType.Response, responseBytes, cancellationToken) :
+            SendMessage(responseBytes, cancellationToken) :
             SendDownloadStream(responseBytes, downloadStream, cancellationToken);
         async ValueTask SendDownloadStream(RecyclableMemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
         {
             using (downloadStream)
             {
-                await SendStream(MessageType.Response, responseBytes, downloadStream, cancellationToken);
+                await SendStream(responseBytes, downloadStream, cancellationToken);
             }
         }
     }
-    private async ValueTask SendStream(MessageType messageType, RecyclableMemoryStream data, Stream userStream, CancellationToken cancellationToken)
+    private async ValueTask SendStream(RecyclableMemoryStream data, Stream userStream, CancellationToken cancellationToken)
     {
         await _sendLock.WaitAsync(cancellationToken);
         CancellationTokenRegistration tokenRegistration = default;
         try
         {
             tokenRegistration = cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), this);
-            await Network.WriteMessage(messageType, data, cancellationToken);
+            await Network.WriteMessage(data, cancellationToken);
             await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
             const int DefaultCopyBufferSize = 81920;
             await userStream.CopyToAsync(Network, DefaultCopyBufferSize, cancellationToken);
@@ -147,12 +145,12 @@ public sealed class Connection : IDisposable
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    private async ValueTask SendMessage(MessageType messageType, RecyclableMemoryStream data, CancellationToken cancellationToken)
+    private async ValueTask SendMessage(RecyclableMemoryStream data, CancellationToken cancellationToken)
     {
         await _sendLock.WaitAsync(cancellationToken);
         try
         {
-            await Network.WriteMessage(messageType, data, CancellationToken.None);
+            await Network.WriteMessage(data, CancellationToken.None);
         }
         finally
         {
@@ -212,16 +210,12 @@ public sealed class Connection : IDisposable
     {
         try
         {
-            while (await ReadHeader(HeaderLength))
+            ReadOnlySequence<byte>? bytes;
+            while ((bytes = await _streamReader.ReadAsync(default)) != null)
             {
                 Debug.Assert(SynchronizationContext.Current == null);
-                var length = BitConverter.ToInt32(_buffer, startIndex: 1);
-                if (length > _maxMessageSize)
-                {
-                    throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
-                }
-                _nestedStream.Reset(length);
-                await HandleMessage((MessageType)_buffer[0]);
+                var messageType = (MessageType)await Deserialize<byte>();
+                await HandleMessage(messageType);
                 _streamReader.DiscardBufferedData();
             }
         }
@@ -311,12 +305,12 @@ public sealed class Connection : IDisposable
         var userStreamLength = BitConverter.ToInt64(_buffer, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
     }
-    static RecyclableMemoryStream Serialize<T>(T value, Action<T, IBufferWriter<byte>> serializer)
+    static RecyclableMemoryStream Serialize<T>(MessageType messageType, T value, Action<T, IBufferWriter<byte>> serializer)
     {
         var stream = GetStream();
         try
         {
-            stream.Position = HeaderLength;
+            Serialize((byte)messageType, stream);
             serializer(value, stream);
             return stream;
         }

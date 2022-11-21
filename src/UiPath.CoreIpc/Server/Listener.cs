@@ -6,7 +6,6 @@ public class ListenerSettings
 {
     public ListenerSettings(string name) => Name = name;
     public byte ConcurrentAccepts { get; set; } = 5;
-    public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
     public X509Certificate Certificate { get; set; }
     public string Name { get; }
     public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
@@ -18,13 +17,11 @@ abstract class Listener : IDisposable
     protected Listener(ListenerSettings settings)
     {
         Settings = settings;
-        MaxMessageSize = settings.MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
     }
     public string Name => Settings.Name;
     public ILogger Logger { get; private set; }
     public IServiceProvider ServiceProvider => Settings.ServiceProvider;
     public ListenerSettings Settings { get; }
-    public int MaxMessageSize { get; }
     public Task Listen(CancellationToken token)
     {
         Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
