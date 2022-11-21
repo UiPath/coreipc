@@ -30,7 +30,7 @@ public sealed class Connection : IDisposable
     {
         Network = network;
         _nestedStream = new NestedStream(network, 0);
-        _streamReader = new(_nestedStream);
+        _streamReader = new(Network);
         Logger = logger;
         Name = $"{name} {GetHashCode()}";
         _receiveLoop = new(ReceiveLoop);
@@ -214,9 +214,12 @@ public sealed class Connection : IDisposable
             while ((bytes = await _streamReader.ReadAsync(default)) != null)
             {
                 Debug.Assert(SynchronizationContext.Current == null);
-                var messageType = (MessageType)await Deserialize<byte>();
+                if (bytes.Value.Length != 1)
+                {
+                    throw new InvalidOperationException("Invalid message header!");
+                }
+                var messageType = (MessageType)bytes.Value.First.Span[0];
                 await HandleMessage(messageType);
-                _streamReader.DiscardBufferedData();
             }
         }
         catch (Exception ex)

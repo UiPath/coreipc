@@ -135,6 +135,7 @@ public static class IOHelpers
     {
         using (data)
         {
+            data.Position = 0;
             await data.CopyToAsync(stream, 0, cancellationToken);
         }
     }
