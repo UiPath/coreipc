@@ -139,8 +139,6 @@ public static class IOHelpers
             await data.CopyToAsync(stream, 0, cancellationToken);
         }
     }
-    internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
-        stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
 }
 public static class Validator
 {

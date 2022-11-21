@@ -131,8 +131,8 @@ public sealed class Connection : IDisposable
         try
         {
             tokenRegistration = cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), this);
+            Serialize(userStream.Length, data);
             await Network.WriteMessage(data, cancellationToken);
-            await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
             const int DefaultCopyBufferSize = 81920;
             await userStream.CopyToAsync(Network, DefaultCopyBufferSize, cancellationToken);
         }
@@ -181,31 +181,6 @@ public sealed class Connection : IDisposable
             Completion(requestId)?.SetException(ClosedException);
         }
     }
-#if !NET461
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-#endif
-    private async ValueTask<bool> ReadHeader(int length)
-    {
-        int offset = 0;
-        int toRead = length;
-        do
-        {
-            var read = await Network.ReadAsync(
-#if NET461
-                _buffer, offset, toRead);
-#else
-                _buffer.AsMemory(offset, toRead));
-#endif
-            if (read == 0)
-            {
-                return false;
-            }
-            offset += read;
-            toRead -= read;
-        }
-        while (toRead > 0);
-        return true;
-    }
     private async Task ReceiveLoop()
     {
         try
@@ -216,7 +191,7 @@ public sealed class Connection : IDisposable
                 Debug.Assert(SynchronizationContext.Current == null);
                 if (bytes.Value.Length != 1)
                 {
-                    throw new InvalidOperationException("Invalid message header!");
+                    throw new InvalidDataException("Invalid message header!");
                 }
                 var messageType = (MessageType)bytes.Value.First.Span[0];
                 await HandleMessage(messageType);
@@ -301,11 +276,7 @@ public sealed class Connection : IDisposable
     }
     private async Task EnterStreamMode()
     {
-        if (!await ReadHeader(sizeof(long)))
-        {
-            throw ClosedException;
-        }
-        var userStreamLength = BitConverter.ToInt64(_buffer, startIndex: 0);
+        var userStreamLength = await Deserialize<long>();
         _nestedStream.Reset(userStreamLength);
     }
     static RecyclableMemoryStream Serialize<T>(MessageType messageType, T value, Action<T, IBufferWriter<byte>> serializer)
