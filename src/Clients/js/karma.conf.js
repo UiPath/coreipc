@@ -27,17 +27,17 @@ module.exports = function (config) {
             coverageOptions: {
                 exclude: /(node_modules|tests|spec)/i,
             },
-            reports: {
-                lcovonly: {
-                    directory: './coverage',
-                    subdirectory: () => '',
-                    filename: 'lcov.info',
-                },
-                html: {
-                    directory: './coverage',
-                    subdirectory: () => '',
-                },
-            },
+            // reports: {
+            //     lcovonly: {
+            //         directory: './coverage',
+            //         subdirectory: () => '',
+            //         filename: 'lcov.info',
+            //     },
+            //     html: {
+            //         directory: './coverage',
+            //         subdirectory: () => '',
+            //     },
+            // },
             include: [
                 './src/**/*.ts',
                 './test/infrastructure/**/*.ts',
@@ -70,8 +70,8 @@ module.exports = function (config) {
         coverageReporter: {
             reporters: [
                 { type: 'text' },
-                { type: 'html', dir: 'coverage', subdir: 'web/html' },
-                { type: 'lcov', dir: 'coverage', subdir: 'web/lcov' },
+                { type: 'html', dir: 'coverage/web', subdir: 'html' },
+                { type: 'lcov', dir: 'coverage/web', subdir: 'lcov' },
             ],
         },
     });

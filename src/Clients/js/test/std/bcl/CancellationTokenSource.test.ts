@@ -33,8 +33,6 @@ describe(`${CancellationTokenSource.name}'s`, () => {
         }
 
         it(`should throw when called with invalid arguments`, () => {
-            // expect(1).to.equal(2);
-
             // anything other than number, TimeSpan or no args at all is not supported
             expect(act('some string')).to.throw(ArgumentOutOfRangeError);
             expect(act(true)).to.throw(ArgumentOutOfRangeError);

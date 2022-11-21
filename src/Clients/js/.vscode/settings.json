@@ -16,9 +16,9 @@
         "source.fixAll": true
     },
 
-    "mochaExplorer.files": ["test/node/**/*.ts", "test/std/**/*.ts"],
-    "mochaExplorer.require": "ts-node/register",
-    "mochaExplorer.logpanel": true,
+    // "mochaExplorer.files": ["test/node/**/*.ts", "test/std/**/*.ts"],
+    // "mochaExplorer.require": "ts-node/register",
+    // "mochaExplorer.logpanel": true,
     "karmaTestExplorer.testFiles": ["test/std/**/*.test.ts", "test/web/**/*.test.ts"],
     "jasmineExplorer.config": "jasmine.node.json",
     "jasmineExplorer.nodeArgv": [
