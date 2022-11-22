@@ -59,19 +59,38 @@ module.exports = function (config) {
             '**/*.ts': ['karma-typescript'],
         },
 
-        // plugins: ['karma-verbose-reporter'],
-
-        reporters: ['dots', 'karma-typescript', 'progress', 'coverage', 'verbose'],
-
         browsers: ['Chrome'],
 
         singleRun: true,
 
+        // plugins: ['karma-spec-reporter', 'karma-typescript'],
+
+        // reporters: ['dots', 'karma-typescript', 'progress', 'coverage', 'verbose'],
+        reporters: ['spec', 'coverage', 'junit'],
+
+        specReporter: {
+            maxLogLines: 5,
+            suppressSummary: false,
+            showSpecTiming: true,
+            suppressSkipped: false,
+        },
+
+        junitReporter: {
+            outputDir: 'reports/test/web',
+            outputFile: 'test-results.xml',
+            suite: '',
+            useBrowserName: false,
+            nameFormatter: undefined,
+            classNameFormatter: undefined,
+            properties: {},
+            xmlVersion: null,
+        },
+
         coverageReporter: {
             reporters: [
                 { type: 'text' },
-                { type: 'html', dir: 'coverage/web', subdir: 'html' },
-                { type: 'lcov', dir: 'coverage/web', subdir: 'lcov' },
+                { type: 'html', dir: 'reports/coverage/web', subdir: 'html' },
+                { type: 'cobertura', dir: 'reports/coverage/web', subdir: 'cobertura' },
             ],
         },
     });
