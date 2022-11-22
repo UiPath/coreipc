@@ -15,15 +15,7 @@ import { __members } from '../../infrastructure';
 
 import pluralize from 'pluralize';
 
-const _nameof = <T>(name: keyof T) => name;
-
 describe(`${CancellationTokenSource.name}'s`, () => {
-    const method = function (name: string) {
-        return `📞 ${name}`;
-    };
-
-    const __CancellationTokenSource = __members(CancellationTokenSource);
-
     describe('ctor', () => {
         function act(arg?: any) {
             return () => {
@@ -58,7 +50,7 @@ describe(`${CancellationTokenSource.name}'s`, () => {
         });
     });
 
-    describe(__CancellationTokenSource.cancel, () => {
+    describe('📞 "cancel" instance method', () => {
         let cts: CancellationTokenSource = undefined!;
 
         beforeEach(() => {
@@ -148,9 +140,25 @@ describe(`${CancellationTokenSource.name}'s`, () => {
                 });
             }
         });
+
+        it(`should propagate cancellation through a linked cancellation source`, () => {
+            const cts = new CancellationTokenSource();
+            const linked = CancellationTokenSource.createLinkedTokenSource(cts.token);
+
+            try {
+                expect(linked.token.isCancellationRequested).to.be.false;
+
+                cts.cancel();
+
+                expect(linked.token.isCancellationRequested).to.be.true;
+            } finally {
+                cts.dispose();
+                linked.dispose();
+            }
+        });
     });
 
-    describe(__CancellationTokenSource.cancelAfter, () => {
+    describe('📞 "cancelAfter" instance method', () => {
         let cts: CancellationTokenSource = undefined!;
 
         beforeEach(() => {
@@ -278,7 +286,7 @@ describe(`${CancellationTokenSource.name}'s`, () => {
         });
     });
 
-    describe(__CancellationTokenSource.createLinkedTokenSource, () => {
+    describe('📞 "createLinkedTokenSource" static method', () => {
         describe(`should throw when called with invalid args`, () => {
             const cases = [[], [123], [true, 123]] as any as Parameters<
                 typeof CancellationTokenSource.createLinkedTokenSource
@@ -319,6 +327,59 @@ describe(`${CancellationTokenSource.name}'s`, () => {
 
                     expect(act).not.to.throw();
                 });
+            }
+        });
+    });
+
+    describe('📞 "dispose" instance method', () => {
+        it(`should not throw`, () => {
+            const cts = new CancellationTokenSource();
+            const act = () => cts.dispose();
+            expect(act).not.to.throw();
+        });
+
+        it(`should not throw on linked token sources`, () => {
+            const cts1 = new CancellationTokenSource();
+            const cts2 = new CancellationTokenSource();
+
+            try {
+                const linked = CancellationTokenSource.createLinkedTokenSource(
+                    cts1.token,
+                    cts2.token,
+                );
+
+                const act = () => linked.dispose();
+                expect(act).not.to.throw();
+            } finally {
+                cts1.dispose();
+                cts2.dispose();
+            }
+        });
+
+        it(`should not throw when called a 2nd time`, () => {
+            const cts = new CancellationTokenSource();
+            cts.dispose();
+            const act = () => cts.dispose();
+            expect(act).not.to.throw();
+        });
+
+        it(`should not throw when called a 2nd time on linked token sources`, () => {
+            const cts1 = new CancellationTokenSource();
+            const cts2 = new CancellationTokenSource();
+
+            try {
+                const linked = CancellationTokenSource.createLinkedTokenSource(
+                    cts1.token,
+                    cts2.token,
+                );
+
+                linked.dispose();
+
+                const act = () => linked.dispose();
+                expect(act).not.to.throw();
+            } finally {
+                cts1.dispose();
+                cts2.dispose();
             }
         });
     });

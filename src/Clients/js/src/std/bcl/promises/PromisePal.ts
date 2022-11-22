@@ -31,7 +31,7 @@ export class PromisePal {
         promise.catch(emptyOnRejected);
     }
 
-    public get never(): Promise<never> {
+    public static get never(): Promise<never> {
         return promiseNever;
     }
 

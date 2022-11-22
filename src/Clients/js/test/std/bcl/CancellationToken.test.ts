@@ -8,15 +8,10 @@ import {
 
 import { expect } from 'chai';
 
-import pluralize from 'pluralize';
-import { ArgumentOutOfRangeError } from 'rxjs';
-
-const _nameof = <T>(name: keyof T) => name;
-
 describe(`${CancellationToken.name}'s`, () => {
     const __ = (name: keyof CancellationToken) => name;
 
-    describe(`"${__('bind')}" method`, () => {
+    describe(`📞 "${__('bind')}" instance method`, () => {
         it(`🚡 PromiseCompletionSource should not leave unobserved rejections`, async () => {
             const pcs = new PromiseCompletionSource<void>();
 
@@ -95,7 +90,7 @@ describe(`${CancellationToken.name}'s`, () => {
         });
     });
 
-    describe(`"${__('register')}" method`, () => {
+    describe(`📞 "${__('register')}" instance method`, () => {
         let cts: CancellationTokenSource = undefined!;
         let ct: CancellationToken = undefined!;
 
@@ -134,6 +129,130 @@ describe(`${CancellationToken.name}'s`, () => {
             });
 
             expect(invoked).to.equal(true);
+        });
+    });
+
+    describe(`⚙️ "none" instance field`, () => {
+        it(`should not throw`, () => {
+            const act = () => CancellationToken.none;
+            expect(act).not.to.throw();
+        });
+
+        it(`should return the same reference each time`, () => {
+            expect(CancellationToken.none).to.equal(CancellationToken.none);
+        });
+
+        describe(`the resulting instance's`, () => {
+            describe(`🌿 "canBeCanceled" instance property`, () => {
+                it(`should not throw`, () => {
+                    const act = () => CancellationToken.none.canBeCanceled;
+                    expect(act).not.to.throw();
+                });
+
+                it(`should return false`, () => {
+                    expect(CancellationToken.none.canBeCanceled).to.equal(false);
+                });
+            });
+
+            describe('🌿 "isCancellationRequested" instance property', () => {
+                it(`should not throw`, () => {
+                    const act = () => CancellationToken.none.isCancellationRequested;
+                    expect(act).not.to.throw();
+                });
+
+                it(`should return false`, () => {
+                    expect(CancellationToken.none.isCancellationRequested).to.equal(false);
+                });
+            });
+
+            describe('📞 "throwIfCancellationRequested" instance method', () => {
+                it(`should not throw`, () => {
+                    const act = () => CancellationToken.none.throwIfCancellationRequested();
+                    expect(act).not.to.throw();
+                });
+            });
+        });
+    });
+
+    describe(`🌿 "canBeCanceled" instance property`, () => {
+        let cts: CancellationTokenSource = undefined!;
+        let ct: CancellationToken = undefined!;
+
+        beforeEach(() => {
+            cts = new CancellationTokenSource();
+            ct = cts.token;
+        });
+
+        afterEach(() => {
+            cts.dispose();
+        });
+
+        it(`should not throw`, () => {
+            const act = () => ct.canBeCanceled;
+            expect(act).not.to.throw();
+        });
+
+        it(`should return true`, () => {
+            expect(ct.canBeCanceled).to.equal(true);
+        });
+    });
+
+    describe(`🌿 "isCancellationRequested" instance property`, () => {
+        let cts: CancellationTokenSource = undefined!;
+        let ct: CancellationToken = undefined!;
+
+        beforeEach(() => {
+            cts = new CancellationTokenSource();
+            ct = cts.token;
+        });
+
+        afterEach(() => {
+            cts.dispose();
+        });
+
+        it(`should not throw when the associated CTS hadn't been canceled`, () => {
+            const act = () => ct.isCancellationRequested;
+            expect(act).not.to.throw;
+        });
+
+        it(`should not throw when the associated CTS had been canceled`, () => {
+            cts.cancel();
+            const act = () => ct.isCancellationRequested;
+            expect(act).not.to.throw;
+        });
+
+        it(`should return false when the associated CTS hadn't been canceled`, () => {
+            expect(ct.isCancellationRequested).to.equal(false);
+        });
+
+        it(`should return false when the CTS hadn't been canceled`, () => {
+            cts.cancel();
+            expect(ct.isCancellationRequested).to.equal(true);
+        });
+    });
+
+    describe(`📞 "throwIfCancellationRequested" instance method`, () => {
+        let cts: CancellationTokenSource = undefined!;
+        let ct: CancellationToken = undefined!;
+
+        beforeEach(() => {
+            cts = new CancellationTokenSource();
+            ct = cts.token;
+        });
+
+        afterEach(() => {
+            cts.dispose();
+        });
+
+        it(`should not throw when the associated CTS hadn't been canceled`, () => {
+            const act = () => ct.throwIfCancellationRequested();
+            expect(act).not.to.throw();
+        });
+
+        it(`should throw when the associated CTS had been canceled`, () => {
+            const act = () => ct.throwIfCancellationRequested();
+            cts.cancel();
+            expect(act).to.throw();
         });
     });
 });

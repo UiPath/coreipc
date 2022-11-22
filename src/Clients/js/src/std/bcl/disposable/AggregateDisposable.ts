@@ -3,6 +3,14 @@ import { IDisposable } from '.';
 
 /* @internal */
 export class AggregateDisposable implements IDisposable {
+    public static maybeCreate(...disposables: IDisposable[]): AggregateDisposable | null {
+        if (disposables.length === 0) {
+            return null;
+        }
+
+        return new AggregateDisposable(...disposables);
+    }
+
     private readonly _disposables: IDisposable[];
 
     public constructor(...disposables: IDisposable[]) {
@@ -10,6 +18,10 @@ export class AggregateDisposable implements IDisposable {
 
         if (disposables.length === 0) {
             throw new ArgumentError('No disposables were supplied.');
+        }
+
+        if (disposables.filter(x => typeof x['dispose'] !== 'function').length !== 0) {
+            throw new ArgumentError('At least one supplied item is not an IDispoable.');
         }
 
         this._disposables = disposables;

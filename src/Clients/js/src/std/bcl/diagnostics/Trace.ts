@@ -6,6 +6,8 @@ export interface ITraceCategory {
     log(obj: object): void;
 }
 
+export type TraceListener = (errorOrText: Error | string | object, category?: string) => void;
+
 export class Trace {
     private static readonly _listeners = new Array<
         (unit: Error | string | object, category?: string) => void
@@ -13,9 +15,7 @@ export class Trace {
     public static addListener(
         listener: (errorOrText: Error | string | object, category?: string) => void,
     ): IDisposable {
-        if (!listener) {
-            throw new ArgumentNullError('listener');
-        }
+        assertArgument({ listener }, 'function');
 
         Trace._listeners.push(listener);
         return {
@@ -55,6 +55,8 @@ export class Trace {
     };
 
     public static category(name: string): ITraceCategory {
+        assertArgument({ name }, 'string');
+
         return new Trace.traceCategory(name);
     }
 

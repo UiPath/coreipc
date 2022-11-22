@@ -26,6 +26,5 @@
         "ts-node/register",
         "--require",
         "tsconfig-paths/register"
-    ],
-    "jasmineExplorer.breakOnFirstLine": true
+    ]
 }
