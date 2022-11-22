@@ -1,5 +1,6 @@
 import Jasmine from 'jasmine';
 import JCR from 'jasmine-console-reporter';
+import { JUnitXmlReporter } from 'jasmine-reporters';
 
 async function main() {
     const jasmine = new Jasmine();
@@ -15,6 +16,13 @@ async function main() {
             timeUnit: 'ms',
             emoji: true,
             activity: true,
+        }),
+    );
+
+    jasmine.addReporter(
+        new JUnitXmlReporter({
+            savePath: './reports/test/node',
+            consolidateAll: true,
         }),
     );
 

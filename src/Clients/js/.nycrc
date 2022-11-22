@@ -15,12 +15,10 @@
     ],
     "reporter": [
         "html",
-        "lcov",
-        "json",
         "cobertura",
         "text"
     ],
-    "report-dir": "./coverage/node",
+    "report-dir": "./reports/coverage/node/html",
     "cache": true,
     "all": true
 }

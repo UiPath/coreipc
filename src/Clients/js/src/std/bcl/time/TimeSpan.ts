@@ -165,10 +165,7 @@ export class TimeSpan {
             return;
         }
 
-        const start = performance.now();
         const trySetFaulted = () => {
-            const stop = performance.now();
-            const took = new TimeSpan(stop - start);
             pcs.trySetFaulted(new TimeoutError());
         };
 

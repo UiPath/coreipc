@@ -1,20 +1,21 @@
 import { CoreIpcServer, NpmProcess } from './CoreIpcServer';
 import { BrowserWebSocketAddress } from '../../src/web';
-import path from 'path';
 import cliColor from 'cli-color';
 import commandLineArgs from 'command-line-args';
 import { NonZeroExitError } from './CoreIpcServer/NonZeroExitError';
 
 async function main(args: string[]): Promise<number> {
-    const keyPathNpmPackagejson = 'npm_package_json';
-    const pathNpmPackageJson = process.env[keyPathNpmPackagejson];
+    // const keyPathNpmPackagejson = 'npm_package_json';
+    // const pathNpmPackageJson = process.env[keyPathNpmPackagejson];
 
-    if (!pathNpmPackageJson) {
-        console.error(`Expecting the "${keyPathNpmPackagejson}" environment variable to be set.`);
-        return 1;
-    }
+    // console.log(`🎂 process.cwd === `, process.cwd());
 
-    const pathHome = path.dirname(pathNpmPackageJson);
+    // if (!pathNpmPackageJson) {
+    //     console.error(`Expecting the "${keyPathNpmPackagejson}" environment variable to be set.`);
+    //     return 1;
+    // }
+
+    const pathHome = process.cwd(); // path.dirname(pathNpmPackageJson);
 
     const headOptions = commandLineArgs([{ name: 'command', defaultOption: true }], {
         argv: args,
