@@ -12,12 +12,13 @@ variables:
   DotNet_ArtifactName: 'NuGet package'
 
   NodeJS_DotNet_BuildConfiguration: 'Debug'
-  NodeJS_ProjectPath: './src/Clients/nodejs'
-  NodeJS_ArchivePath: './src/Clients/nodejs.zip'
+  NodeJS_ProjectPath: './src/Clients/js'
+  NodeJS_ArchivePath: './src/Clients/js/dist/pack/nodejs.zip'
   NodeJS_ArtifactName: 'NPM package'
   NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.CoreIpc.NodeInterop/bin/Debug/net6.0'
-  NodeJS_DotNetNodeInteropProject : './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop/UiPath.CoreIpc.NodeInterop.csproj'
-  NodeJS_DotNetNodeInteropSolution: './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop.sln'
+  NodeJS_DotNetNodeInteropProject : './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop/UiPath.CoreIpc.NodeInterop.csproj'
+  NodeJS_DotNetNodeInteropSolution: './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop.sln'
+
 jobs:
   # The following 3 jobs will run in parallel:
 
