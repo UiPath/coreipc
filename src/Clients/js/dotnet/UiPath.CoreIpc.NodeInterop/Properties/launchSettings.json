@@ -2,7 +2,7 @@
   "profiles": {
     "UiPath.CoreIpc.NodeInterop": {
       "commandName": "Project",
-      "commandLineArgs": "--websocket ws://127.0.0.1:1234"
+      "commandLineArgs": "--websocket ws://localhost:61234"
     }
   }
 }
