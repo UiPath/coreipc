@@ -1,4 +1,4 @@
-steps:
+﻿steps:
   - task: UseDotNet@2
     inputs:
       version: 6.0.x
@@ -49,12 +49,21 @@ steps:
         script: 'npm test'
 
   - task: PublishTestResults@2
-    displayName: 'Publish Test Results'
+    displayName: 'Publish Web Test Results'
     condition: succeededOrFailed()
     inputs:
       testRunner: JUnit
       workingDir: $(NodeJS_ProjectPath)
       testResultsFiles: './src/Clients/js/reports/test/web/test-results.xml'
+
+  - task: PublishTestResults@2
+    displayName: 'Publish NodeJS Test Results'
+    condition: succeededOrFailed()
+    inputs:
+      testRunner: JUnit
+      workingDir: $(NodeJS_ProjectPath)
+      testRunTitle: '🌲 NodeJs ($(Agent.OS) $(Agent.OSArchitecture))'
+      testResultsFiles: './src/Clients/js/reports/test/node/test-results.xml'
 
   - task: PublishCodeCoverageResults@1
     displayName: 'Publish Code Coverage Results'

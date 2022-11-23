@@ -8,16 +8,16 @@ async function main() {
     jasmine.loadConfigFile('jasmine.node.json');
 
     jasmine.env.clearReporters();
-    // jasmine.addReporter(
-    //     new JCR({
-    //         colors: true,
-    //         cleanStack: true,
-    //         listStyle: 'indent',
-    //         timeUnit: 'ms',
-    //         emoji: true,
-    //         activity: true,
-    //     }),
-    // );
+    jasmine.addReporter(
+        new JCR({
+            colors: true,
+            cleanStack: true,
+            listStyle: 'indent',
+            timeUnit: 'ms',
+            emoji: true,
+            activity: true,
+        }),
+    );
 
     jasmine.addReporter(
         new JUnitXmlReporter({

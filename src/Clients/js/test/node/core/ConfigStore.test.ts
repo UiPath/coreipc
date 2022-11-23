@@ -67,5 +67,6 @@ describe(`${ConfigStore.name}'s`, () => {
             };
 
             applyTestCases(theory);
-        });    });
+        });
+    });
 });
