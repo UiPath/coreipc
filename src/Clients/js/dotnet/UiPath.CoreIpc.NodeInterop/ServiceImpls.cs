@@ -13,7 +13,10 @@ internal static class ServiceImpls
     {
         public Task<string> Ping() => Task.FromResult("Pong");
 
-        public Task<int> MultiplySimple(int x, int y) => Task.FromResult(x * y);
+        public async Task<int> MultiplySimple(int x, int y)
+        {
+            return x * y;
+        }
 
         public async Task<int> Multiply(int x, int y, Message message = default)
         {

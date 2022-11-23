@@ -8,7 +8,7 @@ describe('web:the browser built-in WebSocket class', () => {
     it('should be instantiable', () => {
         const act = () =>
             eval(/* js */ `
-            new WebSocket('ws://localhost:1234', 'foobar')
+            new WebSocket('ws://127.0.0.1:1234', 'foobar')
         `);
         expect(act).not.to.throw().and.to.be.instanceOf(WebSocket);
     });

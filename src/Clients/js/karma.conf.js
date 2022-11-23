@@ -27,17 +27,7 @@ module.exports = function (config) {
             coverageOptions: {
                 exclude: /(node_modules|tests|spec)/i,
             },
-            // reports: {
-            //     lcovonly: {
-            //         directory: './coverage',
-            //         subdirectory: () => '',
-            //         filename: 'lcov.info',
-            //     },
-            //     html: {
-            //         directory: './coverage',
-            //         subdirectory: () => '',
-            //     },
-            // },
+
             include: [
                 './src/**/*.ts',
                 './test/infrastructure/**/*.ts',
@@ -63,9 +53,6 @@ module.exports = function (config) {
 
         singleRun: true,
 
-        // plugins: ['karma-spec-reporter', 'karma-typescript'],
-
-        // reporters: ['dots', 'karma-typescript', 'progress', 'coverage', 'verbose'],
         reporters: ['spec', 'coverage', 'junit'],
 
         specReporter: {

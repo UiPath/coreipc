@@ -6,6 +6,7 @@
         <LangVersion>preview</LangVersion>
         <EnablePreviewFeatures>true</EnablePreviewFeatures>
         <Nullable>enable</Nullable>
+        <NoWarn>1998</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
