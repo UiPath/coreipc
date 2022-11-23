@@ -19,12 +19,12 @@ steps:
       projects: '$(NodeJS_DotNetNodeInteropProject)'
       arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net6.0 -p:Version="$(FullVersion)"'
 
-  - task: Npm@1
+  - task: CmdLine@2
     displayName: '$(Label_NodeJS) Write $[FullVersion] to package.json'
+    condition: succeeded()
     inputs:
-      command: 'custom'
-      workingDir: '$(NodeJS_ProjectPath)'
-      customCommand: 'version $(FullVersion) --allow-same-version'
+      workingDirectory: '$(NodeJS_ProjectPath)'
+      script: 'npm version $(FullVersion) --allow-same-version'
 
   - task: Npm@1
     displayName: '$(Label_NodeJS) Restore'
@@ -34,19 +34,19 @@ steps:
         customRegistry: 'useFeed'
         customFeed: '424ca518-1f12-456b-a4f6-888197fc15ee'
     
-  - task: Npm@1
+  - task: CmdLine@2
     displayName: '$(Label_NodeJS) Build'
+    condition: succeeded()
     inputs:
-        command: 'custom'
-        workingDir: $(NodeJS_ProjectPath)
-        customCommand: 'run build'
+        workingDirectory: $(NodeJS_ProjectPath)
+        script: 'npm run build'
     
-  - task: Npm@1
+  - task: CmdLine@2
     displayName: '$(Label_NodeJS) Run unit tests'
+    condition: succeeded()
     inputs:
-        command: 'custom'
-        workingDir: $(NodeJS_ProjectPath)
-        customCommand: 'run test'
+        workingDirectory: $(NodeJS_ProjectPath)
+        script: 'npm test'
 
   - task: PublishTestResults@2
     displayName: '$(Label_NodeJS) Publish test results'

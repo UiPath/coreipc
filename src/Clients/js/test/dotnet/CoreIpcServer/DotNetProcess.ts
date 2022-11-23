@@ -27,6 +27,7 @@ export class DotNetScriptError extends Error {
 
 export class DotNetProcess implements IAsyncDisposable {
     private _process: ChildProcessWithoutNullStreams | null = null;
+    private _killedByUs = false;
     private _processExitCode: number | null = null;
     private _processExitError: Error | undefined;
     private _stdin: Writable | null = null;
@@ -79,6 +80,11 @@ export class DotNetProcess implements IAsyncDisposable {
         console.log(`⚡ ${cliColor.blueBright(this._label)}::Started. PID === `, this._process.pid);
 
         this._process.once('close', code => {
+            if (this._killedByUs) {
+                this._processExitCode = 0;
+                return;
+            }
+
             this._processExitCode = code;
 
             if (code) {
@@ -194,6 +200,7 @@ export class DotNetProcess implements IAsyncDisposable {
 
     public async disposeAsync(): Promise<void> {
         if (this._process && !this._process.killed) {
+            this._killedByUs = true;
             await new Promise<void>(resolve => {
                 (this._process as ChildProcessWithoutNullStreams).kill();
                 (this._process as ChildProcessWithoutNullStreams).once('exit', () => {
