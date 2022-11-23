@@ -333,7 +333,6 @@ describe(`${Trace.name}'s`, () => {
     describe(`📞 "traceError" static method`, () => {
         describe(`should throw for invalid args`, () => {
             const argsList = [[], [123], [true], [{}]] as Parameters<typeof Trace.traceError>[];
-
             for (const args of argsList) {
                 it(`when called with ${JSON.stringify(args)}`, () => {
                     const act = () => Trace.traceError(...args);

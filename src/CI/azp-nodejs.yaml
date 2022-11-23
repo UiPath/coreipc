@@ -60,4 +60,4 @@ steps:
     displayName: 'Publish Code Coverage Results'
     inputs:
       codeCoverageTool: 'cobertura'
-      summaryFileLocation: './src/Clients/js/reports/coverage/web/cobertura/cobertura-coverage.xml'
+      summaryFileLocation: './src/Clients/js/reports/coverage/merged/cobertura/cobertura-coverage.xml'

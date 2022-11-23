@@ -16,7 +16,8 @@
     "reporter": [
         "html",
         "cobertura",
-        "text"
+        "text",
+        "lcovonly"
     ],
     "report-dir": "./reports/coverage/node/html",
     "cache": true,

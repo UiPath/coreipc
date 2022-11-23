@@ -1,6 +1,6 @@
 {
     "coverage-gutters.coverageBaseDir": "**",
-    "coverage-gutters.coverageFileNames": ["lcov.info", "cov.xml", "coverage.xml", "jacoco.xml"],
+    "coverage-gutters.coverageFileNames": ["lcov.info"],
     "coverage-gutters.showGutterCoverage": false,
     "coverage-gutters.showLineCoverage": true,
     "coverage-gutters.partialHighlightLight": "rgba(220, 213, 143, 0.15)",

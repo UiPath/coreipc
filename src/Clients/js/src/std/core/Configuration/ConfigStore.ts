@@ -1,54 +1,18 @@
 import { assertArgument, PublicCtor, TimeSpan } from '../..';
 import { Address, ServiceId } from '..';
 import { ConfigBuilder, ConnectHelper } from '.';
-
-/* @internal */
-class ConfigCell implements ConfigBuilder<Address> {
-    public connectHelper: ConnectHelper<Address> | undefined;
-    public requestTimeout: TimeSpan | undefined;
-
-    setConnectHelper<T>(
-        this: T,
-        connectHelper: ConnectHelper<Address>,
-    ): Omit<T, keyof ConfigBuilder.SetConnectHelper<Address>> {
-        assertArgument({ connectHelper }, 'function');
-
-        (this as ConfigCell).connectHelper = connectHelper;
-        return this;
-    }
-
-    setRequestTimeout<T>(this: T, value: TimeSpan): Omit<T, keyof ConfigBuilder.SetRequestTimeout>;
-    setRequestTimeout<T>(
-        this: T,
-        milliseconds: number,
-    ): Omit<T, keyof ConfigBuilder.SetRequestTimeout>;
-    setRequestTimeout(value: TimeSpan | number): any {
-        let newValue: TimeSpan;
-
-        switch (assertArgument({ value }, TimeSpan, 'number')) {
-            case TimeSpan: {
-                newValue = value as TimeSpan;
-                break;
-            }
-            case 'number': {
-                newValue = TimeSpan.fromMilliseconds(value as number);
-                break;
-            }
-            default: {
-                throw void 0;
-            }
-        }
-
-        this.requestTimeout = newValue;
-    }
-}
+import { ConfigCell } from './ConfigCell';
 
 /* @internal */
 export class ConfigStore {
+
     public getBuilder<TAddress extends Address>(
-        address: Address | undefined,
-        serviceId: ServiceId | undefined,
+        address?: Address | undefined,
+        serviceId?: ServiceId | undefined,
     ): ConfigBuilder<TAddress> {
+        assertArgument({ address }, Address, 'undefined');
+        assertArgument({ serviceId }, ServiceId, 'undefined');
+
         const compositeKey = ConfigStore.computeCompositeKey(address, serviceId);
 
         let result = this._map.get(compositeKey);
@@ -103,8 +67,8 @@ export class ConfigStore {
             serviceOrServiceId === undefined
                 ? ''
                 : typeof serviceOrServiceId === 'function'
-                ? serviceOrServiceId.name
-                : serviceOrServiceId.key;
+                    ? serviceOrServiceId.name
+                    : serviceOrServiceId.key;
 
         const compositeKey = `[${address?.key ?? ''}][${serviceKey}]`;
         return compositeKey;
