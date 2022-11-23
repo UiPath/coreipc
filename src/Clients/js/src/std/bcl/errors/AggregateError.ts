@@ -3,6 +3,13 @@ import { CoreIpcError, ArgumentOutOfRangeError } from '.';
 
 export class AggregateError extends CoreIpcError {
     public static maybeAggregate(...errors: Error[]): Error | undefined {
+        if (errors.filter((x) => !(x instanceof Error)).length > 0) {
+            throw new ArgumentOutOfRangeError(
+                'errors',
+                `Specified argument contained at least one element which is not an Error.`,
+            );
+        }
+
         switch (errors.length) {
             case 0:
                 return undefined;

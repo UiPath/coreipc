@@ -1,45 +1,62 @@
 export * from './__members';
 
-// import { PublicCtor } from '../../src/std';
-// import { expect } from 'chai';
+import { assert, expect, use } from 'chai';
+import chai from 'chai';
+import chaiAsPromised from 'chai-as-promised';
+import { JsonConvert, TimeSpan } from '../../src/std';
 
-// export function _<T>(sut: () => Promise<T>): _.IAsyncFunc<T> {
-//     return new AsyncFunc<T>(sut);
-// }
+chai.should();
+use(chaiAsPromised);
 
-// export module _ {
-//     export type IAsyncFunc<T> = {
-//         readonly should: IAsyncFuncShould<T>;
-//     };
+export * from './__';
 
-//     export type IAsyncFuncShould<T> = {
-//         throwAsync(): Promise<void>;
-//         throwAsync<TError>(ctor: PublicCtor<TError>): Promise<void>;
-//     };
-// }
+export function constructing<TConstructor extends new (...args: any[]) => any>(
+    ctor: TConstructor,
+    ...args: ConstructorParameters<TConstructor>
+): () => InstanceType<TConstructor> {
+    return () => new ctor(...args);
+}
 
-// class AsyncFunc<T> implements _.IAsyncFunc<T>, _.IAsyncFuncShould<T> {
-//     constructor(private readonly _sut: () => Promise<T>) {}
+export function calling<TFunction extends (...args: any[]) => any>(
+    f: TFunction,
+    ...args: Parameters<TFunction>
+): () => ReturnType<TFunction> {
+    return () => f(...args);
+}
 
-//     get should(): _.IAsyncFuncShould<T> {
-//         return this;
-//     }
+export function toJavaScript(x: unknown): string {
+    switch (typeof x) {
+        case 'undefined':
+            return 'undefined';
+        case 'function':
+            return x.toString();
+        case 'symbol':
+            return x.toString();
+        case 'object':
+            if (x instanceof Error && x.constructor) {
+                return `new ${x.constructor.name}('${x.message}')`;
+            }
+            if (x instanceof TimeSpan && x.isInfinite) {
+                return 'Timeout.infiniteTimeSpan';
+            }
+            if (x instanceof Uint8Array && x.constructor) {
+                return `${x.constructor.name}[byteLength: ${x.byteLength}]`;
+            }
+            if (x && !(x instanceof Array) && x.constructor && x.constructor !== Object) {
+                if (x.toString !== Object.prototype.toString) {
+                    return x.toString();
+                }
+                return `new ${x.constructor.name}(...)`;
+            }
+            break;
+    }
+    return JsonConvert.serializeObject(x);
+}
 
-//     throwAsync(): Promise<void>;
-//     throwAsync<TError>(ctor: PublicCtor<TError>): Promise<void>;
-//     async throwAsync<TError>(ctor?: PublicCtor<TError>): Promise<void> {
-//         let actual = undefined;
-//         try {
-//             await this._sut();
-//         } catch (error) {
-//             actual = error;
-//         }
+export function _jsargs(args: readonly unknown[]): string {
+    return args.map(toJavaScript).join(', ');
+}
 
-//         if (ctor) {
-//             expect(actual).to.be.instanceOf(ctor);
-//             return;
-//         }
+const context = describe;
 
-//         expect(actual).not.to.be.undefined;
-//     }
-// }
+export { expect, assert, context };
