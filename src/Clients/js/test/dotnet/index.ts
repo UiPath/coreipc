@@ -42,6 +42,8 @@ async function main(args: string[]): Promise<number> {
                 await CoreIpcServer.host(new BrowserWebSocketAddress(websocketUrl), async () => {
                     await NpmProcess.runAsync('𝒏𝒑𝒎 𝒓𝒖𝒏', pathHome, script);
                 });
+
+                return 0;
             } catch (error) {
                 function print() {
                     if (error instanceof NonZeroExitError) {
@@ -54,7 +56,7 @@ async function main(args: string[]): Promise<number> {
                 }
 
                 print();
-                process.exit(2);
+                return 3;
             }
         }
         default: {
@@ -64,7 +66,13 @@ async function main(args: string[]): Promise<number> {
 }
 
 async function bootstrapper() {
-    process.exit(await main(process.argv));
+    try {
+        const code = await main(process.argv);
+        process.exit(code);
+    } catch (e) {
+        console.error(e);
+        process.exit(4);
+    }
 }
 
 bootstrapper();

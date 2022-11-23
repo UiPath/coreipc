@@ -202,7 +202,8 @@ export class DotNetProcess implements IAsyncDisposable {
         if (this._process && !this._process.killed) {
             this._killedByUs = true;
             await new Promise<void>(resolve => {
-                (this._process as ChildProcessWithoutNullStreams).kill();
+                const SIGINT = 2;
+                (this._process as ChildProcessWithoutNullStreams).kill(SIGINT);
                 (this._process as ChildProcessWithoutNullStreams).once('exit', () => {
                     resolve();
                 });
