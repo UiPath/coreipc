@@ -13,10 +13,16 @@ public static class Helpers
 {
     public const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly;
 #if NET461
-    public static CancellationTokenRegistration UnsafeRegister(this CancellationToken token, Action<object> callback, object state) => token.Register(callback, state);
+    public static CancellationTokenRegistration UnsafeRegister(this CancellationToken token, Action<object> callback, object state)
+    {
+        using (ExecutionContext.SuppressFlow())
+        {
+            return token.Register(callback, state);
+        }
+    }
     public static async Task ConnectAsync(this TcpClient tcpClient, IPAddress address, int port, CancellationToken cancellationToken)
     {
-        using var token = cancellationToken.Register(state => ((TcpClient)state).Dispose(), tcpClient);
+        using var token = cancellationToken.UnsafeRegister(state => ((TcpClient)state).Dispose(), tcpClient);
         await tcpClient.ConnectAsync(address, port);
     }
 #endif
