@@ -26,12 +26,11 @@ public sealed class Connection : IDisposable
     private readonly Action<object> _cancelRequest;
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
-    private readonly MessagePackStreamReader _streamReader;
+    private RecyclableMemoryStream _messageStream;
     public Connection(Stream network, ILogger logger, string name, int maxMessageSize = int.MaxValue)
     {
         Network = network;
         _nestedStream = new NestedStream(network, 0);
-        _streamReader = new(_nestedStream);
         Logger = logger;
         Name = $"{name} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
@@ -168,7 +167,6 @@ public sealed class Connection : IDisposable
         }
         _sendLock.AssertDisposed();
         Network.Dispose();
-        _streamReader.Dispose();
         Server?.CancelRequests();
         try
         {
@@ -221,8 +219,19 @@ public sealed class Connection : IDisposable
                     throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
                 }
                 _nestedStream.Reset(length);
+                var stream = GetStream();
+                try
+                {
+                    await _nestedStream.CopyToAsync(stream);
+                    stream.Position = 0;
+                    _messageStream = stream;
+                }
+                catch
+                {
+                    stream.Dispose();
+                    throw;
+                }
                 await HandleMessage((MessageType)_buffer[0]);
-                _streamReader.DiscardBufferedData();
             }
         }
         catch (Exception ex)
@@ -251,21 +260,33 @@ public sealed class Connection : IDisposable
             return default;
         }
     }
-    private async ValueTask OnCancel() => RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
+    private ValueTask OnCancel()
+    {
+        using var _ = _messageStream;
+        var reader = CreateReader();
+        RunAsync(_onCancellation, Deserialize<CancellationRequest>(ref reader).RequestId);
+        return default;
+    }
 #if NET461
     static void RunAsync(WaitCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state);
 #else
     static void RunAsync<T>(Action<T> callback, T state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state, preferLocal: true);
 #endif
-    private async ValueTask OnResponse()
+    private ValueTask OnResponse()
     {
-        var incomingResponse = await DeserializeResponse();
+        var incomingResponse = DeserializeResponse();
         var response = incomingResponse.Response;
         if (response.Empty)
         {
-            return;
+            return default;
         }
         if (response.Data == _nestedStream)
+        {
+            return OnDownloadResponse(incomingResponse);
+        }
+        RunAsync(_onResponse, incomingResponse);
+        return default;
+        async ValueTask OnDownloadResponse(IncomingResponse incomingResponse)
         {
             await EnterStreamMode();
             var streamDisposed = new TaskCompletionSource<bool>();
@@ -281,15 +302,20 @@ public sealed class Connection : IDisposable
                 _nestedStream.Disposed -= disposedHandler;
             }
         }
+    }
+    private ValueTask OnRequest()
+    {
+        var request = DeserializeRequest();
+        if (request.Request.Parameters is [Stream,..])
+        {
+            return OnUploadRequest(request);
+        }
         else
         {
-            RunAsync(_onResponse, incomingResponse);
+            RunAsync(_onRequest, request);
+            return default;
         }
-    }
-    private async ValueTask OnRequest()
-    {
-        var request = await DeserializeRequest();
-        if (request.Request.Parameters is [Stream,..])
+        async ValueTask OnUploadRequest(IncomingRequest request)
         {
             await EnterStreamMode();
             using (_nestedStream)
@@ -297,12 +323,8 @@ public sealed class Connection : IDisposable
                 await OnRequestReceived(request);
             }
         }
-        else
-        {
-            RunAsync(_onRequest, request);
-        }
     }
-    private async Task EnterStreamMode()
+    private async ValueTask EnterStreamMode()
     {
         if (!await ReadHeader(sizeof(long)))
         {
@@ -327,8 +349,7 @@ public sealed class Connection : IDisposable
         }
     }
     static void Serialize<T>(T value, IBufferWriter<byte> writer) => MessagePackSerializer.Serialize(writer, value, Contractless);
-    private async ValueTask<T> Deserialize<T>() => MessagePackSerializer.Deserialize<T>(await ReadBytes(), Contractless);
-    private async ValueTask<ReadOnlySequence<byte>> ReadBytes() => await _streamReader.ReadAsync(default) ?? throw ClosedException;
+    static T Deserialize<T>(ref MessagePackReader reader) => MessagePackSerializer.Deserialize<T>(ref reader, Contractless);
     private void OnCancellationReceived(int requestId)
     {
         try
@@ -341,9 +362,11 @@ public sealed class Connection : IDisposable
         }
     }
     private void Log(Exception ex) => Logger.LogException(ex, Name);
-    private async ValueTask<IncomingResponse> DeserializeResponse()
+    private IncomingResponse DeserializeResponse()
     {
-        var response = await Deserialize<Response>();
+        using var _ = _messageStream;
+        var reader = CreateReader();
+        var response = Deserialize<Response>(ref reader);
         if (LogEnabled)
         {
             Log($"Received response for request {response.RequestId} {Name}.");
@@ -352,41 +375,57 @@ public sealed class Connection : IDisposable
         {
             return default;
         }
-        var bytes = await ReadBytes();
         var responseType = outgoingRequest.ResponseType;
         if (response.Error == null)
         {
-            response.Data = responseType == typeof(Stream) ? _nestedStream : MessagePackSerializer.Deserialize(responseType, bytes, Contractless);
+            if (responseType == typeof(Stream))
+            {
+                reader.ReadNil();
+                response.Data = _nestedStream;
+            }
+            else
+            {
+                response.Data = MessagePackSerializer.Deserialize(responseType, ref reader, Contractless);
+            }
+        }
+        else
+        {
+            reader.ReadNil();
         }
         return new(response, outgoingRequest.Completion);
     }
-    private async ValueTask<IncomingRequest> DeserializeRequest()
+    private MessagePackReader CreateReader() => new(_messageStream.GetReadOnlySequence());
+    private IncomingRequest DeserializeRequest()
     {
-        var request = await Deserialize<Request>();
+        using var _ = _messageStream;
+        var reader = CreateReader();
+        var request = Deserialize<Request>(ref reader);
         if (LogEnabled)
         {
             Log($"{Name} received request {request}");
         }
         if (!Server.Endpoints.TryGetValue(request.Endpoint, out var endpoint))
         {
-            await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
+            Error(request);
+            return default;
         }
         var method = GetMethod(endpoint.Contract, request.MethodName);
         var args = new object[method.Parameters.Length];
         for (int index = 0; index < args.Length; index++)
         {
             var type = method.Parameters[index].ParameterType;
-            var bytes = await ReadBytes();
             if (type == typeof(CancellationToken))
             {
+                reader.ReadNil();
                 continue;
             }
             else if (type == typeof(Stream))
             {
+                reader.ReadNil();
                 args[index] = _nestedStream;
                 continue;
             }
-            var arg = MessagePackSerializer.Deserialize(type, bytes, Contractless);
+            var arg = MessagePackSerializer.Deserialize(type, ref reader, Contractless);
             args[index] = CheckMessage(arg, type);
         }
         request.Parameters = args;
@@ -403,6 +442,17 @@ public sealed class Connection : IDisposable
                 message.Client = Server.Client;
             }
             return argument;
+        }
+    }
+    async void Error(Request request)
+    {
+        try
+        {
+            await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
+        }
+        catch (Exception ex)
+        {
+            Log(ex);
         }
     }
     private ValueTask OnRequestReceived(IncomingRequest request)
