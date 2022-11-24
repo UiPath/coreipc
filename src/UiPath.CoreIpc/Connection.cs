@@ -254,8 +254,7 @@ public sealed class Connection : IDisposable
     }
     private ValueTask OnCancel()
     {
-        using var _ = _messageStream;
-        var reader = CreateReader();
+        using var _ = CreateReader(out var reader);
         RunAsync(_onCancellation, Deserialize<CancellationRequest>(ref reader).RequestId);
         return default;
     }
@@ -356,8 +355,7 @@ public sealed class Connection : IDisposable
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     private IncomingResponse DeserializeResponse()
     {
-        using var _ = _messageStream;
-        var reader = CreateReader();
+        using var _= CreateReader(out var reader);
         var response = Deserialize<Response>(ref reader);
         if (LogEnabled)
         {
@@ -386,11 +384,14 @@ public sealed class Connection : IDisposable
         }
         return new(response, outgoingRequest.Completion);
     }
-    private MessagePackReader CreateReader() => new(_messageStream.GetReadOnlySequence());
+    private RecyclableMemoryStream CreateReader(out MessagePackReader reader)
+    {
+        reader = new(_messageStream.GetReadOnlySequence());
+        return _messageStream;
+    }
     private IncomingRequest DeserializeRequest()
     {
-        using var _ = _messageStream;
-        var reader = CreateReader();
+        using var _ = CreateReader(out var reader);
         var request = Deserialize<Request>(ref reader);
         if (LogEnabled)
         {
