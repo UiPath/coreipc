@@ -219,18 +219,10 @@ public sealed class Connection : IDisposable
                     throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
                 }
                 _nestedStream.Reset(length);
-                var stream = GetStream();
-                try
-                {
-                    await _nestedStream.CopyToAsync(stream);
-                    stream.Position = 0;
-                    _messageStream = stream;
-                }
-                catch
-                {
-                    stream.Dispose();
-                    throw;
-                }
+                using var stream = GetStream();
+                await _nestedStream.CopyToAsync(stream);
+                stream.Position = 0;
+                _messageStream = stream;
                 await HandleMessage((MessageType)_buffer[0]);
             }
         }
