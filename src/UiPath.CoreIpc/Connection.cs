@@ -399,7 +399,7 @@ public sealed class Connection : IDisposable
         }
         if (!Server.Endpoints.TryGetValue(request.Endpoint, out var endpoint))
         {
-            Error(request);
+            OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
             return default;
         }
         var method = GetMethod(endpoint.Contract, request.MethodName);
@@ -435,17 +435,6 @@ public sealed class Connection : IDisposable
                 message.Client = Server.Client;
             }
             return argument;
-        }
-    }
-    async void Error(Request request)
-    {
-        try
-        {
-            await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
-        }
-        catch (Exception ex)
-        {
-            Log(ex);
         }
     }
     private ValueTask OnRequestReceived(IncomingRequest request)
