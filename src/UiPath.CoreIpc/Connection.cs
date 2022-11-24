@@ -358,7 +358,7 @@ public sealed class Connection : IDisposable
         {
             response.Data = responseType == typeof(Stream) ? _nestedStream : MessagePackSerializer.Deserialize(responseType, bytes, Contractless);
         }
-        return new(response, outgoingRequest.Completion); ;
+        return new(response, outgoingRequest.Completion);
     }
     private async ValueTask<IncomingRequest> DeserializeRequest()
     {
