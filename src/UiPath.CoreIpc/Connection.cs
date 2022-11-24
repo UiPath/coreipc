@@ -419,11 +419,11 @@ public sealed class Connection : IDisposable
                 continue;
             }
             var arg = MessagePackSerializer.Deserialize(type, ref reader, Contractless);
-            args[index] = CheckMessage(arg, type);
+            args[index] = CheckMessage(arg, type, endpoint.CallbackContract);
         }
         request.Parameters = args;
         return new(request, method, endpoint);
-        object CheckMessage(object argument, Type parameterType)
+        object CheckMessage(object argument, Type parameterType, Type callbackType)
         {
             if (parameterType == typeof(Message) && argument == null)
             {
@@ -431,7 +431,7 @@ public sealed class Connection : IDisposable
             }
             if (argument is Message message)
             {
-                message.CallbackContract = endpoint.CallbackContract;
+                message.CallbackContract = callbackType;
                 message.Client = Server.Client;
             }
             return argument;
