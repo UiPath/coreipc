@@ -94,21 +94,12 @@ class Server
         {
             await beforeCall(new(default, method.MethodInfo, request.Parameters), cancellationToken);
         }
-        IServiceScope scope = null;
         var service = endpoint.ServiceInstance;
-        try
+        if (service == null)
         {
-            if (service == null)
-            {
-                scope = ServiceProvider.CreateScope();
-                service = scope.ServiceProvider.GetRequiredService(contract);
-            }
-            return await InvokeMethod();
+            service = ServiceProvider.GetRequiredService(contract);
         }
-        finally
-        {
-            scope?.Dispose();
-        }
+        return await InvokeMethod();
 #if !NET461
         [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
