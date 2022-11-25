@@ -406,6 +406,11 @@ public sealed class Connection : IDisposable
         for (int index = 0; index < args.Length; index++)
         {
             var type = method.Parameters[index].ParameterType;
+            if (reader.End)
+            {
+                args[index] = CheckMessage(method.Defaults[index], type, endpoint);
+                continue;
+            }
             if (type == typeof(CancellationToken))
             {
                 reader.ReadNil();
@@ -418,11 +423,11 @@ public sealed class Connection : IDisposable
                 continue;
             }
             var arg = MessagePackSerializer.Deserialize(type, ref reader, Contractless);
-            args[index] = CheckMessage(arg, type, endpoint.CallbackContract);
+            args[index] = CheckMessage(arg, type, endpoint);
         }
         request.Parameters = args;
         return new(request, method, endpoint);
-        object CheckMessage(object argument, Type parameterType, Type callbackType)
+        object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint)
         {
             if (parameterType == typeof(Message) && argument == null)
             {
@@ -430,7 +435,7 @@ public sealed class Connection : IDisposable
             }
             if (argument is Message message)
             {
-                message.CallbackContract = callbackType;
+                message.CallbackContract = endpoint.CallbackContract;
                 message.Client = Server.Client;
             }
             return argument;
