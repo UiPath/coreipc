@@ -219,11 +219,14 @@ public sealed class Connection : IDisposable
                     throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
                 }
                 _nestedStream.Reset(length);
-                using var stream = GetStream();
-                await _nestedStream.CopyToAsync(stream);
-                stream.Position = 0;
-                _messageStream = stream;
-                await HandleMessage((MessageType)_buffer[0]);
+                ValueTask messageTask;
+                using (_messageStream = GetStream(length))
+                {
+                    await _nestedStream.CopyToAsync(_messageStream);
+                    _messageStream.Position = 0;
+                    messageTask = HandleMessage((MessageType)_buffer[0]);
+                }
+                await messageTask;
             }
         }
         catch (Exception ex)
@@ -254,7 +257,7 @@ public sealed class Connection : IDisposable
     }
     private ValueTask OnCancel()
     {
-        using var _ = CreateReader(out var reader);
+        var reader = CreateReader();
         RunAsync(_onCancellation, Deserialize<CancellationRequest>(ref reader).RequestId);
         return default;
     }
@@ -355,7 +358,7 @@ public sealed class Connection : IDisposable
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     private IncomingResponse DeserializeResponse()
     {
-        using var _= CreateReader(out var reader);
+        var reader = CreateReader();
         var response = Deserialize<Response>(ref reader);
         if (LogEnabled)
         {
@@ -384,14 +387,10 @@ public sealed class Connection : IDisposable
         }
         return new(response, outgoingRequest.Completion);
     }
-    private RecyclableMemoryStream CreateReader(out MessagePackReader reader)
-    {
-        reader = new(_messageStream.GetReadOnlySequence());
-        return _messageStream;
-    }
+    private MessagePackReader CreateReader() => new(_messageStream.GetReadOnlySequence());
     private IncomingRequest DeserializeRequest()
     {
-        using var _ = CreateReader(out var reader);
+        var reader = CreateReader();
         var request = Deserialize<Request>(ref reader);
         if (LogEnabled)
         {
