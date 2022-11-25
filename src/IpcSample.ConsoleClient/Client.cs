@@ -32,7 +32,7 @@ class Client
         var serviceProvider = ConfigureServices();
         var callback = new ComputingCallback { Id = "custom made" };
         var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>("test", serviceProvider)
-            .CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
+            .CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(5));
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
         try
@@ -40,7 +40,7 @@ class Client
             var computingClient = computingClientBuilder.ValidateAndBuild();
             var systemClient =
                 new NamedPipeClientBuilder<ISystemService>("test")
-                .RequestTimeout(TimeSpan.FromSeconds(2))
+                .RequestTimeout(TimeSpan.FromSeconds(5))
                 .Logger(serviceProvider)
                 .AllowImpersonation()
                 .ValidateAndBuild();
