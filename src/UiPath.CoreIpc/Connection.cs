@@ -68,7 +68,7 @@ public sealed class Connection : IDisposable
             requestCompletion.Return();
         }
     }
-    internal ValueTask Send(Request request, CancellationToken token)
+    internal ValueTask Send(in Request request, CancellationToken token)
     {
         if (request.Parameters is [Stream uploadStream, ..])
         {
@@ -441,7 +441,7 @@ public sealed class Connection : IDisposable
             return argument;
         }
     }
-    private ValueTask OnRequestReceived(IncomingRequest request)
+    private ValueTask OnRequestReceived(in IncomingRequest request)
     {
         try
         {
@@ -453,7 +453,7 @@ public sealed class Connection : IDisposable
             return default;
         }
     }
-    internal ValueTask OnError(Request request, Exception ex)
+    internal ValueTask OnError(in Request request, Exception ex)
     {
         Logger.LogException(ex, $"{Name} {request}");
         return Send(Response.Fail(request, ex), default);

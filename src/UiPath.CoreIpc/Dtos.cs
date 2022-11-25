@@ -28,7 +28,7 @@ public record struct Response(int RequestId, Error Error = null)
 {
     internal bool Empty => RequestId == 0;
     internal object Data { get; set; }
-    public static Response Fail(Request request, Exception ex) => new(request.Id, ex.ToError());
+    public static Response Fail(in Request request, Exception ex) => new(request.Id, ex.ToError());
 }
 [Serializable]
 public record Error(string Message, string StackTrace, string Type, Error InnerError)
