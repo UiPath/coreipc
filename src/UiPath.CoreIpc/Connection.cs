@@ -37,7 +37,7 @@ public sealed class Connection : IDisposable
         _receiveLoop = new(ReceiveLoop);
         _onResponse = response => OnResponseReceived((IncomingResponse)response);
         _onRequest = request => OnRequestReceived((IncomingRequest)request);
-        _onCancellation = requestId => Server.CancelRequest((int)requestId);
+        _onCancellation = requestId => Server?.CancelRequest((int)requestId);
         _cancelRequest = requestId => CancelRequest((int)requestId);
     }
     internal Server Server { get; private set; }
