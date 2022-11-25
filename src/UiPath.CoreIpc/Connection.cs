@@ -62,11 +62,11 @@ public sealed class Connection : IDisposable
         }
         catch
         {
-            tokenRegistration.Dispose();
             if (_requests.TryRemove(requestId, out _))
             {
                 requestCompletion.Return();
             }
+            tokenRegistration.Dispose();
             throw;
         }
         try
