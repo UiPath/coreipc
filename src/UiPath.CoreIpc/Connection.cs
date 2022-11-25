@@ -45,11 +45,23 @@ public sealed class Connection : IDisposable
 #endif
     internal async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
     {
-        await Send(request, token);
         var requestCompletion = Rent();
         var requestId = request.Id;
         _requests[requestId] = requestCompletion;
         var tokenRegistration = token.UnsafeRegister(_cancelRequest, requestId);
+        try
+        {
+            await Send(request, token);
+        }
+        catch
+        {
+            tokenRegistration.Dispose();
+            if (_requests.TryRemove(requestId, out _))
+            {
+                requestCompletion.Return();
+            }
+            throw;
+        }
         try
         {
             return await requestCompletion.ValueTask();
