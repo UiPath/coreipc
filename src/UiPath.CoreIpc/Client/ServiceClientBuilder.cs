@@ -1,6 +1,6 @@
 ﻿namespace UiPath.CoreIpc;
 
-using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
+using ConnectionFactory = Func<Connection, Connection>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 
 public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
@@ -22,7 +22,7 @@ public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterfac
 
     internal Type CallbackContract { get; }
 
-    public TDerived DontReconnect() => ConnectionFactory((connection, _) => Task.FromResult(connection));
+    public TDerived DontReconnect() => ConnectionFactory(connection => connection);
 
     public TDerived ConnectionFactory(ConnectionFactory connectionFactory)
     {

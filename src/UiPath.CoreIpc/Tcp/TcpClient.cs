@@ -3,7 +3,7 @@ using System.Net.Sockets;
 
 namespace UiPath.CoreIpc.Tcp;
 
-using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
+using ConnectionFactory = Func<Connection, Connection>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 interface ITcpKey : IConnectionKey
 {

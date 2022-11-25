@@ -3,7 +3,7 @@ using System.Security.Principal;
 
 namespace UiPath.CoreIpc.NamedPipe;
 
-using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
+using ConnectionFactory = Func<Connection, Connection>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 
 interface INamedPipeKey : IConnectionKey

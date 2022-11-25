@@ -1,6 +1,6 @@
 ﻿using System.Net.WebSockets;
 namespace UiPath.CoreIpc.WebSockets;
-using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
+using ConnectionFactory = Func<Connection, Connection>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 interface IWebSocketsKey : IConnectionKey
 {

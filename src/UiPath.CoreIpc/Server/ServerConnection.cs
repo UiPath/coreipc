@@ -11,7 +11,6 @@ abstract class ServerConnection : IClient, IDisposable
     private readonly ConcurrentDictionary<Type, object> _callbacks = new();
     protected readonly Listener _listener;
     private Connection _connection;
-    private Task<Connection> _connectionAsTask;
     protected ServerConnection(Listener listener) => _listener = listener;
     public ILogger Logger => _listener.Logger;
     public ListenerSettings Settings => _listener.Settings;
@@ -34,8 +33,7 @@ abstract class ServerConnection : IClient, IDisposable
             {
                 _listener.Log($"Create callback {callbackContract} {_listener.Name}");
             }
-            _connectionAsTask ??= Task.FromResult(_connection);
-            var serviceClient = new ServiceClient<TCallbackInterface>(Settings.RequestTimeout, Logger, (_, _) => _connectionAsTask);
+            var serviceClient = new ServiceClient<TCallbackInterface>(Settings.RequestTimeout, Logger, _=> _connection);
             return serviceClient.CreateProxy();
         }
     }

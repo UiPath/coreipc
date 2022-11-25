@@ -1,7 +1,7 @@
 ﻿using System.Net.Security;
 namespace UiPath.CoreIpc;
 
-using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
+using ConnectionFactory = Func<Connection, Connection>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 using InvokeDelegate = Func<IServiceClient, MethodInfo, object[], object>;
 
@@ -150,26 +150,26 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         }
     }
 
-    private async Task<bool> EnsureConnection(CancellationToken cancellationToken)
+    private Task<bool> EnsureConnection(CancellationToken cancellationToken)
     {
         if (_connectionFactory != null)
         {
-            var externalConnection = await _connectionFactory(_connection, cancellationToken);
+            var externalConnection = _connectionFactory(_connection);
             if (externalConnection != null)
             {
                 if (_connection == null)
                 {
                     OnNewConnection(externalConnection);
-                    return true;
+                    return Task.FromResult(true);
                 }
-                return false;
+                return Task.FromResult(false);
             }
         }
         if (_clientConnection?.Connected is true)
         {
-            return false;
+            return Task.FromResult(false);
         }
-        return await Connect(cancellationToken);
+        return Connect(cancellationToken);
     }
 
     private async Task<bool> Connect(CancellationToken cancellationToken)
