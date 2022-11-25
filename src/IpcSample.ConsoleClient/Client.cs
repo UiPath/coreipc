@@ -7,7 +7,7 @@ namespace UiPath.CoreIpc.Tests;
 
 class Client
 {
-    static async Task _Main(string[] args)
+    static async Task Main(string[] args)
     {
         Console.WriteLine(typeof(int).Assembly);
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
@@ -45,7 +45,7 @@ class Client
                 .AllowImpersonation()
                 .ValidateAndBuild();
             var watch = Stopwatch.StartNew();
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < int.MaxValue; i++)
             {
                 // test 1: call IPC service method with primitive types
                 float result1 = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);
