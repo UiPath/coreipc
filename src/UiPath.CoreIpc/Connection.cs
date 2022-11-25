@@ -186,7 +186,7 @@ public sealed class Connection : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogException(ex, this);
+            Log(ex);
         }
         foreach (var requestId in _requests.Keys)
         {
@@ -243,7 +243,7 @@ public sealed class Connection : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogException(ex, $"{nameof(ReceiveLoop)} {Name}");
+            Log(ex);
         }
         if (LogEnabled)
         {
