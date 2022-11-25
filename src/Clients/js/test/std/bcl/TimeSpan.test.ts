@@ -89,6 +89,7 @@ describe(`${TimeSpan.name}'s`, () => {
             expect(() => TimeSpan.toTimeSpan({} as any))
                 .to.throw(ArgumentOutOfRangeError)
                 .with.property('paramName', 'arg0');
+
             expect(() => TimeSpan.toTimeSpan(true as any))
                 .to.throw(ArgumentOutOfRangeError)
                 .with.property('paramName', 'arg0');

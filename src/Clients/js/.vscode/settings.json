@@ -10,7 +10,9 @@
     "coverage-gutters.noHighlightDark": "rgba(121, 31, 10, 0.15)",
     "coverage-gutters.noHighlightLight": "rgba(220, 143, 143, 0.15)",
     "typescript.tsdk": "node_modules\\typescript\\lib",
+
     "prettier.singleQuote": true,
+
     "editor.codeActionsOnSave": {
         "source.organizeImports": false,
         "source.fixAll": true
@@ -24,5 +26,18 @@
         "ts-node/register",
         "--require",
         "tsconfig-paths/register"
-    ]
+    ],
+
+    "editor.tokenColorCustomizations": {
+        "[windows-xp]": {
+            "textMateRules": [
+                {
+                    "scope": "variable.language",
+                    "settings": {
+                        "fontStyle": "italic"
+                    }
+                }
+            ]
+        }
+    }
 }

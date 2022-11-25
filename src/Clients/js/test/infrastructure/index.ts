@@ -1,4 +1,5 @@
 export * from './__members';
+export * from './cover';
 
 import { assert, expect, use } from 'chai';
 import chai from 'chai';

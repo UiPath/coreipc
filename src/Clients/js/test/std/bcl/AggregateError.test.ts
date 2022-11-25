@@ -6,7 +6,7 @@ import {
 } from '../../../src/std';
 
 import { expect } from 'chai';
-import { _jsargs, __for, __fact } from '../../infrastructure';
+import { _jsargs, __for, __fact, cover } from '../../infrastructure';
 
 __for(`${AggregateError.name}'s`, () => {
     __for(`ctor`, () => {
@@ -102,11 +102,14 @@ __for(`${AggregateError.name}'s`, () => {
                 ['some message', new Error(), new ArgumentError()],
                 ['some message', new Error(), new ArgumentError(), new InvalidOperationError()],
             ] as ConstructorParameters<typeof AggregateError>[]) {
-                __fact(`should set errors to [${JSON.stringify(
-                    args.slice(1),
-                )}] when called with: (${_jsargs(args)})`, () => {
-                    expect(new AggregateError(...args).errors).to.be.deep.eq(args.slice(1));
-                });
+                __fact(
+                    `should set errors to [${JSON.stringify(
+                        args.slice(1),
+                    )}] when called with: (${_jsargs(args)})`,
+                    () => {
+                        expect(new AggregateError(...args).errors).to.be.deep.eq(args.slice(1));
+                    },
+                );
             }
         });
 
@@ -130,13 +133,16 @@ __for(`${AggregateError.name}'s`, () => {
             ] as Array<{ expected: string; args: ConstructorParameters<typeof AggregateError> }>) {
                 const concatenatedArgs = JSON.stringify(_case.args);
 
-                __fact(`should set objectName to ${JSON.stringify(
-                    _case.expected,
-                )} when called with: (${concatenatedArgs})`, () => {
-                    const sut = new AggregateError(..._case.args);
+                __fact(
+                    `should set objectName to ${JSON.stringify(
+                        _case.expected,
+                    )} when called with: (${concatenatedArgs})`,
+                    () => {
+                        const sut = new AggregateError(..._case.args);
 
-                    expect(sut.message).to.be.eq(_case.expected);
-                });
+                        expect(sut.message).to.be.eq(_case.expected);
+                    },
+                );
             }
         });
     });
@@ -186,21 +192,24 @@ __for(`${AggregateError.name}'s`, () => {
             expect(actual).to.equal(singleError);
         });
 
-        __fact(`should return an ${AggregateError.name} that contains the received errors when called with more than one error`, () => {
-            const error1 = new Error();
-            const error2 = new Error();
-            const actual = AggregateError.maybeAggregate(error1, error2);
+        __fact(
+            `should return an ${AggregateError.name} that contains the received errors when called with more than one error`,
+            () => {
+                const error1 = new Error();
+                const error2 = new Error();
+                const actual = AggregateError.maybeAggregate(error1, error2);
 
-            expect(actual)
-                .to.be.instanceOf(AggregateError)
-                .that.satisfies((x: any) => {
-                    const specific = x as AggregateError;
+                expect(actual)
+                    .to.be.instanceOf(AggregateError)
+                    .that.satisfies((x: any) => {
+                        const specific = x as AggregateError;
 
-                    expect(specific.errors).to.have.lengthOf(2);
-                    expect(specific.errors).to.contain(error1).and.to.contain(error2);
+                        expect(specific.errors).to.have.lengthOf(2);
+                        expect(specific.errors).to.contain(error1).and.to.contain(error2);
 
-                    return true;
-                });
-        });
+                        return true;
+                    });
+            },
+        );
     });
 });
