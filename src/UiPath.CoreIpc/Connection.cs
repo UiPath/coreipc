@@ -27,7 +27,7 @@ public sealed class Connection : IDisposable
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
     private RecyclableMemoryStream _messageStream;
-    public Connection(Stream network, ILogger logger, string name, int maxMessageSize = int.MaxValue)
+    internal Connection(Stream network, ILogger logger, string name, int maxMessageSize = int.MaxValue)
     {
         Network = network;
         _nestedStream = new NestedStream(network, 0);
@@ -41,15 +41,15 @@ public sealed class Connection : IDisposable
         _cancelRequest = requestId => CancelRequest((int)requestId);
     }
     internal Server Server { get; private set; }
-    public Stream Network { get; }
-    public ILogger Logger { get; internal set; }
-    public bool LogEnabled => Logger.Enabled();
-    public string Name { get; }
+    Stream Network { get; }
+    internal ILogger Logger { get; set; }
+    internal bool LogEnabled => Logger.Enabled();
+    internal string Name { get; }
     public override string ToString() => Name;
-    public int NewRequestId() => Interlocked.Increment(ref _requestCounter);
-    public Task Listen() => _receiveLoop.Value;
+    internal int NewRequestId() => Interlocked.Increment(ref _requestCounter);
+    internal Task Listen() => _receiveLoop.Value;
     public event EventHandler<EventArgs> Closed = delegate{};
-    public void SetServer(ListenerSettings settings, IClient client = null) => Server = new(settings, this, client);
+    internal void SetServer(ListenerSettings settings, IClient client = null) => Server = new(settings, this, client);
     internal async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
     {
         await Send(request, token);
@@ -469,7 +469,7 @@ public sealed class Connection : IDisposable
             Log(ex);
         }
     }
-    public void Log(string message) => Logger.LogInformation(message);
+    internal void Log(string message) => Logger.LogInformation(message);
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
 }
