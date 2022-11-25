@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net6.0-windows;net461;net6.0;</TargetFrameworks>
+    <TargetFrameworks>net7.0-windows;net461;net7.0;</TargetFrameworks>
     <ApplicationManifest>app1.manifest</ApplicationManifest>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>true</ImplicitUsings>
