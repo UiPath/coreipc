@@ -37,7 +37,7 @@ public sealed class Connection : IDisposable
         _receiveLoop = new(ReceiveLoop);
         _onResponse = response => OnResponseReceived((IncomingResponse)response);
         _onRequest = request => OnRequestReceived((IncomingRequest)request);
-        _onCancellation = requestId => OnCancellationReceived((int)requestId);
+        _onCancellation = requestId => Server.CancelRequest((int)requestId);
         _cancelRequest = requestId => CancelRequest((int)requestId);
     }
     internal Server Server { get; private set; }
@@ -356,17 +356,6 @@ public sealed class Connection : IDisposable
     }
     static void Serialize<T>(T value, IBufferWriter<byte> writer) => MessagePackSerializer.Serialize(writer, value, Contractless);
     static T Deserialize<T>(ref MessagePackReader reader) => MessagePackSerializer.Deserialize<T>(ref reader, Contractless);
-    private void OnCancellationReceived(int requestId)
-    {
-        try
-        {
-            Server.CancelRequest(requestId);
-        }
-        catch(Exception ex)
-        {
-            Log(ex);
-        }
-    }
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     private IncomingResponse DeserializeResponse()
     {

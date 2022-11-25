@@ -25,22 +25,22 @@ class Server
         }
         foreach (var requestId in _requests.Keys)
         {
-            try
-            {
-                CancelRequest(requestId);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogException(ex, $"{Name}");
-            }
+            CancelRequest(requestId);
         }
     }
     public void CancelRequest(int requestId)
     {
-        if (_requests.TryRemove(requestId, out var cancellation))
+        try
         {
-            cancellation.Cancel();
-            cancellation.Return();
+            if (_requests.TryRemove(requestId, out var cancellation))
+            {
+                cancellation.Cancel();
+                cancellation.Return();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogException(ex, $"{Name}");
         }
     }
     public async ValueTask OnRequestReceived(IncomingRequest incomingRequest)
