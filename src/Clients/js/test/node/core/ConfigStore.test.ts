@@ -1,66 +1,102 @@
 import { Address, ConfigStore, ServiceId } from '../../../src/std';
-import { NodeWebSocketAddress } from '../../../src/node';
+import { NamedPipeAddress, NodeWebSocketAddress } from '../../../src/node';
 
 import { expect } from 'chai';
-import { cover, fcover } from '../../infrastructure';
+import { cover, _jsargs } from '../../infrastructure';
 
-cover<typeof ConfigStore>(ConfigStore, function () {
-    this.coverGetBuilder(function () {
+const $ConfigStore = cover<typeof ConfigStore>(ConfigStore);
+
+describe($ConfigStore, () => {
+    describe($ConfigStore.$GetBuilder, function () {
         class MockContract {}
 
-        const serviceId1 = new ServiceId(MockContract);
-        const serviceId2 = new ServiceId(MockContract, 'endpoint');
-        const address = new NodeWebSocketAddress('ws://localhost:61234');
+        const mockAddress = new NamedPipeAddress('ws://localhost:61234');
+        const mockServiceId1 = new ServiceId(MockContract);
+        const mockServiceId2 = new ServiceId(MockContract, 'mock-endpoint');
 
-        const builder = this.whenCalled(
-            this(undefined, serviceId1),
-            this(undefined, serviceId2),
-            this(undefined, undefined),
-            this(undefined),
-            this(address),
-            this(address, serviceId1),
-            this(address, serviceId2),
-            this(undefined, serviceId1),
-            this(undefined, serviceId2),
-        );
+        describe(`should not throw`, () => {
+            const _ = (
+                call: Parameters<typeof ConfigStore.prototype.getBuilder>,
+            ) => {
+                it(`when called with ${_jsargs(call)}`, () => {
+                    const sut = new ConfigStore();
 
-        this._should('be pure 2', () => {
-            const sut = new ConfigStore();
+                    const act = () => sut.getBuilder(...call);
 
-            sut.getBuilder(undefined, undefined).should.equal(
-                sut.getBuilder(undefined, undefined),
-            );
-        });
+                    act.should.not.throw();
+                });
+            };
 
-        builder.shouldAll('not throw', call => {
-            const sut = new ConfigStore();
-
-            const act = () => sut.getBuilder(...call.args);
-
-            act.should.not.throw();
-        });
-
-        builder.shouldAll('be a pure function', call => {
-            const sut = new ConfigStore();
-
-            const first = sut.getBuilder(...call.args);
-            const second = sut.getBuilder(...call.args);
-
-            first.should.equal(second);
-        });
-    });
-
-    this.coverConstructor(function () {
-        const construction = this();
-        const x = construction();
-
-        this._should('not throw', () => {
-            const act = this();
-
-            act.should.not.throw();
+            _(this());
+            _(this(undefined));
+            _(this(undefined, undefined));
+            _(this(mockAddress));
+            _(this(mockAddress, undefined));
+            _(this(mockAddress, mockServiceId1));
+            _(this(mockAddress, mockServiceId2));
+            _(this(undefined, mockServiceId1));
+            _(this(undefined, mockServiceId2));
         });
     });
 });
+
+// cover<typeof ConfigStore>(ConfigStore, function () {
+//     this.coverGetBuilder(function () {
+//         class MockContract {}
+
+//         const serviceId1 = new ServiceId(MockContract);
+//         const serviceId2 = new ServiceId(MockContract, 'endpoint');
+//         const address = new NodeWebSocketAddress('ws://localhost:61234');
+
+//         const builder = this.whenCalled(
+//             this(undefined, serviceId1),
+//             this(undefined, serviceId2),
+//             this(undefined, undefined),
+//             this(undefined),
+//             this(address),
+//             this(address, serviceId1),
+//             this(address, serviceId2),
+//             this(undefined, serviceId1),
+//             this(undefined, serviceId2),
+//         );
+
+//         this._should('be pure 2', () => {
+//             const sut = new ConfigStore();
+
+//             sut.getBuilder(undefined, undefined).should.equal(
+//                 sut.getBuilder(undefined, undefined),
+//             );
+//         });
+
+//         builder.shouldAll('not throw', call => {
+//             const sut = new ConfigStore();
+
+//             const act = () => sut.getBuilder(...call.args);
+
+//             act.should.not.throw();
+//         });
+
+//         builder.shouldAll('be a pure function', call => {
+//             const sut = new ConfigStore();
+
+//             const first = sut.getBuilder(...call.args);
+//             const second = sut.getBuilder(...call.args);
+
+//             first.should.equal(second);
+//         });
+//     });
+
+//     this.coverConstructor(function () {
+//         const construction = this();
+//         const x = construction();
+
+//         this._should('not throw', () => {
+//             const act = this();
+
+//             act.should.not.throw();
+//         });
+//     });
+// });
 
 describe(`${ConfigStore.name}'s`, () => {
     describe(`ctor`, () => {

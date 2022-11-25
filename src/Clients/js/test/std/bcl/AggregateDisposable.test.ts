@@ -1,11 +1,18 @@
-import { AggregateDisposable, AggregateError, IDisposable } from '../../../src/std';
+import {
+    AggregateDisposable,
+    AggregateError,
+    IDisposable,
+} from '../../../src/std';
 
 import { expect } from 'chai';
 import { cover } from '../../infrastructure';
 
-cover<typeof AggregateDisposable>(AggregateDisposable, function () {
-    this.coverDispose(function () {
-        this.should('not throw', () => {
+const $AggregateDisposable =
+    cover<typeof AggregateDisposable>(AggregateDisposable);
+
+describe($AggregateDisposable.$Constructor, () => {
+    describe($AggregateDisposable.$Dispose, () => {
+        it(`should not throw`, () => {
             const mockDisposable = { dispose(): void {} };
             const sut = new AggregateDisposable(mockDisposable);
             const act = () => sut.dispose();

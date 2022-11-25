@@ -1,5 +1,5 @@
 export * from './__members';
-export * from './cover';
+export * from './cover2';
 
 import { assert, expect, use } from 'chai';
 import chai from 'chai';
