@@ -17,7 +17,7 @@ public class ValidationTests
     [Fact]
     public void Request()
     {
-        Request request = new("endpoint", 42, "method", 43);
+        Request request = new(42, "method", "endpoint", 43);
         Roundtrip(request);
     }
     [Fact]

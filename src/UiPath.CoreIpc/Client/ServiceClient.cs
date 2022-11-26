@@ -101,7 +101,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                     await _beforeCall(new(newConnection, method, args), token);
                 }
                 var requestId = _connection.NewRequestId();
-                var request = new Request(typeof(TInterface).Name, requestId, methodName, messageTimeout.TotalSeconds)
+                var request = new Request(requestId, methodName, typeof(TInterface).Name, messageTimeout.TotalSeconds)
                 {
                     Parameters = args, ResponseType = typeof(TResult)
                 };

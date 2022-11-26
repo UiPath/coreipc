@@ -16,7 +16,7 @@ public class Message<TPayload> : Message
     public Message(TPayload payload) => Payload = payload;
     public TPayload Payload { get; }
 }
-public record struct Request(string Endpoint, int Id, string Method, double Timeout)
+public record struct Request(int Id, string Method, string Endpoint, double Timeout)
 {
     internal Type ResponseType { get; init; }
     internal object[] Parameters { get; set; }
