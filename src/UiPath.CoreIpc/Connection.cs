@@ -24,7 +24,7 @@ public sealed class Connection : IDisposable
     private readonly Action<int> _onCancellation;
 #endif
     private readonly Action<object> _cancelRequest;
-    private readonly byte[] _buffer = new byte[sizeof(long)];
+    private readonly byte[] _header = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
     private RecyclableMemoryStream _messageStream;
     internal Connection(Stream network, ILogger logger, string name, int maxMessageSize = int.MaxValue)
@@ -204,9 +204,9 @@ public sealed class Connection : IDisposable
         {
             var read = await Network.ReadAsync(
 #if NET461
-                _buffer, offset, toRead);
+                _header, offset, toRead);
 #else
-                _buffer.AsMemory(offset, toRead));
+                _header.AsMemory(offset, toRead));
 #endif
             if (read == 0)
             {
@@ -225,7 +225,7 @@ public sealed class Connection : IDisposable
             while (await ReadHeader(HeaderLength))
             {
                 Debug.Assert(SynchronizationContext.Current == null);
-                var length = BitConverter.ToInt32(_buffer, startIndex: 1);
+                var length = BitConverter.ToInt32(_header, startIndex: 1);
                 if (length > _maxMessageSize)
                 {
                     throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
@@ -236,7 +236,7 @@ public sealed class Connection : IDisposable
                 {
                     await _nestedStream.CopyToAsync(_messageStream);
                     _messageStream.Position = 0;
-                    messageTask = HandleMessage((MessageType)_buffer[0]);
+                    messageTask = HandleMessage((MessageType)_header[0]);
                 }
                 await messageTask;
             }
@@ -336,7 +336,7 @@ public sealed class Connection : IDisposable
         {
             throw ClosedException;
         }
-        var userStreamLength = BitConverter.ToInt64(_buffer, startIndex: 0);
+        var userStreamLength = BitConverter.ToInt64(_header, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
     }
     static RecyclableMemoryStream Serialize<T>(T value, Action<T, IBufferWriter<byte>> serializer)
