@@ -399,7 +399,7 @@ public sealed class Connection : IDisposable
             OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
             return default;
         }
-        var method = GetMethod(endpoint.Contract, request.MethodName);
+        var method = GetMethod(endpoint.Contract, request.Method);
         var args = new object[method.Parameters.Length];
         for (int index = 0; index < args.Length; index++)
         {

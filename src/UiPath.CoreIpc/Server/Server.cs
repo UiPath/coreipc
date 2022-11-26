@@ -70,7 +70,7 @@ class Server
             }
             catch (Exception ex) when(response.Empty)
             {
-                await _connection.OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName));
+                await _connection.OnError(request, timeoutHelper.CheckTimeout(ex, request.Method));
             }
             finally
             {
