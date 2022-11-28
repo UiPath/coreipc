@@ -7,7 +7,7 @@ namespace UiPath.CoreIpc.Tests;
 
 class Client
 {
-    static async Task _Main(string[] args)
+    static async Task Main(string[] args)
     {
         Console.WriteLine(typeof(int).Assembly);
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
