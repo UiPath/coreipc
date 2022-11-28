@@ -231,7 +231,21 @@ public sealed class Connection : IDisposable
                 ValueTask messageTask;
                 using (_messageStream = GetStream(length))
                 {
+#if NET461
                     await _nestedStream.CopyToAsync(_messageStream);
+#else
+                    int read;
+                    Memory<byte> memory;
+                    while (true)
+                    {
+                        memory = _messageStream.GetMemory();
+                        if ((read = await _nestedStream.ReadAsync(memory)) == 0)
+                        {
+                            break;
+                        }
+                        _messageStream.Advance(read);
+                    }
+#endif
                     _messageStream.Position = 0;
                     messageTask = HandleMessage((MessageType)_header[0]);
                 }
