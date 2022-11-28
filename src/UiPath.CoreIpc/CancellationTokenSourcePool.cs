@@ -4,7 +4,7 @@ internal static class CancellationTokenSourcePool
 {
     public static PooledCancellationTokenSource Rent() =>
 #if !NET461
-        ObjectPool<PooledCancellationTokenSource>.Rent();
+        ObjectPool<PooledCancellationTokenSource>.TryRent() ?? new();
 #else
         new();
 #endif
@@ -23,19 +23,19 @@ internal static class CancellationTokenSourcePool
         }
     }
 }
-static class ObjectPool<T> where T : new()
+static class ObjectPool<T>
 {
     private const int MaxQueueSize = 1024;
     private static readonly ConcurrentQueue<T> Cache = new();
     private static int Count;
-    public static T Rent()
+    public static T TryRent()
     {
-        if (Cache.TryDequeue(out var cts))
+        if (Cache.TryDequeue(out var pooled))
         {
             Interlocked.Decrement(ref Count);
-            return cts;
+            return pooled;
         }
-        return new();
+        return pooled;
     }
     public static bool Return(T item)
     {

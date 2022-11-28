@@ -2,7 +2,7 @@ using System.Threading.Tasks.Sources;
 namespace UiPath.CoreIpc;
 internal static class TaskCompletionPool<T>
 {
-    public static ManualResetValueTaskSource Rent() => ObjectPool<ManualResetValueTaskSource>.Rent();
+    public static ManualResetValueTaskSource Rent() => ObjectPool<ManualResetValueTaskSource>.TryRent() ?? new();
     static void Return(ManualResetValueTaskSource source) => ObjectPool<ManualResetValueTaskSource>.Return(source);
     public sealed class ManualResetValueTaskSource : IValueTaskSource<T>, IValueTaskSource
     {
