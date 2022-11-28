@@ -68,8 +68,7 @@ public class NestedStream : Stream
         return bytesRead;
     }
 #if !NET461
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-    public async override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
         if (buffer.Length > _remainingBytes)
         {
@@ -77,11 +76,23 @@ public class NestedStream : Stream
         }
         if (buffer.Length <= 0)
         {
-            return 0;
+            return default;
         }
-        int bytesRead = await _underlyingStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
-        _remainingBytes -= bytesRead;
-        return bytesRead;
+        var valueTask = _underlyingStream.ReadAsync(buffer, cancellationToken);
+        if (valueTask.IsCompletedSuccessfully)
+        {
+            int bytesRead = valueTask.Result;
+            _remainingBytes -= bytesRead;
+            return new(bytesRead);
+        }
+        return CompleteAsync(valueTask);
+        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+        async ValueTask<int> CompleteAsync(ValueTask<int> result)
+        {
+            int bytesRead = await result.ConfigureAwait(false);
+            _remainingBytes -= bytesRead;
+            return bytesRead;
+        }
     }
 #endif
     /// <inheritdoc />
