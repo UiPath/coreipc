@@ -71,8 +71,6 @@ globalThis.describe = function (
         _this = description;
     }
 
-    console.log(`🎂 description === `, description, ` _this === `, _this);
-
     const tail = stack.join('.');
     stack.push(description.toString());
 

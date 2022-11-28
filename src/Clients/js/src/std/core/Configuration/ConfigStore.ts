@@ -1,51 +1,47 @@
-import { assertArgument, PublicCtor, TimeSpan } from '../..';
+import { assertArgument, TimeSpan } from '../..';
 import { Address, ServiceId } from '..';
-import { ConfigBuilder, ConnectHelper } from '.';
-import { ConfigCell } from './ConfigCell';
+import { ConnectHelper } from '.';
 
 /* @internal */
 export class ConfigStore {
-
-    public getBuilder<TAddress extends Address>(
-        address?: Address | undefined,
-        serviceId?: ServiceId | undefined,
-    ): ConfigBuilder<TAddress> {
-        assertArgument({ address }, Address, 'undefined');
-        assertArgument({ serviceId }, ServiceId, 'undefined');
-
-        const compositeKey = ConfigStore.computeCompositeKey(address, serviceId);
-
-        let result = this._map.get(compositeKey);
-
-        if (result) {
-            return result as unknown as ConfigBuilder<TAddress>;
-        }
-
-        result = new ConfigCell();
-        this._map.set(compositeKey, result);
-
-        return result as unknown as ConfigBuilder<TAddress>;
-    }
+    private static readonly EmptyKey = '';
 
     public getConnectHelper<TAddress extends Address>(
         address: TAddress,
     ): ConnectHelper<TAddress> | undefined {
         const key = ConfigStore.computeCompositeKey(address, undefined);
 
-        return this._map.get(key)?.connectHelper;
+        return (
+            this._connectHelpers.get(key) ??
+            this._connectHelpers.get(ConfigStore.EmptyKey)
+        );
+    }
+
+    public setConnectHelper<TAddress extends Address>(
+        address: TAddress | undefined,
+        value: ConnectHelper<TAddress> | undefined,
+    ): void {
+        assertArgument({ address }, Address, 'undefined');
+        assertArgument({ value }, 'function', 'undefined');
+
+        const key = address?.key ?? ConfigStore.EmptyKey;
+
+        if (!value) {
+            this._connectHelpers.delete(key);
+            return;
+        }
+
+        this._connectHelpers.set(key, value);
     }
 
     public getRequestTimeout<TService, TAddress extends Address>(
-        service: PublicCtor<TService>,
         address: TAddress,
+        service: ServiceId<TService>,
     ): TimeSpan | undefined {
         for (const key of enumerateCandidateKeys()) {
-            const cell = this._map.get(key);
-
-            const maybeValue = cell?.requestTimeout;
-
-            if (maybeValue) {
-                return maybeValue;
+            const result = this._requestTimeouts.get(key);
+            if (result) {
+                return result;
             }
         }
 
@@ -59,20 +55,41 @@ export class ConfigStore {
         }
     }
 
+    public setRequestTimeout<TService, TAddress extends Address>(
+        address: TAddress | undefined,
+        service: ServiceId<TService> | undefined,
+        value: TimeSpan | undefined,
+    ): void {
+        assertArgument({ address }, Address, 'undefined');
+        assertArgument({ service }, ServiceId, 'undefined');
+        assertArgument({ value }, TimeSpan, 'undefined');
+
+        const key = ConfigStore.computeCompositeKey(address, service);
+
+        if (!value) {
+            this._requestTimeouts.delete(key);
+            return;
+        }
+
+        this._requestTimeouts.set(key, value);
+    }
+
     private static computeCompositeKey(
         address: Address | undefined,
-        serviceOrServiceId: ServiceId | PublicCtor | undefined,
+        serviceOrServiceId: ServiceId | undefined,
     ) {
-        const serviceKey =
-            serviceOrServiceId === undefined
-                ? ''
-                : typeof serviceOrServiceId === 'function'
-                    ? serviceOrServiceId.name
-                    : serviceOrServiceId.key;
+        const addressKey = address?.key ?? ConfigStore.EmptyKey;
 
-        const compositeKey = `[${address?.key ?? ''}][${serviceKey}]`;
+        const serviceKey =
+            serviceOrServiceId?.endpointName ??
+            serviceOrServiceId?.key ??
+            ConfigStore.EmptyKey;
+
+        const compositeKey = `[${addressKey}][${serviceKey}]`;
         return compositeKey;
     }
 
-    private readonly _map = new Map<string, ConfigCell>();
+    private readonly _requestTimeouts = new Map<string, TimeSpan>();
+
+    private readonly _connectHelpers = new Map<string, ConnectHelper<any>>();
 }
