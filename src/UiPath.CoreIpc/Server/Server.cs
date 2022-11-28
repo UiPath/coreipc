@@ -94,36 +94,25 @@ class Server
         {
             await beforeCall(new(default, method.MethodInfo, request.Parameters), cancellationToken);
         }
-        var service = endpoint.ServiceInstance;
-        if (service == null)
+        var service = endpoint.ServiceInstance ?? ServiceProvider.GetRequiredService(contract);
+        var returnTaskType = method.ReturnType;
+        var scheduler = endpoint.Scheduler;
+        Debug.Assert(scheduler != null);
+        var defaultScheduler = scheduler == TaskScheduler.Default;
+        if (returnTaskType.IsGenericType)
         {
-            service = ServiceProvider.GetRequiredService(contract);
+            var methodResult = defaultScheduler ? MethodCall() : await RunOnScheduler();
+            await methodResult;
+            var returnValue = GetTaskResult(returnTaskType, methodResult);
+            return new Response(request.Id) { Data = returnValue };
         }
-        return await InvokeMethod();
-#if !NET461
-        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-#endif
-        async ValueTask<Response> InvokeMethod()
+        else
         {
-            var returnTaskType = method.ReturnType;
-            var scheduler = endpoint.Scheduler;
-            Debug.Assert(scheduler != null);
-            var defaultScheduler = scheduler == TaskScheduler.Default;
-            if (returnTaskType.IsGenericType)
-            {
-                var methodResult = defaultScheduler ? MethodCall() : await RunOnScheduler();
-                await methodResult;
-                var returnValue = GetTaskResult(returnTaskType, methodResult);
-                return new Response(request.Id) { Data = returnValue };
-            }
-            else
-            {
-                (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method.MethodInfo);
-                return default;
-            }
-            Task MethodCall() => method.Invoke(service, request.Parameters, cancellationToken);
-            Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
+            (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method.MethodInfo);
+            return default;
         }
+        Task MethodCall() => method.Invoke(service, request.Parameters, cancellationToken);
+        Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
     }
     private void Log(string message) => _connection.Log(message);
     private ILogger Logger => _connection.Logger;
