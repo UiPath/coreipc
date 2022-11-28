@@ -1,4 +1,10 @@
-import { Address, CancellationToken, ConnectHelper, Socket, TimeSpan } from '../../../std';
+import {
+    Address,
+    CancellationToken,
+    ConnectHelper,
+    Socket,
+    TimeSpan,
+} from '../../../std';
 import { NamedPipeSocket } from './NamedPipeSocket';
 
 export class NamedPipeAddress extends Address {

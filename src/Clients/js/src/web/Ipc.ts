@@ -1,4 +1,4 @@
-import { Ipc as IpcBase, AddressSelectionDelegate } from '../std';
+import { IpcBase, AddressSelectionDelegate } from '../std';
 
 import { BrowserWebSocketAddress } from '.';
 import { WebAddressBuilder } from './WebAddressBuilder';
@@ -11,7 +11,7 @@ export class Ipc extends IpcBase<WebAddressBuilder> {
     public webSocket(
         url: string,
     ): AddressSelectionDelegate<WebAddressBuilder, BrowserWebSocketAddress> {
-        return (builder) => builder.isWebSocket(url);
+        return builder => builder.isWebSocket(url);
     }
 }
 

@@ -1,4 +1,4 @@
-import { Ipc as IpcBase, AddressSelectionDelegate } from '../std';
+import { IpcBase, AddressSelectionDelegate } from '../std';
 import { NodeAddressBuilder } from './NodeAddressBuilder';
 import { NamedPipeAddress } from '.';
 

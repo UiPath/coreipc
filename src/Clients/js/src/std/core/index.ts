@@ -1,6 +1,6 @@
 export * from './Addresses';
 export * from './Configuration';
-export * from './Ipc';
+export * from './IpcBase';
 export * from './ServiceId';
 export * from './Proxies';
 export * from './Protocol';

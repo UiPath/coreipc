@@ -27,7 +27,7 @@ import {
 import { ContractStore, IContractStore } from './Contract';
 import { Callback, CallbackImpl } from './Callbacks';
 
-export abstract class Ipc<TAddressBuilder extends AddressBuilder = any>
+export abstract class IpcBase<TAddressBuilder extends AddressBuilder = any>
     implements IServiceProvider<TAddressBuilder>
 {
     constructor(
@@ -39,11 +39,11 @@ export abstract class Ipc<TAddressBuilder extends AddressBuilder = any>
         return new this.addressBuilder();
     }
 
-    public readonly proxy: Ipc.ProxySource<TAddressBuilder> =
-        new Ipc.ProxySource<TAddressBuilder>(this);
+    public readonly proxy: IpcBase.ProxySource<TAddressBuilder> =
+        new IpcBase.ProxySource<TAddressBuilder>(this);
 
-    public readonly config: Ipc.Configuration<TAddressBuilder> =
-        new Ipc.Configuration<TAddressBuilder>(this);
+    public readonly config: IpcBase.Configuration<TAddressBuilder> =
+        new IpcBase.Configuration<TAddressBuilder>(this);
 
     public readonly callback: Callback<TAddressBuilder> =
         new CallbackImpl<TAddressBuilder>(this);
@@ -72,10 +72,10 @@ export abstract class Ipc<TAddressBuilder extends AddressBuilder = any>
     public readonly callbackStore = new CallbackStoreImpl();
 }
 
-export module Ipc {
+export module IpcBase {
     export class ProxySource<TAddressBuilder extends AddressBuilder> {
         /* @internal */
-        constructor(private readonly _ipc: Ipc<TAddressBuilder>) {}
+        constructor(private readonly _ipc: IpcBase<TAddressBuilder>) {}
 
         public withAddress<TAddress extends Address>(
             configure: AddressSelectionDelegate<TAddressBuilder, TAddress>,
@@ -91,7 +91,7 @@ export module Ipc {
     export class ProxySourceWithAddress<TAddress extends Address> {
         /* @internal */
         constructor(
-            private readonly _ipc: Ipc,
+            private readonly _ipc: IpcBase,
             private readonly _address: TAddress,
         ) {}
 
@@ -112,7 +112,7 @@ export module Ipc {
 
     export class Configuration<TAddressBuilder extends AddressBuilder> {
         /* @internal */
-        constructor(private readonly _ipc: Ipc<TAddressBuilder>) {}
+        constructor(private readonly _ipc: IpcBase<TAddressBuilder>) {}
 
         public forAnyAddress(): ConfigurationWithAddress {
             return new ConfigurationWithAddress(this._ipc);
@@ -132,7 +132,7 @@ export module Ipc {
     export class ConfigurationWithAddress<TAddress extends Address = Address> {
         /* @internal */
         constructor(
-            private readonly _ipc: Ipc,
+            private readonly _ipc: IpcBase,
             private readonly _address?: TAddress,
         ) {}
 
@@ -166,7 +166,7 @@ export module Ipc {
     > {
         /* @internal */
         constructor(
-            private readonly _ipc: Ipc,
+            private readonly _ipc: IpcBase,
             private readonly _address: TAddress | undefined,
             private readonly _serviceId?: ServiceId<TService>,
         ) {}

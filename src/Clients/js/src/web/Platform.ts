@@ -1,4 +1,8 @@
-import { InvalidOperationError, PlatformNotSupportedError, IPlatform } from '../std';
+import {
+    InvalidOperationError,
+    PlatformNotSupportedError,
+    IPlatform,
+} from '../std';
 
 /* @internal */
 export module Platform {
@@ -12,6 +16,10 @@ export module Platform {
         }
 
         getFullPipeName(shortName: string): string {
+            throw new PlatformNotSupportedError();
+        }
+
+        async pipeExists(shortName: string): Promise<boolean> {
             throw new PlatformNotSupportedError();
         }
     }

@@ -1,5 +1,12 @@
+import * as fs from 'fs';
 import path from 'path';
-import { InvalidOperationError, IPlatform } from '../std';
+import { NamedPipeSocket } from '.';
+import {
+    CancellationToken,
+    InvalidOperationError,
+    IPlatform,
+    Timeout,
+} from '../std';
 
 /* @internal */
 export module Platform {
@@ -16,6 +23,10 @@ export module Platform {
         getFullPipeName(shortName: string): string {
             return `\\\\.\\pipe\\${shortName}`;
         }
+
+        async pipeExists(shortName: string): Promise<boolean> {
+            return fs.existsSync(this.getFullPipeName(shortName));
+        }
     }
 
     class Linux implements IPlatform<Id> {
@@ -29,6 +40,28 @@ export module Platform {
                 return shortName;
             }
             return `${Linux.tempPath}CoreFxPipe_${shortName}`;
+        }
+
+        async pipeExists(shortName: string): Promise<boolean> {
+            let socket: NamedPipeSocket | undefined;
+            let result: boolean;
+
+            try {
+                socket = await NamedPipeSocket.connect(
+                    shortName,
+                    Timeout.infiniteTimeSpan,
+                    CancellationToken.none,
+                    undefined,
+                );
+                result = true;
+            } catch (err) {
+                result = false;
+            }
+
+            if (socket) {
+                socket.dispose();
+            }
+            return result;
         }
 
         private static get tempPath(): string {
