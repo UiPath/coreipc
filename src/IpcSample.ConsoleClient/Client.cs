@@ -35,8 +35,6 @@ class Client
             .Logger(serviceProvider)
             .AllowImpersonation()
             .ValidateAndBuild();
-        _ = await computingClient.AddFloat(1.23f, 4.56f);
-        _ = await systemClient.ConvertText("hEllO woRd!", TextStyle.Upper);
         Console.ReadLine();
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
