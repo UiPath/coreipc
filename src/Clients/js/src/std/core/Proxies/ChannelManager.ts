@@ -1,8 +1,7 @@
-import { CancellationToken, Timeout, TimeSpan } from '../..';
+import { CancellationToken, PublicCtor, Timeout, TimeSpan } from '../..';
 
 import {
     IServiceProvider,
-    ServiceId,
     Address,
     Converter,
     IRpcChannel,
@@ -29,23 +28,30 @@ export class ChannelManager<TAddress extends Address = Address> {
     ) {}
 
     async invokeMethod<TService>(
-        serviceId: ServiceId<TService>,
+        service: PublicCtor<TService>,
         methodName: keyof TService & string,
         args: unknown[],
     ): Promise<unknown> {
-        const [rpcRequest, returnsPromiseOf, ct, timeout] = RpcRequestFactory.create({
-            domain: this._domain,
-            service: serviceId.service,
-            address: this._address,
-            methodName,
-            args,
-        });
+        const [rpcRequest, returnsPromiseOf, ct, timeout] =
+            RpcRequestFactory.create({
+                domain: this._domain,
+                service: service,
+                address: this._address,
+                methodName,
+                args,
+            });
 
-        const channel = await this.ensureConnection(Timeout.infiniteTimeSpan, ct);
+        const channel = await this.ensureConnection(
+            Timeout.infiniteTimeSpan,
+            ct,
+        );
 
         const rpcResponse = await channel.call(rpcRequest, timeout, ct);
 
-        const result = Converter.fromRpcResponse(rpcResponse, rpcRequest) as any;
+        const result = Converter.fromRpcResponse(
+            rpcResponse,
+            rpcRequest,
+        ) as any;
 
         if (returnsPromiseOf instanceof Function) {
             result.constructor = returnsPromiseOf;
@@ -54,10 +60,14 @@ export class ChannelManager<TAddress extends Address = Address> {
         return result;
     }
 
-    private async ensureConnection(timeout: TimeSpan, ct: CancellationToken): Promise<IRpcChannel> {
+    private async ensureConnection(
+        timeout: TimeSpan,
+        ct: CancellationToken,
+    ): Promise<IRpcChannel> {
         if (!this._channel || this._channel.isDisposed) {
             const connectHelper =
-                this._domain.configStore.getConnectHelper(this._address) ?? defaultConnectHelper;
+                this._domain.configStore.getConnectHelper(this._address) ??
+                defaultConnectHelper;
 
             this._channel = this._rpcChannelFactory.create(
                 this._address,
@@ -72,14 +82,23 @@ export class ChannelManager<TAddress extends Address = Address> {
         return this._channel;
     }
 
-    private async invokeCallback(request: RpcMessage.Request): Promise<RpcMessage.Response> {
-        const callback = this._domain.callbackStore.get(request.Endpoint, this._address) as any;
+    private async invokeCallback(
+        request: RpcMessage.Request,
+    ): Promise<RpcMessage.Response> {
+        const callback = this._domain.callbackStore.get(
+            request.Endpoint,
+            this._address,
+        ) as any;
 
         if (!callback) {
-            throw new Error(`A callback is not defined for endpoint "${request.Endpoint}".`);
+            throw new Error(
+                `A callback is not defined for endpoint "${request.Endpoint}".`,
+            );
         }
 
-        const method = callback[request.MethodName] as (...args: any[]) => Promise<unknown>;
+        const method = callback[request.MethodName] as (
+            ...args: any[]
+        ) => Promise<unknown>;
         if (!(typeof method === 'function')) {
             throw new Error(
                 `The callback defined for endpoint "${request.Endpoint}" does not expose a method named "${request.MethodName}".`,
@@ -103,12 +122,18 @@ export class ChannelManager<TAddress extends Address = Address> {
     private readonly _incommingCallObserver = new (class
         implements Observer<RpcCallContext.Incomming>
     {
-        constructor(private readonly _channelManager: ChannelManager<TAddress>) {}
+        constructor(
+            private readonly _channelManager: ChannelManager<TAddress>,
+        ) {}
 
         public closed?: boolean;
-        public async next(incommingContext: RpcCallContext.Incomming): Promise<void> {
+        public async next(
+            incommingContext: RpcCallContext.Incomming,
+        ): Promise<void> {
             incommingContext.respond(
-                await this._channelManager.invokeCallback(incommingContext.request),
+                await this._channelManager.invokeCallback(
+                    incommingContext.request,
+                ),
             );
         }
         public error(err: any): void {}

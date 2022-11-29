@@ -9,9 +9,13 @@ import {
 } from '.';
 
 /* @internal */
-export interface IServiceProvider<TAddressBuilder extends AddressBuilder = any> {
-    readonly configStore: ConfigStore;
-    readonly proxyStore: ProxyStore;
+export interface IServiceProvider<
+    TAddressBuilder extends AddressBuilder = any,
+> {
+    readonly symbolofServiceAttachment: symbol;
+
+    readonly configStore: ConfigStore<TAddressBuilder>;
+    readonly proxyStore: ProxyStore<TAddressBuilder>;
     readonly dispatchProxyStore: DispatchProxyStore;
     readonly channelStore: ChannelManagerStore;
     readonly contractStore: IContractStore;

@@ -8,7 +8,6 @@ import {
     Timeout,
 } from '../std';
 
-/* @internal */
 export module Platform {
     export enum Id {
         Windows,

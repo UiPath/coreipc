@@ -1,5 +1,5 @@
-export * from './ClassAnnotations';
-export * from './MethodAnnotations';
+export * from './ServiceAnnotations';
+export * from './OperationAnnotations';
 
-export * from './ClassAnnotationsWrapper';
-export * from './MethodAnnotationsWrapper';
+export * from './ServiceAnnotationsWrapper';
+export * from './OperationAnnotationsWrapper';

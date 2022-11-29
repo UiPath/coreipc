@@ -1,11 +1,15 @@
-import { Address } from '..';
+import { Address, AddressBuilder } from '..';
 import { ICallInterceptor } from './DispatchProxy';
 import { IServiceProvider, ProxyId } from '.';
 
 /* @internal */
-export class ProxyManager<TService = unknown, TAddress extends Address = Address> {
+export class ProxyManager<
+    TAddressBuilder extends AddressBuilder,
+    TService = unknown,
+    TAddress extends Address = Address,
+> {
     constructor(
-        private readonly _domain: IServiceProvider,
+        private readonly _serviceProvider: IServiceProvider<TAddressBuilder>,
         public readonly proxyId: ProxyId<TService, TAddress>,
     ) {
         this.proxy = this.createProxy();
@@ -16,9 +20,14 @@ export class ProxyManager<TService = unknown, TAddress extends Address = Address
     private createProxy(): TService {
         const _this = this;
 
-        const EmittedInterceptorClass = class implements ICallInterceptor<TService> {
-            invokeMethod(methodName: keyof TService & string, args: unknown[]): Promise<unknown> {
-                const result = _this._domain.channelStore.invokeMethod(
+        const EmittedInterceptorClass = class
+            implements ICallInterceptor<TService>
+        {
+            invokeMethod(
+                methodName: keyof TService & string,
+                args: unknown[],
+            ): Promise<unknown> {
+                const result = _this._serviceProvider.channelStore.invokeMethod(
                     _this.proxyId,
                     methodName,
                     args,
@@ -30,9 +39,10 @@ export class ProxyManager<TService = unknown, TAddress extends Address = Address
 
         const interceptorInstance = new EmittedInterceptorClass();
 
-        const DispatchProxyClass = this._domain.dispatchProxyStore.get<TService>(
-            this.proxyId.serviceId.service,
-        );
+        const DispatchProxyClass =
+            this._serviceProvider.dispatchProxyStore.get<TService>(
+                this.proxyId.service,
+            );
 
         const dispatcherProxy = new DispatchProxyClass(interceptorInstance);
 

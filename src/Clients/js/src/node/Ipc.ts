@@ -1,15 +1,23 @@
-import { IpcBase, AddressSelectionDelegate } from '../std';
+import { IpcBaseImpl, AddressSelectionDelegate, IpcBase } from '../std';
 import { NodeAddressBuilder } from './NodeAddressBuilder';
 import { NamedPipeAddress } from '.';
 
-export class Ipc extends IpcBase<NodeAddressBuilder> {
+class IpcNodeImpl extends IpcBaseImpl<NodeAddressBuilder> implements Ipc {
     constructor() {
         super(NodeAddressBuilder);
     }
 
-    public namedPipe(name: string): AddressSelectionDelegate<NodeAddressBuilder, NamedPipeAddress> {
+    public namedPipe(
+        name: string,
+    ): AddressSelectionDelegate<NodeAddressBuilder, NamedPipeAddress> {
         return builder => builder.isPipe(name);
     }
 }
 
-export const ipc: Ipc = new Ipc();
+export interface Ipc extends IpcBase<NodeAddressBuilder> {
+    namedPipe(
+        name: string,
+    ): AddressSelectionDelegate<NodeAddressBuilder, NamedPipeAddress>;
+}
+
+export const ipc: Ipc = new IpcNodeImpl();

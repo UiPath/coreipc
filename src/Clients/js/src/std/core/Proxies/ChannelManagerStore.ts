@@ -10,7 +10,7 @@ export class ChannelManagerStore {
     ): Promise<unknown> {
         const channel = this.getOrCreateChannel<TAddress>(proxyId.address);
 
-        const result = channel.invokeMethod(proxyId.serviceId, methodName, args);
+        const result = channel.invokeMethod(proxyId.service, methodName, args);
 
         return result;
     }

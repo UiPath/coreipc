@@ -1,13 +1,15 @@
 import { PublicCtor, Primitive, InvalidOperationError } from '../..';
 import { IServiceProvider } from '..';
-import { MethodAnnotations } from '.';
+import { OperationAnnotations } from '.';
 
 /* @internal */
-export class MethodAnnotationsWrapper {
+export class OperationAnnotationsWrapper {
     public constructor(private readonly _domain: IServiceProvider) {}
 
-    public readonly iface: MethodAnnotations = ((
-        arg0: any | { name?: string; returnsPromiseOf?: PublicCtor | Primitive },
+    public readonly iface: OperationAnnotations = ((
+        arg0:
+            | any
+            | { name?: string; returnsPromiseOf?: PublicCtor | Primitive },
         propertyKey?: string,
     ): void | ((target: any, propertyKey: string) => void) => {
         if (typeof propertyKey === 'string') {

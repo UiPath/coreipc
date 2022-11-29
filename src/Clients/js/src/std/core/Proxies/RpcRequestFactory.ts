@@ -57,7 +57,7 @@ export class RpcRequestFactory {
             message?.RequestTimeout ??
             params.domain.configStore.getRequestTimeout(
                 params.address,
-                serviceId,
+                params.service,
             ) ??
             Timeout.infiniteTimeSpan;
 

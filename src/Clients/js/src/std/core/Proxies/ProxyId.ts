@@ -1,13 +1,10 @@
-import { ServiceId, Address } from '..';
+import { PublicCtor } from '../../bcl';
+import { Address } from '..';
 
 /* @internal */
 export class ProxyId<TService, TAddress extends Address> {
     constructor(
-        public readonly serviceId: ServiceId<TService>,
+        public readonly service: PublicCtor<TService>,
         public readonly address: TAddress,
     ) {}
-
-    public get key(): string {
-        return `${this.serviceId.key}@${this.address}`;
-    }
 }

@@ -25,7 +25,6 @@ const promiseNever: Promise<never> = {
     },
 };
 
-/* @internal */
 export class PromisePal {
     public static traceError<T>(promise: Promise<T>): void {
         promise.catch(emptyOnRejected);

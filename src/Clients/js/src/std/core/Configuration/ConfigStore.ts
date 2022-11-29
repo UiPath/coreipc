@@ -1,15 +1,23 @@
-import { assertArgument, TimeSpan } from '../..';
-import { Address, ServiceId } from '..';
+import { assertArgument, PublicCtor, TimeSpan } from '../..';
+import { Address, AddressBuilder, IServiceProvider } from '..';
 import { ConnectHelper } from '.';
 
 /* @internal */
-export class ConfigStore {
+export class ConfigStore<TAddressBuilder extends AddressBuilder> {
     private static readonly EmptyKey = '';
+
+    constructor(
+        private readonly _serviceProvider: IServiceProvider<TAddressBuilder>,
+    ) {}
 
     public getConnectHelper<TAddress extends Address>(
         address: TAddress,
     ): ConnectHelper<TAddress> | undefined {
-        const key = ConfigStore.computeCompositeKey(address, undefined);
+        const key = ConfigStore.computeCompositeKey<
+            TAddressBuilder,
+            TAddress,
+            any
+        >(this._serviceProvider, address, undefined);
 
         return (
             this._connectHelpers.get(key) ??
@@ -36,9 +44,9 @@ export class ConfigStore {
 
     public getRequestTimeout<TService, TAddress extends Address>(
         address: TAddress,
-        service: ServiceId<TService>,
+        service: PublicCtor<TService>,
     ): TimeSpan | undefined {
-        for (const key of enumerateCandidateKeys()) {
+        for (const key of enumerateCandidateKeys(this._serviceProvider)) {
             const result = this._requestTimeouts.get(key);
             if (result) {
                 return result;
@@ -47,24 +55,41 @@ export class ConfigStore {
 
         return undefined;
 
-        function* enumerateCandidateKeys() {
-            yield ConfigStore.computeCompositeKey(address, service);
-            yield ConfigStore.computeCompositeKey(address, undefined);
-            yield ConfigStore.computeCompositeKey(undefined, service);
-            yield ConfigStore.computeCompositeKey(undefined, undefined);
+        function* enumerateCandidateKeys(
+            serviceProvider: IServiceProvider<TAddressBuilder>,
+        ) {
+            function make(
+                address: TAddress | undefined,
+                service: PublicCtor<TService> | undefined,
+            ): string {
+                return ConfigStore.computeCompositeKey<
+                    TAddressBuilder,
+                    TAddress,
+                    TService
+                >(serviceProvider, address, service);
+            }
+
+            yield make(address, service);
+            yield make(address, undefined);
+            yield make(undefined, service);
+            yield make(undefined, undefined);
         }
     }
 
     public setRequestTimeout<TService, TAddress extends Address>(
         address: TAddress | undefined,
-        service: ServiceId<TService> | undefined,
+        service: PublicCtor<TService> | undefined,
         value: TimeSpan | undefined,
     ): void {
         assertArgument({ address }, Address, 'undefined');
-        assertArgument({ service }, ServiceId, 'undefined');
+        assertArgument({ service }, 'function', 'undefined');
         assertArgument({ value }, TimeSpan, 'undefined');
 
-        const key = ConfigStore.computeCompositeKey(address, service);
+        const key = ConfigStore.computeCompositeKey<
+            TAddressBuilder,
+            TAddress,
+            TService
+        >(this._serviceProvider, address, service);
 
         if (!value) {
             this._requestTimeouts.delete(key);
@@ -74,16 +99,21 @@ export class ConfigStore {
         this._requestTimeouts.set(key, value);
     }
 
-    private static computeCompositeKey(
-        address: Address | undefined,
-        serviceOrServiceId: ServiceId | undefined,
+    private static computeCompositeKey<
+        TAddressBuilder extends AddressBuilder,
+        TAddress extends Address,
+        TService,
+    >(
+        serviceProvider: IServiceProvider<TAddressBuilder>,
+        address: TAddress | undefined,
+        service: PublicCtor<TService> | undefined,
     ) {
         const addressKey = address?.key ?? ConfigStore.EmptyKey;
 
-        const serviceKey =
-            serviceOrServiceId?.endpointName ??
-            serviceOrServiceId?.key ??
-            ConfigStore.EmptyKey;
+        const serviceKey = !service
+            ? ConfigStore.EmptyKey
+            : serviceProvider.contractStore.maybeGet<TService>(service)
+                  ?.endpoint ?? service.name;
 
         const compositeKey = `[${addressKey}][${serviceKey}]`;
         return compositeKey;
