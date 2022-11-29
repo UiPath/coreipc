@@ -146,7 +146,7 @@ public static class IOHelpers
         Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer[1..]), payloadLength);
         var resultTask = data.CopyToAsync(stream, 0, cancellationToken);
 #if !NET461
-        if(resultTask.IsCompletedSuccessfully)
+        if (resultTask.IsCompletedSuccessfully)
         {
             data.Dispose();
             return default;
