@@ -1,5 +1,6 @@
 export * from './__members';
 export * from './cover2';
+export * from './MockServiceProvider';
 
 import { assert, expect, use } from 'chai';
 import chai from 'chai';
@@ -43,7 +44,12 @@ export function toJavaScript(x: unknown): string {
             if (x instanceof Uint8Array && x.constructor) {
                 return `${x.constructor.name}[byteLength: ${x.byteLength}]`;
             }
-            if (x && !(x instanceof Array) && x.constructor && x.constructor !== Object) {
+            if (
+                x &&
+                !(x instanceof Array) &&
+                x.constructor &&
+                x.constructor !== Object
+            ) {
                 if (x.toString !== Object.prototype.toString) {
                     return x.toString();
                 }

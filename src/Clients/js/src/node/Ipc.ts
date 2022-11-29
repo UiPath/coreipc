@@ -2,7 +2,8 @@ import { IpcBaseImpl, AddressSelectionDelegate, IpcBase } from '../std';
 import { NodeAddressBuilder } from './NodeAddressBuilder';
 import { NamedPipeAddress } from '.';
 
-class IpcNodeImpl extends IpcBaseImpl<NodeAddressBuilder> implements Ipc {
+/* @internal */
+export class IpcNodeImpl extends IpcBaseImpl<NodeAddressBuilder> implements Ipc {
     constructor() {
         super(NodeAddressBuilder);
     }
