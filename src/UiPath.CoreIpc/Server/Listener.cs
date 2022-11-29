@@ -7,7 +7,6 @@ public class ListenerSettings
     public ListenerSettings(string name) => Name = name;
     public byte ConcurrentAccepts { get; set; } = 5;
     public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
-    public X509Certificate Certificate { get; set; }
     public string Name { get; }
     public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
     internal IServiceProvider ServiceProvider { get; set; }
@@ -58,14 +57,7 @@ abstract class Listener : IDisposable
             }
         }
     }
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!disposing)
-        {
-            return;
-        }
-        Settings.Certificate?.Dispose();
-    }
+    protected virtual void Dispose(bool disposing) { }
     public void Dispose()
     {
         if (LogEnabled)

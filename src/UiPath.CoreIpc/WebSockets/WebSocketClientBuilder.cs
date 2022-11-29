@@ -5,7 +5,7 @@ public abstract class WebSocketClientBuilderBase<TDerived, TInterface> : Service
     protected WebSocketClientBuilderBase(Uri uri, Type callbackContract = null, IServiceProvider serviceProvider = null) : base(callbackContract, serviceProvider) =>
         _uri = uri;
     protected override TInterface BuildCore(EndpointSettings serviceEndpoint) =>
-        new WebSocketClient<TInterface>(_uri, _requestTimeout, _logger, _connectionFactory, _sslServer, _beforeCall, serviceEndpoint).CreateProxy();
+        new WebSocketClient<TInterface>(_uri, _requestTimeout, _logger, _connectionFactory, _beforeCall, serviceEndpoint).CreateProxy();
 }
 public class WebSocketClientBuilder<TInterface> : WebSocketClientBuilderBase<WebSocketClientBuilder<TInterface>, TInterface> where TInterface : class
 {

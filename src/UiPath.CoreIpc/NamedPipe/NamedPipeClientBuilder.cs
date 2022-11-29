@@ -27,7 +27,7 @@ public abstract class NamedPipeClientBuilderBase<TDerived, TInterface> : Service
     }
 
     protected override TInterface BuildCore(EndpointSettings serviceEndpoint) =>
-        new NamedPipeClient<TInterface>(_serverName, _pipeName, _requestTimeout, _allowImpersonation, _logger, _connectionFactory, _sslServer, _beforeCall, serviceEndpoint).CreateProxy();
+        new NamedPipeClient<TInterface>(_serverName, _pipeName, _requestTimeout, _allowImpersonation, _logger, _connectionFactory, _beforeCall, serviceEndpoint).CreateProxy();
 }
 
 public class NamedPipeClientBuilder<TInterface> : NamedPipeClientBuilderBase<NamedPipeClientBuilder<TInterface>, TInterface> where TInterface : class

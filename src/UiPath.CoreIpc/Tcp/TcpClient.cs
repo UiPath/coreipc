@@ -11,10 +11,10 @@ interface ITcpKey : IConnectionKey
 }
 class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterface : class
 {
-    public TcpClient(IPEndPoint endPoint, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(requestTimeout, logger, connectionFactory, sslServer, beforeCall, serviceEndpoint)
+    public TcpClient(IPEndPoint endPoint, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(requestTimeout, logger, connectionFactory, beforeCall, serviceEndpoint)
     {
         EndPoint = endPoint;
-        HashCode = (EndPoint, sslServer).GetHashCode();
+        HashCode = EndPoint.GetHashCode();
     }
     public override string Name => base.Name ?? EndPoint.ToString();
     public IPEndPoint EndPoint { get; }

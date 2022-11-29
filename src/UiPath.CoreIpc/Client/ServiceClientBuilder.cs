@@ -12,7 +12,6 @@ public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterfac
     protected BeforeCallHandler _beforeCall;
     protected object _callbackInstance;
     protected TaskScheduler _taskScheduler;
-    protected string _sslServer;
 
     protected ServiceClientBuilder(Type callbackContract, IServiceProvider serviceProvider)
     {
@@ -27,16 +26,6 @@ public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterfac
     public TDerived ConnectionFactory(ConnectionFactory connectionFactory)
     {
         _connectionFactory = connectionFactory;
-        return (TDerived)this;
-    }
-
-    public TDerived EncryptAndSign(string certificateServerName)
-    {
-        if (string.IsNullOrWhiteSpace(certificateServerName))
-        {
-            throw new ArgumentException($"'{nameof(certificateServerName)}' must match the name on the server's certificate.", nameof(certificateServerName));
-        }
-        _sslServer = certificateServerName;
         return (TDerived)this;
     }
 

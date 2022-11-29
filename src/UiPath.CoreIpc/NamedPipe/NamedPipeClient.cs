@@ -15,13 +15,13 @@ interface INamedPipeKey : IConnectionKey
 
 class NamedPipeClient<TInterface> : ServiceClient<TInterface>, INamedPipeKey where TInterface : class
 {
-    public NamedPipeClient(string serverName, string pipeName, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint)
-        : base(requestTimeout, logger, connectionFactory, sslServer, beforeCall, serviceEndpoint)
+    public NamedPipeClient(string serverName, string pipeName, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint)
+        : base(requestTimeout, logger, connectionFactory, beforeCall, serviceEndpoint)
     {
         ServerName = serverName;
         PipeName = pipeName;
         AllowImpersonation = allowImpersonation;
-        HashCode = (serverName, pipeName, allowImpersonation, sslServer).GetHashCode();
+        HashCode = (serverName, pipeName, allowImpersonation).GetHashCode();
     }
     public override string Name => base.Name ?? PipeName;
     public string ServerName { get; }

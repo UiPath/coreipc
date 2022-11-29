@@ -39,34 +39,12 @@ abstract class ServerConnection : IClient, IDisposable
     }
     public async Task Listen(Stream network, CancellationToken cancellationToken)
     {
-        var stream = await AuthenticateAsServer();
-        _connection = new(stream, Logger, _listener.Name, _listener.MaxMessageSize);
+        _connection = new(network, Logger, _listener.Name, _listener.MaxMessageSize);
         _connection.SetServer(Settings, this);
         // close the connection when the service host closes
         using (cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), _connection))
         {
             await _connection.Listen();
-        }
-        return;
-        async Task<Stream> AuthenticateAsServer()
-        {
-            var certificate = Settings.Certificate;
-            if (certificate == null)
-            {
-                return network;
-            }
-            var sslStream = new SslStream(network);
-            try
-            {
-                await sslStream.AuthenticateAsServerAsync(certificate);
-            }
-            catch
-            {
-                sslStream.Dispose();
-                throw;
-            }
-            Debug.Assert(sslStream.IsEncrypted && sslStream.IsSigned);
-            return sslStream;
         }
     }
     protected virtual void Dispose(bool disposing){}
