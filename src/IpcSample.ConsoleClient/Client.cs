@@ -14,12 +14,7 @@ class Client
         var source = new CancellationTokenSource();
         try
         {
-            await await Task.WhenAny(RunTestsAsync(source.Token), Task.Run(() =>
-            {
-                Console.ReadLine();
-                Console.WriteLine("Cancelling...");
-                source.Cancel();
-            }));
+            await RunTestsAsync(source.Token);
         }
         catch (Exception ex)
         {
@@ -33,19 +28,20 @@ class Client
         var callback = new ComputingCallback { Id = "custom made" };
         var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>("test", serviceProvider)
             .CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(5));
+        var computingClient = computingClientBuilder.ValidateAndBuild();
+        var systemClient =
+            new NamedPipeClientBuilder<ISystemService>("test")
+            .RequestTimeout(TimeSpan.FromSeconds(5))
+            .Logger(serviceProvider)
+            .AllowImpersonation()
+            .ValidateAndBuild();
+        _ = await computingClient.AddFloat(1.23f, 4.56f);
+        _ = await systemClient.ConvertText("hEllO woRd!", TextStyle.Upper);
+        Console.ReadLine();
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
         try
         {
-            var computingClient = computingClientBuilder.ValidateAndBuild();
-            var systemClient =
-                new NamedPipeClientBuilder<ISystemService>("test")
-                .RequestTimeout(TimeSpan.FromSeconds(5))
-                .Logger(serviceProvider)
-                .AllowImpersonation()
-                .ValidateAndBuild();
-            Console.ReadLine();
-            var watch = Stopwatch.StartNew();
             for (int i = 0; i < 50; i++)
             {
                 // test 1: call IPC service method with primitive types
@@ -100,8 +96,8 @@ class Client
                 //    //Console.WriteLineex.Message);
                 //}
             }
-            watch.Stop();
-            Console.WriteLine(watch.ElapsedMilliseconds);
+            stopwatch.Stop();
+            Console.WriteLine(stopwatch.ElapsedMilliseconds);
             var callbackProxy = (IDisposable)computingClient;
             callbackProxy.Dispose();
             callbackProxy.Dispose();
