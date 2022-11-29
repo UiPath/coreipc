@@ -135,7 +135,6 @@ public static class IOHelpers
         }
         return false;
     }
-
     internal static ValueTask WriteMessage(this Stream stream, MessageType messageType, RecyclableMemoryStream data, CancellationToken cancellationToken = default)
     {
         data.Position = 0;
@@ -145,20 +144,26 @@ public static class IOHelpers
         var payloadLength = totalLength - HeaderLength;
         // https://github.com/dotnet/runtime/blob/85441ce69b81dfd5bf57b9d00ba525440b7bb25d/src/libraries/System.Private.CoreLib/src/System/BitConverter.cs#L133
         Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer[1..]), payloadLength);
-        return stream.WriteMessageCore(data, cancellationToken);
-    }
+        var resultTask = data.CopyToAsync(stream, 0, cancellationToken);
 #if !NET461
-    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
-#endif
-    private static async ValueTask WriteMessageCore(this Stream stream, RecyclableMemoryStream recyclableStream, CancellationToken cancellationToken)
-    {
-        using (recyclableStream)
+        if(resultTask.IsCompletedSuccessfully)
         {
-            await recyclableStream.CopyToAsync(stream, 0, cancellationToken);
+            data.Dispose();
+            return default;
+        }
+#endif
+        return CompleteAsync(data, resultTask);
+#if !NET461
+        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
+#endif
+        static async ValueTask CompleteAsync(RecyclableMemoryStream recyclableStream, Task resultTask)
+        {
+            using (recyclableStream)
+            {
+                await resultTask;
+            }
         }
     }
-    internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
-        stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
 }
 public static class Validator
 {

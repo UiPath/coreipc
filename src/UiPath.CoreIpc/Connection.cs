@@ -142,7 +142,12 @@ public sealed class Connection : IDisposable
         {
             tokenRegistration = cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), this);
             await Network.WriteMessage(messageType, data, cancellationToken);
-            await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
+            var lengthBytes = BitConverter.GetBytes(userStream.Length);
+#if NET461
+            await Network.WriteAsync(lengthBytes, 0, lengthBytes.Length, cancellationToken);
+#else
+            await Network.WriteAsync(lengthBytes, cancellationToken);
+#endif
             const int DefaultCopyBufferSize = 81920;
             await userStream.CopyToAsync(Network, DefaultCopyBufferSize, cancellationToken);
         }

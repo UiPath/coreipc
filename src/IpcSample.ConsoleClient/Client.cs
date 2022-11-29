@@ -44,6 +44,7 @@ class Client
                 .Logger(serviceProvider)
                 .AllowImpersonation()
                 .ValidateAndBuild();
+            Console.ReadLine();
             var watch = Stopwatch.StartNew();
             for (int i = 0; i < 50; i++)
             {
@@ -67,8 +68,8 @@ class Client
                 Console.WriteLine($"[TEST 3] sum of 3 complexe number is: {result3.A}+{result3.B}i", cancellationToken);
 
                 // test 4: call IPC service method without parameter or return
-                //await systemClient.DoNothing(cancellationToken);
-                //Console.WriteLine($"[TEST 4] invoked DoNothing()");
+                await systemClient.DoNothing(cancellationToken);
+                Console.WriteLine($"[TEST 4] invoked DoNothing()");
                 //((IDisposable)systemClient).Dispose();
 
                 // test 5: call IPC service method with enum parameter
