@@ -1,4 +1,3 @@
-/* @internal */
 export enum Primitive {
     string = 'string',
     number = 'number',

@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFrameworks>net6.0;net461;net6.0-windows</TargetFrameworks>
     <RootNamespace>UiPath.CoreIpc</RootNamespace>
-    <GeneratePackageOnBuild Condition="$(Configuration)=='Release'">true</GeneratePackageOnBuild>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Authors>UiPath</Authors>
     <Version>2.5.1</Version>
     <PackageProjectUrl>https://github.com/UiPath/CoreIpc/</PackageProjectUrl>

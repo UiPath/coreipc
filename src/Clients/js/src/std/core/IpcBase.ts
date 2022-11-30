@@ -1,9 +1,4 @@
-import {
-    PublicCtor,
-    ParameterlessPublicCtor,
-    assertArgument,
-    TimeSpan,
-} from '../bcl';
+import { PublicCtor, ParameterlessPublicCtor, assertArgument, TimeSpan } from '../bcl';
 
 import {
     Address,
@@ -58,9 +53,7 @@ export module IpcBase {
         ): ConfigurationWithAddress<TAddress>;
     }
 
-    export interface ConfigurationWithAddress<
-        TAddress extends Address = Address,
-    > {
+    export interface ConfigurationWithAddress<TAddress extends Address = Address> {
         setConnectHelper(value: ConnectHelper<TAddress>): void;
 
         forAnyService(): ConfigurationWithAddressService<TAddress>;
@@ -91,8 +84,7 @@ export abstract class IpcBaseImpl<TAddressBuilder extends AddressBuilder = any>
         $operation?: OperationAnnotations,
     ) {
         this.$service = $service ?? new ServiceAnnotationsWrapper(this).iface;
-        this.$operation =
-            $operation ?? new OperationAnnotationsWrapper(this).iface;
+        this.$operation = $operation ?? new OperationAnnotationsWrapper(this).iface;
     }
 
     readonly $service: ServiceAnnotations;
@@ -110,20 +102,18 @@ export abstract class IpcBaseImpl<TAddressBuilder extends AddressBuilder = any>
     public readonly config: IpcBaseImpl.Configuration<TAddressBuilder> =
         new IpcBaseImpl.Configuration<TAddressBuilder>(this);
 
-    public readonly callback: Callback<TAddressBuilder> =
-        new CallbackImpl<TAddressBuilder>(this);
+    public readonly callback: Callback<TAddressBuilder> = new CallbackImpl<TAddressBuilder>(this);
 
     /* @internal */
-    public readonly configStore: ConfigStore<TAddressBuilder> =
-        new ConfigStore<TAddressBuilder>(this);
+    public readonly configStore: ConfigStore<TAddressBuilder> = new ConfigStore<TAddressBuilder>(
+        this,
+    );
 
     /* @internal */
-    public readonly proxyStore: ProxyStore<TAddressBuilder> =
-        new ProxyStore<TAddressBuilder>(this);
+    public readonly proxyStore: ProxyStore<TAddressBuilder> = new ProxyStore<TAddressBuilder>(this);
 
     /* @internal */
-    public readonly dispatchProxyStore: DispatchProxyStore =
-        new DispatchProxyStore(this);
+    public readonly dispatchProxyStore: DispatchProxyStore = new DispatchProxyStore(this);
 
     /* @internal */
     public readonly channelStore: ChannelManagerStore = new ChannelManagerStore(
@@ -160,16 +150,10 @@ export module IpcBaseImpl {
     export class ProxySourceWithAddress<TAddress extends Address>
         implements IpcBase.ProxySourceWithAddress
     {
-        constructor(
-            private readonly _ipc: IpcBaseImpl,
-            private readonly _address: TAddress,
-        ) {}
+        constructor(private readonly _ipc: IpcBaseImpl, private readonly _address: TAddress) {}
 
         public withService<TService>(service: PublicCtor<TService>): TService {
-            const proxyId = new ProxyId<TService, TAddress>(
-                service,
-                this._address,
-            );
+            const proxyId = new ProxyId<TService, TAddress>(service, this._address);
 
             const proxy = this._ipc.proxyStore.resolve(proxyId);
             return proxy;
@@ -195,10 +179,7 @@ export module IpcBaseImpl {
     }
 
     export class ConfigurationWithAddress<TAddress extends Address = Address> {
-        constructor(
-            private readonly _ipc: IpcBaseImpl,
-            private readonly _address?: TAddress,
-        ) {}
+        constructor(private readonly _ipc: IpcBaseImpl, private readonly _address?: TAddress) {}
 
         public setConnectHelper(value: ConnectHelper<TAddress>): void {
             assertArgument({ value }, 'function');
@@ -206,20 +187,13 @@ export module IpcBaseImpl {
         }
 
         public forAnyService(): ConfigurationWithAddressService<TAddress> {
-            return new ConfigurationWithAddressService(
-                this._ipc,
-                this._address,
-            );
+            return new ConfigurationWithAddressService(this._ipc, this._address);
         }
 
         public forService<TService>(
             service: PublicCtor<TService>,
         ): ConfigurationWithAddressService<TAddress, TService> {
-            return new ConfigurationWithAddressService(
-                this._ipc,
-                this._address,
-                service,
-            );
+            return new ConfigurationWithAddressService(this._ipc, this._address, service);
         }
     }
 
@@ -240,11 +214,7 @@ export module IpcBaseImpl {
                 value = TimeSpan.fromMilliseconds(value);
             }
 
-            this._ipc.configStore.setRequestTimeout(
-                this._address,
-                this._service,
-                value,
-            );
+            this._ipc.configStore.setRequestTimeout(this._address, this._service, value);
         }
     }
 }

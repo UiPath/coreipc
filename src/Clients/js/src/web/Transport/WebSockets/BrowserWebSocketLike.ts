@@ -1,4 +1,3 @@
-/* @internal */
 export interface BrowserWebSocketLike {
     binaryType: 'blob' | 'arraybuffer';
 
