@@ -87,12 +87,12 @@ public sealed class Connection : IDisposable
         {
             uploadStream = null;
         }
-        var requestBytes = Serialize(request, static(request, writer)=>
+        var requestBytes = Serialize(request, static(in Request request, ref MessagePackWriter writer)=>
         {
-            Serialize(request, writer);
+            Serialize(request, ref writer);
             foreach (var arg in request.Parameters)
             {
-                Serialize(arg, writer);
+                Serialize(arg, ref writer);
             }
         });
         return uploadStream == null ?
@@ -105,7 +105,8 @@ public sealed class Connection : IDisposable
         Completion(requestId)?.SetCanceled();
         return;
         Task CancelServerCall(int requestId) =>
-            SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId), Serialize), default).AsTask();
+            SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId), 
+                static (in CancellationRequest request, ref MessagePackWriter writer) => Serialize(request, ref writer)), default).AsTask();
     }
     ManualResetValueTaskSource Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
@@ -118,10 +119,10 @@ public sealed class Connection : IDisposable
         {
             downloadStream = null;
         }
-        var responseBytes = Serialize(response, static(response, writer)=>
+        var responseBytes = Serialize(response, static(in Response response, ref MessagePackWriter writer)=>
         {
-            Serialize(response, writer);
-            Serialize(response.Data, writer);
+            Serialize(response, ref writer);
+            Serialize(response.Data, ref writer);
         });
         return downloadStream == null ?
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
@@ -355,13 +356,16 @@ public sealed class Connection : IDisposable
         var userStreamLength = BitConverter.ToInt64(_header, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
     }
-    static RecyclableMemoryStream Serialize<T>(T value, Action<T, IBufferWriter<byte>> serializer)
+    delegate void Serializer<T>(in T value, ref MessagePackWriter writer);
+    static RecyclableMemoryStream Serialize<T>(in T value, Serializer<T> serializer)
     {
         var stream = GetStream();
         try
         {
             stream.Position = HeaderLength;
-            serializer(value, stream);
+            var writer = new MessagePackWriter(stream);
+            serializer(value, ref writer);
+            writer.Flush();
             return stream;
         }
         catch
@@ -370,7 +374,7 @@ public sealed class Connection : IDisposable
             throw;
         }
     }
-    static void Serialize<T>(T value, IBufferWriter<byte> writer) => MessagePackSerializer.Serialize(writer, value, Contractless);
+    static void Serialize<T>(T value, ref MessagePackWriter writer) => MessagePackSerializer.Serialize(ref writer, value, Contractless);
     static T Deserialize<T>(ref MessagePackReader reader) => MessagePackSerializer.Deserialize<T>(ref reader, Contractless);
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     private IncomingResponse DeserializeResponse()
