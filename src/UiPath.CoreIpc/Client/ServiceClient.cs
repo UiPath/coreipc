@@ -136,8 +136,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             {
                 if (args is [Message { RequestTimeout: var requestTimeout }, ..] && requestTimeout != TimeSpan.Zero)
                 {
-                    messageTimeout = requestTimeout;
-                    clientTimeout = requestTimeout;
+                    messageTimeout = clientTimeout = requestTimeout;
                 }
                 if (args is [.., CancellationToken token])
                 {
