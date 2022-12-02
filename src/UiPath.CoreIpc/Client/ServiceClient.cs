@@ -1,6 +1,4 @@
-﻿using System.Net.Security;
-namespace UiPath.CoreIpc;
-
+﻿namespace UiPath.CoreIpc;
 using ConnectionFactory = Func<Connection, Connection>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 using InvokeDelegate = Func<IServiceClient, MethodInfo, object[], object>;
