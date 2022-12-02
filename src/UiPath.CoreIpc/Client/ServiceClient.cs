@@ -76,8 +76,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         async Task<TResult> Invoke()
         {
             CancellationToken cancellationToken = default;
-            TimeSpan messageTimeout = default;
-            TimeSpan clientTimeout = _requestTimeout;
+            TimeSpan messageTimeout = default, clientTimeout = _requestTimeout;
             var methodName = method.Name;
             WellKnownArguments();
             TimeoutHelper timeoutHelper = new(clientTimeout, cancellationToken);
@@ -117,11 +116,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 {
                     Log($"IpcClient called {methodName} {requestId} {Name}.");
                 }
-                if (response.Error != null)
-                {
-                    throw new RemoteException(response.Error);
-                }
-                return (TResult) response.Data;
+                return response.Error == null ? (TResult)response.Data : throw new RemoteException(response.Error);
             }
             catch (Exception ex)
             {
