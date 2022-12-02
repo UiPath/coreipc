@@ -67,17 +67,12 @@ public static class Helpers
             Trace.TraceError(message);
         }
     }
-    public static async void LogException(this Task task, ILogger logger, object tag)
+    public static void LogException(this Task task, ILogger logger, object tag) => task.ContinueWith(static(result, state) =>
     {
-        try
-        {
-            await task;
-        }
-        catch (Exception ex)
-        {
-            logger.LogException(ex, tag);
-        }
-    }
+        var logInfo = (LogInfo)state;
+        logInfo.Logger.LogException(result.Exception, logInfo.Tag);
+    }, new LogInfo(logger, tag), TaskContinuationOptions.NotOnRanToCompletion);
+    record LogInfo(ILogger Logger, object Tag);
 }
 public static class IOHelpers
 {
