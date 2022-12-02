@@ -80,7 +80,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             TimeSpan clientTimeout = _requestTimeout;
             var methodName = method.Name;
             WellKnownArguments();
-            var timeoutHelper = new TimeoutHelper(clientTimeout, cancellationToken);
+            TimeoutHelper timeoutHelper = new(clientTimeout, cancellationToken);
             try
             {
                 var token = timeoutHelper.Token;
