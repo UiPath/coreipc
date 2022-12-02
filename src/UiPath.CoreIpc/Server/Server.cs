@@ -108,7 +108,8 @@ class Server
         }
         else
         {
-            (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method.MethodInfo);
+            var methodCall = defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap();
+            _=methodCall.ContinueWith(static(task, state)=>((ILogger)state).LogException(task.Exception, null), Logger, TaskContinuationOptions.NotOnRanToCompletion);
             return default;
         }
         Task MethodCall() => method.Invoke(service, request.Parameters, cancellationToken);
