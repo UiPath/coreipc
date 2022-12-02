@@ -2,13 +2,11 @@
 using ConnectionFactory = Func<Connection, Connection>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 using InvokeDelegate = Func<IServiceClient, MethodInfo, object[], object>;
-
 interface IServiceClient : IDisposable
 {
     Task<TResult> Invoke<TResult>(MethodInfo method, object[] args);
     Connection Connection { get; }
 }
-
 class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterface : class
 {
     private readonly TimeSpan _requestTimeout;
@@ -19,7 +17,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     private readonly SemaphoreSlim _connectionLock = new(1);
     private Connection _connection;
     private ClientConnection _clientConnection;
-
     internal ServiceClient(TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
     {
         _requestTimeout = requestTimeout;
@@ -38,9 +35,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         (proxy as IpcProxy).ServiceClient = this;
         return proxy;
     }
-    
     public override int GetHashCode() => HashCode;
-
     private void OnNewConnection(Connection connection)
     {
         _connection?.Dispose();
@@ -65,7 +60,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         ListenerSettings listenerSettings = new(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
         connection.SetServer(listenerSettings);
     }
-
     public Task<TResult> Invoke<TResult>(MethodInfo method, object[] args)
     {
         var syncContext = SynchronizationContext.Current;
@@ -139,7 +133,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             }
         }
     }
-
     private Task<bool> EnsureConnection(CancellationToken cancellationToken)
     {
         if (_connectionFactory != null)
@@ -161,7 +154,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         }
         return Connect(cancellationToken);
     }
-
     private async Task<bool> Connect(CancellationToken cancellationToken)
     {
         var clientConnection = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
@@ -196,7 +188,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         }
         return true;
     }
-
     private void ReuseClientConnection(ClientConnection clientConnection)
     {
         _clientConnection = clientConnection;
@@ -206,22 +197,18 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         }
         OnNewConnection(clientConnection.Connection);
     }
-
     public void Log(string message) => _logger.LogInformation(message);
-
     private void InitializeClientConnection(ClientConnection clientConnection)
     {
         _connection.Listen().LogException(_logger, Name);
         clientConnection.Connection = _connection;
         _clientConnection = clientConnection;
     }
-
     public void Dispose()
     {
         Dispose(true);
         GC.SuppressFinalize(this);
     }
-
     protected virtual void Dispose(bool disposing)
     {
         _connectionLock.AssertDisposed();
@@ -234,34 +221,23 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             _connection?.Server.Endpoints.Remove(_serviceEndpoint.Name);
         }
     }
-
     public override string ToString() => Name;
-
     public virtual bool Equals(IConnectionKey other) => true;
-
     public virtual ClientConnection CreateClientConnection() => throw new NotImplementedException();
 }
-
 public class IpcProxy : DispatchProxy, IDisposable
 {
     private static readonly MethodInfo InvokeMethod = typeof(IpcProxy).GetStaticMethod(nameof(GenericInvoke));
     private static readonly ConcurrentDictionary<Type, InvokeDelegate> InvokeByType = new();
-
     internal IServiceClient ServiceClient { get; set; }
-
     public Connection Connection => ServiceClient.Connection;
-
     protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvoke(targetMethod)(ServiceClient, targetMethod, args);
-
     public void Dispose() => ServiceClient.Dispose();
-
     public void CloseConnection() => Connection?.Dispose();
-
     private static InvokeDelegate GetInvoke(MethodInfo targetMethod) => InvokeByType.GetOrAdd(targetMethod.ReturnType, taskType =>
     {
         var resultType = taskType.IsGenericType ? taskType.GenericTypeArguments[0] : typeof(object);
         return InvokeMethod.MakeGenericDelegate<InvokeDelegate>(resultType);
     });
-
     private static object GenericInvoke<T>(IServiceClient serviceClient, MethodInfo method, object[] args) => serviceClient.Invoke<T>(method, args);
 }
