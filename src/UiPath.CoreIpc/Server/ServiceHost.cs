@@ -6,7 +6,7 @@ public sealed class ServiceHost : IDisposable
     private readonly IReadOnlyCollection<Listener> _listeners;
     internal ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, EndpointSettings> endpoints)
     {
-        _endpoints = endpoints.ToReadOnlyDictionary();
+        _endpoints = endpoints.ReadOnly();
         _listeners = listeners.ToArray();
     }
     public void Dispose()

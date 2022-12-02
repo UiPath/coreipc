@@ -54,7 +54,7 @@ public static class Helpers
         { ParameterType: { IsValueType: true }, DefaultValue: null } => Activator.CreateInstance(parameter.ParameterType),
         _ => parameter.DefaultValue
     };
-    public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
+    public static ReadOnlyDictionary<TKey, TValue> ReadOnly<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
     public static void LogException(this ILogger logger, Exception ex, object tag)
     {
         var message = $"{tag} # {ex}";
