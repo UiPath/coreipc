@@ -67,12 +67,13 @@ public static class Helpers
             Trace.TraceError(message);
         }
     }
-    public static void LogException(this Task task, ILogger logger, object tag) => task.ContinueWith(static(result, state) =>
+    public static void LogException(this Task task, ILogger logger, object tag) => 
+        task.ContinueWith(LogInfo.Log, new LogInfo(logger, tag), TaskContinuationOptions.NotOnRanToCompletion);
+    record LogInfo(ILogger Logger, object Tag)
     {
-        var logInfo = (LogInfo)state;
-        logInfo.Logger.LogException(result.Exception, logInfo.Tag);
-    }, new LogInfo(logger, tag), TaskContinuationOptions.NotOnRanToCompletion);
-    record LogInfo(ILogger Logger, object Tag);
+        public void Log(Task task) => Logger.LogException(task.Exception, Tag);
+        public static void Log(Task task, object state) => ((LogInfo)state).Log(task);
+    }
 }
 public static class IOHelpers
 {
