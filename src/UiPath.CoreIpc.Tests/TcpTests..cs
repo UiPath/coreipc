@@ -17,7 +17,7 @@ public class SystemTcpTests : SystemTests<TcpClientBuilder<ISystemService>>
 }
 public class ComputingTcpTests : ComputingTests<TcpClientBuilder<IComputingService, IComputingCallback>>
 {
-    protected static readonly IPEndPoint ComputingEndPoint = new(IPAddress.Loopback, 2121+GetCount());
+    protected readonly IPEndPoint ComputingEndPoint = new(IPAddress.Loopback, 2121+GetCount());
     protected override TcpClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
         new TcpClientBuilder<IComputingService, IComputingCallback>(ComputingEndPoint, _serviceProvider)
             .RequestTimeout(RequestTimeout)
