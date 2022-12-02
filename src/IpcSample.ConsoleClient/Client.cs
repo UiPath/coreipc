@@ -40,7 +40,7 @@ class Client
         int count = 0;
         try
         {
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 5000; i++)
             {
                 // test 1: call IPC service method with primitive types
                 float result1 = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);
@@ -105,7 +105,7 @@ class Client
         {
             stopwatch.Stop();
             Console.WriteLine();
-            Console.WriteLine("Calls per second: " + count / stopwatch.Elapsed.TotalSeconds);
+            Console.WriteLine("Calls per second: " + (count*8) / stopwatch.Elapsed.TotalSeconds);
             Console.WriteLine();
         }
         // test 10: call slow IPC service method
