@@ -53,7 +53,7 @@ class Server
                 await HandleRequest(method, endpoint, request, default);
                 return;
             }
-            Response response = new();
+            Response response = default;
             var requestCancellation = Rent();
             _requests[request.Id] = requestCancellation;
             var timeout = request.GetTimeout(Settings.RequestTimeout);
