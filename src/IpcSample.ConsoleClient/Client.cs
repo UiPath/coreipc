@@ -40,7 +40,7 @@ class Client
         int count = 0;
         try
         {
-            for (int i = 0; i < 5000; i++)
+            for (int i = 0; i < int.MaxValue; i++)
             {
                 // test 1: call IPC service method with primitive types
                 float result1 = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);
