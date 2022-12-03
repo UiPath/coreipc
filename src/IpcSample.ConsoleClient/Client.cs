@@ -45,7 +45,6 @@ class Client
                 .Logger(serviceProvider)
                 .AllowImpersonation()
                 .ValidateAndBuild();
-            var watch = Stopwatch.StartNew();
             for (int i = 0; i < 5000; i++)
             {
                 // test 1: call IPC service method with primitive types
@@ -100,8 +99,6 @@ class Client
                 //    //Console.WriteLineex.Message);
                 //}
             }
-            watch.Stop();
-            Console.WriteLine(watch.ElapsedMilliseconds);
             var callbackProxy = (IDisposable)computingClient;
             callbackProxy.Dispose();
             callbackProxy.Dispose();
