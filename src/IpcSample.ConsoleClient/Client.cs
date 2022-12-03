@@ -46,7 +46,7 @@ class Client
                 .AllowImpersonation()
                 .ValidateAndBuild();
             var watch = Stopwatch.StartNew();
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 5000; i++)
             {
                 // test 1: call IPC service method with primitive types
                 float result1 = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);
@@ -68,8 +68,8 @@ class Client
                 Console.WriteLine($"[TEST 3] sum of 3 complexe number is: {result3.A}+{result3.B}i", cancellationToken);
 
                 // test 4: call IPC service method without parameter or return
-                //await systemClient.DoNothing(cancellationToken);
-                //Console.WriteLine($"[TEST 4] invoked DoNothing()");
+                await systemClient.DoNothing(cancellationToken);
+                Console.WriteLine($"[TEST 4] invoked DoNothing()");
                 //((IDisposable)systemClient).Dispose();
 
                 // test 5: call IPC service method with enum parameter
@@ -111,7 +111,7 @@ class Client
         {
             stopwatch.Stop();
             Console.WriteLine();
-            Console.WriteLine("Calls per second: " + count / stopwatch.Elapsed.TotalSeconds);
+            Console.WriteLine("Calls per second: " + count*8 / stopwatch.Elapsed.TotalSeconds);
             Console.WriteLine();
         }
         // test 10: call slow IPC service method
