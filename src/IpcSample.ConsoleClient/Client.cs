@@ -99,6 +99,7 @@ class Client
                 //    //Console.WriteLineex.Message);
                 //}
             }
+            stopwatch.Stop();
             var callbackProxy = (IDisposable)computingClient;
             callbackProxy.Dispose();
             callbackProxy.Dispose();
