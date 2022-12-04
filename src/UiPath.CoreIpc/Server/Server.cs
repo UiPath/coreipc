@@ -97,18 +97,16 @@ class Server
         var service = endpoint.ServiceInstance ?? ServiceProvider.GetRequiredService(contract);
         var returnTaskType = method.ReturnType;
         var scheduler = endpoint.Scheduler;
-        Debug.Assert(scheduler != null);
-        var defaultScheduler = scheduler == TaskScheduler.Default;
         if (returnTaskType.IsGenericType)
         {
-            var methodResult = defaultScheduler ? MethodCall() : await RunOnScheduler();
+            var methodResult = scheduler == null ? MethodCall() : await RunOnScheduler();
             await methodResult;
             var returnValue = GetTaskResult(returnTaskType, methodResult);
             return new Response(request.Id) { Data = returnValue };
         }
         else
         {
-            var methodCall = defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap();
+            var methodCall = scheduler == null ? MethodCall() : RunOnScheduler().Unwrap();
             _=methodCall.ContinueWith(static(task, state)=>((ILogger)state).LogException(task.Exception, null), Logger, TaskContinuationOptions.NotOnRanToCompletion);
             return default;
         }
