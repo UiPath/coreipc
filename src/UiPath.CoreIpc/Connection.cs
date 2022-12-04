@@ -29,7 +29,7 @@ public sealed class Connection : IDisposable
         void CancelRequest(object state)
         {
             var requestId = (int)state;
-            var data = Serialize(new CancellationRequest(requestId), static (in CancellationRequest request, ref MessagePackWriter writer) => Serialize(request, ref writer));
+            var data = Serialize(new CancellationRequest(requestId), static(in CancellationRequest request, ref MessagePackWriter writer)=>Serialize(request, ref writer));
             SendMessage(MessageType.CancellationRequest, data, default).AsTask().LogException(Logger, this);
             Completion(requestId)?.SetCanceled();
         }
