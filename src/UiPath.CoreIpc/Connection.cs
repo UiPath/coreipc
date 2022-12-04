@@ -29,7 +29,7 @@ public sealed class Connection : IDisposable
         void CancelRequest(object state)
         {
             var requestId = (int)state;
-            var data = Serialize(new CancellationRequest(requestId), static(in CancellationRequest request, ref MessagePackWriter writer)=>Serialize(request, ref writer));
+            var data = SerializeMessage(new CancellationRequest(requestId), Serialize);
             SendMessage(MessageType.CancellationRequest, data, default).AsTask().LogException(Logger, this);
             Completion(requestId)?.SetCanceled();
         }
@@ -81,7 +81,7 @@ public sealed class Connection : IDisposable
         {
             uploadStream = null;
         }
-        var requestBytes = Serialize(request, static(in Request request, ref MessagePackWriter writer)=>
+        var requestBytes = SerializeMessage(request, static(in Request request, ref MessagePackWriter writer)=>
         {
             Serialize(request, ref writer);
             foreach (var arg in request.Parameters)
@@ -104,7 +104,7 @@ public sealed class Connection : IDisposable
         {
             downloadStream = null;
         }
-        var responseBytes = Serialize(response, static(in Response response, ref MessagePackWriter writer)=>
+        var responseBytes = SerializeMessage(response, static(in Response response, ref MessagePackWriter writer)=>
         {
             Serialize(response, ref writer);
             Serialize(response.Data, ref writer);
@@ -329,7 +329,7 @@ public sealed class Connection : IDisposable
         _nestedStream.Reset(userStreamLength);
     }
     delegate void Serializer<T>(in T value, ref MessagePackWriter writer);
-    static RecyclableMemoryStream Serialize<T>(in T value, Serializer<T> serializer)
+    static RecyclableMemoryStream SerializeMessage<T>(in T value, Serializer<T> serializer)
     {
         var stream = GetStream();
         try
@@ -346,7 +346,7 @@ public sealed class Connection : IDisposable
             throw;
         }
     }
-    static void Serialize<T>(T value, ref MessagePackWriter writer) => MessagePackSerializer.Serialize(ref writer, value, Contractless);
+    static void Serialize<T>(in T value, ref MessagePackWriter writer) => MessagePackSerializer.Serialize(ref writer, value, Contractless);
     static T Deserialize<T>(ref MessagePackReader reader) => MessagePackSerializer.Deserialize<T>(ref reader, Contractless);
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     private IncomingResponse DeserializeResponse()
