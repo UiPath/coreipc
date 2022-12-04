@@ -13,13 +13,6 @@ public sealed class Connection : IDisposable
     private readonly int _maxMessageSize;
     private readonly Lazy<Task> _receiveLoop;
     private readonly SemaphoreSlim _sendLock = new(1);
-#if NET461
-    private readonly WaitCallback _onResponse;
-    private readonly WaitCallback _onCancellation;
-#else
-    private readonly Action<IncomingResponse> _onResponse;
-    private readonly Action<int> _onCancellation;
-#endif
     private readonly Action<object> _cancelRequest;
     private readonly byte[] _header = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
@@ -32,8 +25,6 @@ public sealed class Connection : IDisposable
         Name = $"{name} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
         _receiveLoop = new(ReceiveLoop);
-        _onResponse = response => OnResponseReceived((IncomingResponse)response);
-        _onCancellation = requestId => Server?.CancelRequest((int)requestId);
         _cancelRequest = requestId => CancelRequest((int)requestId);
     }
     internal Server Server { get; private set; }
@@ -283,14 +274,9 @@ public sealed class Connection : IDisposable
     private ValueTask OnCancel()
     {
         var reader = CreateReader();
-        RunAsync(_onCancellation, Deserialize<CancellationRequest>(ref reader).RequestId);
+        Server?.CancelRequest(Deserialize<CancellationRequest>(ref reader).RequestId);
         return default;
     }
-#if NET461
-    static void RunAsync(WaitCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state);
-#else
-    static void RunAsync<T>(Action<T> callback, T state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state, preferLocal: true);
-#endif
     private ValueTask OnResponse()
     {
         var incomingResponse = DeserializeResponse();
@@ -303,7 +289,7 @@ public sealed class Connection : IDisposable
         {
             return OnDownloadResponse(incomingResponse);
         }
-        RunAsync(_onResponse, incomingResponse);
+        OnResponseReceived(incomingResponse);
         return default;
         async ValueTask OnDownloadResponse(IncomingResponse incomingResponse)
         {
