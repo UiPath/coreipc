@@ -15,11 +15,9 @@ public sealed class Connection : IDisposable
     private readonly SemaphoreSlim _sendLock = new(1);
 #if NET461
     private readonly WaitCallback _onResponse;
-    private readonly WaitCallback _onRequest;
     private readonly WaitCallback _onCancellation;
 #else
     private readonly Action<IncomingResponse> _onResponse;
-    private readonly Action<IncomingRequest> _onRequest;
     private readonly Action<int> _onCancellation;
 #endif
     private readonly Action<object> _cancelRequest;
@@ -35,7 +33,6 @@ public sealed class Connection : IDisposable
         _maxMessageSize = maxMessageSize;
         _receiveLoop = new(ReceiveLoop);
         _onResponse = response => OnResponseReceived((IncomingResponse)response);
-        _onRequest = request => OnRequestReceived((IncomingRequest)request);
         _onCancellation = requestId => Server?.CancelRequest((int)requestId);
         _cancelRequest = requestId => CancelRequest((int)requestId);
     }
@@ -334,7 +331,7 @@ public sealed class Connection : IDisposable
         }
         else
         {
-            RunAsync(_onRequest, request);
+            OnRequestReceived(request);
             return default;
         }
         async ValueTask OnUploadRequest(IncomingRequest request)
