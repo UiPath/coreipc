@@ -289,7 +289,7 @@ public sealed class Connection : IDisposable
         {
             return OnDownloadResponse(incomingResponse);
         }
-        OnResponseReceived(incomingResponse);
+        incomingResponse.SetResult();
         return default;
         async ValueTask OnDownloadResponse(IncomingResponse incomingResponse)
         {
@@ -297,15 +297,9 @@ public sealed class Connection : IDisposable
             var streamDisposed = new TaskCompletionSource<bool>();
             EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
             _nestedStream.Disposed += disposedHandler;
-            try
-            {
-                OnResponseReceived(incomingResponse);
-                await streamDisposed.Task;
-            }
-            finally
-            {
-                _nestedStream.Disposed -= disposedHandler;
-            }
+            incomingResponse.SetResult();
+            await streamDisposed.Task;
+            _nestedStream.Disposed -= disposedHandler;
         }
     }
     private ValueTask OnRequest()
@@ -317,16 +311,14 @@ public sealed class Connection : IDisposable
         }
         else
         {
-            OnRequestReceived(request);
+            _=Server.OnRequestReceived(request);
             return default;
         }
         async ValueTask OnUploadRequest(IncomingRequest request)
         {
             await EnterStreamMode();
-            using (_nestedStream)
-            {
-                await OnRequestReceived(request);
-            }
+            await Server.OnRequestReceived(request);
+            _nestedStream.Dispose();
         }
     }
     private async ValueTask EnterStreamMode()
@@ -444,33 +436,10 @@ public sealed class Connection : IDisposable
             return argument;
         }
     }
-    private ValueTask OnRequestReceived(in IncomingRequest request)
-    {
-        try
-        {
-            return Server.OnRequestReceived(request);
-        }
-        catch (Exception ex)
-        {
-            Log(ex);
-            return default;
-        }
-    }
     internal ValueTask OnError(in Request request, Exception ex)
     {
         Logger.LogException(ex, $"{Name} {request}");
         return Send(Response.Fail(request, ex), default);
-    }
-    private void OnResponseReceived(in IncomingResponse incomingResponse)
-    {
-        try
-        {
-            incomingResponse.Completion.SetResult(incomingResponse.Response);
-        }
-        catch (Exception ex)
-        {
-            Log(ex);
-        }
     }
     internal void Log(string message) => Logger.LogInformation(message);
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
@@ -478,4 +447,7 @@ public sealed class Connection : IDisposable
 }
 readonly record struct IncomingRequest(in Request Request, in Method Method, EndpointSettings Endpoint);
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
-readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion);
+readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
+{
+    public void SetResult() => Completion.SetResult(Response);
+}
