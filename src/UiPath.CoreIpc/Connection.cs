@@ -24,8 +24,15 @@ public sealed class Connection : IDisposable
         Logger = logger;
         Name = $"{name} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
+        _cancelRequest = CancelRequest;
         _receiveLoop = new(ReceiveLoop);
-        _cancelRequest = requestId => CancelRequest((int)requestId);
+        void CancelRequest(object state)
+        {
+            var requestId = (int)state;
+            var data = Serialize(new CancellationRequest(requestId), static (in CancellationRequest request, ref MessagePackWriter writer) => Serialize(request, ref writer));
+            SendMessage(MessageType.CancellationRequest, data, default).AsTask().LogException(Logger, this);
+            Completion(requestId)?.SetCanceled();
+        }
     }
     internal Server Server { get; private set; }
     Stream Network { get; }
@@ -85,15 +92,6 @@ public sealed class Connection : IDisposable
         return uploadStream == null ?
             SendMessage(MessageType.Request, requestBytes, token) :
             SendStream(MessageType.Request, requestBytes, uploadStream, token);
-    }
-    void CancelRequest(int requestId)
-    {
-        CancelServerCall(requestId).LogException(Logger, this);
-        Completion(requestId)?.SetCanceled();
-        return;
-        Task CancelServerCall(int requestId) =>
-            SendMessage(MessageType.CancellationRequest, Serialize(new CancellationRequest(requestId), 
-                static (in CancellationRequest request, ref MessagePackWriter writer) => Serialize(request, ref writer)), default).AsTask();
     }
     ManualResetValueTaskSource Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
