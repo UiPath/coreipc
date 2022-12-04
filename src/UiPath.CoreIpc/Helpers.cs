@@ -51,7 +51,7 @@ public static class Helpers
     public static object GetDefaultValue(this ParameterInfo parameter) => parameter switch
     {
         { HasDefaultValue: false } => null,
-        { ParameterType: { IsValueType: true }, DefaultValue: null } => Activator.CreateInstance(parameter.ParameterType),
+        { ParameterType.IsValueType: true, DefaultValue: null } => Activator.CreateInstance(parameter.ParameterType),
         _ => parameter.DefaultValue
     };
     public static void LogException(this ILogger logger, Exception ex, object tag)
