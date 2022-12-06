@@ -89,9 +89,11 @@ class Server
     async ValueTask<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
     {
         var beforeCall = endpoint.BeforeCall;
+        var parameters = request.Parameters;
+        var executor = method.Invoke;
         if (beforeCall != null)
         {
-            await beforeCall(new(default, method.MethodInfo, request.Parameters), cancellationToken);
+            await beforeCall(new(default, method.MethodInfo, parameters), cancellationToken);
         }
         var service = endpoint.ServiceInstance ?? ServiceProvider.GetRequiredService(endpoint.Contract);
         var returnTaskType = method.ReturnType;
@@ -109,7 +111,7 @@ class Server
             _=methodCall.ContinueWith(static(task, state)=>((ILogger)state).LogException(task.Exception, null), Logger, TaskContinuationOptions.NotOnRanToCompletion);
             return default;
         }
-        Task MethodCall() => method.Invoke(service, request.Parameters, cancellationToken);
+        Task MethodCall() => executor(service, parameters, cancellationToken);
         Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
     }
     private void Log(string message) => _connection.Log(message);
