@@ -88,13 +88,12 @@ class Server
     }
     async ValueTask<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
     {
-        var contract = endpoint.Contract;
         var beforeCall = endpoint.BeforeCall;
         if (beforeCall != null)
         {
             await beforeCall(new(default, method.MethodInfo, request.Parameters), cancellationToken);
         }
-        var service = endpoint.ServiceInstance ?? ServiceProvider.GetRequiredService(contract);
+        var service = endpoint.ServiceInstance ?? ServiceProvider.GetRequiredService(endpoint.Contract);
         var returnTaskType = method.ReturnType;
         var scheduler = endpoint.Scheduler;
         if (returnTaskType.IsGenericType)
