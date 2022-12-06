@@ -212,15 +212,8 @@ public sealed class Connection : IDisposable
         {
             while (await ReadHeader(HeaderLength))
             {
-                Debug.Assert(SynchronizationContext.Current == null);
-                var length = BitConverter.ToInt32(_header, startIndex: 1);
-                if (length > _maxMessageSize)
-                {
-                    throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
-                }
-                _nestedStream.Reset(length);
                 ValueTask messageTask;
-                using (_messageStream = GetStream(length))
+                using (_messageStream = NewMessage())
                 {
 #if NET461
                     await _nestedStream.CopyToAsync(_messageStream);
@@ -267,6 +260,17 @@ public sealed class Connection : IDisposable
                 Log("Unknown message type " + messageType);
             }
             return default;
+        }
+        RecyclableMemoryStream NewMessage()
+        {
+            Debug.Assert(SynchronizationContext.Current == null);
+            var length = BitConverter.ToInt32(_header, startIndex: 1);
+            if (length > _maxMessageSize)
+            {
+                throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
+            }
+            _nestedStream.Reset(length);
+            return GetStream(length);
         }
     }
     private ValueTask OnCancel()
