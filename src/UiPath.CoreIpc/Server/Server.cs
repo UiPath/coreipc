@@ -110,7 +110,7 @@ class Server
             _=methodCall.ContinueWith(static(task, state)=>((ILogger)state).LogException(task.Exception, null), Logger, TaskContinuationOptions.NotOnRanToCompletion);
             return default;
         }
-        Task MethodCall() => method.Executor(service, request.Parameters, cancellationToken);
+        Task MethodCall() => method.Invoke(service, request.Parameters, cancellationToken);
         Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
     }
     private void Log(string message) => _connection.Log(message);
@@ -129,7 +129,7 @@ public readonly struct Method
     static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
     static readonly ParameterExpression TokenParameter = Parameter(typeof(CancellationToken), "cancellationToken");
     static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
-    public readonly MethodExecutor Executor;
+    public readonly MethodExecutor Invoke;
     public readonly MethodInfo MethodInfo;
     public readonly ParameterInfo[] Parameters;
     public readonly object[] Defaults;
@@ -151,7 +151,7 @@ public readonly struct Method
         var instanceCast = Convert(TargetParameter, method.DeclaringType);
         var methodCall = Call(instanceCast, method, callParameters);
         var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter, TokenParameter);
-        Executor = lambda.Compile();
+        Invoke = lambda.Compile();
         MethodInfo = method;
         Parameters = parameters;
         Defaults = defaults;
