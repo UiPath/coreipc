@@ -121,9 +121,8 @@ class Server
     public string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
     static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
-    static object GetTaskResult(Type taskType, Task task) => 
-        GetTaskResultByType.GetOrAdd(taskType, 
-            resultType => GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType.GenericTypeArguments[0]))(task);
+    static object GetTaskResult(Type taskType, Task task) => GetTaskResultByType.GetOrAdd(taskType, resultType =>
+        GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType.GenericTypeArguments[0]))(task);
 }
 public readonly struct Method
 {
