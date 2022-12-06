@@ -1,6 +1,4 @@
-﻿using System.Net.Security;
-namespace UiPath.CoreIpc;
-
+﻿namespace UiPath.CoreIpc;
 public interface IClient
 {
     TCallbackInterface GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class;
