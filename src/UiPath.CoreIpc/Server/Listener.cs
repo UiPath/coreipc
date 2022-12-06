@@ -1,7 +1,4 @@
-﻿using System.Security.Cryptography.X509Certificates;
-
-namespace UiPath.CoreIpc;
-
+﻿namespace UiPath.CoreIpc;
 public class ListenerSettings
 {
     public ListenerSettings(string name) => Name = name;
