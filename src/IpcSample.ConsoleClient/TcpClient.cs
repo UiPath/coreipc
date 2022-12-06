@@ -15,7 +15,7 @@ namespace UiPath.CoreIpc.Tests
     class TcpClient
     {
         static readonly IPEndPoint SystemEndPoint = new(IPAddress.Loopback, 3131);
-        static async Task Main(string[] args)
+        static async Task _Main(string[] args)
         {
             Console.WriteLine(typeof(int).Assembly);
             Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));

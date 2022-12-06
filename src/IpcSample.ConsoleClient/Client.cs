@@ -12,19 +12,14 @@ namespace UiPath.CoreIpc.Tests
 {
     class Client
     {
-        static async Task _Main(string[] args)
+        static async Task Main(string[] args)
         {
             Console.WriteLine(typeof(int).Assembly);
             Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
             var source = new CancellationTokenSource();
             try
             {
-                await await Task.WhenAny(RunTestsAsync(source.Token), Task.Run(() =>
-                {
-                    Console.ReadLine();
-                    Console.WriteLine("Cancelling...");
-                    source.Cancel();
-                }));
+                await RunTestsAsync(source.Token);
             }
             catch (Exception ex)
             {
@@ -102,6 +97,9 @@ namespace UiPath.CoreIpc.Tests
                     //{
                     //    //Console.WriteLineex.Message);
                     //}
+
+                    Console.WriteLine("Press any key to run another test batch...");
+                    Console.ReadKey();
                 }
                 var callbackProxy = (IDisposable)computingClient;
                 callbackProxy.Dispose();
