@@ -88,9 +88,7 @@ class Server
     }
     async ValueTask<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
     {
-        var beforeCall = endpoint.BeforeCall;
-        var parameters = request.Parameters;
-        var executor = method.Invoke;
+        var (beforeCall, parameters, executor) = (endpoint.BeforeCall, request.Parameters, method.Invoke);
         if (beforeCall != null)
         {
             await beforeCall(new(default, method.MethodInfo, parameters), cancellationToken);
