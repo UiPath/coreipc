@@ -291,7 +291,7 @@ public sealed class Connection : IDisposable
         {
             return OnDownloadResponse(incomingResponse);
         }
-        incomingResponse.SetResult();
+        incomingResponse.CompleteRequest();
         return default;
         async ValueTask OnDownloadResponse(IncomingResponse incomingResponse)
         {
@@ -299,7 +299,7 @@ public sealed class Connection : IDisposable
             var streamDisposed = new TaskCompletionSource<bool>();
             EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
             _nestedStream.Disposed += disposedHandler;
-            incomingResponse.SetResult();
+            incomingResponse.CompleteRequest();
             await streamDisposed.Task;
             _nestedStream.Disposed -= disposedHandler;
         }
@@ -455,5 +455,5 @@ readonly record struct IncomingRequest(in Request Request, in Method Method, End
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
 readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
 {
-    public void SetResult() => Completion.SetResult(Response);
+    public void CompleteRequest() => Completion.SetResult(Response);
 }
