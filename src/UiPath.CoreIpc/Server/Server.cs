@@ -88,7 +88,7 @@ class Server
     }
     static Task HandleOneWayRequest(in Method method, EndpointSettings endpoint, in Request request) =>
         endpoint.Scheduler == null ? CallMethod(method, endpoint, request, default) : CallOnScheduler(method, endpoint, request, default).Unwrap();
-    static ValueTask<Response> HandleRequest(in Method method, EndpointSettings endpoint, in Request request, in CancellationToken cancellationToken) =>
+    static ValueTask<Response> HandleRequest(in Method method, EndpointSettings endpoint, in Request request, CancellationToken cancellationToken) =>
         endpoint.Scheduler == null ? 
             Response(request, method.ReturnType, CallMethod(method, endpoint, request, cancellationToken)) : 
             RunOnScheduler(method, endpoint, request, cancellationToken);
@@ -102,7 +102,7 @@ class Server
         var returnValue = GetTaskResult(returnTaskType, methodResult);
         return new Response(request.Id) { Data = returnValue };
     }
-    static Task CallMethod(in Method method, EndpointSettings endpoint, in Request request, in CancellationToken cancellationToken) =>
+    static Task CallMethod(in Method method, EndpointSettings endpoint, in Request request, CancellationToken cancellationToken) =>
         method.Invoke(endpoint.ServerObject(), request.Parameters, cancellationToken);
     private void Log(string message) => _connection.Log(message);
     private ILogger Logger => _connection.Logger;
