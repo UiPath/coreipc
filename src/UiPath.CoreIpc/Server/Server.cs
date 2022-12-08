@@ -99,8 +99,7 @@ class Server
     static async ValueTask<Response> GetMethodResult(int requestId, Type returnTaskType, Task methodResult)
     {
         await methodResult;
-        var returnValue = GetTaskResult(returnTaskType, methodResult);
-        return new Response(requestId) { Data = returnValue };
+        return new(requestId) { Data = GetTaskResult(returnTaskType, methodResult) };
     }
     static Task CallMethod(in IncomingRequest incomingRequest, CancellationToken cancellationToken) =>
         incomingRequest.Method.Invoke(incomingRequest.Endpoint.ServerObject(), incomingRequest.Request.Parameters, cancellationToken);
