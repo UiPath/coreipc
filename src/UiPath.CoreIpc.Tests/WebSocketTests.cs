@@ -15,12 +15,6 @@ public class SystemWebSocketTests : SystemTests<WebSocketClientBuilder<ISystemSe
         _listener?.Dispose();
     }
     protected override WebSocketClientBuilder<ISystemService> CreateSystemClientBuilder() => new(new("ws"+GetEndPoint()));
-    [Fact]
-    public override  async void BeforeCallServerSide()
-    {
-        _port++;
-        base.BeforeCallServerSide();
-    }
     [Fact(Skip = "WebSocket.State is unreliable")]
     public override Task UploadNoRead() => base.UploadNoRead();
     string GetEndPoint() => $"://localhost:{_port}/";

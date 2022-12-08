@@ -273,23 +273,4 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         _systemHost.Dispose();
         sendMessageResult.ShouldThrow<Exception>();
     }
-    [Fact]
-    public virtual async void BeforeCallServerSide()
-    {
-        var newGuid = System.Guid.NewGuid();
-        MethodInfo method = null;
-        using var protectedService = Configure(new ServiceHostBuilder(_serviceProvider))
-            .AddEndpoint(new EndpointSettings<ISystemService>
-            {
-                BeforeCall = async (call, ct) =>
-                {
-                    method = call.Method;
-                    call.Arguments[0].ShouldBe(newGuid);
-                }
-            })
-            .ValidateAndBuild();
-        _ = protectedService.RunAsync();
-        await CreateSystemService().GetGuid(newGuid);
-        method.ShouldBe(typeof(ISystemService).GetMethod(nameof(ISystemService.GetGuid)));
-    }
 }

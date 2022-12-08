@@ -17,12 +17,6 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
     }
     [Fact]
     public Task ServerName() => SystemClientBuilder().ValidateAndBuild().GetGuid(System.Guid.Empty);
-    [Fact]
-    public override void BeforeCallServerSide()
-    {
-        _pipeName = "beforeCall";
-        base.BeforeCallServerSide();
-    }
 #if WINDOWS
     [Fact]
     public async Task PipeSecurityForWindows()

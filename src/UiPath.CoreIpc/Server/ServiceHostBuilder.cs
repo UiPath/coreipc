@@ -55,8 +55,8 @@ public class EndpointSettings
     internal Type Contract { get; }
     internal Type CallbackContract { get; }
     internal IServiceProvider ServiceProvider { get; set; }
-    public BeforeCallHandler BeforeCall { get; set; }
     public void Validate() => Validator.Validate(Contract, CallbackContract);
+    internal object ServerObject() => ServiceInstance ?? ServiceProvider.GetRequiredService(Contract);
 }
 public class EndpointSettings<TContract> : EndpointSettings where TContract : class
 {

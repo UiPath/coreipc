@@ -86,31 +86,35 @@ class Server
             cancellation.Return();
         }
     }
-    async ValueTask<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
+    ValueTask<Response> HandleRequest(in Method method, EndpointSettings endpoint, in Request request, in CancellationToken cancellationToken)
     {
-        var (beforeCall, parameters, executor) = (endpoint.BeforeCall, request.Parameters, method.Invoke);
-        if (beforeCall != null)
+        if (endpoint.Scheduler == null)
         {
-            await beforeCall(new(default, method.MethodInfo, parameters), cancellationToken);
+            var methodCall = CallMethod(method, endpoint, request, cancellationToken);
+            var returnTaskType = method.ReturnType;
+            return returnTaskType.IsGenericType ? Response(request, returnTaskType, methodCall) : new(LogException(methodCall));
         }
-        var service = endpoint.ServiceInstance ?? ServiceProvider.GetRequiredService(endpoint.Contract);
-        var returnTaskType = method.ReturnType;
-        var scheduler = endpoint.Scheduler;
-        if (returnTaskType.IsGenericType)
+        return Schedule(method, endpoint, request, cancellationToken);
+        async ValueTask<Response> Schedule(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
         {
-            var methodResult = scheduler == null ? MethodCall() : await RunOnScheduler();
+            var methodCall = Task.Factory.StartNew(() => CallMethod(method, endpoint, request, cancellationToken),
+                cancellationToken, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler);
+            var returnTaskType = method.ReturnType;
+            return returnTaskType.IsGenericType ? await Response(request, returnTaskType, await methodCall) : LogException(methodCall.Unwrap());
+        }
+        Response LogException(Task methodCall)
+        {
+            methodCall.ContinueWith(static (task, state) => ((ILogger)state).LogException(task.Exception, null), Logger, TaskContinuationOptions.NotOnRanToCompletion);
+            return default;
+        }
+        static async ValueTask<Response> Response(Request request, Type returnTaskType, Task methodResult)
+        {
             await methodResult;
             var returnValue = GetTaskResult(returnTaskType, methodResult);
             return new Response(request.Id) { Data = returnValue };
         }
-        else
-        {
-            var methodCall = scheduler == null ? MethodCall() : RunOnScheduler().Unwrap();
-            _=methodCall.ContinueWith(static(task, state)=>((ILogger)state).LogException(task.Exception, null), Logger, TaskContinuationOptions.NotOnRanToCompletion);
-            return default;
-        }
-        Task MethodCall() => executor(service, parameters, cancellationToken);
-        Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
+        static Task CallMethod(in Method method, EndpointSettings endpoint, in Request request, in CancellationToken cancellationToken) =>
+            method.Invoke(endpoint.ServerObject(), request.Parameters, cancellationToken);
     }
     private void Log(string message) => _connection.Log(message);
     private ILogger Logger => _connection.Logger;
