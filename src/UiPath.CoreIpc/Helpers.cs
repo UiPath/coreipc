@@ -92,25 +92,20 @@ public static class IOHelpers
     }
 
     public static PipeSecurity LocalOnly(this PipeSecurity pipeSecurity) => pipeSecurity.Deny(WellKnownSidType.NetworkSid, PipeAccessRights.FullControl);
-
     public static PipeSecurity Deny(this PipeSecurity pipeSecurity, WellKnownSidType sid, PipeAccessRights pipeAccessRights) =>
         pipeSecurity.Deny(new SecurityIdentifier(sid, null), pipeAccessRights);
-
     public static PipeSecurity Deny(this PipeSecurity pipeSecurity, IdentityReference sid, PipeAccessRights pipeAccessRights)
     {
         pipeSecurity.SetAccessRule(new(sid, pipeAccessRights, AccessControlType.Deny));
         return pipeSecurity;
     }
-
     public static PipeSecurity Allow(this PipeSecurity pipeSecurity, WellKnownSidType sid, PipeAccessRights pipeAccessRights) =>
         pipeSecurity.Allow(new SecurityIdentifier(sid, null), pipeAccessRights);
-
     public static PipeSecurity Allow(this PipeSecurity pipeSecurity, IdentityReference sid, PipeAccessRights pipeAccessRights)
     {
         pipeSecurity.SetAccessRule(new(sid, pipeAccessRights, AccessControlType.Allow));
         return pipeSecurity;
     }
-
     public static PipeSecurity AllowCurrentUser(this PipeSecurity pipeSecurity, bool onlyNonAdmin = false)
     {
         using (var currentIdentity = WindowsIdentity.GetCurrent())
@@ -123,7 +118,6 @@ public static class IOHelpers
         }
         return pipeSecurity;
     }
-
     public static bool PipeExists(string pipeName, int timeout = 1)
     {
         try
@@ -179,10 +173,8 @@ public static class Validator
             endpointSettings.Validate();
         }
     }
-
     public static void Validate<TDerived, TInterface>(ServiceClientBuilder<TDerived, TInterface> builder) where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
         => Validate(typeof(TInterface), builder.CallbackContract);
-
     public static void Validate(params Type[] contracts)
     {
         foreach (var contract in contracts.Where(c => c != null))
@@ -197,7 +189,6 @@ public static class Validator
             }
         }
     }
-
     private static void Validate(MethodInfo method)
     {
         var returnType = method.ReturnType;
@@ -258,7 +249,6 @@ public static class Validator
             }
         }
     }
-
     private static void CheckDerivedStream(MethodInfo method, Type type)
     {
         if (typeof(Stream).IsAssignableFrom(type))
