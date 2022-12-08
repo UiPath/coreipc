@@ -1,6 +1,5 @@
 ﻿using System.Net;
 namespace UiPath.CoreIpc.Tcp;
-
 public class TcpSettings : ListenerSettings
 {
     public TcpSettings(IPEndPoint endPoint) : base(endPoint.ToString())

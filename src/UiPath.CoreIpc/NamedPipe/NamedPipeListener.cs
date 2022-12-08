@@ -1,8 +1,6 @@
 ﻿using System.IO.Pipes;
 using System.Security.Principal;
-
 namespace UiPath.CoreIpc.NamedPipe;
-
 public class NamedPipeSettings : ListenerSettings
 {
     public NamedPipeSettings(string pipeName) : base(pipeName) { }

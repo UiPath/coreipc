@@ -1,18 +1,14 @@
 ﻿using System.IO.Pipes;
 using System.Security.Principal;
-
 namespace UiPath.CoreIpc.NamedPipe;
-
 using ConnectionFactory = Func<Connection, Connection>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
-
 interface INamedPipeKey : IConnectionKey
 {
     string ServerName { get; }
     string PipeName { get; }
     bool AllowImpersonation { get; }
 }
-
 class NamedPipeClient<TInterface> : ServiceClient<TInterface>, INamedPipeKey where TInterface : class
 {
     public NamedPipeClient(string serverName, string pipeName, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint)
