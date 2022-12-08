@@ -108,7 +108,6 @@ class Server
     private ILogger Logger => _connection.Logger;
     private bool LogEnabled => Logger.Enabled();
     private ListenerSettings Settings { get; }
-    public IServiceProvider ServiceProvider => Settings.ServiceProvider;
     public string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
     static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
