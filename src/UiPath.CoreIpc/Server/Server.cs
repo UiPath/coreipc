@@ -90,17 +90,17 @@ class Server
         incomingRequest.Scheduler == null ? CallMethod(incomingRequest, default) : CallOnScheduler(incomingRequest, default).Unwrap();
     static ValueTask<Response> HandleRequest(in IncomingRequest incomingRequest, CancellationToken cancellationToken) =>
         incomingRequest.Scheduler == null ? 
-            Response(incomingRequest.Request, incomingRequest.ReturnType, CallMethod(incomingRequest, cancellationToken)) : 
+            Response(incomingRequest.Request.Id, incomingRequest.ReturnType, CallMethod(incomingRequest, cancellationToken)) : 
             RunOnScheduler(incomingRequest, cancellationToken);
     static async ValueTask<Response> RunOnScheduler(IncomingRequest incomingRequest, CancellationToken cancellationToken) =>
-        await Response(incomingRequest.Request, incomingRequest.ReturnType, await CallOnScheduler(incomingRequest, cancellationToken));
+        await Response(incomingRequest.Request.Id, incomingRequest.ReturnType, await CallOnScheduler(incomingRequest, cancellationToken));
     static Task<Task> CallOnScheduler(IncomingRequest incomingRequest, CancellationToken token) =>
         Task.Factory.StartNew(() => CallMethod(incomingRequest, token), token, TaskCreationOptions.DenyChildAttach, incomingRequest.Scheduler);
-    static async ValueTask<Response> Response(Request request, Type returnTaskType, Task methodResult)
+    static async ValueTask<Response> Response(int requestId, Type returnTaskType, Task methodResult)
     {
         await methodResult;
         var returnValue = GetTaskResult(returnTaskType, methodResult);
-        return new Response(request.Id) { Data = returnValue };
+        return new Response(requestId) { Data = returnValue };
     }
     static Task CallMethod(in IncomingRequest incomingRequest, CancellationToken cancellationToken) =>
         incomingRequest.Method.Invoke(incomingRequest.Endpoint.ServerObject(), incomingRequest.Request.Parameters, cancellationToken);
