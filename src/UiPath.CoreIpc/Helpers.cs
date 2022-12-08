@@ -90,7 +90,6 @@ public static class IOHelpers
         return new(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options);
 #endif
     }
-
     public static PipeSecurity LocalOnly(this PipeSecurity pipeSecurity) => pipeSecurity.Deny(WellKnownSidType.NetworkSid, PipeAccessRights.FullControl);
     public static PipeSecurity Deny(this PipeSecurity pipeSecurity, WellKnownSidType sid, PipeAccessRights pipeAccessRights) =>
         pipeSecurity.Deny(new SecurityIdentifier(sid, null), pipeAccessRights);
