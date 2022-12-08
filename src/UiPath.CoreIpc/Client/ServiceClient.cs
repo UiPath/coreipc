@@ -64,8 +64,9 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     {
         var syncContext = SynchronizationContext.Current;
         var defaultContext = syncContext == null || syncContext.GetType() == typeof(SynchronizationContext);
-        return defaultContext ? Invoke() : Task.Run(Invoke);
-        async Task<TResult> Invoke()
+        return defaultContext ? InvokeCore(method, args) : InvokeAsync(method, args);
+        Task<TResult> InvokeAsync(MethodInfo method, object[] args) => Task.Run(() => InvokeCore(method, args));
+        async Task<TResult> InvokeCore(MethodInfo method, object[] args)
         {
             CancellationToken cancellationToken = default;
             TimeSpan messageTimeout = default, clientTimeout = _requestTimeout;
@@ -92,7 +93,8 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 var requestId = _connection.NewRequestId();
                 var request = new Request(requestId, methodName, typeof(TInterface).Name, messageTimeout.TotalSeconds)
                 {
-                    Parameters = args, ResponseType = typeof(TResult)
+                    Parameters = args,
+                    ResponseType = typeof(TResult)
                 };
                 if (LogEnabled)
                 {
