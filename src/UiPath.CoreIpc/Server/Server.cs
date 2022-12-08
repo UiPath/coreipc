@@ -45,12 +45,12 @@ class Server
     }
     public async ValueTask OnRequestReceived(IncomingRequest incomingRequest)
     {
-        var (request, method, endpoint) = incomingRequest;
+        var request = incomingRequest.Request;
         try
         {
-            if (!method.ReturnType.IsGenericType)
+            if (!incomingRequest.ReturnType.IsGenericType)
             {
-                await HandleOneWayRequest(method, endpoint, request);
+                await HandleOneWayRequest(incomingRequest);
                 return;
             }
             Response response = default;
@@ -61,7 +61,7 @@ class Server
             try
             {
                 var token = timeoutHelper.Token;
-                response = await HandleRequest(method, endpoint, request, token);
+                response = await HandleRequest(incomingRequest, token);
                 if (LogEnabled)
                 {
                     Log($"{Name} sending response for {request}");
@@ -86,24 +86,24 @@ class Server
             cancellation.Return();
         }
     }
-    static Task HandleOneWayRequest(in Method method, EndpointSettings endpoint, in Request request) =>
-        endpoint.Scheduler == null ? CallMethod(method, endpoint, request, default) : CallOnScheduler(method, endpoint, request, default).Unwrap();
-    static ValueTask<Response> HandleRequest(in Method method, EndpointSettings endpoint, in Request request, CancellationToken cancellationToken) =>
-        endpoint.Scheduler == null ? 
-            Response(request, method.ReturnType, CallMethod(method, endpoint, request, cancellationToken)) : 
-            RunOnScheduler(method, endpoint, request, cancellationToken);
-    static async ValueTask<Response> RunOnScheduler(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken) =>
-        await Response(request, method.ReturnType, await CallOnScheduler(method, endpoint, request, cancellationToken));
-    static Task<Task> CallOnScheduler(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken) =>
-        Task.Factory.StartNew(() => CallMethod(method, endpoint, request, cancellationToken), cancellationToken, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler);
+    static Task HandleOneWayRequest(in IncomingRequest incomingRequest) =>
+        incomingRequest.Scheduler == null ? CallMethod(incomingRequest, default) : CallOnScheduler(incomingRequest, default).Unwrap();
+    static ValueTask<Response> HandleRequest(in IncomingRequest incomingRequest, CancellationToken cancellationToken) =>
+        incomingRequest.Scheduler == null ? 
+            Response(incomingRequest.Request, incomingRequest.ReturnType, CallMethod(incomingRequest, cancellationToken)) : 
+            RunOnScheduler(incomingRequest, cancellationToken);
+    static async ValueTask<Response> RunOnScheduler(IncomingRequest incomingRequest, CancellationToken cancellationToken) =>
+        await Response(incomingRequest.Request, incomingRequest.ReturnType, await CallOnScheduler(incomingRequest, cancellationToken));
+    static Task<Task> CallOnScheduler(IncomingRequest incomingRequest, CancellationToken token) =>
+        Task.Factory.StartNew(() => CallMethod(incomingRequest, token), token, TaskCreationOptions.DenyChildAttach, incomingRequest.Scheduler);
     static async ValueTask<Response> Response(Request request, Type returnTaskType, Task methodResult)
     {
         await methodResult;
         var returnValue = GetTaskResult(returnTaskType, methodResult);
         return new Response(request.Id) { Data = returnValue };
     }
-    static Task CallMethod(in Method method, EndpointSettings endpoint, in Request request, CancellationToken cancellationToken) =>
-        method.Invoke(endpoint.ServerObject(), request.Parameters, cancellationToken);
+    static Task CallMethod(in IncomingRequest incomingRequest, CancellationToken cancellationToken) =>
+        incomingRequest.Method.Invoke(incomingRequest.Endpoint.ServerObject(), incomingRequest.Request.Parameters, cancellationToken);
     private void Log(string message) => _connection.Log(message);
     private ILogger Logger => _connection.Logger;
     private bool LogEnabled => Logger.Enabled();

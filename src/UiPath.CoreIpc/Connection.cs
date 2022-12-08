@@ -447,7 +447,11 @@ public sealed class Connection : IDisposable
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
 }
-readonly record struct IncomingRequest(in Request Request, in Method Method, EndpointSettings Endpoint);
+readonly record struct IncomingRequest(in Request Request, in Method Method, EndpointSettings Endpoint)
+{
+    public TaskScheduler Scheduler => Endpoint.Scheduler;
+    public Type ReturnType => Method.ReturnType;
+}
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
 readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
 {
