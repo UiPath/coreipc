@@ -94,8 +94,8 @@ class Server
             var returnTaskType = method.ReturnType;
             return returnTaskType.IsGenericType ? Response(request, returnTaskType, methodCall) : new(LogException(methodCall));
         }
-        return Schedule(method, endpoint, request, cancellationToken);
-        async ValueTask<Response> Schedule(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
+        return RunOnScheduler(method, endpoint, request, cancellationToken);
+        async ValueTask<Response> RunOnScheduler(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
         {
             var methodCall = Task.Factory.StartNew(() => CallMethod(method, endpoint, request, cancellationToken),
                 cancellationToken, TaskCreationOptions.DenyChildAttach, endpoint.Scheduler);
