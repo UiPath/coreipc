@@ -50,15 +50,7 @@ public sealed class Connection : IDisposable
         var requestCompletion = Rent();
         var requestId = request.Id;
         _requests[requestId] = new(requestCompletion, request.ResponseType);
-        object state;
-        if (Interlocked.CompareExchange(ref _requestIdToCancel, requestId, 0) == 0)
-        {
-            state = null;
-        }
-        else
-        {
-            state = requestId;
-        }
+        object state = Interlocked.CompareExchange(ref _requestIdToCancel, requestId, 0) == 0 ? null : requestId;
         var tokenRegistration = token.UnsafeRegister(_cancelRequest, state);
         try
         {
