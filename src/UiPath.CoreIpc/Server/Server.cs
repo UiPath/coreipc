@@ -101,11 +101,16 @@ readonly record struct IncomingRequest(in Request Request, in Method Method, End
     public Task HandleOneWayRequest() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
     public ValueTask<Response> HandleRequest(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
     Task Invoke(CancellationToken token = default) => Method.Invoke(Endpoint.ServerObject(), Request.Parameters, token);
-    Task<Task> InvokeOnScheduler(CancellationToken token = default)
+    record InvokeState(in IncomingRequest Request, CancellationToken Token)
     {
-        var request = this;
-        return Task.Factory.StartNew(() => request.Invoke(token), token, TaskCreationOptions.DenyChildAttach, Scheduler);
+        public static Task Invoke(object state)
+        {
+            var (request, token) = (InvokeState)state;
+            return request.Invoke(token);
+        }
     }
+    Task<Task> InvokeOnScheduler(CancellationToken token = default) => 
+        Task.Factory.StartNew(InvokeState.Invoke, new InvokeState(this, token), token, TaskCreationOptions.DenyChildAttach, Scheduler);
     async ValueTask<Response> ScheduleMethodResult(CancellationToken cancellationToken) => await GetMethodResult(await InvokeOnScheduler(cancellationToken));
     async ValueTask<Response> GetMethodResult(Task methodResult)
     {
