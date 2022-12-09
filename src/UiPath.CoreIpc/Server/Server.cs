@@ -95,13 +95,13 @@ readonly record struct IncomingRequest(in Request Request, in Method Method, End
 {
     private static readonly MethodInfo GetResultMethod = typeof(IncomingRequest).GetStaticMethod(nameof(GetTaskResultImpl));
     private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
-    public TaskScheduler Scheduler => Endpoint.Scheduler;
+    TaskScheduler Scheduler => Endpoint.Scheduler;
     public Type ReturnType => Method.ReturnType;
-    public Task HandleOneWayRequest() => Scheduler == null ? Invoke(default) : CallOnScheduler(default).Unwrap();
-    public ValueTask<Response> HandleRequest(CancellationToken cancellationToken) =>
-        Scheduler == null ? GetMethodResult(Request.Id, ReturnType, Invoke(cancellationToken)) : ScheduleMethodResult(cancellationToken);
-    Task Invoke(CancellationToken cancellationToken) => Method.Invoke(Endpoint.ServerObject(), Request.Parameters, cancellationToken);
-    Task<Task> CallOnScheduler(CancellationToken token)
+    public Task HandleOneWayRequest() => Scheduler == null ? Invoke() : CallOnScheduler().Unwrap();
+    public ValueTask<Response> HandleRequest(CancellationToken token) =>
+        Scheduler == null ? GetMethodResult(Request.Id, ReturnType, Invoke(token)) : ScheduleMethodResult(token);
+    Task Invoke(CancellationToken token = default) => Method.Invoke(Endpoint.ServerObject(), Request.Parameters, token);
+    Task<Task> CallOnScheduler(CancellationToken token = default)
     {
         var request = this;
         return Task.Factory.StartNew(() => request.Invoke(token), token, TaskCreationOptions.DenyChildAttach, Scheduler);
