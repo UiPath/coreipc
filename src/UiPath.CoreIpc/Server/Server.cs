@@ -98,23 +98,21 @@ readonly record struct IncomingRequest(in Request Request, in Method Method, End
     TaskScheduler Scheduler => Endpoint.Scheduler;
     public Type ReturnType => Method.ReturnType;
     public Task HandleOneWayRequest() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
-    public ValueTask<Response> HandleRequest(CancellationToken token) =>
-        Scheduler == null ? GetMethodResult(Request.Id, ReturnType, Invoke(token)) : ScheduleMethodResult(token);
+    public ValueTask<Response> HandleRequest(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
     Task Invoke(CancellationToken token = default) => Method.Invoke(Endpoint.ServerObject(), Request.Parameters, token);
     Task<Task> InvokeOnScheduler(CancellationToken token = default)
     {
         var request = this;
         return Task.Factory.StartNew(() => request.Invoke(token), token, TaskCreationOptions.DenyChildAttach, Scheduler);
     }
-    async ValueTask<Response> ScheduleMethodResult(CancellationToken cancellationToken) =>
-        await GetMethodResult(Request.Id, ReturnType, await InvokeOnScheduler(cancellationToken));
-    static async ValueTask<Response> GetMethodResult(int requestId, Type returnTaskType, Task methodResult)
+    async ValueTask<Response> ScheduleMethodResult(CancellationToken cancellationToken) => await GetMethodResult(await InvokeOnScheduler(cancellationToken));
+    async ValueTask<Response> GetMethodResult(Task methodResult)
     {
         await methodResult;
-        return new(requestId) { Data = GetTaskResult(returnTaskType, methodResult) };
+        return new(Request.Id) { Data = GetTaskResult(methodResult) };
     }
     static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
-    static object GetTaskResult(Type taskType, Task task) => GetTaskResultByType.GetOrAdd(taskType, resultType =>
+    object GetTaskResult(Task task) => GetTaskResultByType.GetOrAdd(ReturnType, resultType =>
         GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType.GenericTypeArguments[0]))(task);
 }
 public readonly struct Method
