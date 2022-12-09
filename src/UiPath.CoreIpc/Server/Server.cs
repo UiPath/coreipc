@@ -114,7 +114,7 @@ readonly record struct IncomingRequest(in Request Request, in Method Method, End
         return new(requestId) { Data = GetTaskResult(returnTaskType, methodResult) };
     }
     static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
-    public static object GetTaskResult(Type taskType, Task task) => GetTaskResultByType.GetOrAdd(taskType, resultType =>
+    static object GetTaskResult(Type taskType, Task task) => GetTaskResultByType.GetOrAdd(taskType, resultType =>
         GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType.GenericTypeArguments[0]))(task);
 }
 public readonly struct Method
