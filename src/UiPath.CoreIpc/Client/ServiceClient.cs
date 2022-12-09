@@ -61,7 +61,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         ListenerSettings listenerSettings = new(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
         connection.SetServer(listenerSettings);
     }
-    record MethodState(MethodInfo method, object[] args, IServiceClient ServiceClient);
+    record MethodState(MethodInfo Method, object[] Args, IServiceClient ServiceClient);
     public Task<TResult> Invoke<TResult>(MethodInfo method, object[] args)
     {
         var syncContext = SynchronizationContext.Current;
