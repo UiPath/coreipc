@@ -97,6 +97,7 @@ readonly record struct IncomingRequest(in Request Request, in Method Method, End
     private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
     TaskScheduler Scheduler => Endpoint.Scheduler;
     public Type ReturnType => Method.ReturnType;
+    public bool IsUpload => Request.Parameters is [Stream, ..];
     public Task HandleOneWayRequest() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
     public ValueTask<Response> HandleRequest(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
     Task Invoke(CancellationToken token = default) => Method.Invoke(Endpoint.ServerObject(), Request.Parameters, token);

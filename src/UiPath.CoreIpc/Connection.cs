@@ -307,7 +307,7 @@ public sealed class Connection : IDisposable
     private ValueTask OnRequest()
     {
         var request = DeserializeRequest();
-        if (request.Request.Parameters is [Stream,..])
+        if (request.IsUpload)
         {
             return OnUploadRequest(request);
         }
