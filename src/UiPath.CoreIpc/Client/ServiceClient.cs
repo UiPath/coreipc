@@ -5,6 +5,7 @@ using InvokeDelegate = Func<IServiceClient, MethodInfo, object[], object>;
 interface IServiceClient : IDisposable
 {
     Task<TResult> Invoke<TResult>(MethodInfo method, object[] args);
+    Task<TResult> InvokeCore<TResult>(MethodInfo method, object[] args);
     Connection Connection { get; }
 }
 class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterface : class
@@ -60,78 +61,85 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         ListenerSettings listenerSettings = new(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
         connection.SetServer(listenerSettings);
     }
+    record MethodState(MethodInfo method, object[] args, IServiceClient ServiceClient)
+    {
+    }
     public Task<TResult> Invoke<TResult>(MethodInfo method, object[] args)
     {
         var syncContext = SynchronizationContext.Current;
         var defaultContext = syncContext == null || syncContext.GetType() == typeof(SynchronizationContext);
-        return defaultContext ? InvokeCore(method, args) : InvokeAsync(method, args);
-        Task<TResult> InvokeAsync(MethodInfo method, object[] args) => Task.Run(() => InvokeCore(method, args));
-        async Task<TResult> InvokeCore(MethodInfo method, object[] args)
+        return defaultContext ? InvokeCore<TResult>(method, args) : InvokeAsync(method, args);
+        Task<TResult> InvokeAsync(MethodInfo method, object[] args) => Task.Factory.StartNew(static state =>
         {
-            CancellationToken cancellationToken = default;
-            TimeSpan messageTimeout = default, clientTimeout = _requestTimeout;
-            var methodName = method.Name;
-            WellKnownArguments();
-            TimeoutHelper timeoutHelper = new(clientTimeout, cancellationToken);
+            var (method, args, serviceClient) = (MethodState)state;
+            return serviceClient.InvokeCore<TResult>(method, args);
+        }, new MethodState(method, args, this), default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default).Unwrap();
+    }
+    public async Task<TResult> InvokeCore<TResult>(MethodInfo method, object[] args)
+    {
+        CancellationToken cancellationToken = default;
+        TimeSpan messageTimeout = default, clientTimeout = _requestTimeout;
+        var methodName = method.Name;
+        WellKnownArguments();
+        TimeoutHelper timeoutHelper = new(clientTimeout, cancellationToken);
+        try
+        {
+            var token = timeoutHelper.Token;
+            bool newConnection;
+            await _connectionLock.WaitAsync(token);
             try
             {
-                var token = timeoutHelper.Token;
-                bool newConnection;
-                await _connectionLock.WaitAsync(token);
-                try
-                {
-                    newConnection = await EnsureConnection(token);
-                }
-                finally
-                {
-                    _connectionLock.Release();
-                }
-                if (_beforeCall != null)
-                {
-                    await _beforeCall(new(newConnection, method, args), token);
-                }
-                var requestId = _connection.NewRequestId();
-                Request request = new(requestId, methodName, typeof(TInterface).Name, messageTimeout.TotalSeconds)
-                {
-                    Parameters = args,
-                    ResponseType = typeof(TResult)
-                };
-                if (LogEnabled)
-                {
-                    Log($"IpcClient calling {methodName} {requestId} {Name}.");
-                }
-                if (!method.ReturnType.IsGenericType)
-                {
-                    await _connection.Send(request, token);
-                    return default;
-                }
-                var response = await _connection.RemoteCall(request, token);
-                if (LogEnabled)
-                {
-                    Log($"IpcClient called {methodName} {requestId} {Name}.");
-                }
-                return response.Error == null ? (TResult)response.Data : throw new RemoteException(response.Error);
-            }
-            catch (Exception ex)
-            {
-                timeoutHelper.ThrowTimeout(ex, methodName);
-                throw;
+                newConnection = await EnsureConnection(token);
             }
             finally
             {
-                timeoutHelper.Dispose();
+                _connectionLock.Release();
             }
-            void WellKnownArguments()
+            if (_beforeCall != null)
             {
-                if (args is [Message { RequestTimeout: var requestTimeout }, ..] && requestTimeout != TimeSpan.Zero)
-                {
-                    messageTimeout = clientTimeout = requestTimeout;
-                }
-                if (args is [.., CancellationToken token])
-                {
-                    cancellationToken = token;
-                    args[^1] = null;
-                }
+                await _beforeCall(new(newConnection, method, args), token);
+            }
+            var requestId = _connection.NewRequestId();
+            Request request = new(requestId, methodName, typeof(TInterface).Name, messageTimeout.TotalSeconds)
+            {
+                Parameters = args,
+                ResponseType = typeof(TResult)
+            };
+            if (LogEnabled)
+            {
+                Log($"IpcClient calling {methodName} {requestId} {Name}.");
+            }
+            if (!method.ReturnType.IsGenericType)
+            {
+                await _connection.Send(request, token);
+                return default;
+            }
+            var response = await _connection.RemoteCall(request, token);
+            if (LogEnabled)
+            {
+                Log($"IpcClient called {methodName} {requestId} {Name}.");
+            }
+            return response.Error == null ? (TResult)response.Data : throw new RemoteException(response.Error);
+        }
+        catch (Exception ex)
+        {
+            timeoutHelper.ThrowTimeout(ex, methodName);
+            throw;
+        }
+        finally
+        {
+            timeoutHelper.Dispose();
+        }
+        void WellKnownArguments()
+        {
+            if (args is [Message { RequestTimeout: var requestTimeout }, ..] && requestTimeout != TimeSpan.Zero)
+            {
+                messageTimeout = clientTimeout = requestTimeout;
+            }
+            if (args is [.., CancellationToken token])
+            {
+                cancellationToken = token;
+                args[^1] = null;
             }
         }
     }
