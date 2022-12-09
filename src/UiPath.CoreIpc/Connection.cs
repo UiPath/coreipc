@@ -276,7 +276,7 @@ public sealed class Connection : IDisposable
     private ValueTask OnCancel()
     {
         var reader = CreateReader();
-        Server?.CancelRequest(Deserialize<CancellationRequest>(ref reader).RequestId);
+        Server.CancelRequest(Deserialize<CancellationRequest>(ref reader).RequestId);
         return default;
     }
     private ValueTask OnResponse()
@@ -446,11 +446,6 @@ public sealed class Connection : IDisposable
     internal void Log(string message) => Logger.LogInformation(message);
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
-}
-readonly record struct IncomingRequest(in Request Request, in Method Method, EndpointSettings Endpoint)
-{
-    public TaskScheduler Scheduler => Endpoint.Scheduler;
-    public Type ReturnType => Method.ReturnType;
 }
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
 readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
