@@ -97,17 +97,17 @@ readonly record struct IncomingRequest(in Request Request, in Method Method, End
     private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
     TaskScheduler Scheduler => Endpoint.Scheduler;
     public Type ReturnType => Method.ReturnType;
-    public Task HandleOneWayRequest() => Scheduler == null ? Invoke() : CallOnScheduler().Unwrap();
+    public Task HandleOneWayRequest() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
     public ValueTask<Response> HandleRequest(CancellationToken token) =>
         Scheduler == null ? GetMethodResult(Request.Id, ReturnType, Invoke(token)) : ScheduleMethodResult(token);
     Task Invoke(CancellationToken token = default) => Method.Invoke(Endpoint.ServerObject(), Request.Parameters, token);
-    Task<Task> CallOnScheduler(CancellationToken token = default)
+    Task<Task> InvokeOnScheduler(CancellationToken token = default)
     {
         var request = this;
         return Task.Factory.StartNew(() => request.Invoke(token), token, TaskCreationOptions.DenyChildAttach, Scheduler);
     }
     async ValueTask<Response> ScheduleMethodResult(CancellationToken cancellationToken) =>
-        await GetMethodResult(Request.Id, ReturnType, await CallOnScheduler(cancellationToken));
+        await GetMethodResult(Request.Id, ReturnType, await InvokeOnScheduler(cancellationToken));
     static async ValueTask<Response> GetMethodResult(int requestId, Type returnTaskType, Task methodResult)
     {
         await methodResult;
