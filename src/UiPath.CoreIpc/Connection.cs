@@ -17,6 +17,7 @@ public sealed class Connection : IDisposable
     private readonly byte[] _header = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
     private RecyclableMemoryStream _messageStream;
+    private int _requestIdToCancel;
     internal Connection(Stream network, ILogger logger, string name, int maxMessageSize = int.MaxValue)
     {
         Network = network;
@@ -28,7 +29,7 @@ public sealed class Connection : IDisposable
         _receiveLoop = new(ReceiveLoop);
         void CancelRequest(object state)
         {
-            var requestId = (int)state;
+            var requestId = state == null ? _requestIdToCancel : (int)state;
             var data = SerializeMessage(new CancellationRequest(requestId), Serialize);
             SendMessage(MessageType.CancellationRequest, data, default).AsTask().LogException(Logger, this);
             Completion(requestId)?.SetCanceled();
@@ -49,7 +50,16 @@ public sealed class Connection : IDisposable
         var requestCompletion = Rent();
         var requestId = request.Id;
         _requests[requestId] = new(requestCompletion, request.ResponseType);
-        var tokenRegistration = token.UnsafeRegister(_cancelRequest, requestId);
+        object state;
+        if (Interlocked.CompareExchange(ref _requestIdToCancel, requestId, 0) == 0)
+        {
+            state = null;
+        }
+        else
+        {
+            state = requestId;
+        }
+        var tokenRegistration = token.UnsafeRegister(_cancelRequest, state);
         try
         {
             await Send(request, token);
@@ -58,6 +68,7 @@ public sealed class Connection : IDisposable
         {
             Completion(requestId)?.Return();
             tokenRegistration.Dispose();
+            Reset(state);
             throw;
         }
         try
@@ -67,8 +78,16 @@ public sealed class Connection : IDisposable
         finally
         {
             _requests.TryRemove(requestId, out _);
+            Reset(state);
             tokenRegistration.Dispose();
             requestCompletion.Return();
+        }
+        void Reset(object state)
+        {
+            if (state == null)
+            {
+                _requestIdToCancel = 0;
+            }
         }
     }
     internal ValueTask Send(in Request request, CancellationToken token)
