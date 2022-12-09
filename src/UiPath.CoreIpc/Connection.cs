@@ -50,8 +50,8 @@ public sealed class Connection : IDisposable
         var requestCompletion = Rent();
         var requestId = request.Id;
         _requests[requestId] = new(requestCompletion, request.ResponseType);
-        object state = Interlocked.CompareExchange(ref _requestIdToCancel, requestId, 0) == 0 ? null : requestId;
-        var tokenRegistration = token.UnsafeRegister(_cancelRequest, state);
+        object cancellationState = Interlocked.CompareExchange(ref _requestIdToCancel, requestId, 0) == 0 ? null : requestId;
+        var tokenRegistration = token.UnsafeRegister(_cancelRequest, cancellationState);
         try
         {
             await Send(request, token);
@@ -60,7 +60,7 @@ public sealed class Connection : IDisposable
         {
             Completion(requestId)?.Return();
             tokenRegistration.Dispose();
-            Reset(state);
+            Reset(cancellationState);
             throw;
         }
         try
@@ -70,13 +70,13 @@ public sealed class Connection : IDisposable
         finally
         {
             _requests.TryRemove(requestId, out _);
-            Reset(state);
+            Reset(cancellationState);
             tokenRegistration.Dispose();
             requestCompletion.Return();
         }
-        void Reset(object state)
+        void Reset(object cancellationState)
         {
-            if (state == null)
+            if (cancellationState == null)
             {
                 _requestIdToCancel = 0;
             }
