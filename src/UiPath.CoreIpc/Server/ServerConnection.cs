@@ -23,7 +23,7 @@ abstract class ServerConnection : IClient, IDisposable
 #if !NET461
         return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, static(callback, server) => server.CreateCallback<TCallbackInterface>(callback), this);
 #else
-        return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, callback => CreateCallback<TCallbackInterface>(callback));
+        return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, CreateCallback<TCallbackInterface>);
 #endif
     }
     TCallbackInterface CreateCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class
