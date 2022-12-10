@@ -36,8 +36,7 @@ abstract class ServerConnection : IClient, IDisposable
         {
             _listener.Log($"Create callback {callbackContract} {_listener.Name}");
         }
-        var serviceClient = new ServiceClient<TCallbackInterface>(Settings.RequestTimeout, Logger, _ => _connection);
-        return serviceClient.CreateProxy();
+        return new ServiceClient<TCallbackInterface>(Settings.RequestTimeout, Logger, _ => _connection).CreateProxy();
     }
     public async Task Listen(Stream network, CancellationToken cancellationToken)
     {
