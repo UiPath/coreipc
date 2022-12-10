@@ -20,10 +20,11 @@ abstract class ServerConnection : IClient, IDisposable
         {
             throw new InvalidOperationException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's not configured.");
         }
+        return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract,
 #if !NET461
-        return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, static(callback, server) => server.CreateCallback<TCallbackInterface>(callback), this);
+            static (callback, server) => server.CreateCallback<TCallbackInterface>(callback), this);
 #else
-        return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, CreateCallback<TCallbackInterface>);
+            CreateCallback<TCallbackInterface>);
 #endif
     }
     TCallbackInterface CreateCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class
