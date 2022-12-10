@@ -20,20 +20,24 @@ abstract class ServerConnection : IClient, IDisposable
         {
             throw new InvalidOperationException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's not configured.");
         }
-        return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, CreateCallback);
-        TCallbackInterface CreateCallback(Type callbackContract)
+#if !NET461
+        return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, static(callback, server) => server.CreateCallback<TCallbackInterface>(callback), this);
+#else
+        return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, callback => CreateCallback<TCallbackInterface>(callback));
+#endif
+    }
+    TCallbackInterface CreateCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class
+    {
+        if (!typeof(TCallbackInterface).IsAssignableFrom(callbackContract))
         {
-            if (!typeof(TCallbackInterface).IsAssignableFrom(callbackContract))
-            {
-                throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's {callbackContract}.");
-            }
-            if (_listener.LogEnabled)
-            {
-                _listener.Log($"Create callback {callbackContract} {_listener.Name}");
-            }
-            var serviceClient = new ServiceClient<TCallbackInterface>(Settings.RequestTimeout, Logger, _=> _connection);
-            return serviceClient.CreateProxy();
+            throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's {callbackContract}.");
         }
+        if (_listener.LogEnabled)
+        {
+            _listener.Log($"Create callback {callbackContract} {_listener.Name}");
+        }
+        var serviceClient = new ServiceClient<TCallbackInterface>(Settings.RequestTimeout, Logger, _ => _connection);
+        return serviceClient.CreateProxy();
     }
     public async Task Listen(Stream network, CancellationToken cancellationToken)
     {
