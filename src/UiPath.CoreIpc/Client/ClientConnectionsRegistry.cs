@@ -25,7 +25,7 @@ static class ClientConnectionsRegistry
         }
         return clientConnection;
     }
-    private static ClientConnection GetOrAdd(IConnectionKey key) => Connections.GetOrAdd(key, key => key.CreateClientConnection());
+    private static ClientConnection GetOrAdd(IConnectionKey key) => Connections.GetOrAdd(key, static key => key.CreateClientConnection());
     public static bool TryGet(IConnectionKey key, out ClientConnection connection) => Connections.TryGetValue(key, out connection);
     internal static ClientConnection Remove(IConnectionKey connectionKey)
     {
