@@ -2,9 +2,7 @@
 using System.Diagnostics;
 using UiPath.CoreIpc.NamedPipe;
 using Microsoft.Extensions.DependencyInjection;
-
 namespace UiPath.CoreIpc.Tests;
-
 class Client
 {
     static async Task Main(string[] args)

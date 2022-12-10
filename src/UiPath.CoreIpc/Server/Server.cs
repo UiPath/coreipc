@@ -1,6 +1,5 @@
 ﻿using System.Linq.Expressions;
 namespace UiPath.CoreIpc;
-using GetTaskResultFunc = Func<Task, object>;
 using MethodExecutor = Func<object, object[], CancellationToken, Task>;
 using static Expression;
 using static CancellationTokenSourcePool;
@@ -93,8 +92,6 @@ class Server
 }
 readonly record struct IncomingRequest(in Request Request, in Method Method, EndpointSettings Endpoint)
 {
-    private static readonly MethodInfo GetResultMethod = typeof(IncomingRequest).GetStaticMethod(nameof(GetTaskResultImpl));
-    private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
     TaskScheduler Scheduler => Endpoint.Scheduler;
     public Type ReturnType => Method.ReturnType;
     public bool IsUpload => Request.Parameters is [Stream, ..];
@@ -115,11 +112,8 @@ readonly record struct IncomingRequest(in Request Request, in Method Method, End
     async ValueTask<Response> GetMethodResult(Task methodResult)
     {
         await methodResult;
-        return new(Request.Id) { Data = GetTaskResult(methodResult) };
+        return new(Request.Id) { Data = methodResult };
     }
-    static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
-    object GetTaskResult(Task task) => GetTaskResultByType.GetOrAdd(ReturnType, resultType =>
-        GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType.GenericTypeArguments[0]))(task);
 }
 public readonly struct Method
 {

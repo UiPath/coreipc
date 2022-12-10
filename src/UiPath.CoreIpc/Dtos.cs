@@ -27,7 +27,7 @@ public readonly record struct CancellationRequest(int RequestId);
 public record struct Response(int RequestId, Error Error = null)
 {
     internal bool Empty => RequestId == 0;
-    internal object Data { get; set; }
+    internal Task Data { get; set; }
     public static Response Fail(in Request request, Exception ex) => new(request.Id, ex.ToError());
 }
 [Serializable]

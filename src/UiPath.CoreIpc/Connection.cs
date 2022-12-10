@@ -6,6 +6,10 @@ using static IOHelpers;
 public sealed class Connection : IDisposable
 {
     static readonly MessagePackSerializerOptions Contractless = MessagePack.Resolvers.ContractlessStandardResolver.Options;
+    private static readonly ConcurrentDictionary<Type, TaskSerializer> SerializeTaskByType = new();
+    private static readonly ConcurrentDictionary<Type, Deserializer<Task>> DeserializeTaskByType = new();
+    private static readonly MethodInfo SerializeMethod = typeof(Connection).GetStaticMethod(nameof(SerializeTaskImpl));
+    private static readonly MethodInfo DeserializeMethod = typeof(Connection).GetStaticMethod(nameof(DeserializeTaskImpl));
     static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
     private static readonly IOException ClosedException = new("Connection closed.");
     private readonly ConcurrentDictionary<int, OutgoingRequest> _requests = new();
@@ -16,12 +20,14 @@ public sealed class Connection : IDisposable
     private readonly Action<object> _cancelRequest;
     private readonly byte[] _header = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
+    private readonly Task<Stream> _nestedStreamTask;
     private RecyclableMemoryStream _messageStream;
     private int _requestIdToCancel;
     internal Connection(Stream network, ILogger logger, string name, int maxMessageSize = int.MaxValue)
     {
         Network = network;
         _nestedStream = new NestedStream(network, 0);
+        _nestedStreamTask = Task.FromResult<Stream>(_nestedStream);
         Logger = logger;
         Name = $"{name} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
@@ -107,7 +113,7 @@ public sealed class Connection : IDisposable
     ManualResetValueTaskSource Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
     {
-        if (response.Data is Stream downloadStream)
+        if (response.Data is Task<Stream> downloadStream)
         {
             response.Data = null;
         }
@@ -118,11 +124,17 @@ public sealed class Connection : IDisposable
         var responseBytes = SerializeMessage(response, static(in Response response, ref MessagePackWriter writer)=>
         {
             Serialize(response, ref writer);
-            Serialize(response.Data, ref writer);
+            var data = response.Data;
+            if (data == null)
+            {
+                writer.WriteNil();
+                return;
+            }
+            SerializeTask(data, ref writer);
         });
         return downloadStream == null ?
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
-            SendDownloadStream(responseBytes, downloadStream, cancellationToken);
+            SendDownloadStream(responseBytes, downloadStream.Result, cancellationToken);
         async ValueTask SendDownloadStream(RecyclableMemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
         {
             using (downloadStream)
@@ -298,7 +310,7 @@ public sealed class Connection : IDisposable
         {
             return default;
         }
-        if (response.Data == _nestedStream)
+        if (response.Data == _nestedStreamTask)
         {
             return OnDownloadResponse(incomingResponse);
         }
@@ -344,6 +356,7 @@ public sealed class Connection : IDisposable
         _nestedStream.Reset(userStreamLength);
     }
     delegate void Serializer<T>(in T value, ref MessagePackWriter writer);
+    delegate T Deserializer<T>(ref MessagePackReader reader);
     static RecyclableMemoryStream SerializeMessage<T>(in T value, Serializer<T> serializer)
     {
         var stream = GetStream();
@@ -382,11 +395,11 @@ public sealed class Connection : IDisposable
             if (responseType == typeof(Stream))
             {
                 reader.ReadNil();
-                response.Data = _nestedStream;
+                response.Data = _nestedStreamTask;
             }
             else
             {
-                response.Data = MessagePackSerializer.Deserialize(responseType, ref reader, Contractless);
+                response.Data = DeserializeTask(responseType, ref reader);
             }
         }
         else
@@ -457,6 +470,17 @@ public sealed class Connection : IDisposable
     internal void Log(string message) => Logger.LogInformation(message);
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
+    delegate void TaskSerializer(Task task, ref MessagePackWriter writer);
+    static void SerializeTaskImpl<T>(Task task, ref MessagePackWriter writer)
+    {
+        var result = ((Task<T>)task).Result;
+        Serialize(result, ref writer);
+    }
+    static Task DeserializeTaskImpl<T>(ref MessagePackReader reader) => Task.FromResult(Deserialize<T>(ref reader));
+    static void SerializeTask(Task task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), resultType =>
+        SerializeMethod.MakeGenericDelegate<TaskSerializer>(resultType.GenericTypeArguments[0]))(task, ref writer);
+    static Task DeserializeTask(Type type, ref MessagePackReader reader) => DeserializeTaskByType.GetOrAdd(type, resultType =>
+        DeserializeMethod.MakeGenericDelegate<Deserializer<Task>>(type))(ref reader);
 }
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
 readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
