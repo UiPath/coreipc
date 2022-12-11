@@ -471,11 +471,7 @@ public sealed class Connection : IDisposable
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
     delegate void TaskSerializer(object task, ref MessagePackWriter writer);
-    static void SerializeTaskImpl<T>(object task, ref MessagePackWriter writer)
-    {
-        var result = ((Task<T>)task).Result;
-        Serialize(result, ref writer);
-    }
+    static void SerializeTaskImpl<T>(object task, ref MessagePackWriter writer) => Serialize(((Task<T>)task).Result, ref writer);
     static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
     static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
         SerializeMethod.MakeGenericDelegate<TaskSerializer>(resultType.GenericTypeArguments[0]))(task, ref writer);
