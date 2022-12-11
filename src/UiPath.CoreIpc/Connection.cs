@@ -7,7 +7,7 @@ public sealed class Connection : IDisposable
 {
     static readonly MessagePackSerializerOptions Contractless = MessagePack.Resolvers.ContractlessStandardResolver.Options;
     private static readonly ConcurrentDictionary<Type, TaskSerializer> SerializeTaskByType = new();
-    private static readonly ConcurrentDictionary<Type, Deserializer<object>> DeserializeObjectByType = new();
+    private static readonly ConcurrentDictionary<Type, Deserializer> DeserializeObjectByType = new();
     private static readonly MethodInfo SerializeMethod = typeof(Connection).GetStaticMethod(nameof(SerializeTaskImpl));
     private static readonly MethodInfo DeserializeMethod = typeof(Connection).GetStaticMethod(nameof(DeserializeObjectImpl));
     static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
@@ -354,7 +354,7 @@ public sealed class Connection : IDisposable
         _nestedStream.Reset(userStreamLength);
     }
     delegate void Serializer<T>(in T value, ref MessagePackWriter writer);
-    delegate T Deserializer<T>(ref MessagePackReader reader);
+    delegate object Deserializer(ref MessagePackReader reader);
     static RecyclableMemoryStream SerializeMessage<T>(in T value, Serializer<T> serializer)
     {
         var stream = GetStream();
@@ -474,7 +474,7 @@ public sealed class Connection : IDisposable
     static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
         SerializeMethod.MakeGenericDelegate<TaskSerializer>(resultType.GenericTypeArguments[0]))(task, ref writer);
     static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
-        DeserializeMethod.MakeGenericDelegate<Deserializer<object>>(resultType))(ref reader);
+        DeserializeMethod.MakeGenericDelegate<Deserializer>(resultType))(ref reader);
 }
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
 readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
