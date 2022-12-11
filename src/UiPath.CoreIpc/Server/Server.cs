@@ -45,7 +45,7 @@ class Server
         var request = incomingRequest.Request;
         try
         {
-            if (!incomingRequest.ReturnType.IsGenericType)
+            if (incomingRequest.IsOneWay)
             {
                 await incomingRequest.HandleOneWayRequest();
                 return;
@@ -93,7 +93,7 @@ class Server
 readonly record struct IncomingRequest(in Request Request, in Method Method, EndpointSettings Endpoint)
 {
     TaskScheduler Scheduler => Endpoint.Scheduler;
-    public Type ReturnType => Method.ReturnType;
+    public bool IsOneWay => Method.MethodInfo.IsOneWay();
     public bool IsUpload => Request.Parameters is [Stream, ..];
     public Task HandleOneWayRequest() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
     public ValueTask<Response> HandleRequest(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);

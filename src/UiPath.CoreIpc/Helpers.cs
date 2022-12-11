@@ -26,6 +26,7 @@ public static class Helpers
         await tcpClient.ConnectAsync(address, port);
     }
 #endif
+    public static bool IsOneWay(this MethodInfo method) => !method.ReturnType.IsGenericType;
     public static Error ToError(this Exception ex) => new(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace, GetExceptionType(ex), ex.InnerException?.ToError());
     private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
     public static bool Enabled(this ILogger logger) => logger != null && logger.IsEnabled(LogLevel.Information);
@@ -213,7 +214,7 @@ public static class Validator
             {
                 throw new ArgumentException($"The stream must be the first parameter! {method}");
             }
-            if (!method.ReturnType.IsGenericType)
+            if (method.IsOneWay())
             {
                 throw new ArgumentException($"Upload methods must return a value! {method}");
             }

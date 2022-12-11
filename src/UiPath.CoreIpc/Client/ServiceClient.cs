@@ -107,7 +107,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             {
                 Log($"IpcClient calling {methodName} {requestId} {Name}.");
             }
-            if (!method.ReturnType.IsGenericType)
+            if (method.IsOneWay())
             {
                 await _connection.Send(request, token);
                 return default;
@@ -242,7 +242,7 @@ public class IpcProxy : DispatchProxy, IDisposable
     protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvoke(targetMethod)(ServiceClient, targetMethod, args);
     public void Dispose() => ServiceClient.Dispose();
     public void CloseConnection() => Connection?.Dispose();
-    private static InvokeDelegate GetInvoke(MethodInfo targetMethod) => InvokeByType.GetOrAdd(targetMethod.ReturnType, taskType =>
+    private static InvokeDelegate GetInvoke(MethodInfo targetMethod) => InvokeByType.GetOrAdd(targetMethod.ReturnType, static taskType =>
     {
         var resultType = taskType.IsGenericType ? taskType.GenericTypeArguments[0] : typeof(object);
         return InvokeMethod.MakeGenericDelegate<InvokeDelegate>(resultType);
