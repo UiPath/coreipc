@@ -469,7 +469,7 @@ public sealed class Connection : IDisposable
     }
     internal void Log(string message) => Logger.LogInformation(message);
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
-        ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
+        static ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
     delegate void TaskSerializer(object task, ref MessagePackWriter writer);
     static void SerializeTaskImpl<T>(object task, ref MessagePackWriter writer) => Serialize(((Task<T>)task).Result, ref writer);
     static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
