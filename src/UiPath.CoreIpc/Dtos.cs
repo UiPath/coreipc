@@ -27,8 +27,16 @@ public readonly record struct CancellationRequest(int RequestId);
 public record struct Response(int RequestId, Error Error = null)
 {
     internal bool Empty => RequestId == 0;
-    internal Task Data { get; set; }
+    internal object Data { get; set; }
     public static Response Fail(in Request request, Exception ex) => new(request.Id, ex.ToError());
+    public object GetResult()
+    {
+        if (Error != null)
+        {
+            throw new RemoteException(Error);
+        }
+        return Data;
+    }
 }
 [Serializable]
 public record Error(string Message, string StackTrace, string Type, Error InnerError)

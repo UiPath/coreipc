@@ -117,7 +117,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             {
                 Log($"IpcClient called {methodName} {requestId} {Name}.");
             }
-            return response.Error == null ? ((Task<TResult>)response.Data).Result : throw new RemoteException(response.Error);
+            return (TResult)response.GetResult();
         }
         catch (Exception ex)
         {

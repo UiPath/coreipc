@@ -7,7 +7,7 @@ public sealed class Connection : IDisposable
 {
     static readonly MessagePackSerializerOptions Contractless = MessagePack.Resolvers.ContractlessStandardResolver.Options;
     private static readonly ConcurrentDictionary<Type, TaskSerializer> SerializeTaskByType = new();
-    private static readonly ConcurrentDictionary<Type, Deserializer<Task>> DeserializeTaskByType = new();
+    private static readonly ConcurrentDictionary<Type, Deserializer<object>> DeserializeTaskByType = new();
     private static readonly MethodInfo SerializeMethod = typeof(Connection).GetStaticMethod(nameof(SerializeTaskImpl));
     private static readonly MethodInfo DeserializeMethod = typeof(Connection).GetStaticMethod(nameof(DeserializeTaskImpl));
     static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
@@ -310,7 +310,7 @@ public sealed class Connection : IDisposable
         {
             return default;
         }
-        if (response.Data == _nestedStreamTask)
+        if (response.Data == _nestedStream)
         {
             return OnDownloadResponse(incomingResponse);
         }
@@ -395,7 +395,7 @@ public sealed class Connection : IDisposable
             if (responseType == typeof(Stream))
             {
                 reader.ReadNil();
-                response.Data = _nestedStreamTask;
+                response.Data = _nestedStream;
             }
             else
             {
@@ -470,17 +470,17 @@ public sealed class Connection : IDisposable
     internal void Log(string message) => Logger.LogInformation(message);
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
-    delegate void TaskSerializer(Task task, ref MessagePackWriter writer);
-    static void SerializeTaskImpl<T>(Task task, ref MessagePackWriter writer)
+    delegate void TaskSerializer(object task, ref MessagePackWriter writer);
+    static void SerializeTaskImpl<T>(object task, ref MessagePackWriter writer)
     {
         var result = ((Task<T>)task).Result;
         Serialize(result, ref writer);
     }
-    static Task DeserializeTaskImpl<T>(ref MessagePackReader reader) => Task.FromResult(Deserialize<T>(ref reader));
-    static void SerializeTask(Task task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), resultType =>
+    static object DeserializeTaskImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
+    static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), resultType =>
         SerializeMethod.MakeGenericDelegate<TaskSerializer>(resultType.GenericTypeArguments[0]))(task, ref writer);
-    static Task DeserializeTask(Type type, ref MessagePackReader reader) => DeserializeTaskByType.GetOrAdd(type, resultType =>
-        DeserializeMethod.MakeGenericDelegate<Deserializer<Task>>(type))(ref reader);
+    static object DeserializeTask(Type type, ref MessagePackReader reader) => DeserializeTaskByType.GetOrAdd(type, resultType =>
+        DeserializeMethod.MakeGenericDelegate<Deserializer<object>>(type))(ref reader);
 }
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
 readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
