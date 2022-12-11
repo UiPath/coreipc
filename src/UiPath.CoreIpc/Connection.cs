@@ -20,14 +20,12 @@ public sealed class Connection : IDisposable
     private readonly Action<object> _cancelRequest;
     private readonly byte[] _header = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
-    private readonly Task<Stream> _nestedStreamTask;
     private RecyclableMemoryStream _messageStream;
     private int _requestIdToCancel;
     internal Connection(Stream network, ILogger logger, string name, int maxMessageSize = int.MaxValue)
     {
         Network = network;
         _nestedStream = new NestedStream(network, 0);
-        _nestedStreamTask = Task.FromResult<Stream>(_nestedStream);
         Logger = logger;
         Name = $"{name} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
