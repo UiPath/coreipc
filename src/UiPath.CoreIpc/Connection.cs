@@ -399,7 +399,7 @@ public sealed class Connection : IDisposable
             }
             else
             {
-                response.Data = DeserializeTask(responseType, ref reader);
+                response.Data = DeserializeObject(responseType, ref reader);
             }
         }
         else
@@ -443,7 +443,7 @@ public sealed class Connection : IDisposable
                 args[index] = _nestedStream;
                 continue;
             }
-            var arg = MessagePackSerializer.Deserialize(type, ref reader, Contractless);
+            var arg = DeserializeObject(type, ref reader);
             args[index] = CheckMessage(arg, type, endpoint);
         }
         request.Parameters = args;
@@ -479,7 +479,7 @@ public sealed class Connection : IDisposable
     static object DeserializeTaskImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
     static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), resultType =>
         SerializeMethod.MakeGenericDelegate<TaskSerializer>(resultType.GenericTypeArguments[0]))(task, ref writer);
-    static object DeserializeTask(Type type, ref MessagePackReader reader) => DeserializeTaskByType.GetOrAdd(type, resultType =>
+    static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeTaskByType.GetOrAdd(type, resultType =>
         DeserializeMethod.MakeGenericDelegate<Deserializer<object>>(type))(ref reader);
 }
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
