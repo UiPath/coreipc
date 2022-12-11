@@ -477,10 +477,10 @@ public sealed class Connection : IDisposable
         Serialize(result, ref writer);
     }
     static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
-    static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), resultType =>
+    static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
         SerializeMethod.MakeGenericDelegate<TaskSerializer>(resultType.GenericTypeArguments[0]))(task, ref writer);
-    static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, resultType =>
-        DeserializeMethod.MakeGenericDelegate<Deserializer<object>>(type))(ref reader);
+    static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
+        DeserializeMethod.MakeGenericDelegate<Deserializer<object>>(resultType))(ref reader);
 }
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
 readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
