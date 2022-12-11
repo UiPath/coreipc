@@ -7,9 +7,9 @@ public sealed class Connection : IDisposable
 {
     static readonly MessagePackSerializerOptions Contractless = MessagePack.Resolvers.ContractlessStandardResolver.Options;
     private static readonly ConcurrentDictionary<Type, TaskSerializer> SerializeTaskByType = new();
-    private static readonly ConcurrentDictionary<Type, Deserializer<object>> DeserializeTaskByType = new();
+    private static readonly ConcurrentDictionary<Type, Deserializer<object>> DeserializeObjectByType = new();
     private static readonly MethodInfo SerializeMethod = typeof(Connection).GetStaticMethod(nameof(SerializeTaskImpl));
-    private static readonly MethodInfo DeserializeMethod = typeof(Connection).GetStaticMethod(nameof(DeserializeTaskImpl));
+    private static readonly MethodInfo DeserializeMethod = typeof(Connection).GetStaticMethod(nameof(DeserializeObjectImpl));
     static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
     private static readonly IOException ClosedException = new("Connection closed.");
     private readonly ConcurrentDictionary<int, OutgoingRequest> _requests = new();
@@ -476,10 +476,10 @@ public sealed class Connection : IDisposable
         var result = ((Task<T>)task).Result;
         Serialize(result, ref writer);
     }
-    static object DeserializeTaskImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
+    static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
     static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), resultType =>
         SerializeMethod.MakeGenericDelegate<TaskSerializer>(resultType.GenericTypeArguments[0]))(task, ref writer);
-    static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeTaskByType.GetOrAdd(type, resultType =>
+    static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, resultType =>
         DeserializeMethod.MakeGenericDelegate<Deserializer<object>>(type))(ref reader);
 }
 readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
