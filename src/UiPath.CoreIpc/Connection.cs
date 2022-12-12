@@ -329,7 +329,7 @@ public sealed class Connection : IDisposable
     private ValueTask OnRequest()
     {
         var (request, endpoint, executor, isOneWay) = DeserializeRequest();
-        if (request.Endpoint == null)
+        if (endpoint == null)
         {
             return default;
         }
