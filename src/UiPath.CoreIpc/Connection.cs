@@ -1,6 +1,7 @@
 ﻿using MessagePack;
 using Microsoft.IO;
 namespace UiPath.CoreIpc;
+using MethodExecutor = Func<object, object[], CancellationToken, Task>;
 using static TaskCompletionPool<Response>;
 using static IOHelpers;
 public sealed class Connection : IDisposable
@@ -327,24 +328,24 @@ public sealed class Connection : IDisposable
     }
     private ValueTask OnRequest()
     {
-        var isOneWay = DeserializeRequest(out var request);
+        var (request, endpoint, executor, isOneWay) = DeserializeRequest();
         if (request.Endpoint == null)
         {
             return default;
         }
         if (request.IsUpload)
         {
-            return OnUploadRequest(request);
+            return OnUploadRequest(request, endpoint, executor);
         }
         else
         {
-            _=Server.OnRequestReceived(request, isOneWay);
+            _=Server.OnRequestReceived(request, endpoint, executor, isOneWay);
             return default;
         }
-        async ValueTask OnUploadRequest(IncomingRequest request)
+        async ValueTask OnUploadRequest(Request request, EndpointSettings endpoint, MethodExecutor executor)
         {
             await EnterStreamMode();
-            await Server.OnRequestReceived(request, isOneWay: false);
+            await Server.OnRequestReceived(request, endpoint, executor, isOneWay: false);
             _nestedStream.Dispose();
         }
     }
@@ -411,7 +412,7 @@ public sealed class Connection : IDisposable
         return new(response, outgoingRequest.Completion);
     }
     private MessagePackReader CreateReader() => new(_messageStream.GetReadOnlySequence());
-    private bool DeserializeRequest(out IncomingRequest incomingRequest)
+    private (Request, EndpointSettings, MethodExecutor, bool) DeserializeRequest()
     {
         var reader = CreateReader();
         var request = Deserialize<Request>(ref reader);
@@ -422,8 +423,7 @@ public sealed class Connection : IDisposable
         if (!Server.Endpoints.TryGetValue(request.Endpoint, out var endpoint))
         {
             OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
-            incomingRequest = default;
-            return true;
+            return default;
         }
         var method = GetMethod(endpoint.Contract, request.Method);
         var args = new object[method.Parameters.Length];
@@ -451,8 +451,7 @@ public sealed class Connection : IDisposable
             args[index] = CheckMessage(arg, type, endpoint);
         }
         request.Parameters = args;
-        incomingRequest = new(request, endpoint, method.Invoke);
-        return method.IsOneWay;
+        return (request, endpoint, method.Invoke, method.IsOneWay);
         object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint)
         {
             if (parameterType == typeof(Message) && argument == null)

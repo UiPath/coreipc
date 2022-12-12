@@ -40,9 +40,10 @@ class Server
             Logger.LogException(ex, $"{Name}");
         }
     }
-    public async ValueTask OnRequestReceived(IncomingRequest incomingRequest, bool isOneWay)
+    public async ValueTask OnRequestReceived(Request request, EndpointSettings endpoint, MethodExecutor executor, bool isOneWay)
     {
-        var request = incomingRequest.Request;
+        int requestId = request.Id;
+        IncomingRequest incomingRequest = new(requestId, request.Parameters, endpoint, executor);
         try
         {
             if (isOneWay)
@@ -52,7 +53,7 @@ class Server
             }
             Response response = default;
             var requestCancellation = Rent();
-            _requests[request.Id] = requestCancellation;
+            _requests[requestId] = requestCancellation;
             var timeout = request.GetTimeout(Settings.RequestTimeout);
             var timeoutHelper = new TimeoutHelper(timeout, requestCancellation.Token);
             try
@@ -78,7 +79,7 @@ class Server
         {
             Logger.LogException(ex, $"{Name} {request}");
         }
-        if (_requests.TryRemove(request.Id, out var cancellation))
+        if (_requests.TryRemove(requestId, out var cancellation))
         {
             cancellation.Return();
         }
@@ -90,13 +91,12 @@ class Server
     public string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
 }
-readonly record struct IncomingRequest(in Request Request, EndpointSettings Endpoint, MethodExecutor Executor)
+readonly record struct IncomingRequest(int RequestId, object[] Parameters, EndpointSettings Endpoint, MethodExecutor Executor)
 {
     TaskScheduler Scheduler => Endpoint.Scheduler;
-    public bool IsUpload => Request.Parameters is [Stream, ..];
     public Task HandleOneWayRequest() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
     public ValueTask<Response> HandleRequest(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
-    Task Invoke(CancellationToken token = default) => Executor.Invoke(Endpoint.ServerObject(), Request.Parameters, token);
+    Task Invoke(CancellationToken token = default) => Executor.Invoke(Endpoint.ServerObject(), Parameters, token);
     record InvokeState(in IncomingRequest Request, CancellationToken Token)
     {
         public static Task Invoke(object state)
@@ -111,7 +111,7 @@ readonly record struct IncomingRequest(in Request Request, EndpointSettings Endp
     async ValueTask<Response> GetMethodResult(Task methodResult)
     {
         await methodResult;
-        return new(Request.Id) { Data = methodResult };
+        return new(RequestId) { Data = methodResult };
     }
 }
 public readonly struct Method

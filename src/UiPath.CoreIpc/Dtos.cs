@@ -18,6 +18,7 @@ public class Message<TPayload> : Message
 }
 public record struct Request(int Id, string Method, string Endpoint, double Timeout)
 {
+    internal bool IsUpload => Parameters is [Stream, ..];
     internal object[] Parameters { get; set; }
     public override string ToString() => $"{Endpoint} {Method} {Id}.";
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => Timeout == 0 ? defaultTimeout : TimeSpan.FromSeconds(Timeout);
