@@ -327,20 +327,24 @@ public sealed class Connection : IDisposable
     }
     private ValueTask OnRequest()
     {
-        var request = DeserializeRequest();
+        var isOneWay = DeserializeRequest(out var request);
+        if (request.Endpoint == null)
+        {
+            return default;
+        }
         if (request.IsUpload)
         {
             return OnUploadRequest(request);
         }
         else
         {
-            _=Server.OnRequestReceived(request);
+            _=Server.OnRequestReceived(request, isOneWay);
             return default;
         }
         async ValueTask OnUploadRequest(IncomingRequest request)
         {
             await EnterStreamMode();
-            await Server.OnRequestReceived(request);
+            await Server.OnRequestReceived(request, isOneWay: false);
             _nestedStream.Dispose();
         }
     }
@@ -407,7 +411,7 @@ public sealed class Connection : IDisposable
         return new(response, outgoingRequest.Completion);
     }
     private MessagePackReader CreateReader() => new(_messageStream.GetReadOnlySequence());
-    private IncomingRequest DeserializeRequest()
+    private bool DeserializeRequest(out IncomingRequest incomingRequest)
     {
         var reader = CreateReader();
         var request = Deserialize<Request>(ref reader);
@@ -418,7 +422,8 @@ public sealed class Connection : IDisposable
         if (!Server.Endpoints.TryGetValue(request.Endpoint, out var endpoint))
         {
             OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
-            return default;
+            incomingRequest = default;
+            return true;
         }
         var method = GetMethod(endpoint.Contract, request.Method);
         var args = new object[method.Parameters.Length];
@@ -446,7 +451,8 @@ public sealed class Connection : IDisposable
             args[index] = CheckMessage(arg, type, endpoint);
         }
         request.Parameters = args;
-        return new(request, method, endpoint);
+        incomingRequest = new(request, endpoint, method.Invoke);
+        return method.IsOneWay;
         object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint)
         {
             if (parameterType == typeof(Message) && argument == null)

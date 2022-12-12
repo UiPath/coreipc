@@ -40,12 +40,12 @@ class Server
             Logger.LogException(ex, $"{Name}");
         }
     }
-    public async ValueTask OnRequestReceived(IncomingRequest incomingRequest)
+    public async ValueTask OnRequestReceived(IncomingRequest incomingRequest, bool isOneWay)
     {
         var request = incomingRequest.Request;
         try
         {
-            if (incomingRequest.IsOneWay)
+            if (isOneWay)
             {
                 await incomingRequest.HandleOneWayRequest();
                 return;
@@ -90,14 +90,13 @@ class Server
     public string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
 }
-readonly record struct IncomingRequest(in Request Request, in Method Method, EndpointSettings Endpoint)
+readonly record struct IncomingRequest(in Request Request, EndpointSettings Endpoint, MethodExecutor Executor)
 {
     TaskScheduler Scheduler => Endpoint.Scheduler;
-    public bool IsOneWay => Method.IsOneWay;
     public bool IsUpload => Request.Parameters is [Stream, ..];
     public Task HandleOneWayRequest() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
     public ValueTask<Response> HandleRequest(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
-    Task Invoke(CancellationToken token = default) => Method.Invoke(Endpoint.ServerObject(), Request.Parameters, token);
+    Task Invoke(CancellationToken token = default) => Executor.Invoke(Endpoint.ServerObject(), Request.Parameters, token);
     record InvokeState(in IncomingRequest Request, CancellationToken Token)
     {
         public static Task Invoke(object state)
