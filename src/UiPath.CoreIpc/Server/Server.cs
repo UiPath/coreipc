@@ -48,7 +48,7 @@ class Server
         {
             if (isOneWay)
             {
-                await incomingRequest.HandleOneWayRequest();
+                await incomingRequest.OneWay();
                 return;
             }
             Response response = default;
@@ -59,7 +59,7 @@ class Server
             try
             {
                 var token = timeoutHelper.Token;
-                response = await incomingRequest.HandleRequest(token);
+                response = await incomingRequest.GetResponse(token);
                 if (LogEnabled)
                 {
                     Log($"{Name} sending response for {request}");
@@ -94,8 +94,8 @@ class Server
 readonly record struct IncomingRequest(int RequestId, object[] Parameters, EndpointSettings Endpoint, MethodExecutor Executor)
 {
     TaskScheduler Scheduler => Endpoint.Scheduler;
-    public Task HandleOneWayRequest() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
-    public ValueTask<Response> HandleRequest(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
+    public Task OneWay() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
+    public ValueTask<Response> GetResponse(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
     Task Invoke(CancellationToken token = default) => Executor.Invoke(Endpoint.ServerObject(), Parameters, token);
     record InvokeState(in IncomingRequest Request, CancellationToken Token)
     {
