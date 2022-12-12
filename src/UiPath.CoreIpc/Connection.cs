@@ -458,11 +458,7 @@ public sealed class Connection : IDisposable
             {
                 return parameterType == typeof(Message) ? new Message().SetValues(endpoint, Server) : null;
             }
-            if (argument is Message message)
-            {
-                return message.SetValues(endpoint, Server);
-            }
-            return argument;
+            return argument is Message message ? message.SetValues(endpoint, Server) : argument;
         }
     }
     internal ValueTask OnError(in Request request, Exception ex)
