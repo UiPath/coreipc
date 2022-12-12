@@ -469,7 +469,7 @@ public sealed class Connection : IDisposable
     internal ValueTask OnError(in Request request, Exception ex)
     {
         Logger.LogException(ex, $"{Name} {request}");
-        return Send(Response.Fail(request, ex), default);
+        return Send(new(request.Id, ex.ToError()), default);
     }
     internal void Log(string message) => Logger.LogInformation(message);
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
