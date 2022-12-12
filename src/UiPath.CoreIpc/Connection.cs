@@ -424,10 +424,11 @@ public sealed class Connection : IDisposable
         var args = new object[method.Parameters.Length];
         for (int index = 0; index < args.Length; index++)
         {
-            var type = method.Parameters[index].ParameterType;
+            var parameter = method.Parameters[index];
+            var type = parameter.Type;
             if (reader.End)
             {
-                args[index] = CheckMessage(method.Defaults[index], type, endpoint);
+                args[index] = CheckMessage(parameter.Default, type, endpoint);
                 continue;
             }
             if (type == typeof(CancellationToken))

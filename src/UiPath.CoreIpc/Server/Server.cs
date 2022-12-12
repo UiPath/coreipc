@@ -122,8 +122,7 @@ public readonly struct Method
     static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
     public readonly MethodExecutor Invoke;
     public readonly MethodInfo MethodInfo;
-    public readonly ParameterInfo[] Parameters;
-    public readonly object[] Defaults;
+    public readonly Parameter[] Parameters;
     public Type ReturnType => MethodInfo.ReturnType;
     public Method(MethodInfo method)
     {
@@ -131,11 +130,11 @@ public readonly struct Method
         var parameters = method.GetParameters();
         var parametersLength = parameters.Length;
         var callParameters = new Expression[parametersLength];
-        var defaults = new object[parametersLength];
+        Parameters = new Parameter[parametersLength];
         for (int index = 0; index < parametersLength; index++)
         {
             var parameter = parameters[index];
-            defaults[index] = parameter.GetDefaultValue();
+            Parameters[index] = new(parameter);
             callParameters[index] = parameter.ParameterType == typeof(CancellationToken) ? TokenParameter :
                 Convert(ArrayIndex(ParametersParameter, Constant(index, typeof(int))), parameter.ParameterType);
         }
@@ -144,8 +143,10 @@ public readonly struct Method
         var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter, TokenParameter);
         Invoke = lambda.Compile();
         MethodInfo = method;
-        Parameters = parameters;
-        Defaults = defaults;
     }
     public override string ToString() => MethodInfo.ToString();
+    public readonly record struct Parameter(Type Type, object Default)
+    {
+        public Parameter(ParameterInfo parameter) : this(parameter.ParameterType, parameter.GetDefaultValue()) { }
+    }
 }
