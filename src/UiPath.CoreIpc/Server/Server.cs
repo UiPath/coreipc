@@ -93,7 +93,7 @@ class Server
 readonly record struct IncomingRequest(in Request Request, in Method Method, EndpointSettings Endpoint)
 {
     TaskScheduler Scheduler => Endpoint.Scheduler;
-    public bool IsOneWay => Method.MethodInfo.IsOneWay();
+    public bool IsOneWay => Method.IsOneWay;
     public bool IsUpload => Request.Parameters is [Stream, ..];
     public Task HandleOneWayRequest() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
     public ValueTask<Response> HandleRequest(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
@@ -121,9 +121,8 @@ public readonly struct Method
     static readonly ParameterExpression TokenParameter = Parameter(typeof(CancellationToken), "cancellationToken");
     static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
     public readonly MethodExecutor Invoke;
-    public readonly MethodInfo MethodInfo;
+    public readonly bool IsOneWay;
     public readonly Parameter[] Parameters;
-    public Type ReturnType => MethodInfo.ReturnType;
     public Method(MethodInfo method)
     {
         // https://github.com/dotnet/aspnetcore/blob/3f620310883092905ed6f13d784c908b5f4a9d7e/src/Shared/ObjectMethodExecutor/ObjectMethodExecutor.cs#L156
@@ -142,9 +141,8 @@ public readonly struct Method
         var methodCall = Call(instanceCast, method, callParameters);
         var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter, TokenParameter);
         Invoke = lambda.Compile();
-        MethodInfo = method;
+        IsOneWay = method.IsOneWay();
     }
-    public override string ToString() => MethodInfo.ToString();
     public readonly record struct Parameter(Type Type, object Default)
     {
         public Parameter(ParameterInfo parameter) : this(parameter.ParameterType, parameter.GetDefaultValue()) { }
