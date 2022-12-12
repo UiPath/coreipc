@@ -6,7 +6,7 @@ using static IOHelpers;
 public sealed class Connection : IDisposable
 {
     static readonly MessagePackSerializerOptions Contractless = MessagePack.Resolvers.ContractlessStandardResolver.Options;
-    private static readonly ConcurrentDictionary<Type, TaskSerializer> SerializeTaskByType = new();
+    private static readonly ConcurrentDictionary<Type, Serializer<object>> SerializeTaskByType = new();
     private static readonly ConcurrentDictionary<Type, Deserializer> DeserializeObjectByType = new();
     private static readonly MethodInfo SerializeMethod = typeof(Connection).GetStaticMethod(nameof(SerializeTaskImpl));
     private static readonly MethodInfo DeserializeMethod = typeof(Connection).GetStaticMethod(nameof(DeserializeObjectImpl));
@@ -468,11 +468,10 @@ public sealed class Connection : IDisposable
     internal void Log(string message) => Logger.LogInformation(message);
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         static ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
-    delegate void TaskSerializer(object task, ref MessagePackWriter writer);
-    static void SerializeTaskImpl<T>(object task, ref MessagePackWriter writer) => Serialize(((Task<T>)task).Result, ref writer);
+    static void SerializeTaskImpl<T>(in object task, ref MessagePackWriter writer) => Serialize(((Task<T>)task).Result, ref writer);
     static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
     static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
-        SerializeMethod.MakeGenericDelegate<TaskSerializer>(resultType.GenericTypeArguments[0]))(task, ref writer);
+        SerializeMethod.MakeGenericDelegate<Serializer<object>>(resultType.GenericTypeArguments[0]))(task, ref writer);
     static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
         DeserializeMethod.MakeGenericDelegate<Deserializer>(resultType))(ref reader);
 }
