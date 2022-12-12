@@ -433,7 +433,7 @@ public sealed class Connection : IDisposable
             var type = parameter.Type;
             if (reader.End)
             {
-                args[index] = CheckMessage(parameter.Default, type, endpoint);
+                args[index] = CheckNullMessage(parameter.Default, type, endpoint);
                 continue;
             }
             if (type == typeof(CancellationToken))
@@ -452,14 +452,10 @@ public sealed class Connection : IDisposable
         }
         request.Parameters = args;
         return (request, endpoint, method.Invoke, method.IsOneWay);
-        object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint)
-        {
-            if (argument == null)
-            {
-                return parameterType == typeof(Message) ? new Message().SetValues(endpoint, Server) : null;
-            }
-            return argument is Message message ? message.SetValues(endpoint, Server) : argument;
-        }
+        object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint) => argument == null ?
+            CheckNullMessage(argument, parameterType, endpoint) : (argument is Message message ? message.SetValues(endpoint, Server) : argument);
+        object CheckNullMessage(object argument, Type parameterType, EndpointSettings endpoint) => parameterType == typeof(Message) ? 
+            new Message().SetValues(endpoint, Server) : argument;
     }
     internal ValueTask OnError(in Request request, Exception ex)
     {
