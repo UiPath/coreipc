@@ -101,7 +101,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             Request request = new(requestId, methodName, typeof(TInterface).Name, messageTimeout.TotalSeconds)
             {
                 Parameters = args,
-                ResponseType = typeof(TResult)
             };
             if (LogEnabled)
             {
@@ -112,7 +111,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 await _connection.Send(request, token);
                 return default;
             }
-            var response = await _connection.RemoteCall(request, token);
+            var response = await _connection.RemoteCall(request, typeof(TResult), token);
             if (LogEnabled)
             {
                 Log($"IpcClient called {methodName} {requestId} {Name}.");

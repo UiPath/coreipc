@@ -49,11 +49,11 @@ public sealed class Connection : IDisposable
     internal Task Listen() => _receiveLoop.Value;
     public event EventHandler<EventArgs> Closed = delegate{};
     internal void SetServer(ListenerSettings settings, IClient client = null) => Server = new(settings, this, client);
-    internal async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
+    internal async ValueTask<Response> RemoteCall(Request request, Type responseType, CancellationToken token)
     {
         var requestCompletion = Rent();
         var requestId = request.Id;
-        _requests[requestId] = new(requestCompletion, request.ResponseType);
+        _requests[requestId] = new(requestCompletion, responseType);
         object cancellationState = Interlocked.CompareExchange(ref _requestIdToCancel, requestId, 0) == 0 ? null : requestId;
         var tokenRegistration = token.UnsafeRegister(_cancelRequest, cancellationState);
         try
