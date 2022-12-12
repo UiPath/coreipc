@@ -454,14 +454,13 @@ public sealed class Connection : IDisposable
         return (request, endpoint, method.Invoke, method.IsOneWay);
         object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint)
         {
-            if (parameterType == typeof(Message) && argument == null)
+            if (argument == null && parameterType == typeof(Message))
             {
-                argument = new Message();
+                return new Message().SetValues(endpoint, Server);
             }
             if (argument is Message message)
             {
-                message.CallbackContract = endpoint.CallbackContract;
-                message.Client = Server.Client;
+                return message.SetValues(endpoint, Server);
             }
             return argument;
         }

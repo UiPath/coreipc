@@ -10,6 +10,12 @@ public class Message
     public TimeSpan RequestTimeout { get; set; }
     public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => Client.GetCallback<TCallbackInterface>(CallbackContract);
     public void ImpersonateClient(Action action) => Client.Impersonate(action);
+    internal Message SetValues(EndpointSettings endpoint, Server server)
+    {
+        CallbackContract = endpoint.CallbackContract;
+        Client = server.Client;
+        return this;
+    }
 }
 public class Message<TPayload> : Message
 {
