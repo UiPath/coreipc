@@ -454,9 +454,9 @@ public sealed class Connection : IDisposable
         return (request, endpoint, method.Invoke, method.IsOneWay);
         object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint)
         {
-            if (argument == null && parameterType == typeof(Message))
+            if (argument == null)
             {
-                return new Message().SetValues(endpoint, Server);
+                return parameterType == typeof(Message) ? new Message().SetValues(endpoint, Server) : null;
             }
             if (argument is Message message)
             {
