@@ -102,11 +102,10 @@ public sealed class Connection : IDisposable
             Serialize(request, ref writer);
             foreach (var arg in request.Parameters)
             {
-                if (arg == Contractless)
+                if (arg != Contractless)
                 {
-                    continue;
+                    Serialize(arg, ref writer);
                 }
-                Serialize(arg, ref writer);
             }
         });
         return uploadStream == null ?
