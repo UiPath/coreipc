@@ -75,7 +75,7 @@ class Server
             }
             catch (Exception ex) when(response.Empty)
             {
-                await _connection.OnError(request, timeoutHelper.CheckTimeout(ex, request.Method));
+                await OnError(request, timeoutHelper.CheckTimeout(ex, request.Method));
             }
             finally
             {
@@ -95,10 +95,15 @@ class Server
     {
         if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
         {
-            _connection.OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
+            OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
             return default;
         }
         return (GetMethod(endpoint.Contract, request.Method), endpoint);
+    }
+    ValueTask OnError(in Request request, Exception ex)
+    {
+        Logger.LogException(ex, $"{Name} {request}");
+        return _connection.Send(new(request.Id, ex.ToError()), default);
     }
     private void Log(string message) => _connection.Log(message);
     private ILogger Logger => _connection.Logger;

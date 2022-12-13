@@ -440,11 +440,6 @@ public sealed class Connection : IDisposable
         object CheckNullMessage(object argument, Type parameterType, EndpointSettings endpoint) => parameterType == typeof(Message) ? 
             new Message().SetValues(endpoint, Server) : argument;
     }
-    internal ValueTask OnError(in Request request, Exception ex)
-    {
-        Logger.LogException(ex, $"{Name} {request}");
-        return Send(new(request.Id, ex.ToError()), default);
-    }
     internal void Log(string message) => Logger.LogInformation(message);
     internal static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
     readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Deserializer Deserializer);
