@@ -269,7 +269,7 @@ public sealed class Connection : IDisposable
         {
             MessageType.Response => OnResponse(),
             MessageType.Request => Server.OnRequest(_nestedStream),
-            MessageType.CancellationRequest => OnCancel(),
+            MessageType.CancellationRequest => Server.OnCancel(),
             _ => Unknown(messageType),
         };
         ValueTask Unknown(MessageType messageType)
@@ -291,12 +291,6 @@ public sealed class Connection : IDisposable
             _nestedStream.Reset(length);
             return GetStream(length);
         }
-    }
-    private ValueTask OnCancel()
-    {
-        var request = DeserializeMessage<CancellationRequest>(out var _);
-        Server.CancelRequest(request.RequestId);
-        return default;
     }
     private ValueTask OnResponse()
     {

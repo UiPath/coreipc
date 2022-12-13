@@ -32,7 +32,13 @@ class Server
             CancelRequest(requestId);
         }
     }
-    public void CancelRequest(int requestId)
+    public ValueTask OnCancel()
+    {
+        var request = _connection.DeserializeMessage<CancellationRequest>(out var _);
+        CancelRequest(request.RequestId);
+        return default;
+    }
+    private void CancelRequest(int requestId)
     {
         try
         {
