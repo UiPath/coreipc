@@ -406,12 +406,11 @@ public sealed class Connection : IDisposable
         {
             Log($"{Name} received request {request}");
         }
-        if (!Server.Endpoints.TryGetValue(request.Endpoint, out var endpoint))
+        var (method, endpoint) = Server.GetMethod(request);
+        if (endpoint == null)
         {
-            OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
             return default;
         }
-        var method = Server.GetMethod(endpoint.Contract, request.Method);
         var args = new object[method.Parameters.Length];
         for (int index = 0; index < args.Length; index++)
         {

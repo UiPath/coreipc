@@ -91,6 +91,15 @@ class Server
             cancellation.Return();
         }
     }
+    public (Method, EndpointSettings) GetMethod(in Request request)
+    {
+        if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
+        {
+            _connection.OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
+            return default;
+        }
+        return (GetMethod(endpoint.Contract, request.Method), endpoint);
+    }
     private void Log(string message) => _connection.Log(message);
     private ILogger Logger => _connection.Logger;
     private bool LogEnabled => Logger.Enabled();
@@ -102,7 +111,7 @@ class Server
     public static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
         DeserializeMethod.MakeGenericDelegate<Deserializer>(resultType))(ref reader);
     static void SerializeTaskImpl<T>(in object task, ref MessagePackWriter writer) => Serialize(((Task<T>)task).Result, ref writer);
-    public static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
+    static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         static ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
     readonly record struct IncomingRequest(int RequestId, object[] Parameters, EndpointSettings Endpoint, MethodExecutor Executor)
     {
