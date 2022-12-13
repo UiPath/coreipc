@@ -316,7 +316,7 @@ public sealed class Connection : IDisposable
             _nestedStream.Disposed -= disposedHandler;
         }
     }
-    public async ValueTask EnterStreamMode()
+    internal async ValueTask EnterStreamMode()
     {
         if (!await ReadHeader(sizeof(long)))
         {
@@ -344,7 +344,7 @@ public sealed class Connection : IDisposable
         }
     }
     internal static void Serialize<T>(in T value, ref MessagePackWriter writer) => MessagePackSerializer.Serialize(ref writer, value, Contractless);
-    public T DeserializeMessage<T>(out MessagePackReader reader)
+    internal T DeserializeMessage<T>(out MessagePackReader reader)
     {
         reader = new(_messageStream.GetReadOnlySequence());
         return Deserialize<T>(ref reader);
