@@ -396,7 +396,7 @@ public sealed class Connection : IDisposable
         if (response.Error == null)
         {
             var deserializer = outgoingRequest.Deserializer;
-            response.Data = deserializer == null ? _nestedStream : outgoingRequest.Deserializer?.Invoke(ref reader);
+            response.Data = deserializer == null ? _nestedStream : outgoingRequest.Deserializer.Invoke(ref reader);
         }
         return new(response, outgoingRequest.Completion);
     }
