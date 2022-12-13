@@ -20,7 +20,7 @@ class Server
         _connection = connection;
         Client = client;
     }
-    public IClient Client { get; }
+    IClient Client { get; }
     public void CancelRequests()
     {
         if (LogEnabled)
@@ -158,9 +158,9 @@ class Server
         request.Parameters = args;
         return (request, endpoint, method.Invoke, method.IsOneWay);
         object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint) => argument == null ?
-            CheckNullMessage(argument, parameterType, endpoint) : (argument is Message message ? message.SetValues(endpoint, this) : argument);
+            CheckNullMessage(argument, parameterType, endpoint) : (argument is Message message ? message.SetValues(endpoint, Client) : argument);
         object CheckNullMessage(object argument, Type parameterType, EndpointSettings endpoint) => parameterType == typeof(Message) ?
-            new Message().SetValues(endpoint, this) : argument;
+            new Message().SetValues(endpoint, Client) : argument;
     }
     ValueTask OnError(in Request request, Exception ex)
     {
