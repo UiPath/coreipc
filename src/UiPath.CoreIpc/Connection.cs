@@ -297,8 +297,8 @@ public sealed class Connection : IDisposable
     }
     private ValueTask OnCancel()
     {
-        var reader = CreateReader();
-        Server.CancelRequest(Deserialize<CancellationRequest>(ref reader).RequestId);
+        var request = DeserializeMessage<CancellationRequest>(out var _);
+        Server.CancelRequest(request.RequestId);
         return default;
     }
     private ValueTask OnResponse()
@@ -378,12 +378,16 @@ public sealed class Connection : IDisposable
         }
     }
     static void Serialize<T>(in T value, ref MessagePackWriter writer) => MessagePackSerializer.Serialize(ref writer, value, Contractless);
+    T DeserializeMessage<T>(out MessagePackReader reader)
+    {
+        reader = new(_messageStream.GetReadOnlySequence());
+        return Deserialize<T>(ref reader);
+    }
     static T Deserialize<T>(ref MessagePackReader reader) => MessagePackSerializer.Deserialize<T>(ref reader, Contractless);
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     private IncomingResponse DeserializeResponse()
     {
-        var reader = CreateReader();
-        var response = Deserialize<Response>(ref reader);
+        var response = DeserializeMessage<Response>(out var reader);
         if (LogEnabled)
         {
             Log($"Received response for request {response.RequestId} {Name}.");
@@ -411,11 +415,9 @@ public sealed class Connection : IDisposable
         }
         return new(response, outgoingRequest.Completion);
     }
-    private MessagePackReader CreateReader() => new(_messageStream.GetReadOnlySequence());
     private (Request, EndpointSettings, MethodExecutor, bool) DeserializeRequest()
     {
-        var reader = CreateReader();
-        var request = Deserialize<Request>(ref reader);
+        var request = DeserializeMessage<Request>(out var reader);
         if (LogEnabled)
         {
             Log($"{Name} received request {request}");
