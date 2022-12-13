@@ -50,11 +50,11 @@ public sealed class Connection : IDisposable
     internal Task Listen() => _receiveLoop.Value;
     public event EventHandler<EventArgs> Closed = delegate{};
     internal void SetServer(ListenerSettings settings, IClient client = null) => Server = new(settings, this, client);
-    internal async ValueTask<Response> RemoteCall(Request request, Type responseType, CancellationToken token)
+    internal async ValueTask<Response> RemoteCall(Request request, Deserializer deserializer, CancellationToken token)
     {
         var requestCompletion = Rent();
         var requestId = request.Id;
-        _requests[requestId] = new(requestCompletion, responseType);
+        _requests[requestId] = new(requestCompletion, deserializer);
         object cancellationState = Interlocked.CompareExchange(ref _requestIdToCancel, requestId, 0) == 0 ? null : requestId;
         var tokenRegistration = token.UnsafeRegister(_cancelRequest, cancellationState);
         try
@@ -361,7 +361,7 @@ public sealed class Connection : IDisposable
         _nestedStream.Reset(userStreamLength);
     }
     delegate void Serializer<T>(in T value, ref MessagePackWriter writer);
-    delegate object Deserializer(ref MessagePackReader reader);
+    internal delegate object Deserializer(ref MessagePackReader reader);
     static RecyclableMemoryStream SerializeMessage<T>(in T value, Serializer<T> serializer)
     {
         var stream = GetStream();
@@ -400,8 +400,8 @@ public sealed class Connection : IDisposable
         }
         if (response.Error == null)
         {
-            var responseType = outgoingRequest.ResponseType;
-            response.Data = responseType == typeof(Stream) ? _nestedStream : DeserializeObject(responseType, ref reader);
+            var deserializer = outgoingRequest.Deserializer;
+            response.Data = deserializer == null ? _nestedStream : outgoingRequest.Deserializer?.Invoke(ref reader);
         }
         return new(response, outgoingRequest.Completion);
     }
@@ -456,14 +456,14 @@ public sealed class Connection : IDisposable
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         static ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
     static void SerializeTaskImpl<T>(in object task, ref MessagePackWriter writer) => Serialize(((Task<T>)task).Result, ref writer);
-    static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
+    internal static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
     static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
         SerializeMethod.MakeGenericDelegate<Serializer<object>>(resultType.GenericTypeArguments[0]))(task, ref writer);
     static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
         DeserializeMethod.MakeGenericDelegate<Deserializer>(resultType))(ref reader);
-}
-readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Type ResponseType);
-readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
-{
-    public void CompleteRequest() => Completion.SetResult(Response);
+    readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Deserializer Deserializer);
+    readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
+    {
+        public void CompleteRequest() => Completion.SetResult(Response);
+    }
 }

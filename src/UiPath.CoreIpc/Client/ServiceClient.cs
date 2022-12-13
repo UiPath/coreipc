@@ -111,7 +111,8 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 await _connection.Send(request, token);
                 return default;
             }
-            var response = await _connection.RemoteCall(request, typeof(TResult), token);
+            var isDownload = typeof(TResult) == typeof(Stream);
+            var response = await _connection.RemoteCall(request, isDownload ? null : Connection.DeserializeObjectImpl<TResult>, token);
             if (LogEnabled)
             {
                 Log($"IpcClient called {methodName} {requestId} {Name}.");
