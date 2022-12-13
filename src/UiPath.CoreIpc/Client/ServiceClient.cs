@@ -136,7 +136,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             if (args is [.., CancellationToken token])
             {
                 cancellationToken = token;
-                args[^1] = null;
+                args[^1] = Connection.Contractless;
             }
         }
     }

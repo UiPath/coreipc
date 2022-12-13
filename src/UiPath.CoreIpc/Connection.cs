@@ -6,7 +6,7 @@ using static TaskCompletionPool<Response>;
 using static IOHelpers;
 public sealed class Connection : IDisposable
 {
-    static readonly MessagePackSerializerOptions Contractless = MessagePack.Resolvers.ContractlessStandardResolver.Options;
+    internal static readonly MessagePackSerializerOptions Contractless = MessagePack.Resolvers.ContractlessStandardResolver.Options;
     private static readonly ConcurrentDictionary<Type, Serializer<object>> SerializeTaskByType = new();
     private static readonly ConcurrentDictionary<Type, Deserializer> DeserializeObjectByType = new();
     private static readonly MethodInfo SerializeMethod = typeof(Connection).GetStaticMethod(nameof(SerializeTaskImpl));
@@ -91,7 +91,7 @@ public sealed class Connection : IDisposable
     {
         if (request.Parameters is [Stream uploadStream, ..])
         {
-            request.Parameters[0] = null;
+            request.Parameters[0] = Contractless;
         }
         else
         {
@@ -102,6 +102,10 @@ public sealed class Connection : IDisposable
             Serialize(request, ref writer);
             foreach (var arg in request.Parameters)
             {
+                if (arg == Contractless)
+                {
+                    continue;
+                }
                 Serialize(arg, ref writer);
             }
         });
@@ -126,7 +130,6 @@ public sealed class Connection : IDisposable
             var data = response.Data;
             if (data == null)
             {
-                writer.WriteNil();
                 return;
             }
             SerializeTask(data, ref writer);
@@ -401,17 +404,12 @@ public sealed class Connection : IDisposable
         {
             if (responseType == typeof(Stream))
             {
-                reader.ReadNil();
                 response.Data = _nestedStream;
             }
             else
             {
                 response.Data = DeserializeObject(responseType, ref reader);
             }
-        }
-        else
-        {
-            reader.ReadNil();
         }
         return new(response, outgoingRequest.Completion);
     }
@@ -433,20 +431,18 @@ public sealed class Connection : IDisposable
         {
             var parameter = method.Parameters[index];
             var type = parameter.Type;
-            if (reader.End)
-            {
-                args[index] = CheckNullMessage(parameter.Default, type, endpoint);
-                continue;
-            }
             if (type == typeof(CancellationToken))
             {
-                reader.ReadNil();
                 continue;
             }
             else if (type == typeof(Stream))
             {
-                reader.ReadNil();
                 args[index] = _nestedStream;
+                continue;
+            }
+            if (reader.End)
+            {
+                args[index] = CheckNullMessage(parameter.Default, type, endpoint);
                 continue;
             }
             var arg = DeserializeObject(type, ref reader);

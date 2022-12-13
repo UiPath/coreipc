@@ -203,7 +203,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         {
             newConnection = c.NewConnection;
             c.Method.ShouldBe(typeof(ISystemService).GetMethod(nameof(ISystemService.DoNothing)));
-            c.Arguments.Single().ShouldBeNull(); // cancellation token
+            c.Arguments.Single().ShouldNotBeNull(); // cancellation token
         }).ValidateAndBuild();
         newConnection.ShouldBeFalse();
 
