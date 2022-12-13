@@ -1,10 +1,16 @@
-﻿using System.Linq.Expressions;
+﻿using MessagePack;
+using System.Linq.Expressions;
 namespace UiPath.CoreIpc;
 using MethodExecutor = Func<object, object[], CancellationToken, Task>;
 using static Expression;
 using static CancellationTokenSourcePool;
+using static UiPath.CoreIpc.Connection;
 class Server
 {
+    private static readonly ConcurrentDictionary<Type, Serializer<object>> SerializeTaskByType = new();
+    private static readonly ConcurrentDictionary<Type, Deserializer> DeserializeObjectByType = new();
+    private static readonly MethodInfo SerializeMethod = typeof(Server).GetStaticMethod(nameof(SerializeTaskImpl));
+    private static readonly MethodInfo DeserializeMethod = typeof(Connection).GetStaticMethod(nameof(DeserializeObjectImpl));
     private readonly Connection _connection;
     private readonly ConcurrentDictionary<int, PooledCancellationTokenSource> _requests = new();
     public Server(ListenerSettings settings, Connection connection, IClient client)
@@ -90,6 +96,11 @@ class Server
     private ListenerSettings Settings { get; }
     public string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
+    public static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
+        SerializeMethod.MakeGenericDelegate<Serializer<object>>(resultType.GenericTypeArguments[0]))(task, ref writer);
+    public static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
+        DeserializeMethod.MakeGenericDelegate<Deserializer>(resultType))(ref reader);
+    static void SerializeTaskImpl<T>(in object task, ref MessagePackWriter writer) => Serialize(((Task<T>)task).Result, ref writer);
 }
 readonly record struct IncomingRequest(int RequestId, object[] Parameters, EndpointSettings Endpoint, MethodExecutor Executor)
 {

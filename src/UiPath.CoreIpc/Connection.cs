@@ -7,10 +7,6 @@ using static IOHelpers;
 public sealed class Connection : IDisposable
 {
     internal static readonly MessagePackSerializerOptions Contractless = MessagePack.Resolvers.ContractlessStandardResolver.Options;
-    private static readonly ConcurrentDictionary<Type, Serializer<object>> SerializeTaskByType = new();
-    private static readonly ConcurrentDictionary<Type, Deserializer> DeserializeObjectByType = new();
-    private static readonly MethodInfo SerializeMethod = typeof(Connection).GetStaticMethod(nameof(SerializeTaskImpl));
-    private static readonly MethodInfo DeserializeMethod = typeof(Connection).GetStaticMethod(nameof(DeserializeObjectImpl));
     static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
     private static readonly IOException ClosedException = new("Connection closed.");
     private readonly ConcurrentDictionary<int, OutgoingRequest> _requests = new();
@@ -131,7 +127,7 @@ public sealed class Connection : IDisposable
             {
                 return;
             }
-            SerializeTask(data, ref writer);
+            Server.SerializeTask(data, ref writer);
         });
         return downloadStream == null ?
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
@@ -360,7 +356,6 @@ public sealed class Connection : IDisposable
         var userStreamLength = BitConverter.ToInt64(_header, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
     }
-    delegate void Serializer<T>(in T value, ref MessagePackWriter writer);
     internal delegate object Deserializer(ref MessagePackReader reader);
     static RecyclableMemoryStream SerializeMessage<T>(in T value, Serializer<T> serializer)
     {
@@ -379,7 +374,7 @@ public sealed class Connection : IDisposable
             throw;
         }
     }
-    static void Serialize<T>(in T value, ref MessagePackWriter writer) => MessagePackSerializer.Serialize(ref writer, value, Contractless);
+    internal static void Serialize<T>(in T value, ref MessagePackWriter writer) => MessagePackSerializer.Serialize(ref writer, value, Contractless);
     T DeserializeMessage<T>(out MessagePackReader reader)
     {
         reader = new(_messageStream.GetReadOnlySequence());
@@ -437,7 +432,7 @@ public sealed class Connection : IDisposable
                 args[index] = CheckNullMessage(parameter.Default, type, endpoint);
                 continue;
             }
-            var arg = DeserializeObject(type, ref reader);
+            var arg = Server.DeserializeObject(type, ref reader);
             args[index] = CheckMessage(arg, type, endpoint);
         }
         request.Parameters = args;
@@ -455,15 +450,11 @@ public sealed class Connection : IDisposable
     internal void Log(string message) => Logger.LogInformation(message);
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
         static ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
-    static void SerializeTaskImpl<T>(in object task, ref MessagePackWriter writer) => Serialize(((Task<T>)task).Result, ref writer);
     internal static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
-    static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
-        SerializeMethod.MakeGenericDelegate<Serializer<object>>(resultType.GenericTypeArguments[0]))(task, ref writer);
-    static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
-        DeserializeMethod.MakeGenericDelegate<Deserializer>(resultType))(ref reader);
     readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Deserializer Deserializer);
     readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
     {
         public void CompleteRequest() => Completion.SetResult(Response);
     }
 }
+delegate void Serializer<T>(in T value, ref MessagePackWriter writer);
