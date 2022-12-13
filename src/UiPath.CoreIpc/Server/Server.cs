@@ -203,37 +203,37 @@ class Server
             return new(RequestId) { Data = methodResult };
         }
     }
-}
-public readonly struct Method
-{
-    static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
-    static readonly ParameterExpression TokenParameter = Parameter(typeof(CancellationToken), "cancellationToken");
-    static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
-    public readonly MethodExecutor Invoke;
-    public readonly bool IsOneWay;
-    public readonly Parameter[] Parameters;
-    public Method(MethodInfo method)
+    readonly struct Method
     {
-        // https://github.com/dotnet/aspnetcore/blob/3f620310883092905ed6f13d784c908b5f4a9d7e/src/Shared/ObjectMethodExecutor/ObjectMethodExecutor.cs#L156
-        var parameters = method.GetParameters();
-        var parametersLength = parameters.Length;
-        var callParameters = new Expression[parametersLength];
-        Parameters = new Parameter[parametersLength];
-        for (int index = 0; index < parametersLength; index++)
+        static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
+        static readonly ParameterExpression TokenParameter = Parameter(typeof(CancellationToken), "cancellationToken");
+        static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
+        public readonly MethodExecutor Invoke;
+        public readonly bool IsOneWay;
+        public readonly Parameter[] Parameters;
+        public Method(MethodInfo method)
         {
-            var parameter = parameters[index];
-            Parameters[index] = new(parameter);
-            callParameters[index] = parameter.ParameterType == typeof(CancellationToken) ? TokenParameter :
-                Convert(ArrayIndex(ParametersParameter, Constant(index, typeof(int))), parameter.ParameterType);
+            // https://github.com/dotnet/aspnetcore/blob/3f620310883092905ed6f13d784c908b5f4a9d7e/src/Shared/ObjectMethodExecutor/ObjectMethodExecutor.cs#L156
+            var parameters = method.GetParameters();
+            var parametersLength = parameters.Length;
+            var callParameters = new Expression[parametersLength];
+            Parameters = new Parameter[parametersLength];
+            for (int index = 0; index < parametersLength; index++)
+            {
+                var parameter = parameters[index];
+                Parameters[index] = new(parameter);
+                callParameters[index] = parameter.ParameterType == typeof(CancellationToken) ? TokenParameter :
+                    Convert(ArrayIndex(ParametersParameter, Constant(index, typeof(int))), parameter.ParameterType);
+            }
+            var instanceCast = Convert(TargetParameter, method.DeclaringType);
+            var methodCall = Call(instanceCast, method, callParameters);
+            var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter, TokenParameter);
+            Invoke = lambda.Compile();
+            IsOneWay = method.IsOneWay();
         }
-        var instanceCast = Convert(TargetParameter, method.DeclaringType);
-        var methodCall = Call(instanceCast, method, callParameters);
-        var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter, TokenParameter);
-        Invoke = lambda.Compile();
-        IsOneWay = method.IsOneWay();
-    }
-    public readonly record struct Parameter(Type Type, object Default)
-    {
-        public Parameter(ParameterInfo parameter) : this(parameter.ParameterType, parameter.GetDefaultValue()) { }
+        public readonly record struct Parameter(Type Type, object Default)
+        {
+            public Parameter(ParameterInfo parameter) : this(parameter.ParameterType, parameter.GetDefaultValue()) { }
+        }
     }
 }
