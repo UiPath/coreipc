@@ -47,7 +47,30 @@ class Server
             Logger.LogException(ex, $"{Name}");
         }
     }
-    public async ValueTask OnRequestReceived(Request request, EndpointSettings endpoint, MethodExecutor executor, bool isOneWay)
+    public ValueTask OnRequest(Stream nestedStream)
+    {
+        var (request, endpoint, executor, isOneWay) = DeserializeRequest(nestedStream);
+        if (endpoint == null)
+        {
+            return default;
+        }
+        if (request.IsUpload)
+        {
+            return OnUploadRequest(request, endpoint, executor, nestedStream);
+        }
+        else
+        {
+            _ = OnRequestReceived(request, endpoint, executor, isOneWay);
+            return default;
+        }
+        async ValueTask OnUploadRequest(Request request, EndpointSettings endpoint, MethodExecutor executor, Stream nestedStream)
+        {
+            await _connection.EnterStreamMode();
+            await OnRequestReceived(request, endpoint, executor, isOneWay: false);
+            nestedStream.Dispose();
+        }
+    }
+    async ValueTask OnRequestReceived(Request request, EndpointSettings endpoint, MethodExecutor executor, bool isOneWay)
     {
         int requestId = request.Id;
         IncomingRequest incomingRequest = new(requestId, request.Parameters, endpoint, executor);
@@ -91,7 +114,7 @@ class Server
             cancellation.Return();
         }
     }
-    public (Request, EndpointSettings, MethodExecutor, bool) DeserializeRequest(Stream stream)
+    (Request, EndpointSettings, MethodExecutor, bool) DeserializeRequest(Stream stream)
     {
         var request = _connection.DeserializeMessage<Request>(out var reader);
         if (LogEnabled)

@@ -268,7 +268,7 @@ public sealed class Connection : IDisposable
         ValueTask HandleMessage(MessageType messageType) => messageType switch
         {
             MessageType.Response => OnResponse(),
-            MessageType.Request => OnRequest(),
+            MessageType.Request => Server.OnRequest(_nestedStream),
             MessageType.CancellationRequest => OnCancel(),
             _ => Unknown(messageType),
         };
@@ -323,30 +323,7 @@ public sealed class Connection : IDisposable
             _nestedStream.Disposed -= disposedHandler;
         }
     }
-    private ValueTask OnRequest()
-    {
-        var (request, endpoint, executor, isOneWay) = Server.DeserializeRequest(_nestedStream);
-        if (endpoint == null)
-        {
-            return default;
-        }
-        if (request.IsUpload)
-        {
-            return OnUploadRequest(request, endpoint, executor);
-        }
-        else
-        {
-            _=Server.OnRequestReceived(request, endpoint, executor, isOneWay);
-            return default;
-        }
-        async ValueTask OnUploadRequest(Request request, EndpointSettings endpoint, MethodExecutor executor)
-        {
-            await EnterStreamMode();
-            await Server.OnRequestReceived(request, endpoint, executor, isOneWay: false);
-            _nestedStream.Dispose();
-        }
-    }
-    private async ValueTask EnterStreamMode()
+    public async ValueTask EnterStreamMode()
     {
         if (!await ReadHeader(sizeof(long)))
         {
