@@ -91,14 +91,47 @@ class Server
             cancellation.Return();
         }
     }
-    public (Method, EndpointSettings) GetMethod(in Request request)
+    public (Request, EndpointSettings, MethodExecutor, bool) DeserializeRequest(Stream stream)
     {
+        var request = _connection.DeserializeMessage<Request>(out var reader);
+        if (LogEnabled)
+        {
+            Log($"{Name} received request {request}");
+        }
         if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
         {
             OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
             return default;
         }
-        return (GetMethod(endpoint.Contract, request.Method), endpoint);
+        var method = GetMethod(endpoint.Contract, request.Method);
+        var args = new object[method.Parameters.Length];
+        for (int index = 0; index < args.Length; index++)
+        {
+            var parameter = method.Parameters[index];
+            var type = parameter.Type;
+            if (type == typeof(CancellationToken))
+            {
+                continue;
+            }
+            else if (type == typeof(Stream))
+            {
+                args[index] = stream;
+                continue;
+            }
+            if (reader.End)
+            {
+                args[index] = CheckNullMessage(parameter.Default, type, endpoint);
+                continue;
+            }
+            var arg = DeserializeObject(type, ref reader);
+            args[index] = CheckMessage(arg, type, endpoint);
+        }
+        request.Parameters = args;
+        return (request, endpoint, method.Invoke, method.IsOneWay);
+        object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint) => argument == null ?
+            CheckNullMessage(argument, parameterType, endpoint) : (argument is Message message ? message.SetValues(endpoint, this) : argument);
+        object CheckNullMessage(object argument, Type parameterType, EndpointSettings endpoint) => parameterType == typeof(Message) ?
+            new Message().SetValues(endpoint, this) : argument;
     }
     ValueTask OnError(in Request request, Exception ex)
     {
@@ -113,7 +146,7 @@ class Server
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
     public static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
         SerializeMethod.MakeGenericDelegate<Serializer<object>>(resultType.GenericTypeArguments[0]))(task, ref writer);
-    public static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
+    static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
         DeserializeMethod.MakeGenericDelegate<Deserializer>(resultType))(ref reader);
     static void SerializeTaskImpl<T>(in object task, ref MessagePackWriter writer) => Serialize(((Task<T>)task).Result, ref writer);
     static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),

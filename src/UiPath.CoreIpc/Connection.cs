@@ -325,7 +325,7 @@ public sealed class Connection : IDisposable
     }
     private ValueTask OnRequest()
     {
-        var (request, endpoint, executor, isOneWay) = DeserializeRequest();
+        var (request, endpoint, executor, isOneWay) = Server.DeserializeRequest(_nestedStream);
         if (endpoint == null)
         {
             return default;
@@ -374,7 +374,7 @@ public sealed class Connection : IDisposable
         }
     }
     internal static void Serialize<T>(in T value, ref MessagePackWriter writer) => MessagePackSerializer.Serialize(ref writer, value, Contractless);
-    T DeserializeMessage<T>(out MessagePackReader reader)
+    public T DeserializeMessage<T>(out MessagePackReader reader)
     {
         reader = new(_messageStream.GetReadOnlySequence());
         return Deserialize<T>(ref reader);
@@ -398,47 +398,6 @@ public sealed class Connection : IDisposable
             response.Data = deserializer == null ? _nestedStream : deserializer.Invoke(ref reader);
         }
         return new(response, outgoingRequest.Completion);
-    }
-    private (Request, EndpointSettings, MethodExecutor, bool) DeserializeRequest()
-    {
-        var request = DeserializeMessage<Request>(out var reader);
-        if (LogEnabled)
-        {
-            Log($"{Name} received request {request}");
-        }
-        var (method, endpoint) = Server.GetMethod(request);
-        if (endpoint == null)
-        {
-            return default;
-        }
-        var args = new object[method.Parameters.Length];
-        for (int index = 0; index < args.Length; index++)
-        {
-            var parameter = method.Parameters[index];
-            var type = parameter.Type;
-            if (type == typeof(CancellationToken))
-            {
-                continue;
-            }
-            else if (type == typeof(Stream))
-            {
-                args[index] = _nestedStream;
-                continue;
-            }
-            if (reader.End)
-            {
-                args[index] = CheckNullMessage(parameter.Default, type, endpoint);
-                continue;
-            }
-            var arg = Server.DeserializeObject(type, ref reader);
-            args[index] = CheckMessage(arg, type, endpoint);
-        }
-        request.Parameters = args;
-        return (request, endpoint, method.Invoke, method.IsOneWay);
-        object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint) => argument == null ?
-            CheckNullMessage(argument, parameterType, endpoint) : (argument is Message message ? message.SetValues(endpoint, Server) : argument);
-        object CheckNullMessage(object argument, Type parameterType, EndpointSettings endpoint) => parameterType == typeof(Message) ? 
-            new Message().SetValues(endpoint, Server) : argument;
     }
     internal void Log(string message) => Logger.LogInformation(message);
     internal static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
