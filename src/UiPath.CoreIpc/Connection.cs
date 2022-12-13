@@ -7,7 +7,6 @@ using static IOHelpers;
 public sealed class Connection : IDisposable
 {
     internal static readonly MessagePackSerializerOptions Contractless = MessagePack.Resolvers.ContractlessStandardResolver.Options;
-    static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
     private static readonly IOException ClosedException = new("Connection closed.");
     private readonly ConcurrentDictionary<int, OutgoingRequest> _requests = new();
     private int _requestCounter;
@@ -412,7 +411,7 @@ public sealed class Connection : IDisposable
             OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
             return default;
         }
-        var method = GetMethod(endpoint.Contract, request.Method);
+        var method = Server.GetMethod(endpoint.Contract, request.Method);
         var args = new object[method.Parameters.Length];
         for (int index = 0; index < args.Length; index++)
         {
@@ -448,8 +447,6 @@ public sealed class Connection : IDisposable
         return Send(new(request.Id, ex.ToError()), default);
     }
     internal void Log(string message) => Logger.LogInformation(message);
-    static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
-        static ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
     internal static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
     readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Deserializer Deserializer);
     readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)

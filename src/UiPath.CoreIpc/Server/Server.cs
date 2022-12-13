@@ -7,6 +7,7 @@ using static CancellationTokenSourcePool;
 using static Connection;
 class Server
 {
+    private static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
     private static readonly ConcurrentDictionary<Type, Serializer<object>> SerializeTaskByType = new();
     private static readonly ConcurrentDictionary<Type, Deserializer> DeserializeObjectByType = new();
     private static readonly MethodInfo SerializeMethod = typeof(Server).GetStaticMethod(nameof(SerializeTaskImpl));
@@ -101,6 +102,8 @@ class Server
     public static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
         DeserializeMethod.MakeGenericDelegate<Deserializer>(resultType))(ref reader);
     static void SerializeTaskImpl<T>(in object task, ref MessagePackWriter writer) => Serialize(((Task<T>)task).Result, ref writer);
+    public static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
+        static ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
     readonly record struct IncomingRequest(int RequestId, object[] Parameters, EndpointSettings Endpoint, MethodExecutor Executor)
     {
         TaskScheduler Scheduler => Endpoint.Scheduler;
