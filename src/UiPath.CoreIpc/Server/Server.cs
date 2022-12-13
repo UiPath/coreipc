@@ -171,7 +171,7 @@ class Server
     private ILogger Logger => _connection.Logger;
     private bool LogEnabled => Logger.Enabled();
     private ListenerSettings Settings { get; }
-    public string Name => _connection.Name;
+    string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
     public static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
         SerializeMethod.MakeGenericDelegate<Serializer<object>>(resultType.GenericTypeArguments[0]))(task, ref writer);
