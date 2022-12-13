@@ -398,17 +398,10 @@ public sealed class Connection : IDisposable
         {
             return default;
         }
-        var responseType = outgoingRequest.ResponseType;
         if (response.Error == null)
         {
-            if (responseType == typeof(Stream))
-            {
-                response.Data = _nestedStream;
-            }
-            else
-            {
-                response.Data = DeserializeObject(responseType, ref reader);
-            }
+            var responseType = outgoingRequest.ResponseType;
+            response.Data = responseType == typeof(Stream) ? _nestedStream : DeserializeObject(responseType, ref reader);
         }
         return new(response, outgoingRequest.Completion);
     }
