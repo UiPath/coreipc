@@ -1,7 +1,6 @@
 ﻿using MessagePack;
 using Microsoft.IO;
 namespace UiPath.CoreIpc;
-using MethodExecutor = Func<object, object[], CancellationToken, Task>;
 using static TaskCompletionPool<Response>;
 using static IOHelpers;
 public sealed class Connection : IDisposable
