@@ -4,7 +4,7 @@ namespace UiPath.CoreIpc;
 using MethodExecutor = Func<object, object[], CancellationToken, Task>;
 using static Expression;
 using static CancellationTokenSourcePool;
-using static UiPath.CoreIpc.Connection;
+using static Connection;
 class Server
 {
     private static readonly ConcurrentDictionary<Type, Serializer<object>> SerializeTaskByType = new();
@@ -101,28 +101,28 @@ class Server
     public static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
         DeserializeMethod.MakeGenericDelegate<Deserializer>(resultType))(ref reader);
     static void SerializeTaskImpl<T>(in object task, ref MessagePackWriter writer) => Serialize(((Task<T>)task).Result, ref writer);
-}
-readonly record struct IncomingRequest(int RequestId, object[] Parameters, EndpointSettings Endpoint, MethodExecutor Executor)
-{
-    TaskScheduler Scheduler => Endpoint.Scheduler;
-    public Task OneWay() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
-    public ValueTask<Response> GetResponse(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
-    Task Invoke(CancellationToken token = default) => Executor.Invoke(Endpoint.ServerObject(), Parameters, token);
-    record InvokeState(in IncomingRequest Request, CancellationToken Token)
+    readonly record struct IncomingRequest(int RequestId, object[] Parameters, EndpointSettings Endpoint, MethodExecutor Executor)
     {
-        public static Task Invoke(object state)
+        TaskScheduler Scheduler => Endpoint.Scheduler;
+        public Task OneWay() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
+        public ValueTask<Response> GetResponse(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
+        Task Invoke(CancellationToken token = default) => Executor.Invoke(Endpoint.ServerObject(), Parameters, token);
+        record InvokeState(in IncomingRequest Request, CancellationToken Token)
         {
-            var (request, token) = (InvokeState)state;
-            return request.Invoke(token);
+            public static Task Invoke(object state)
+            {
+                var (request, token) = (InvokeState)state;
+                return request.Invoke(token);
+            }
         }
-    }
-    Task<Task> InvokeOnScheduler(CancellationToken token = default) => 
-        Task.Factory.StartNew(InvokeState.Invoke, new InvokeState(this, token), token, TaskCreationOptions.DenyChildAttach, Scheduler);
-    async ValueTask<Response> ScheduleMethodResult(CancellationToken cancellationToken) => await GetMethodResult(await InvokeOnScheduler(cancellationToken));
-    async ValueTask<Response> GetMethodResult(Task methodResult)
-    {
-        await methodResult;
-        return new(RequestId) { Data = methodResult };
+        Task<Task> InvokeOnScheduler(CancellationToken token = default) =>
+            Task.Factory.StartNew(InvokeState.Invoke, new InvokeState(this, token), token, TaskCreationOptions.DenyChildAttach, Scheduler);
+        async ValueTask<Response> ScheduleMethodResult(CancellationToken cancellationToken) => await GetMethodResult(await InvokeOnScheduler(cancellationToken));
+        async ValueTask<Response> GetMethodResult(Task methodResult)
+        {
+            await methodResult;
+            return new(RequestId) { Data = methodResult };
+        }
     }
 }
 public readonly struct Method
