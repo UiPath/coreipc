@@ -56,25 +56,63 @@ class Server
     }
     public ValueTask OnRequest(Stream nestedStream)
     {
-        var (request, endpoint, executor, isOneWay) = DeserializeRequest(nestedStream);
-        if (endpoint == null)
+        var request = _connection.DeserializeMessage<Request>(out var reader);
+        if (LogEnabled)
         {
+            Log($"{Name} received request {request}");
+        }
+        if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
+        {
+            OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
             return default;
         }
+        var method = GetMethod(endpoint.Contract, request.Method);
+        request.Parameters = DeserializeParemeters(ref reader, method.Parameters, nestedStream, endpoint);
+        var executor = method.Invoke;
         if (request.IsUpload)
         {
             return OnUploadRequest(request, endpoint, executor, nestedStream);
         }
-        _ = OnRequestReceived(request, endpoint, executor, isOneWay);
+        _ = HandleRequest(request, endpoint, executor, method.IsOneWay);
         return default;
+        object[] DeserializeParemeters(ref MessagePackReader reader, Parameter[] parameters, Stream stream, EndpointSettings endpoint)
+        {
+            var args = new object[parameters.Length];
+            for (int index = 0; index < args.Length; index++)
+            {
+                var parameter = parameters[index];
+                var type = parameter.Type;
+                if (type == typeof(CancellationToken))
+                {
+                    continue;
+                }
+                else if (type == typeof(Stream))
+                {
+                    args[index] = stream;
+                    continue;
+                }
+                if (reader.End)
+                {
+                    args[index] = CheckNullMessage(parameter.Default, type, endpoint);
+                    continue;
+                }
+                var arg = DeserializeObject(type, ref reader);
+                args[index] = CheckMessage(arg, type, endpoint);
+            }
+            return args;
+            object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint) => argument == null ?
+                CheckNullMessage(argument, parameterType, endpoint) : (argument is Message message ? message.SetValues(endpoint, Client) : argument);
+            object CheckNullMessage(object argument, Type parameterType, EndpointSettings endpoint) => parameterType == typeof(Message) ?
+                new Message().SetValues(endpoint, Client) : argument;
+        }
         async ValueTask OnUploadRequest(Request request, EndpointSettings endpoint, MethodExecutor executor, Stream nestedStream)
         {
             await _connection.EnterStreamMode();
-            await OnRequestReceived(request, endpoint, executor, isOneWay: false);
+            await HandleRequest(request, endpoint, executor, isOneWay: false);
             nestedStream.Dispose();
         }
     }
-    async ValueTask OnRequestReceived(Request request, EndpointSettings endpoint, MethodExecutor executor, bool isOneWay)
+    async ValueTask HandleRequest(Request request, EndpointSettings endpoint, MethodExecutor executor, bool isOneWay)
     {
         int requestId = request.Id;
         IncomingRequest incomingRequest = new(requestId, request.Parameters, endpoint, executor);
@@ -117,48 +155,6 @@ class Server
         {
             cancellation.Return();
         }
-    }
-    (Request, EndpointSettings, MethodExecutor, bool) DeserializeRequest(Stream stream)
-    {
-        var request = _connection.DeserializeMessage<Request>(out var reader);
-        if (LogEnabled)
-        {
-            Log($"{Name} received request {request}");
-        }
-        if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
-        {
-            OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
-            return default;
-        }
-        var method = GetMethod(endpoint.Contract, request.Method);
-        var args = new object[method.Parameters.Length];
-        for (int index = 0; index < args.Length; index++)
-        {
-            var parameter = method.Parameters[index];
-            var type = parameter.Type;
-            if (type == typeof(CancellationToken))
-            {
-                continue;
-            }
-            else if (type == typeof(Stream))
-            {
-                args[index] = stream;
-                continue;
-            }
-            if (reader.End)
-            {
-                args[index] = CheckNullMessage(parameter.Default, type, endpoint);
-                continue;
-            }
-            var arg = DeserializeObject(type, ref reader);
-            args[index] = CheckMessage(arg, type, endpoint);
-        }
-        request.Parameters = args;
-        return (request, endpoint, method.Invoke, method.IsOneWay);
-        object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint) => argument == null ?
-            CheckNullMessage(argument, parameterType, endpoint) : (argument is Message message ? message.SetValues(endpoint, Client) : argument);
-        object CheckNullMessage(object argument, Type parameterType, EndpointSettings endpoint) => parameterType == typeof(Message) ?
-            new Message().SetValues(endpoint, Client) : argument;
     }
     ValueTask OnError(in Request request, Exception ex)
     {
@@ -260,9 +256,9 @@ class Server
             Invoke = lambda.Compile();
             IsOneWay = method.IsOneWay();
         }
-        public readonly record struct Parameter(Type Type, object Default)
-        {
-            public Parameter(ParameterInfo parameter) : this(parameter.ParameterType, parameter.GetDefaultValue()) { }
-        }
+    }
+    public readonly record struct Parameter(Type Type, object Default)
+    {
+        public Parameter(ParameterInfo parameter) : this(parameter.ParameterType, parameter.GetDefaultValue()) { }
     }
 }
