@@ -1,5 +1,4 @@
 ﻿namespace UiPath.CoreIpc;
-using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 public class ServiceHostBuilder
 {
     private readonly List<Listener> _listeners = new();
