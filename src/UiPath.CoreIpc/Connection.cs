@@ -107,38 +107,7 @@ public sealed class Connection : IDisposable
             SendStream(MessageType.Request, requestBytes, uploadStream, token);
     }
     ManualResetValueTaskSource Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
-    internal ValueTask Send(Response response, CancellationToken cancellationToken)
-    {
-        if (response.Data is Task<Stream> downloadStream)
-        {
-            response.Data = null;
-        }
-        else
-        {
-            downloadStream = null;
-        }
-        var responseBytes = SerializeMessage(response, static(in Response response, ref MessagePackWriter writer)=>
-        {
-            Serialize(response, ref writer);
-            var data = response.Data;
-            if (data == null)
-            {
-                return;
-            }
-            Server.SerializeTask(data, ref writer);
-        });
-        return downloadStream == null ?
-            SendMessage(MessageType.Response, responseBytes, cancellationToken) :
-            SendDownloadStream(responseBytes, downloadStream.Result, cancellationToken);
-        async ValueTask SendDownloadStream(RecyclableMemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
-        {
-            using (downloadStream)
-            {
-                await SendStream(MessageType.Response, responseBytes, downloadStream, cancellationToken);
-            }
-        }
-    }
-    private async ValueTask SendStream(MessageType messageType, RecyclableMemoryStream data, Stream userStream, CancellationToken cancellationToken)
+    internal async ValueTask SendStream(MessageType messageType, RecyclableMemoryStream data, Stream userStream, CancellationToken cancellationToken)
     {
         await _sendLock.WaitAsync(cancellationToken);
         CancellationTokenRegistration tokenRegistration = default;
@@ -164,7 +133,7 @@ public sealed class Connection : IDisposable
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    private async ValueTask SendMessage(MessageType messageType, RecyclableMemoryStream data, CancellationToken cancellationToken)
+    internal async ValueTask SendMessage(MessageType messageType, RecyclableMemoryStream data, CancellationToken cancellationToken)
     {
         await _sendLock.WaitAsync(cancellationToken);
         try
@@ -326,7 +295,7 @@ public sealed class Connection : IDisposable
         _nestedStream.Reset(userStreamLength);
     }
     internal delegate object Deserializer(ref MessagePackReader reader);
-    static RecyclableMemoryStream SerializeMessage<T>(in T value, Serializer<T> serializer)
+    internal static RecyclableMemoryStream SerializeMessage<T>(in T value, Serializer<T> serializer)
     {
         var stream = GetStream();
         try

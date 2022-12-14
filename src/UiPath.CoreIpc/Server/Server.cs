@@ -1,4 +1,5 @@
 ﻿using MessagePack;
+using Microsoft.IO;
 using System.Linq.Expressions;
 namespace UiPath.CoreIpc;
 using MethodExecutor = Func<object, object[], CancellationToken, Task>;
@@ -100,7 +101,7 @@ class Server
                 {
                     Log($"{Name} sending response for {request}");
                 }
-                await _connection.Send(response, token);
+                await Send(response, token);
             }
             catch (Exception ex) when(response.Empty)
             {
@@ -165,7 +166,38 @@ class Server
     ValueTask OnError(in Request request, Exception ex)
     {
         Logger.LogException(ex, $"{Name} {request}");
-        return _connection.Send(new(request.Id, ex.ToError()), default);
+        return Send(new(request.Id, ex.ToError()), default);
+    }
+    ValueTask Send(Response response, CancellationToken cancellationToken)
+    {
+        if (response.Data is Task<Stream> downloadStream)
+        {
+            response.Data = null;
+        }
+        else
+        {
+            downloadStream = null;
+        }
+        var responseBytes = SerializeMessage(response, static (in Response response, ref MessagePackWriter writer) =>
+        {
+            Serialize(response, ref writer);
+            var data = response.Data;
+            if (data == null)
+            {
+                return;
+            }
+            SerializeTask(data, ref writer);
+        });
+        return downloadStream == null ?
+            _connection.SendMessage(MessageType.Response, responseBytes, cancellationToken) :
+            SendDownloadStream(responseBytes, downloadStream.Result, cancellationToken);
+        async ValueTask SendDownloadStream(RecyclableMemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
+        {
+            using (downloadStream)
+            {
+                await _connection.SendStream(MessageType.Response, responseBytes, downloadStream, cancellationToken);
+            }
+        }
     }
     private void Log(string message) => _connection.Log(message);
     private ILogger Logger => _connection.Logger;
@@ -173,7 +205,7 @@ class Server
     private ListenerSettings Settings { get; }
     string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
-    public static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
+    static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
         SerializeMethod.MakeGenericDelegate<Serializer<object>>(resultType.GenericTypeArguments[0]))(task, ref writer);
     static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
         DeserializeMethod.MakeGenericDelegate<Deserializer>(resultType))(ref reader);
