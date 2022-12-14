@@ -230,9 +230,9 @@ class Server
     }
     readonly struct Method
     {
-        static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
-        static readonly ParameterExpression TokenParameter = Parameter(typeof(CancellationToken), "cancellationToken");
-        static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
+        static readonly ParameterExpression Target = Parameter(typeof(object), "target");
+        static readonly ParameterExpression Token = Parameter(typeof(CancellationToken), "cancellationToken");
+        static readonly ParameterExpression Arguments = Parameter(typeof(object[]), "parameters");
         public readonly MethodExecutor Invoke;
         public readonly bool IsOneWay;
         public readonly Parameter[] Parameters;
@@ -246,19 +246,18 @@ class Server
             for (int index = 0; index < parametersLength; index++)
             {
                 var parameter = parameters[index];
-                Parameters[index] = new(parameter);
-                callParameters[index] = parameter.ParameterType == typeof(CancellationToken) ? TokenParameter :
-                    Convert(ArrayIndex(ParametersParameter, Constant(index, typeof(int))), parameter.ParameterType);
+                var type = parameter.ParameterType;
+                Parameters[index] = new(type, parameter.GetDefaultValue());
+                callParameters[index] = type == typeof(CancellationToken) ? Token : Convert(ArrayIndex(Arguments, Constant(index, typeof(int))), type);
             }
-            var instanceCast = Convert(TargetParameter, method.DeclaringType);
+            var instanceCast = Convert(Target, method.DeclaringType);
             var methodCall = Call(instanceCast, method, callParameters);
-            var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter, TokenParameter);
+            var lambda = Lambda<MethodExecutor>(methodCall, Target, Arguments, Token);
             Invoke = lambda.Compile();
             IsOneWay = method.IsOneWay();
         }
     }
     public readonly record struct Parameter(Type Type, object Default)
     {
-        public Parameter(ParameterInfo parameter) : this(parameter.ParameterType, parameter.GetDefaultValue()) { }
     }
 }
