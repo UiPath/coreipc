@@ -33,7 +33,7 @@ class Client
             .Logger(serviceProvider)
             .AllowImpersonation()
             .ValidateAndBuild();
-        await Calls(computingClient, systemClient, 0, cancellationToken);
+        //await Calls(computingClient, systemClient, 0, cancellationToken);
         Console.ReadLine();
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
@@ -42,7 +42,6 @@ class Client
             for (int i = 0; i < 50; i++)
             {
                 count = await Calls(computingClient, systemClient, count, cancellationToken);
-
                 //// test 9: call IPC service method with message parameter
                 ////Console.WriteLine($"[TEST 9] callback error");
                 //try
