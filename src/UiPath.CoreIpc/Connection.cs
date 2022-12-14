@@ -262,25 +262,34 @@ public sealed class Connection : IDisposable
     }
     private ValueTask OnResponse()
     {
-        var incomingResponse = DeserializeResponse();
-        var response = incomingResponse.Response;
-        if (response.Empty)
+        var response = DeserializeMessage<Response>(out var reader);
+        if (LogEnabled)
+        {
+            Log($"Received response for request {response.RequestId} {Name}.");
+        }
+        if (!_requests.TryRemove(response.RequestId, out var outgoingRequest))
         {
             return default;
         }
+        if (response.Error == null)
+        {
+            var deserializer = outgoingRequest.Deserializer;
+            response.Data = deserializer == null ? _nestedStream : deserializer.Invoke(ref reader);
+        }
+        var completion = outgoingRequest.Completion;
         if (response.Data == _nestedStream)
         {
-            return OnDownloadResponse(incomingResponse);
+            return OnDownloadResponse(response, completion);
         }
-        incomingResponse.CompleteRequest();
+        completion.SetResult(response);
         return default;
-        async ValueTask OnDownloadResponse(IncomingResponse incomingResponse)
+        async ValueTask OnDownloadResponse(Response response, ManualResetValueTaskSource completion)
         {
             await EnterStreamMode();
             var streamDisposed = new TaskCompletionSource<bool>();
             EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
             _nestedStream.Disposed += disposedHandler;
-            incomingResponse.CompleteRequest();
+            completion.SetResult(response);
             await streamDisposed.Task;
             _nestedStream.Disposed -= disposedHandler;
         }
@@ -320,30 +329,8 @@ public sealed class Connection : IDisposable
     }
     static T Deserialize<T>(ref MessagePackReader reader) => MessagePackSerializer.Deserialize<T>(ref reader, Contractless);
     private void Log(Exception ex) => Logger.LogException(ex, Name);
-    private IncomingResponse DeserializeResponse()
-    {
-        var response = DeserializeMessage<Response>(out var reader);
-        if (LogEnabled)
-        {
-            Log($"Received response for request {response.RequestId} {Name}.");
-        }
-        if (!_requests.TryRemove(response.RequestId, out var outgoingRequest))
-        {
-            return default;
-        }
-        if (response.Error == null)
-        {
-            var deserializer = outgoingRequest.Deserializer;
-            response.Data = deserializer == null ? _nestedStream : deserializer.Invoke(ref reader);
-        }
-        return new(response, outgoingRequest.Completion);
-    }
     internal void Log(string message) => Logger.LogInformation(message);
     internal static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
     readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Deserializer Deserializer);
-    readonly record struct IncomingResponse(in Response Response, ManualResetValueTaskSource Completion)
-    {
-        public void CompleteRequest() => Completion.SetResult(Response);
-    }
 }
 delegate void Serializer<T>(in T value, ref MessagePackWriter writer);
