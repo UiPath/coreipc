@@ -65,11 +65,8 @@ class Server
         {
             return OnUploadRequest(request, endpoint, executor, nestedStream);
         }
-        else
-        {
-            _ = OnRequestReceived(request, endpoint, executor, isOneWay);
-            return default;
-        }
+        _ = OnRequestReceived(request, endpoint, executor, isOneWay);
+        return default;
         async ValueTask OnUploadRequest(Request request, EndpointSettings endpoint, MethodExecutor executor, Stream nestedStream)
         {
             await _connection.EnterStreamMode();
