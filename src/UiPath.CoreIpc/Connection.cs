@@ -271,15 +271,16 @@ public sealed class Connection : IDisposable
         {
             return default;
         }
+        var completion = outgoingRequest.Completion;
         if (response.Error == null)
         {
             var deserializer = outgoingRequest.Deserializer;
-            response.Data = deserializer == null ? _nestedStream : deserializer.Invoke(ref reader);
-        }
-        var completion = outgoingRequest.Completion;
-        if (response.Data == _nestedStream)
-        {
-            return OnDownloadResponse(response, completion);
+            if (deserializer == null)
+            {
+                response.Data = _nestedStream;
+                return OnDownloadResponse(response, completion);
+            }
+            response.Data = deserializer.Invoke(ref reader);
         }
         completion.SetResult(response);
         return default;
