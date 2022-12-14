@@ -67,7 +67,7 @@ class Server
             return default;
         }
         var method = GetMethod(endpoint.Contract, request.Method);
-        request.Parameters = DeserializeParemeters(ref reader, method.Parameters, nestedStream, endpoint);
+        request.Parameters = DeserializeParameters(ref reader, method.Parameters, nestedStream, endpoint);
         var executor = method.Invoke;
         if (request.IsUpload)
         {
@@ -75,7 +75,7 @@ class Server
         }
         _ = HandleRequest(request, endpoint, executor, method.IsOneWay);
         return default;
-        object[] DeserializeParemeters(ref MessagePackReader reader, Parameter[] parameters, Stream stream, EndpointSettings endpoint)
+        object[] DeserializeParameters(ref MessagePackReader reader, Parameter[] parameters, Stream stream, EndpointSettings endpoint)
         {
             var args = new object[parameters.Length];
             for (int index = 0; index < args.Length; index++)
