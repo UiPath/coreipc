@@ -257,7 +257,5 @@ class Server
             IsOneWay = method.IsOneWay();
         }
     }
-    public readonly record struct Parameter(Type Type, object Default)
-    {
-    }
+    public readonly record struct Parameter(Type Type, object Default);
 }
