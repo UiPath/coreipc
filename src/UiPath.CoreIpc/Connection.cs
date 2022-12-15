@@ -334,8 +334,20 @@ public sealed class Connection : IDisposable
     internal void Log(string message) => Logger.LogInformation(message);
     internal static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
     delegate void Deserializer<out T>(ref MessagePackReader reader, IErrorCompletion completion);
-    internal static void DeserializeResult<T>(ref MessagePackReader reader, IErrorCompletion completion) => 
-        ((TaskCompletionPool<T>.ManualResetValueTaskSource)completion).SetResult(Deserialize<T>(ref reader));
+    internal static void DeserializeResult<T>(ref MessagePackReader reader, IErrorCompletion completion)
+    {
+        T result;
+        try
+        {
+            result = Deserialize<T>(ref reader);
+        }
+        catch (Exception ex)
+        {
+            completion.SetException(ex);
+            throw;
+        }
+        ((TaskCompletionPool<T>.ManualResetValueTaskSource)completion).SetResult(result);
+    }
     readonly record struct OutgoingRequest(IErrorCompletion Completion, Deserializer<object> Deserializer);
 }
 delegate void Serializer<T>(in T value, ref MessagePackWriter writer);
