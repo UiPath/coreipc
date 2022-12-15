@@ -8,6 +8,7 @@ using static CancellationTokenSourcePool;
 using static Connection;
 class Server
 {
+    delegate object Deserializer(ref MessagePackReader reader);
     private static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
     private static readonly ConcurrentDictionary<Type, Serializer<object>> SerializeTaskByType = new();
     private static readonly ConcurrentDictionary<Type, Deserializer> DeserializeObjectByType = new();

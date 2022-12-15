@@ -4,7 +4,7 @@ internal static class TaskCompletionPool<T>
 {
     public static ManualResetValueTaskSource Rent() => ObjectPool<ManualResetValueTaskSource>.TryRent() ?? new();
     static void Return(ManualResetValueTaskSource source) => ObjectPool<ManualResetValueTaskSource>.Return(source);
-    public sealed class ManualResetValueTaskSource : IValueTaskSource<T>, IValueTaskSource
+    public sealed class ManualResetValueTaskSource : IValueTaskSource<T>, IValueTaskSource, IErrorCompletion
     {
         private ManualResetValueTaskSourceCore<T> _core; // mutable struct; do not make this readonly
         public bool RunContinuationsAsynchronously { get => _core.RunContinuationsAsynchronously; set => _core.RunContinuationsAsynchronously = value; }
@@ -24,4 +24,10 @@ internal static class TaskCompletionPool<T>
             TaskCompletionPool<T>.Return(this);
         }
     }
+}
+interface IErrorCompletion
+{
+    void SetException(Exception error);
+    void SetCanceled();
+    void Return();
 }

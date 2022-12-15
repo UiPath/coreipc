@@ -1,7 +1,6 @@
 ﻿using MessagePack;
 using Microsoft.IO;
 namespace UiPath.CoreIpc;
-using static TaskCompletionPool<Response>;
 using static IOHelpers;
 public sealed class Connection : IDisposable
 {
@@ -44,11 +43,12 @@ public sealed class Connection : IDisposable
     internal Task Listen() => _receiveLoop.Value;
     public event EventHandler<EventArgs> Closed = delegate{};
     internal void SetServer(ListenerSettings settings, IClient client = null) => Server = new(settings, this, client);
-    internal async ValueTask<Response> RemoteCall(Request request, Deserializer deserializer, CancellationToken token)
+    internal async ValueTask<TResult> RemoteCall<TResult>(Request request, CancellationToken token)
     {
-        var requestCompletion = Rent();
+        var requestCompletion = TaskCompletionPool<TResult>.Rent();
         var requestId = request.Id;
-        _requests[requestId] = new(requestCompletion, deserializer);
+        var isDownload = typeof(TResult) == typeof(Stream);
+        _requests[requestId] = new(requestCompletion, isDownload ? null : DeserializeResult<TResult>);
         object cancellationState = Interlocked.CompareExchange(ref _requestIdToCancel, requestId, 0) == 0 ? null : requestId;
         var tokenRegistration = token.UnsafeRegister(_cancelRequest, cancellationState);
         try
@@ -106,7 +106,7 @@ public sealed class Connection : IDisposable
             SendMessage(MessageType.Request, requestBytes, token) :
             SendStream(MessageType.Request, requestBytes, uploadStream, token);
     }
-    ManualResetValueTaskSource Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
+    IErrorCompletion Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
     internal async ValueTask SendStream(MessageType messageType, RecyclableMemoryStream data, Stream userStream, CancellationToken cancellationToken)
     {
         await _sendLock.WaitAsync(cancellationToken);
@@ -277,20 +277,22 @@ public sealed class Connection : IDisposable
             var deserializer = outgoingRequest.Deserializer;
             if (deserializer == null)
             {
-                response.Data = _nestedStream;
                 return OnDownloadResponse(response, completion);
             }
-            response.Data = deserializer.Invoke(ref reader);
+            deserializer.Invoke(ref reader, completion);
         }
-        completion.SetResult(response);
+        else
+        {
+            completion.SetException(new RemoteException(response.Error));
+        }
         return default;
-        async ValueTask OnDownloadResponse(Response response, ManualResetValueTaskSource completion)
+        async ValueTask OnDownloadResponse(Response response, IErrorCompletion completion)
         {
             await EnterStreamMode();
             var streamDisposed = new TaskCompletionSource<bool>();
             EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
             _nestedStream.Disposed += disposedHandler;
-            completion.SetResult(response);
+            ((TaskCompletionPool<Stream>.ManualResetValueTaskSource)completion).SetResult(_nestedStream);
             await streamDisposed.Task;
             _nestedStream.Disposed -= disposedHandler;
         }
@@ -304,7 +306,6 @@ public sealed class Connection : IDisposable
         var userStreamLength = BitConverter.ToInt64(_header, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
     }
-    internal delegate object Deserializer(ref MessagePackReader reader);
     internal static RecyclableMemoryStream SerializeMessage<T>(in T value, Serializer<T> serializer)
     {
         var stream = GetStream();
@@ -332,6 +333,9 @@ public sealed class Connection : IDisposable
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     internal void Log(string message) => Logger.LogInformation(message);
     internal static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
-    readonly record struct OutgoingRequest(ManualResetValueTaskSource Completion, Deserializer Deserializer);
+    delegate void Deserializer<out T>(ref MessagePackReader reader, IErrorCompletion completion);
+    internal static void DeserializeResult<T>(ref MessagePackReader reader, IErrorCompletion completion) => 
+        ((TaskCompletionPool<T>.ManualResetValueTaskSource)completion).SetResult(Deserialize<T>(ref reader));
+    readonly record struct OutgoingRequest(IErrorCompletion Completion, Deserializer<object> Deserializer);
 }
 delegate void Serializer<T>(in T value, ref MessagePackWriter writer);

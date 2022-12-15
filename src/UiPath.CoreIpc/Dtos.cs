@@ -34,14 +34,6 @@ public record struct Response(int RequestId, Error Error = null)
 {
     internal bool Empty => RequestId == 0;
     internal object Data { get; set; }
-    public object GetResult()
-    {
-        if (Error != null)
-        {
-            throw new RemoteException(Error);
-        }
-        return Data;
-    }
 }
 [Serializable]
 public record Error(string Message, string StackTrace, string Type, Error InnerError)
