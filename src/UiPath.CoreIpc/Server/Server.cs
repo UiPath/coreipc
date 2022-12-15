@@ -64,17 +64,25 @@ class Server
         }
         if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
         {
-            OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")).AsTask().LogException(Logger, this);
+            Log(OnError(request, new ArgumentOutOfRangeException("endpoint", $"{Name} cannot find endpoint {request.Endpoint}")));
             return default;
         }
-        var method = GetMethod(endpoint.Contract, request.Method);
-        request.Parameters = DeserializeParameters(ref reader, method.Parameters, nestedStream, endpoint);
-        var executor = method.Invoke;
-        if (request.IsUpload)
+        try
         {
-            return OnUploadRequest(request, endpoint, executor, nestedStream);
+            var method = GetMethod(endpoint.Contract, request.Method);
+            request.Parameters = DeserializeParameters(ref reader, method.Parameters, nestedStream, endpoint);
+            var executor = method.Invoke;
+            if (request.IsUpload)
+            {
+                return OnUploadRequest(request, endpoint, executor, nestedStream);
+            }
+            _ = HandleRequest(request, endpoint, executor, method.IsOneWay);
         }
-        _ = HandleRequest(request, endpoint, executor, method.IsOneWay);
+        catch (Exception ex)
+        {
+            Log(OnError(request, ex));
+            throw;
+        }
         return default;
         object[] DeserializeParameters(ref MessagePackReader reader, Parameter[] parameters, Stream stream, EndpointSettings endpoint)
         {
@@ -113,6 +121,7 @@ class Server
             nestedStream.Dispose();
         }
     }
+    void Log(ValueTask valueTask) => valueTask.AsTask().LogException(Logger, this);
     async ValueTask HandleRequest(Request request, EndpointSettings endpoint, MethodExecutor executor, bool isOneWay)
     {
         int requestId = request.Id;
