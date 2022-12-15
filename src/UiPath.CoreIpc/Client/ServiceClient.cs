@@ -61,17 +61,21 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         ListenerSettings listenerSettings = new(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
         connection.SetServer(listenerSettings);
     }
-    record MethodState(MethodInfo Method, object[] Args, IServiceClient ServiceClient);
+    record MethodState(MethodInfo Method, object[] Args, IServiceClient ServiceClient)
+    {
+        public static Task<TResult> Invoke<TResult>(object state)
+        {
+            var (method, args, serviceClient) = (MethodState)state;
+            return serviceClient.InvokeCore<TResult>(method, args);
+        }
+    }
     public Task<TResult> Invoke<TResult>(MethodInfo method, object[] args)
     {
         var syncContext = SynchronizationContext.Current;
         var defaultContext = syncContext == null || syncContext.GetType() == typeof(SynchronizationContext);
         return defaultContext ? InvokeCore<TResult>(method, args) : InvokeAsync(method, args);
-        Task<TResult> InvokeAsync(MethodInfo method, object[] args) => Task.Factory.StartNew(static state =>
-        {
-            var (method, args, serviceClient) = (MethodState)state;
-            return serviceClient.InvokeCore<TResult>(method, args);
-        }, new MethodState(method, args, this), default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default).Unwrap();
+        Task<TResult> InvokeAsync(MethodInfo method, object[] args) => Task.Factory.StartNew(MethodState.Invoke<TResult>, new MethodState(method, args, this),
+            default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default).Unwrap();
     }
     public async Task<TResult> InvokeCore<TResult>(MethodInfo method, object[] args)
     {
