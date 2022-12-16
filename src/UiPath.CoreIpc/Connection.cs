@@ -332,7 +332,7 @@ public sealed class Connection : IDisposable
     internal static T Deserialize<T>(ref MessagePackReader reader) => MessagePackSerializer.Deserialize<T>(ref reader, Contractless);
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     internal void Log(string message) => Logger.LogInformation(message);
-    delegate void Deserializer<out T>(ref MessagePackReader reader, IErrorCompletion completion);
+    delegate void Deserializer<T>(ref MessagePackReader reader, IErrorCompletion completion);
     static void DeserializeResult<T>(ref MessagePackReader reader, IErrorCompletion completion)
     {
         T result;
