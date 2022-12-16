@@ -47,8 +47,8 @@ public sealed class Connection : IDisposable
     {
         var requestCompletion = TaskCompletionPool<TResult>.Rent();
         var requestId = request.Id;
-        var isDownload = typeof(TResult) == typeof(Stream);
-        _requests[requestId] = new(requestCompletion, isDownload ? null : DeserializeResult<TResult>);
+        Deserializer deserializer = typeof(TResult) == typeof(Stream) ? null : DeserializeResult<TResult>;
+        _requests[requestId] = new(requestCompletion, deserializer);
         object cancellationState = Interlocked.CompareExchange(ref _requestIdToCancel, requestId, 0) == 0 ? null : requestId;
         var tokenRegistration = token.UnsafeRegister(_cancelRequest, cancellationState);
         try
@@ -332,7 +332,7 @@ public sealed class Connection : IDisposable
     internal static T Deserialize<T>(ref MessagePackReader reader) => MessagePackSerializer.Deserialize<T>(ref reader, Contractless);
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     internal void Log(string message) => Logger.LogInformation(message);
-    delegate void Deserializer<T>(ref MessagePackReader reader, IErrorCompletion completion);
+    delegate void Deserializer(ref MessagePackReader reader, IErrorCompletion completion);
     static void DeserializeResult<T>(ref MessagePackReader reader, IErrorCompletion completion)
     {
         T result;
@@ -347,6 +347,6 @@ public sealed class Connection : IDisposable
         }
         ((TaskCompletionPool<T>.ManualResetValueTaskSource)completion).SetResult(result);
     }
-    readonly record struct OutgoingRequest(IErrorCompletion Completion, Deserializer<object> Deserializer);
+    readonly record struct OutgoingRequest(IErrorCompletion Completion, Deserializer Deserializer);
 }
 delegate void Serializer<T>(in T value, ref MessagePackWriter writer);
