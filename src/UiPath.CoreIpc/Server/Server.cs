@@ -13,7 +13,7 @@ class Server
     private static readonly ConcurrentDictionary<Type, Serializer<object>> SerializeTaskByType = new();
     private static readonly ConcurrentDictionary<Type, Deserializer> DeserializeObjectByType = new();
     private static readonly MethodInfo SerializeMethod = typeof(Server).GetStaticMethod(nameof(SerializeTaskImpl));
-    private static readonly MethodInfo DeserializeMethod = typeof(Connection).GetStaticMethod(nameof(DeserializeObjectImpl));
+    private static readonly MethodInfo DeserializeMethod = typeof(Server).GetStaticMethod(nameof(DeserializeObjectImpl));
     private readonly Connection _connection;
     private readonly ConcurrentDictionary<int, PooledCancellationTokenSource> _requests = new();
     public Server(ListenerSettings settings, Connection connection, IClient client)
@@ -208,6 +208,7 @@ class Server
     private ListenerSettings Settings { get; }
     string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
+    static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
     static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
         SerializeMethod.MakeGenericDelegate<Serializer<object>>(resultType.GenericTypeArguments[0]))(task, ref writer);
     static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>

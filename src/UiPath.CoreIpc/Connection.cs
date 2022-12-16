@@ -329,10 +329,9 @@ public sealed class Connection : IDisposable
         reader = new(_messageStream.GetReadOnlySequence());
         return Deserialize<T>(ref reader);
     }
-    static T Deserialize<T>(ref MessagePackReader reader) => MessagePackSerializer.Deserialize<T>(ref reader, Contractless);
+    internal static T Deserialize<T>(ref MessagePackReader reader) => MessagePackSerializer.Deserialize<T>(ref reader, Contractless);
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     internal void Log(string message) => Logger.LogInformation(message);
-    internal static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
     delegate void Deserializer<out T>(ref MessagePackReader reader, IErrorCompletion completion);
     internal static void DeserializeResult<T>(ref MessagePackReader reader, IErrorCompletion completion)
     {
