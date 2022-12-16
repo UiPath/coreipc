@@ -333,7 +333,7 @@ public sealed class Connection : IDisposable
     private void Log(Exception ex) => Logger.LogException(ex, Name);
     internal void Log(string message) => Logger.LogInformation(message);
     delegate void Deserializer<out T>(ref MessagePackReader reader, IErrorCompletion completion);
-    internal static void DeserializeResult<T>(ref MessagePackReader reader, IErrorCompletion completion)
+    static void DeserializeResult<T>(ref MessagePackReader reader, IErrorCompletion completion)
     {
         T result;
         try
