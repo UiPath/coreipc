@@ -335,17 +335,16 @@ public sealed class Connection : IDisposable
     delegate void Deserializer(ref MessagePackReader reader, IErrorCompletion completion);
     static void DeserializeResult<T>(ref MessagePackReader reader, IErrorCompletion completion)
     {
-        T result;
         try
         {
-            result = Deserialize<T>(ref reader);
+            var result = Deserialize<T>(ref reader);
+            ((TaskCompletionPool<T>.ManualResetValueTaskSource)completion).SetResult(result);
         }
         catch (Exception ex)
         {
             completion.SetException(ex);
             throw;
         }
-        ((TaskCompletionPool<T>.ManualResetValueTaskSource)completion).SetResult(result);
     }
     readonly record struct OutgoingRequest(IErrorCompletion Completion, Deserializer Deserializer);
 }
