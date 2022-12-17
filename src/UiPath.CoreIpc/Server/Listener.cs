@@ -39,28 +39,24 @@ abstract class Listener : IDisposable
         {
             while (!token.IsCancellationRequested)
             {
-                await AcceptConnection(token);
+                var serverConnection = CreateServerConnection();
+                try
+                {
+                    var network = await serverConnection.AcceptClient(token);
+                    serverConnection.Listen(network, token).LogException(Logger, Name);
+                }
+                catch (Exception ex)
+                {
+                    serverConnection.Dispose();
+                    if (!token.IsCancellationRequested)
+                    {
+                        Logger.LogException(ex, Settings.Name);
+                    }
+                }
             }
         }
     }
     protected abstract ServerConnection CreateServerConnection();
-    async Task AcceptConnection(CancellationToken token)
-    {
-        var serverConnection = CreateServerConnection();
-        try
-        {
-            var network = await serverConnection.AcceptClient(token);
-            serverConnection.Listen(network, token).LogException(Logger, Name);
-        }
-        catch (Exception ex)
-        {
-            serverConnection.Dispose();
-            if (!token.IsCancellationRequested)
-            {
-                Logger.LogException(ex, Settings.Name);
-            }
-        }
-    }
     protected virtual void Dispose(bool disposing) { }
     public void Dispose()
     {
