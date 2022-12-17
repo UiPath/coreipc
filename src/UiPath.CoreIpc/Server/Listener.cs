@@ -68,10 +68,10 @@ abstract class Listener : IDisposable
         GC.SuppressFinalize(this);
     }
     public void Log(string message) => Logger.LogInformation(message);
-    internal void SetValues(ServiceHostBuilder serviceHostBuilder)
+    internal void SetValues(IServiceProvider serviceProvider, Dictionary<string, EndpointSettings> endpoints)
     {
-        Settings.ServiceProvider = serviceHostBuilder.ServiceProvider;
-        Settings.Endpoints = serviceHostBuilder.Endpoints;
+        Settings.ServiceProvider = serviceProvider;
+        Settings.Endpoints = endpoints;
     }
     public bool LogEnabled => Logger.Enabled();
 }
