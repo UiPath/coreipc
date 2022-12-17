@@ -58,8 +58,7 @@ public sealed class Connection : IDisposable
         catch
         {
             Completion(requestId)?.Return();
-            tokenRegistration.Dispose();
-            Reset(cancellationState);
+            Cleanup(cancellationState, tokenRegistration);
             throw;
         }
         try
@@ -69,12 +68,12 @@ public sealed class Connection : IDisposable
         finally
         {
             _requests.TryRemove(requestId, out _);
-            Reset(cancellationState);
-            tokenRegistration.Dispose();
             requestCompletion.Return();
+            Cleanup(cancellationState, tokenRegistration);
         }
-        void Reset(object cancellationState)
+        void Cleanup(object cancellationState, CancellationTokenRegistration tokenRegistration)
         {
+            tokenRegistration.Dispose();
             if (cancellationState == null)
             {
                 _requestIdToCancel = 0;
