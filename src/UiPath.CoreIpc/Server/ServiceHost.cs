@@ -4,7 +4,7 @@ public sealed class ServiceHost : IDisposable
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly ReadOnlyDictionary<string, EndpointSettings> _endpoints;
-    private readonly IReadOnlyCollection<Listener> _listeners;
+    private readonly Listener[] _listeners;
     internal ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, EndpointSettings> endpoints)
     {
         _endpoints = new(endpoints);
@@ -30,6 +30,6 @@ public sealed class ServiceHost : IDisposable
         {
             endpoint.Scheduler = taskScheduler;
         }
-        return Task.Run(() => Task.WhenAll(_listeners.Select(listener => listener.Listen(_cancellationTokenSource.Token))));
+        return Task.Run(() => Task.WhenAll(Array.ConvertAll(_listeners, listener => listener.Listen(_cancellationTokenSource.Token))));
     }
 }

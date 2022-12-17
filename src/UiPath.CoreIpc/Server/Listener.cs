@@ -28,13 +28,20 @@ abstract class Listener : IDisposable
         {
             Log($"Starting listener {Name}...");
         }
-        return Task.WhenAll(Enumerable.Range(1, Settings.ConcurrentAccepts).Select(async _ =>
+        var concurrentAccepts = Settings.ConcurrentAccepts;
+        var accepts = new Task[concurrentAccepts];
+        for (int index = 0; index < concurrentAccepts; index++)
         {
-            while (!token.IsCancellationRequested)
-            {
-                await AcceptConnection(token);
-            }
-        }));
+            accepts[index] = AcceptLoop(token);
+        }
+        return Task.WhenAll(accepts);
+    }
+    async Task AcceptLoop(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            await AcceptConnection(token);
+        }
     }
     protected abstract ServerConnection CreateServerConnection();
     async Task AcceptConnection(CancellationToken token)
