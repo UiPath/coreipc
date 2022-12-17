@@ -35,12 +35,12 @@ abstract class Listener : IDisposable
             accepts[index] = AcceptLoop(token);
         }
         return Task.WhenAll(accepts);
-    }
-    async Task AcceptLoop(CancellationToken token)
-    {
-        while (!token.IsCancellationRequested)
+        async Task AcceptLoop(CancellationToken token)
         {
-            await AcceptConnection(token);
+            while (!token.IsCancellationRequested)
+            {
+                await AcceptConnection(token);
+            }
         }
     }
     protected abstract ServerConnection CreateServerConnection();
