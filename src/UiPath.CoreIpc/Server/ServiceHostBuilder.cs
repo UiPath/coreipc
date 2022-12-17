@@ -13,8 +13,7 @@ public class ServiceHostBuilder
     }
     internal ServiceHostBuilder AddListener(Listener listener)
     {
-        listener.Settings.ServiceProvider = ServiceProvider;
-        listener.Settings.Endpoints = Endpoints;
+        listener.SetValues(this);
         _listeners.Add(listener);
         return this;
     }
