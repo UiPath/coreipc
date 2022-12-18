@@ -131,7 +131,7 @@ class Server
                 await incomingRequest.OneWay();
                 return;
             }
-            (Response, Task Result) responseResult = default;
+            (Response, Task Result) response = default;
             var requestCancellation = Rent();
             _requests[requestId] = requestCancellation;
             var timeout = request.GetTimeout(Settings.RequestTimeout);
@@ -139,14 +139,14 @@ class Server
             try
             {
                 var token = timeoutHelper.Token;
-                responseResult = await incomingRequest.GetResponse(token);
+                response = await incomingRequest.GetResponse(token);
                 if (LogEnabled)
                 {
                     Log($"{Name} sending response for {request}");
                 }
-                await Send(responseResult, token);
+                await Send(response, token);
             }
-            catch (Exception ex) when(responseResult.Result == null)
+            catch (Exception ex) when(response.Result == null)
             {
                 await OnError(request, timeoutHelper.CheckTimeout(ex, request.Method));
             }
@@ -169,17 +169,17 @@ class Server
         Logger.LogException(ex, $"{Name} {request}");
         return Send((new(request.Id, ex.ToError()), null), default);
     }
-    ValueTask Send((Response Response, Task Result) responseResult, CancellationToken cancellationToken)
+    ValueTask Send((Response, Task Result) response, CancellationToken cancellationToken)
     {
-        if (responseResult.Result is Task<Stream> downloadStream)
+        if (response.Result is Task<Stream> downloadStream)
         {
-            responseResult = (responseResult.Response, null);
+            response = response with { Result = null };
         }
         else
         {
             downloadStream = null;
         }
-        var responseBytes = SerializeMessage(responseResult, static (in (Response, Task) responseResult, ref MessagePackWriter writer) =>
+        var responseBytes = SerializeMessage(response, static (in (Response, Task) responseResult, ref MessagePackWriter writer) =>
         {
             var (response, result) = responseResult;
             Serialize(response, ref writer);
