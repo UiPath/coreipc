@@ -169,17 +169,17 @@ class Server
         Logger.LogException(ex, $"{Name} {request}");
         return Send((new(request.Id, ex.ToError()), null), default);
     }
-    ValueTask Send((Response, Task Result) response, CancellationToken cancellationToken)
+    ValueTask Send((Response Response, Task Result) responseResult, CancellationToken cancellationToken)
     {
-        if (response.Result is Task<Stream> downloadStream)
+        if (responseResult.Result is Task<Stream> downloadStream)
         {
-            response = response with { Result = null };
+            responseResult = (responseResult.Response, null);
         }
         else
         {
             downloadStream = null;
         }
-        var responseBytes = SerializeMessage(response, static (in (Response, Task) responseResult, ref MessagePackWriter writer) =>
+        var responseBytes = SerializeMessage(responseResult, static (in (Response, Task) responseResult, ref MessagePackWriter writer) =>
         {
             var (response, result) = responseResult;
             Serialize(response, ref writer);
