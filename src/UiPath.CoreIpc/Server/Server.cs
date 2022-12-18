@@ -173,9 +173,9 @@ class Server
     }
     ValueTask Send(Response response, CancellationToken cancellationToken)
     {
-        if (response.Data is Task<Stream> downloadStream)
+        if (response.Result is Task<Stream> downloadStream)
         {
-            response.Data = null;
+            response.Result = null;
         }
         else
         {
@@ -184,12 +184,12 @@ class Server
         var responseBytes = SerializeMessage(response, static (in Response response, ref MessagePackWriter writer) =>
         {
             Serialize(response, ref writer);
-            var data = response.Data;
-            if (data == null)
+            var result = response.Result;
+            if (result == null)
             {
                 return;
             }
-            SerializeTask(data, ref writer);
+            SerializeTask(result, ref writer);
         });
         return downloadStream == null ?
             _connection.SendMessage(MessageType.Response, responseBytes, cancellationToken) :
@@ -209,7 +209,7 @@ class Server
     string Name => _connection.Name;
     public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
     static object DeserializeObjectImpl<T>(ref MessagePackReader reader) => Deserialize<T>(ref reader);
-    static void SerializeTask(object task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
+    static void SerializeTask(Task task, ref MessagePackWriter writer) => SerializeTaskByType.GetOrAdd(task.GetType(), static resultType =>
         SerializeMethod.MakeGenericDelegate<Serializer<object>>(resultType.GenericTypeArguments[0]))(task, ref writer);
     static object DeserializeObject(Type type, ref MessagePackReader reader) => DeserializeObjectByType.GetOrAdd(type, static resultType =>
         DeserializeMethod.MakeGenericDelegate<Deserializer>(resultType))(ref reader);
@@ -267,6 +267,6 @@ file readonly record struct IncomingRequest(int RequestId, object[] Parameters, 
     async ValueTask<Response> GetMethodResult(Task methodResult)
     {
         await methodResult;
-        return new(RequestId) { Data = methodResult };
+        return new(RequestId) { Result = methodResult };
     }
 }

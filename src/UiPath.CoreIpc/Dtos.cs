@@ -33,7 +33,7 @@ public readonly record struct CancellationRequest(int RequestId);
 public record struct Response(int RequestId, Error Error = null)
 {
     internal bool Empty => RequestId == 0;
-    internal object Data { get; set; }
+    internal Task Result { get; set; }
 }
 [Serializable]
 public record Error(string Message, string StackTrace, string Type, Error InnerError)
