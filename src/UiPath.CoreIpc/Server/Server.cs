@@ -131,8 +131,7 @@ class Server
                 await incomingRequest.OneWay();
                 return;
             }
-            Response response;
-            Task result = null;
+            (Response, Task Result) responseResult = default;
             var requestCancellation = Rent();
             _requests[requestId] = requestCancellation;
             var timeout = request.GetTimeout(Settings.RequestTimeout);
@@ -140,14 +139,14 @@ class Server
             try
             {
                 var token = timeoutHelper.Token;
-                (response, result) = await incomingRequest.GetResponse(token);
+                responseResult = await incomingRequest.GetResponse(token);
                 if (LogEnabled)
                 {
                     Log($"{Name} sending response for {request}");
                 }
-                await Send(response, result, token);
+                await Send(responseResult, token);
             }
-            catch (Exception ex) when(result == null)
+            catch (Exception ex) when(responseResult.Result == null)
             {
                 await OnError(request, timeoutHelper.CheckTimeout(ex, request.Method));
             }
@@ -168,21 +167,21 @@ class Server
     ValueTask OnError(in Request request, Exception ex)
     {
         Logger.LogException(ex, $"{Name} {request}");
-        return Send(new(request.Id, ex.ToError()), null, default);
+        return Send((new(request.Id, ex.ToError()), null), default);
     }
-    ValueTask Send(Response response, Task result, CancellationToken cancellationToken)
+    ValueTask Send((Response Response, Task Result) responseResult, CancellationToken cancellationToken)
     {
-        if (result is Task<Stream> downloadStream)
+        if (responseResult.Result is Task<Stream> downloadStream)
         {
-            result = null;
+            responseResult = (responseResult.Response, null);
         }
         else
         {
             downloadStream = null;
         }
-        var responseBytes = SerializeMessage((response, result), static (in (Response, Task) data, ref MessagePackWriter writer) =>
+        var responseBytes = SerializeMessage(responseResult, static (in (Response, Task) responseResult, ref MessagePackWriter writer) =>
         {
-            var (response, result) = data;
+            var (response, result) = responseResult;
             Serialize(response, ref writer);
             if (result == null)
             {
