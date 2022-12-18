@@ -169,7 +169,7 @@ class Server
         Logger.LogException(ex, $"{Name} {request}");
         return Send((new(request.Id, ex.ToError()), null), default);
     }
-    ValueTask Send((Response Response, Task Result) responseResult, CancellationToken cancellationToken)
+    ValueTask Send((Response Response, Task Result) responseResult, CancellationToken token)
     {
         if (responseResult.Result is Task<Stream> downloadStream)
         {
@@ -179,7 +179,7 @@ class Server
         {
             downloadStream = null;
         }
-        var responseBytes = SerializeMessage(responseResult, static (in (Response, Task) responseResult, ref MessagePackWriter writer) =>
+        var bytes = SerializeMessage(responseResult, static (in (Response, Task) responseResult, ref MessagePackWriter writer) =>
         {
             var (response, result) = responseResult;
             Serialize(response, ref writer);
@@ -189,9 +189,7 @@ class Server
             }
             SerializeTask(result, ref writer);
         });
-        return downloadStream == null ?
-            _connection.SendMessage(MessageType.Response, responseBytes, cancellationToken) :
-            SendDownloadStream(responseBytes, downloadStream.Result, cancellationToken);
+        return downloadStream == null ? _connection.SendMessage(MessageType.Response, bytes, token) : SendDownloadStream(bytes, downloadStream.Result, token);
         async ValueTask SendDownloadStream(RecyclableMemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
         {
             using (downloadStream)

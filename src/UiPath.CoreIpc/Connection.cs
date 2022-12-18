@@ -90,7 +90,7 @@ public sealed class Connection : IDisposable
         {
             uploadStream = null;
         }
-        var requestBytes = SerializeMessage(request, static(in Request request, ref MessagePackWriter writer)=>
+        var bytes = SerializeMessage(request, static(in Request request, ref MessagePackWriter writer)=>
         {
             Serialize(request, ref writer);
             foreach (var arg in request.Parameters)
@@ -101,9 +101,7 @@ public sealed class Connection : IDisposable
                 }
             }
         });
-        return uploadStream == null ?
-            SendMessage(MessageType.Request, requestBytes, token) :
-            SendStream(MessageType.Request, requestBytes, uploadStream, token);
+        return uploadStream == null ? SendMessage(MessageType.Request, bytes, token) : SendStream(MessageType.Request, bytes, uploadStream, token);
     }
     IErrorCompletion Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
     internal async ValueTask SendStream(MessageType messageType, RecyclableMemoryStream data, Stream userStream, CancellationToken cancellationToken)
