@@ -102,10 +102,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 await _beforeCall(new(newConnection, method, args), token);
             }
             var requestId = _connection.NewRequestId();
-            Request request = new(requestId, methodName, typeof(TInterface).Name, messageTimeout.TotalSeconds)
-            {
-                Parameters = args,
-            };
+            Request request = new(requestId, methodName, typeof(TInterface).Name, messageTimeout.TotalSeconds) { Parameters = args };
             if (LogEnabled)
             {
                 Log($"IpcClient calling {methodName} {requestId} {Name}.");
