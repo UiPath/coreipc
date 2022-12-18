@@ -106,11 +106,9 @@ class Server
                     continue;
                 }
                 var arg = DeserializeObject(type, ref reader);
-                args[index] = CheckMessage(arg, type, endpoint);
+                args[index] = arg == null ? CheckNullMessage(arg, type, endpoint) : (arg is Message message ? message.SetValues(endpoint, Client) : arg);
             }
             return args;
-            object CheckMessage(object argument, Type parameterType, EndpointSettings endpoint) => argument == null ?
-                CheckNullMessage(argument, parameterType, endpoint) : (argument is Message message ? message.SetValues(endpoint, Client) : argument);
             object CheckNullMessage(object argument, Type parameterType, EndpointSettings endpoint) => parameterType == typeof(Message) ?
                 new Message().SetValues(endpoint, Client) : argument;
         }
