@@ -1,6 +1,6 @@
 namespace UiPath.CoreIpc;
 // https://github.com/dotnet/aspnetcore/blob/main/src/Shared/CancellationTokenSourcePool.cs
-internal static class CancellationTokenSourcePool
+static class CancellationTokenSourcePool
 {
     public static PooledCancellationTokenSource Rent() =>
 #if !NET461

@@ -8,7 +8,7 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Performance", "HAA0501:Explicit new array type allocation", Scope = "module")]
 #if NET461
 namespace System.Runtime.CompilerServices;
-internal static class IsExternalInit
+static class IsExternalInit
 {
 }
 #endif
