@@ -30,7 +30,7 @@ public record struct Request(int Id, string Method, string Endpoint, double Time
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => Timeout == 0 ? defaultTimeout : TimeSpan.FromSeconds(Timeout);
 }
 public readonly record struct CancellationRequest(int RequestId);
-public record struct Response(int RequestId, Error Error = null);
+public readonly record struct Response(int RequestId, Error Error = null);
 [Serializable]
 public record Error(string Message, string StackTrace, string Type, Error InnerError)
 {
