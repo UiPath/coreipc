@@ -131,7 +131,8 @@ class Server
                 await incomingRequest.OneWay();
                 return;
             }
-            Response response = default;
+            Response response;
+            Task result = null;
             var requestCancellation = Rent();
             _requests[requestId] = requestCancellation;
             var timeout = request.GetTimeout(Settings.RequestTimeout);
@@ -139,14 +140,14 @@ class Server
             try
             {
                 var token = timeoutHelper.Token;
-                response = await incomingRequest.GetResponse(token);
+                (response, result) = await incomingRequest.GetResponse(token);
                 if (LogEnabled)
                 {
                     Log($"{Name} sending response for {request}");
                 }
-                await Send(response, token);
+                await Send(response, result, token);
             }
-            catch (Exception ex) when(response.Empty)
+            catch (Exception ex) when(result == null)
             {
                 await OnError(request, timeoutHelper.CheckTimeout(ex, request.Method));
             }
@@ -167,22 +168,22 @@ class Server
     ValueTask OnError(in Request request, Exception ex)
     {
         Logger.LogException(ex, $"{Name} {request}");
-        return Send(new(request.Id, ex.ToError()), default);
+        return Send(new(request.Id, ex.ToError()), null, default);
     }
-    ValueTask Send(Response response, CancellationToken cancellationToken)
+    ValueTask Send(Response response, Task result, CancellationToken cancellationToken)
     {
-        if (response.Result is Task<Stream> downloadStream)
+        if (result is Task<Stream> downloadStream)
         {
-            response.Result = null;
+            result = null;
         }
         else
         {
             downloadStream = null;
         }
-        var responseBytes = SerializeMessage(response, static (in Response response, ref MessagePackWriter writer) =>
+        var responseBytes = SerializeMessage((response, result), static (in (Response, Task) data, ref MessagePackWriter writer) =>
         {
+            var (response, result) = data;
             Serialize(response, ref writer);
-            var result = response.Result;
             if (result == null)
             {
                 return;
@@ -249,7 +250,7 @@ file readonly record struct IncomingRequest(int RequestId, object[] Parameters, 
 {
     TaskScheduler Scheduler => Endpoint.Scheduler;
     public Task OneWay() => Scheduler == null ? Invoke() : InvokeOnScheduler().Unwrap();
-    public ValueTask<Response> GetResponse(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
+    public ValueTask<(Response, Task)> GetResponse(CancellationToken token) => Scheduler == null ? GetMethodResult(Invoke(token)) : ScheduleMethodResult(token);
     Task Invoke(CancellationToken token = default) => Executor.Invoke(Endpoint.ServerObject(), Parameters, token);
     record InvokeState(in IncomingRequest Request, CancellationToken Token)
     {
@@ -261,10 +262,10 @@ file readonly record struct IncomingRequest(int RequestId, object[] Parameters, 
     }
     Task<Task> InvokeOnScheduler(CancellationToken token = default) =>
         Task.Factory.StartNew(InvokeState.Invoke, new InvokeState(this, token), token, TaskCreationOptions.DenyChildAttach, Scheduler);
-    async ValueTask<Response> ScheduleMethodResult(CancellationToken cancellationToken) => await GetMethodResult(await InvokeOnScheduler(cancellationToken));
-    async ValueTask<Response> GetMethodResult(Task methodResult)
+    async ValueTask<(Response, Task)> ScheduleMethodResult(CancellationToken cancellationToken) => await GetMethodResult(await InvokeOnScheduler(cancellationToken));
+    async ValueTask<(Response, Task)> GetMethodResult(Task methodResult)
     {
         await methodResult;
-        return new(RequestId) { Result = methodResult };
+        return (new(RequestId), methodResult);
     }
 }
