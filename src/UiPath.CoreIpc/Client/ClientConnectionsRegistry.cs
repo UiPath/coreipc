@@ -1,5 +1,4 @@
 ﻿namespace UiPath.CoreIpc;
-
 static class ClientConnectionsRegistry
 {
     private static readonly ConcurrentDictionary<IConnectionKey, ClientConnection> Connections = new();
