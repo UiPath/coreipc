@@ -183,11 +183,10 @@ class Server
         {
             var (response, result) = responseResult;
             Serialize(response, ref writer);
-            if (result == null)
+            if (result != null)
             {
-                return;
+                SerializeTask(result, ref writer);
             }
-            SerializeTask(result, ref writer);
         });
         return downloadStream == null ? _connection.SendMessage(MessageType.Response, bytes, token) : SendDownloadStream(bytes, downloadStream.Result, token);
         async ValueTask SendDownloadStream(RecyclableMemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
