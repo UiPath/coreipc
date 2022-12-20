@@ -8,6 +8,11 @@ public class ListenerSettings
     public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
     internal IServiceProvider ServiceProvider { get; set; }
     internal IDictionary<string, EndpointSettings> Endpoints { get; set; }
+    internal void SetValues(IServiceProvider serviceProvider, Dictionary<string, EndpointSettings> endpoints)
+    {
+        ServiceProvider = serviceProvider;
+        Endpoints = endpoints;
+    }
 }
 abstract class Listener : IDisposable
 {
@@ -68,10 +73,5 @@ abstract class Listener : IDisposable
         GC.SuppressFinalize(this);
     }
     public void Log(string message) => Logger.LogInformation(message);
-    internal void SetValues(IServiceProvider serviceProvider, Dictionary<string, EndpointSettings> endpoints)
-    {
-        Settings.ServiceProvider = serviceProvider;
-        Settings.Endpoints = endpoints;
-    }
     public bool LogEnabled => Logger.Enabled();
 }
