@@ -31,6 +31,8 @@ var computingClient =
 // call a remote method
 var result = await computingClient.AddFloat(1, 4, cancellationToken);
 ```
-## Debug using Source Link
-
+# UiPath.Rpc
+https://github.com/UiPath/coreipc/tree/master/UiPath.Rpc
+A more efficient version based on MessagePack.
+# Debug using Source Link
 [Preview builds setup](https://docs.microsoft.com/en-us/azure/devops/pipelines/artifacts/symbols?view=azure-devops#set-up-visual-studio).
