@@ -36,7 +36,7 @@ public static class ServiceHostBuilderExtensions
 }
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddIpc(this IServiceCollection services) => services;
+    public static IServiceCollection AddRpc(this IServiceCollection services) => services;
 }
 public class EndpointSettings
 {

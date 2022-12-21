@@ -23,7 +23,7 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
         for (int i = 0; i < 50; i++)
         {
             await _computingClient.AddFloat(1, 2);
-            ((IpcProxy)_computingClient).CloseConnection();
+            ((RpcProxy)_computingClient).CloseConnection();
             await _computingClient.AddFloat(1, 2);
         }
     }
@@ -62,7 +62,7 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
         proxy.Infinite().ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.Infinite)} timed out.");
         await proxy.GetCallbackThreadName(new Message { RequestTimeout = RequestTimeout });
         ((IDisposable)proxy).Dispose();
-        ((IpcProxy)proxy).CloseConnection();
+        ((RpcProxy)proxy).CloseConnection();
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
     public override void Dispose()
     {
         ((IDisposable)_computingClient).Dispose();
-        ((IpcProxy)_computingClient).CloseConnection();
+        ((RpcProxy)_computingClient).CloseConnection();
         _computingHost.Dispose();
         base.Dispose();
     }

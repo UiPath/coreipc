@@ -26,7 +26,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     public override void Dispose()
     {
         ((IDisposable)_systemClient).Dispose();
-        ((IpcProxy)_systemClient).CloseConnection();
+        ((RpcProxy)_systemClient).CloseConnection();
         _systemHost.Dispose();
         base.Dispose();
     }
@@ -212,10 +212,10 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
 
         await proxy.DoNothing();
         newConnection.ShouldBeFalse();
-        var ipcProxy = (IpcProxy)proxy;
+        var rpcProxy = (RpcProxy)proxy;
         var closed = false;
-        ipcProxy.Connection.Closed += delegate { closed = true; };
-        ipcProxy.CloseConnection();
+        rpcProxy.Connection.Closed += delegate { closed = true; };
+        rpcProxy.CloseConnection();
         closed.ShouldBeTrue();
         newConnection.ShouldBeFalse();
         await proxy.DoNothing();
@@ -223,7 +223,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
 
         await proxy.DoNothing();
         newConnection.ShouldBeFalse();
-        ipcProxy.CloseConnection();
+        rpcProxy.CloseConnection();
     }
 
     [Fact]
@@ -231,7 +231,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     {
         var proxy = SystemClientBuilder().DontReconnect().ValidateAndBuild();
         await proxy.GetGuid(System.Guid.Empty);
-        ((IpcProxy)proxy).CloseConnection();
+        ((RpcProxy)proxy).CloseConnection();
         ObjectDisposedException exception = null;
         try
         {
@@ -256,7 +256,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
             var newGuid = System.Guid.NewGuid();
             (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
             await Task.Delay(1);
-            ((IpcProxy)_systemClient).CloseConnection();
+            ((RpcProxy)_systemClient).CloseConnection();
             sendMessageResult.ShouldThrow<Exception>();
             newGuid = System.Guid.NewGuid();
             (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);

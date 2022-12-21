@@ -24,7 +24,7 @@ public static class RpcHelpers
     public static IServiceProvider ConfigureServices() =>
         new ServiceCollection()
             .AddLogging(b => b.AddTraceSource(new SourceSwitch("", "All")))
-            .AddIpc()
+            .AddRpc()
             .AddSingleton<IComputingServiceBase, ComputingService>()
             .AddSingleton<IComputingService, ComputingService>()
             .AddSingleton<ISystemService, SystemService>()
@@ -35,7 +35,7 @@ public static class RpcHelpers
         client.Impersonate(() => userName = Environment.UserName);
         return userName;
     }
-    public static IServiceCollection AddIpcWithLogging(this IServiceCollection services, bool logToConsole = false)
+    public static IServiceCollection AddRpcWithLogging(this IServiceCollection services, bool logToConsole = false)
     {
         services.AddLogging(builder =>
         {
@@ -48,7 +48,7 @@ public static class RpcHelpers
             //    builder.AddTraceSource(new SourceSwitch(listener.Name, "All"), listener);
             //}
         });
-        return services.AddIpc();
+        return services.AddRpc();
     }
 }
 public class HttpSysWebSocketsListener : IDisposable

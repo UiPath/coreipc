@@ -45,8 +45,8 @@ public class EndpointTests : IDisposable
     {
         ((IDisposable)_computingClient).Dispose();
         ((IDisposable)_systemClient).Dispose();
-        ((IpcProxy)_computingClient).CloseConnection();
-        ((IpcProxy)_systemClient).CloseConnection();
+        ((RpcProxy)_computingClient).CloseConnection();
+        ((RpcProxy)_systemClient).CloseConnection();
         _host.Dispose();
     }
     [Fact]
@@ -57,7 +57,7 @@ public class EndpointTests : IDisposable
         for (int index = 0; index < 50; index++)
         {
             await CallbackCore();
-            ((IpcProxy)_computingClient).CloseConnection();
+            ((RpcProxy)_computingClient).CloseConnection();
         }
     }
 

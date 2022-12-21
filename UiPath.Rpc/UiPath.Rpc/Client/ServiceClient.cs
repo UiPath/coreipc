@@ -32,8 +32,8 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     Connection IServiceClient.Connection => _connection;
     public TInterface CreateProxy()
     {
-        var proxy = DispatchProxy.Create<TInterface, IpcProxy>();
-        (proxy as IpcProxy).ServiceClient = this;
+        var proxy = DispatchProxy.Create<TInterface, RpcProxy>();
+        (proxy as RpcProxy).ServiceClient = this;
         return proxy;
     }
     public override int GetHashCode() => HashCode;
@@ -105,7 +105,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             Request request = new(requestId, methodName, typeof(TInterface).Name, messageTimeout.TotalSeconds) { Parameters = args };
             if (LogEnabled)
             {
-                Log($"IpcClient calling {methodName} {requestId} {Name}.");
+                Log($"RpcClient calling {methodName} {requestId} {Name}.");
             }
             if (method.IsOneWay())
             {
@@ -115,7 +115,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             var result = await _connection.RemoteCall<TResult>(request, token);
             if (LogEnabled)
             {
-                Log($"IpcClient called {methodName} {requestId} {Name}.");
+                Log($"RpcClient called {methodName} {requestId} {Name}.");
             }
             return result;
         }
@@ -233,9 +233,9 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     public virtual bool Equals(IConnectionKey other) => true;
     public virtual ClientConnection CreateClientConnection() => throw new NotImplementedException();
 }
-public class IpcProxy : DispatchProxy, IDisposable
+public class RpcProxy : DispatchProxy, IDisposable
 {
-    private static readonly MethodInfo InvokeMethod = typeof(IpcProxy).GetStaticMethod(nameof(GenericInvoke));
+    private static readonly MethodInfo InvokeMethod = typeof(RpcProxy).GetStaticMethod(nameof(GenericInvoke));
     private static readonly ConcurrentDictionary<Type, InvokeDelegate> InvokeByType = new();
     internal IServiceClient ServiceClient { get; set; }
     public Connection Connection => ServiceClient.Connection;
