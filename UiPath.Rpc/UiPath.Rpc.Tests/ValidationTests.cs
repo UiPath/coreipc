@@ -54,8 +54,8 @@ public class ValidationTests
     [Fact]
     public void DownloadDerivedStream() => new Action(() => new NamedPipeClientBuilder<IDerivedStreamDownload>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Stream parameters must be typed as Stream!");
     [Fact]
-    public void TheCallbackContractMustBeAnInterface() => new Action(() => new NamedPipeClientBuilder<ISystemService, ValidationTests>("", IpcHelpers.ConfigureServices()).ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
+    public void TheCallbackContractMustBeAnInterface() => new Action(() => new NamedPipeClientBuilder<ISystemService, ValidationTests>("", RpcHelpers.ConfigureServices()).ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
     [Fact]
-    public void TheServiceContractMustBeAnInterface() => new Action(() => new ServiceHostBuilder(IpcHelpers.ConfigureServices()).AddEndpoint<ValidationTests>().ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
+    public void TheServiceContractMustBeAnInterface() => new Action(() => new ServiceHostBuilder(RpcHelpers.ConfigureServices()).AddEndpoint<ValidationTests>().ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
 #endif
 }

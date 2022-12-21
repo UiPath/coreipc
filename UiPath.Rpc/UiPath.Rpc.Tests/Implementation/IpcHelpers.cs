@@ -5,7 +5,7 @@ using UiPath.Rpc.Tests;
 
 namespace UiPath.Rpc;
 
-public static class IpcHelpers
+public static class RpcHelpers
 {
     public static TInterface ValidateAndBuild<TDerived, TInterface>(this ServiceClientBuilder<TDerived, TInterface> builder) where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
     {

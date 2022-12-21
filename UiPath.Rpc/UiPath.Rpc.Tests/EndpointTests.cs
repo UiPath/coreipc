@@ -15,7 +15,7 @@ public class EndpointTests : IDisposable
     {
         _computingCallback = new ComputingCallback { Id = Guid.NewGuid().ToString() };
         _systemCallback = new SystemCallback { Id = Guid.NewGuid().ToString() };
-        _serviceProvider = IpcHelpers.ConfigureServices();
+        _serviceProvider = RpcHelpers.ConfigureServices();
         _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
         _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
         _host = new ServiceHostBuilder(_serviceProvider)

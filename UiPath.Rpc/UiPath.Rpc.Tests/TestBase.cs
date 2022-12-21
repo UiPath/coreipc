@@ -21,7 +21,7 @@ public abstract class TestBase : IDisposable
     public TestBase()
     {
         _guiThread.SynchronizationContext.Send(() => Thread.CurrentThread.Name = "GuiThread");
-        _serviceProvider = IpcHelpers.ConfigureServices();
+        _serviceProvider = RpcHelpers.ConfigureServices();
     }
 
     protected static int GetCount() => Interlocked.Increment(ref Count);
