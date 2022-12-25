@@ -144,8 +144,8 @@ public sealed class Connection : IDisposable
     }
     public void Dispose()
     {
-        var closedHandler = Closed;
-        if (closedHandler == null || (closedHandler = Interlocked.CompareExchange(ref Closed, null, closedHandler)) == null)
+        var closedHandler = Volatile.Read(ref Closed);
+        if (closedHandler == null || Interlocked.Exchange(ref Closed, null) == null)
         {
             return;
         }
