@@ -127,9 +127,7 @@ public class ComputingService : IComputingService
         var client = message.Client;
         var callback = message.GetCallback<IComputingCallback>();
         var clientId = await callback.GetId(message);
-        string returnValue = "";
-        client.Impersonate(() => returnValue = client.GetUserName() + "_" + clientId + "_" + message.Text);
-        return returnValue;
+        return Environment.UserName + "_" + clientId + "_" + message.Text;
     }
 
     public async Task<string> GetCallbackThreadName(Message message, CancellationToken cancellationToken = default) => await message.GetCallback<IComputingCallback>().GetThreadName();

@@ -58,12 +58,9 @@ public class SystemService : ISystemService
 
     public async Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default)
     {
-        var client = message.Client;
         var callback = message.GetCallback<ISystemCallback>();
         var clientId = await callback.GetId(message);
-        string returnValue = "";
-        client.Impersonate(() => returnValue = client.GetUserName() + "_" + clientId + "_" + message.Text);
-        return returnValue;
+        return Environment.UserName + "_" + clientId + "_" + message.Text;
     }
 
     public bool DidNothing { get; set; }
@@ -98,7 +95,6 @@ public class SystemService : ISystemService
             await Task.Delay(message.Delay, cancellationToken);
         }
         var domainName = "";
-        var client = message.Client;
         //client.RunAs(() => domainName = "test");
         //try
         //{
@@ -108,7 +104,7 @@ public class SystemService : ISystemService
         //{
         //    Console.WriteLine(ex.ToString());
         //}
-        return client.GetUserName() +" " + domainName;
+        return Environment.UserName +" " + domainName;
     }
 
     public async Task<bool> SlowOperation(CancellationToken cancellationToken = default)
@@ -143,13 +139,7 @@ public class SystemService : ISystemService
 
     public async Task<string> GetThreadName(CancellationToken cancellationToken = default) => Thread.CurrentThread.Name;
 
-    public async Task<string> ImpersonateCaller(Message message = null, CancellationToken cancellationToken = default)
-    {
-        var client = message.Client;
-        string returnValue = "";
-        client.Impersonate(() => returnValue = client.GetUserName());
-        return returnValue;
-    }
+    public async Task<string> ImpersonateCaller(Message message = null, CancellationToken cancellationToken = default) => Environment.UserName;
 
     public async Task<string> Upload(Stream stream, int delay = 0, CancellationToken cancellationToken = default)
     {

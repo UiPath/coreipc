@@ -10,7 +10,7 @@ class NamedPipeListener : Listener
 {
     public NamedPipeListener(NamedPipeSettings settings) : base(settings) { }
     protected override ServerConnection CreateServerConnection() => new NamedPipeServerConnection(this);
-    class NamedPipeServerConnection : ServerConnection
+    public class NamedPipeServerConnection : ServerConnection
     {
         readonly NamedPipeServerStream _server;
         public NamedPipeServerConnection(Listener listener) : base(listener)
@@ -23,7 +23,7 @@ class NamedPipeListener : Listener
             await _server.WaitForConnectionAsync(cancellationToken);
             return _server;
         }
-        public override void Impersonate(Action action) => _server.RunAsClient(()=>action());
+        public void Impersonate(PipeStreamImpersonationWorker action) => _server.RunAsClient(action);
         protected override void Dispose(bool disposing)
         {
             _server.Dispose();
@@ -50,4 +50,6 @@ public static class NamedPipeServiceExtensions
 {
     public static ServiceHostBuilder UseNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings) => 
         builder.AddListener(new NamedPipeListener(settings));
+    public static void ImpersonateClient(this Message message, PipeStreamImpersonationWorker action) => message.Client.Impersonate(action);
+    public static void Impersonate(this IClient client, PipeStreamImpersonationWorker action) => ((NamedPipeListener.NamedPipeServerConnection)client).Impersonate(action);
 }

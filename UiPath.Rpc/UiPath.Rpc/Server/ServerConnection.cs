@@ -2,7 +2,6 @@
 public interface IClient
 {
     TCallbackInterface GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class;
-    void Impersonate(Action action);
 }
 abstract class ServerConnection : IClient, IDisposable
 {
@@ -13,7 +12,6 @@ abstract class ServerConnection : IClient, IDisposable
     public ILogger Logger => _listener.Logger;
     public ListenerSettings Settings => _listener.Settings;
     public abstract Task<Stream> AcceptClient(CancellationToken cancellationToken);
-    public virtual void Impersonate(Action action) => action();
     TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class
     {
         if (callbackContract == null)

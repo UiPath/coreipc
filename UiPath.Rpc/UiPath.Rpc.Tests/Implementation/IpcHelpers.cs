@@ -29,12 +29,6 @@ public static class RpcHelpers
             .AddSingleton<IComputingService, ComputingService>()
             .AddSingleton<ISystemService, SystemService>()
             .BuildServiceProvider();
-    public static string GetUserName(this IClient client)
-    {
-        string userName = null;
-        client.Impersonate(() => userName = Environment.UserName);
-        return userName;
-    }
     public static IServiceCollection AddRpcWithLogging(this IServiceCollection services, bool logToConsole = false)
     {
         services.AddLogging(builder =>

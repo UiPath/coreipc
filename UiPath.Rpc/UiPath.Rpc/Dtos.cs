@@ -9,7 +9,6 @@ public class Message
     [IgnoreDataMember]
     public TimeSpan RequestTimeout { get; set; }
     public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => Client.GetCallback<TCallbackInterface>(CallbackContract);
-    public void ImpersonateClient(Action action) => Client.Impersonate(action);
     internal Message SetValues(EndpointSettings endpoint, IClient client)
     {
         CallbackContract = endpoint.CallbackContract;
