@@ -2,7 +2,6 @@
 using ConnectionFactory = Func<Connection, Connection>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 using InvokeDelegate = Func<IServiceClient, MethodInfo, object[], object>;
-using System.Threading;
 interface IServiceClient : IDisposable
 {
     Task<TResult> Invoke<TResult>(MethodInfo method, object[] args);
