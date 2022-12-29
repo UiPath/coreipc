@@ -2,6 +2,7 @@
 using ConnectionFactory = Func<Connection, Connection>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 using InvokeDelegate = Func<IServiceClient, MethodInfo, object[], object>;
+using System.Threading;
 interface IServiceClient : IDisposable
 {
     Task<TResult> Invoke<TResult>(MethodInfo method, object[] args);
@@ -79,15 +80,12 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     }
     public async Task<TResult> InvokeCore<TResult>(MethodInfo method, object[] args)
     {
-        CancellationToken cancellationToken = default;
-        TimeSpan messageTimeout = default, clientTimeout = _requestTimeout;
         var methodName = method.Name;
-        WellKnownArguments();
-        TimeoutHelper timeoutHelper = new(clientTimeout, cancellationToken);
+        TimeoutHelper(out var timeoutHelper, out var messageTimeout);
+        var token = timeoutHelper.Token;
+        bool newConnection;
         try
         {
-            var token = timeoutHelper.Token;
-            bool newConnection;
             await _connectionLock.WaitAsync(token);
             try
             {
@@ -102,7 +100,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 await _beforeCall(new(newConnection, method, args), token);
             }
             var requestId = _connection.NewRequestId();
-            Request request = new(requestId, methodName, typeof(TInterface).Name, messageTimeout.TotalSeconds) { Parameters = args };
+            Request request = new(requestId, methodName, typeof(TInterface).Name, messageTimeout) { Parameters = args };
             if (LogEnabled)
             {
                 Log($"RpcClient calling {methodName} {requestId} {Name}.");
@@ -128,17 +126,30 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         {
             timeoutHelper.Dispose();
         }
-        void WellKnownArguments()
+        void TimeoutHelper(out TimeoutHelper timeoutHelper, out double messageTimeout)
         {
+            TimeSpan clientTimeout;
+            CancellationToken cancellationToken;
             if (args is [Message { RequestTimeout: var requestTimeout }, ..] && requestTimeout != TimeSpan.Zero)
             {
-                messageTimeout = clientTimeout = requestTimeout;
+                clientTimeout = requestTimeout;
+                messageTimeout = requestTimeout.TotalSeconds;
+            }
+            else
+            {
+                clientTimeout = _requestTimeout;
+                messageTimeout = default;
             }
             if (args is [.., CancellationToken token])
             {
                 cancellationToken = token;
                 args[^1] = Connection.Contractless;
             }
+            else
+            {
+                cancellationToken = default;
+            }
+            timeoutHelper = new(clientTimeout, cancellationToken);
         }
     }
     private Task<bool> EnsureConnection(CancellationToken cancellationToken)
