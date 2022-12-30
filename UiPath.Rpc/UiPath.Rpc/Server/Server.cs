@@ -1,5 +1,6 @@
 ﻿using MessagePack;
 using Microsoft.IO;
+using System.Collections.ObjectModel;
 using System.Linq.Expressions;
 namespace UiPath.Rpc;
 using MethodExecutor = Func<object, object[], CancellationToken, Task>;
@@ -214,8 +215,12 @@ class Server
     readonly struct Method
     {
         static readonly ParameterExpression Target = Parameter(typeof(object), "target");
-        static readonly ParameterExpression Token = Parameter(typeof(CancellationToken), "cancellationToken");
+        static readonly ParameterExpression Token = Parameter(typeof(CancellationToken), "token");
         static readonly ParameterExpression Arguments = Parameter(typeof(object[]), "parameters");
+        static readonly ReadOnlyCollection<ParameterExpression> LambdaParams = 
+            new ReadOnlyCollectionBuilder<ParameterExpression> { Target, Arguments, Token }.ToReadOnlyCollection();
+        static readonly Expression FirstArg = CreateArg(0);
+        static readonly Expression SecondArg = CreateArg(1);
         public readonly MethodExecutor Invoke;
         public readonly bool IsOneWay;
         public readonly Parameter[] Parameters;
@@ -231,14 +236,21 @@ class Server
                 var parameter = parameters[index];
                 var type = parameter.ParameterType;
                 Parameters[index] = new(type, parameter.GetDefaultValue());
-                callParameters[index] = type == typeof(CancellationToken) ? Token : Convert(ArrayIndex(Arguments, Constant(index, typeof(int))), type);
+                callParameters[index] = type == typeof(CancellationToken) ? Token : Convert(GetArg(index), type);
             }
             var instanceCast = Convert(Target, method.DeclaringType);
             var methodCall = Call(instanceCast, method, callParameters);
-            var lambda = Lambda<MethodExecutor>(methodCall, Target, Arguments, Token);
+            var lambda = Lambda<MethodExecutor>(methodCall, LambdaParams);
             Invoke = lambda.Compile();
             IsOneWay = method.IsOneWay();
         }
+        static Expression CreateArg(int index) => ArrayIndex(Arguments, Constant(index, typeof(int)));
+        static Expression GetArg(int index) => index switch
+        {
+            0 => FirstArg,
+            1 => SecondArg,
+            _ => CreateArg(index)
+        };
     }
     public readonly record struct Parameter(Type Type, object Default);
 }
