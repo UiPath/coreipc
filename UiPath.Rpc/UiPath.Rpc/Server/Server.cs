@@ -243,14 +243,14 @@ class Server
             var lambda = Lambda<MethodExecutor>(methodCall, LambdaParams);
             Invoke = lambda.Compile();
             IsOneWay = method.IsOneWay();
+            static Expression GetArg(int index) => index switch
+            {
+                0 => FirstArg,
+                1 => SecondArg,
+                _ => CreateArg(index)
+            };
         }
         static Expression CreateArg(int index) => ArrayIndex(Arguments, Constant(index, typeof(int)));
-        static Expression GetArg(int index) => index switch
-        {
-            0 => FirstArg,
-            1 => SecondArg,
-            _ => CreateArg(index)
-        };
     }
     public readonly record struct Parameter(Type Type, object Default);
 }
