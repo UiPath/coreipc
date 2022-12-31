@@ -159,7 +159,7 @@ public static class IOHelpers
         {
             using (recyclableStream)
             {
-                await resultTask;
+                await resultTask.ConfigureAwait(false);
             }
         }
     }
