@@ -132,10 +132,11 @@ public sealed class Connection : IDisposable
 #endif
     internal async ValueTask SendMessage(MessageType messageType, RecyclableMemoryStream data, CancellationToken cancellationToken)
     {
-        await _sendLock.WaitAsync(cancellationToken);
+        // SendMessage is callled by Cancel on user threads, try to get back on the thread pool, hence ConfigureAwait(false)
+        await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await Network.WriteMessage(messageType, data, CancellationToken.None);
+            await Network.WriteMessage(messageType, data, CancellationToken.None).ConfigureAwait(false);
         }
         finally
         {
