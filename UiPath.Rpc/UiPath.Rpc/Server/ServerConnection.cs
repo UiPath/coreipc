@@ -44,7 +44,7 @@ abstract class ServerConnection : IClient, IDisposable
         // close the connection when the service host closes
         using (cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), _connection))
         {
-            await _connection.Listen();
+            await _connection.Listen().ConfigureAwait(false);
         }
     }
     protected virtual void Dispose(bool disposing){}

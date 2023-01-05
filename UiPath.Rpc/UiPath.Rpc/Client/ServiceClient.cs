@@ -5,7 +5,6 @@ using InvokeDelegate = Func<IServiceClient, MethodInfo, object[], object>;
 interface IServiceClient : IDisposable
 {
     Task<TResult> Invoke<TResult>(MethodInfo method, object[] args);
-    Task<TResult> InvokeCore<TResult>(MethodInfo method, object[] args);
     Connection Connection { get; }
 }
 class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterface : class
@@ -61,23 +60,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         ListenerSettings listenerSettings = new(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
         connection.SetServer(listenerSettings);
     }
-    record MethodState(MethodInfo Method, object[] Args, IServiceClient ServiceClient)
-    {
-        public static Task<TResult> Invoke<TResult>(object state)
-        {
-            var (method, args, serviceClient) = (MethodState)state;
-            return serviceClient.InvokeCore<TResult>(method, args);
-        }
-    }
-    public Task<TResult> Invoke<TResult>(MethodInfo method, object[] args)
-    {
-        var syncContext = SynchronizationContext.Current;
-        var defaultContext = syncContext == null || syncContext.GetType() == typeof(SynchronizationContext);
-        return defaultContext ? InvokeCore<TResult>(method, args) : InvokeAsync(method, args);
-        Task<TResult> InvokeAsync(MethodInfo method, object[] args) => Task.Factory.StartNew(MethodState.Invoke<TResult>, new MethodState(method, args, this),
-            default, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default).Unwrap();
-    }
-    public async Task<TResult> InvokeCore<TResult>(MethodInfo method, object[] args)
+    public async Task<TResult> Invoke<TResult>(MethodInfo method, object[] args)
     {
         var methodName = method.Name;
         TimeoutHelper(out var timeoutHelper, out var messageTimeout);
@@ -85,10 +68,10 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         bool newConnection;
         try
         {
-            await _connectionLock.WaitAsync(token);
+            await _connectionLock.WaitAsync(token).ConfigureAwait(false);
             try
             {
-                newConnection = await EnsureConnection(token);
+                newConnection = await EnsureConnection(token).ConfigureAwait(false);
             }
             finally
             {
@@ -96,7 +79,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             }
             if (_beforeCall != null)
             {
-                await _beforeCall(new(newConnection, method, args), token);
+                await _beforeCall(new(newConnection, method, args), token).ConfigureAwait(false);
             }
             var requestId = _connection.NewRequestId();
             Request request = new(requestId, methodName, typeof(TInterface).Name, messageTimeout) { Parameters = args };
@@ -106,10 +89,10 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             }
             if (method.IsOneWay())
             {
-                await _connection.Send(request, token);
+                await _connection.Send(request, token).ConfigureAwait(false);
                 return default;
             }
-            var result = await _connection.RemoteCall<TResult>(request, token);
+            var result = await _connection.RemoteCall<TResult>(request, token).ConfigureAwait(false);
             if (LogEnabled)
             {
                 Log($"RpcClient called {methodName} {requestId} {Name}.");
@@ -174,7 +157,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     }
     private async Task<bool> Connect(CancellationToken cancellationToken)
     {
-        var clientConnection = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
+        var clientConnection = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken).ConfigureAwait(false);
         try
         {
             if (clientConnection.Connected)
@@ -186,7 +169,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             Stream network;
             try
             {
-                network = await clientConnection.Connect(cancellationToken);
+                network = await clientConnection.Connect(cancellationToken).ConfigureAwait(false);
             }
             catch
             {

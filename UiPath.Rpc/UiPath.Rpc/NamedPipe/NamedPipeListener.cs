@@ -20,7 +20,7 @@ class NamedPipeListener : Listener
         }
         public override async Task<Stream> AcceptClient(CancellationToken cancellationToken)
         {
-            await _server.WaitForConnectionAsync(cancellationToken);
+            await _server.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
             return _server;
         }
         public void Impersonate(PipeStreamImpersonationWorker action) => _server.RunAsClient(action);

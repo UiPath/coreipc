@@ -115,8 +115,8 @@ class Server
         }
         async ValueTask OnUploadRequest(Request request, EndpointSettings endpoint, MethodExecutor executor, Stream nestedStream)
         {
-            await _connection.EnterStreamMode();
-            await HandleRequest(request, endpoint, executor, isOneWay: false);
+            await _connection.EnterStreamMode().ConfigureAwait(false);
+            await HandleRequest(request, endpoint, executor, isOneWay: false).ConfigureAwait(false);
             nestedStream.Dispose();
         }
     }
@@ -129,7 +129,7 @@ class Server
         {
             if (isOneWay)
             {
-                await incomingRequest.OneWay();
+                await incomingRequest.OneWay().ConfigureAwait(false);
                 return;
             }
             (Response, Task Result) response = default;
@@ -140,16 +140,16 @@ class Server
             try
             {
                 var token = timeoutHelper.Token;
-                response = await incomingRequest.GetResponse(token);
+                response = await incomingRequest.GetResponse(token).ConfigureAwait(false);
                 if (LogEnabled)
                 {
                     Log($"{Name} sending response for {request}");
                 }
-                await Send(response, token);
+                await Send(response, token).ConfigureAwait(false);
             }
             catch (Exception ex) when(response.Result == null)
             {
-                await OnError(request, timeoutHelper.CheckTimeout(ex, request.Method));
+                await OnError(request, timeoutHelper.CheckTimeout(ex, request.Method)).ConfigureAwait(false);
             }
             finally
             {
@@ -194,7 +194,7 @@ class Server
         {
             using (downloadStream)
             {
-                await _connection.SendStream(MessageType.Response, responseBytes, downloadStream, cancellationToken);
+                await _connection.SendStream(MessageType.Response, responseBytes, downloadStream, cancellationToken).ConfigureAwait(false);
             }
         }
     }
@@ -270,10 +270,11 @@ file readonly record struct IncomingRequest(int RequestId, object[] Parameters, 
     }
     Task<Task> InvokeOnScheduler(CancellationToken token = default) =>
         Task.Factory.StartNew(InvokeState.Invoke, new InvokeState(this, token), token, TaskCreationOptions.DenyChildAttach, Scheduler);
-    async ValueTask<(Response, Task)> ScheduleMethodResult(CancellationToken cancellationToken) => await GetMethodResult(await InvokeOnScheduler(cancellationToken));
+    async ValueTask<(Response, Task)> ScheduleMethodResult(CancellationToken cancellationToken) => 
+        await GetMethodResult(await InvokeOnScheduler(cancellationToken).ConfigureAwait(false)).ConfigureAwait(false);
     async ValueTask<(Response, Task)> GetMethodResult(Task methodResult)
     {
-        await methodResult;
+        await methodResult.ConfigureAwait(false);
         return (new(RequestId), methodResult);
     }
 }

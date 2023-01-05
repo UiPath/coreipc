@@ -33,7 +33,7 @@ class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterfac
         {
             _tcpClient = new();
             var endPoint = ((ITcpKey)ConnectionKey).EndPoint;
-            await _tcpClient.ConnectAsync(endPoint.Address, endPoint.Port, cancellationToken);
+            await _tcpClient.ConnectAsync(endPoint.Address, endPoint.Port, cancellationToken).ConfigureAwait(false);
             return _tcpClient.GetStream();
         }
     }

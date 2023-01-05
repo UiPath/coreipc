@@ -30,7 +30,7 @@ class TcpListener : Listener
         public TcpServerConnection(Listener listener) : base(listener){}
         public override async Task<Stream> AcceptClient(CancellationToken cancellationToken)
         {
-            _tcpClient = await ((TcpListener)_listener).AcceptClient(cancellationToken);
+            _tcpClient = await ((TcpListener)_listener).AcceptClient(cancellationToken).ConfigureAwait(false);
             return _tcpClient.GetStream();
         }
         protected override void Dispose(bool disposing)

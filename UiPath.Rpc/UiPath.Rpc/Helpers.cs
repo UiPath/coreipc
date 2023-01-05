@@ -23,7 +23,7 @@ public static class Helpers
     public static async Task ConnectAsync(this TcpClient tcpClient, IPAddress address, int port, CancellationToken cancellationToken)
     {
         using var token = cancellationToken.UnsafeRegister(state => ((TcpClient)state).Dispose(), tcpClient);
-        await tcpClient.ConnectAsync(address, port);
+        await tcpClient.ConnectAsync(address, port).ConfigureAwait(false);
     }
 #endif
     public static bool IsOneWay(this MethodInfo method) => !method.ReturnType.IsGenericType;

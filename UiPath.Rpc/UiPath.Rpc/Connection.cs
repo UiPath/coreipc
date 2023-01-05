@@ -53,7 +53,7 @@ public sealed class Connection : IDisposable
         var tokenRegistration = token.UnsafeRegister(_cancelRequest, cancellationState);
         try
         {
-            await Send(request, token);
+            await Send(request, token).ConfigureAwait(false);
         }
         catch
         {
@@ -63,7 +63,7 @@ public sealed class Connection : IDisposable
         }
         try
         {
-            return await requestCompletion.ValueTask();
+            return await requestCompletion.ValueTask().ConfigureAwait(false);
         }
         finally
         {
@@ -106,20 +106,22 @@ public sealed class Connection : IDisposable
     IErrorCompletion Completion(int requestId) => _requests.TryRemove(requestId, out var outgoingRequest) ? outgoingRequest.Completion : null;
     internal async ValueTask SendStream(MessageType messageType, RecyclableMemoryStream data, Stream userStream, CancellationToken cancellationToken)
     {
-        await _sendLock.WaitAsync(cancellationToken);
+        await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         CancellationTokenRegistration tokenRegistration = default;
         try
         {
             tokenRegistration = cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), this);
-            await Network.WriteMessage(messageType, data, cancellationToken);
+            await Network.WriteMessage(messageType, data, cancellationToken).ConfigureAwait(false);
             var lengthBytes = BitConverter.GetBytes(userStream.Length);
+            await
 #if NET461
-            await Network.WriteAsync(lengthBytes, 0, lengthBytes.Length, cancellationToken);
+                Network.WriteAsync(lengthBytes, 0, lengthBytes.Length, cancellationToken)
 #else
-            await Network.WriteAsync(lengthBytes, cancellationToken);
+                Network.WriteAsync(lengthBytes, cancellationToken)
 #endif
+                .ConfigureAwait(false);
             const int DefaultCopyBufferSize = 81920;
-            await userStream.CopyToAsync(Network, DefaultCopyBufferSize, cancellationToken);
+            await userStream.CopyToAsync(Network, DefaultCopyBufferSize, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -132,7 +134,6 @@ public sealed class Connection : IDisposable
 #endif
     internal async ValueTask SendMessage(MessageType messageType, RecyclableMemoryStream data, CancellationToken cancellationToken)
     {
-        // SendMessage is callled by Cancel on user threads, try to get back on the thread pool, hence ConfigureAwait(false)
         await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -177,10 +178,11 @@ public sealed class Connection : IDisposable
         {
             var read = await Network.ReadAsync(
 #if NET461
-                _header, offset, toRead);
+                _header, offset, toRead)
 #else
-                _header.AsMemory(offset, toRead));
+                _header.AsMemory(offset, toRead))
 #endif
+                .ConfigureAwait(false);
             if (read == 0)
             {
                 return false;
@@ -195,20 +197,20 @@ public sealed class Connection : IDisposable
     {
         try
         {
-            while (await ReadHeader(HeaderLength))
+            while (await ReadHeader(HeaderLength).ConfigureAwait(false))
             {
                 ValueTask messageTask;
                 using (_messageStream = NewMessage())
                 {
 #if NET461
-                    await _nestedStream.CopyToAsync(_messageStream);
+                    await _nestedStream.CopyToAsync(_messageStream).ConfigureAwait(false);
 #else
                     int read;
                     Memory<byte> memory;
                     while (true)
                     {
                         memory = _messageStream.GetMemory();
-                        if ((read = await _nestedStream.ReadAsync(memory)) == 0)
+                        if ((read = await _nestedStream.ReadAsync(memory).ConfigureAwait(false)) == 0)
                         {
                             break;
                         }
@@ -218,7 +220,7 @@ public sealed class Connection : IDisposable
                     _messageStream.Position = 0;
                     messageTask = HandleMessage((MessageType)_header[0]);
                 }
-                await messageTask;
+                await messageTask.ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -248,7 +250,6 @@ public sealed class Connection : IDisposable
         }
         RecyclableMemoryStream NewMessage()
         {
-            Debug.Assert(SynchronizationContext.Current == null);
             var length = BitConverter.ToInt32(_header, startIndex: 1);
             if (length > _maxMessageSize)
             {
@@ -286,18 +287,18 @@ public sealed class Connection : IDisposable
         return default;
         async ValueTask OnDownloadResponse(Response response, IErrorCompletion completion)
         {
-            await EnterStreamMode();
+            await EnterStreamMode().ConfigureAwait(false);
             var streamDisposed = new TaskCompletionSource<bool>();
             EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
             _nestedStream.Disposed += disposedHandler;
             ((TaskCompletionPool<Stream>.ManualResetValueTaskSource)completion).SetResult(_nestedStream);
-            await streamDisposed.Task;
+            await streamDisposed.Task.ConfigureAwait(false);
             _nestedStream.Disposed -= disposedHandler;
         }
     }
     internal async ValueTask EnterStreamMode()
     {
-        if (!await ReadHeader(sizeof(long)))
+        if (!await ReadHeader(sizeof(long)).ConfigureAwait(false))
         {
             throw ClosedException;
         }

@@ -14,7 +14,7 @@ class WebSocketListener : Listener
     {
         public WebSocketConnection(Listener listener) : base(listener){}
         public override async Task<Stream> AcceptClient(CancellationToken cancellationToken) => 
-            new WebSocketStream(await ((WebSocketSettings)_listener.Settings).Accept(cancellationToken));
+            new WebSocketStream(await ((WebSocketSettings)_listener.Settings).Accept(cancellationToken).ConfigureAwait(false));
     }
 }
 public static class WebSocketServiceExtensions

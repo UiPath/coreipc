@@ -5,7 +5,7 @@ static class ClientConnectionsRegistry
     public static async Task<ClientConnection> GetOrCreate(IConnectionKey key, CancellationToken cancellationToken)
     {
         var clientConnection = GetOrAdd(key);
-        await clientConnection.Lock(cancellationToken);
+        await clientConnection.Lock(cancellationToken).ConfigureAwait(false);
         try
         {
             // check again just in case it was removed after GetOrAdd but before entering the lock
@@ -13,7 +13,7 @@ static class ClientConnectionsRegistry
             while ((newClientConnection = GetOrAdd(key)) != clientConnection)
             {
                 clientConnection.Release();
-                await newClientConnection.Lock(cancellationToken);
+                await newClientConnection.Lock(cancellationToken).ConfigureAwait(false);
                 clientConnection = newClientConnection;
             }
         }

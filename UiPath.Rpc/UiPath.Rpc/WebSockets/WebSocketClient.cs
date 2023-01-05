@@ -31,7 +31,7 @@ class WebSocketClient<TInterface> : ServiceClient<TInterface>, IWebSocketsKey wh
         {
             _clientWebSocket = new();
             var uri = ((IWebSocketsKey)ConnectionKey).Uri;
-            await _clientWebSocket.ConnectAsync(uri, cancellationToken);
+            await _clientWebSocket.ConnectAsync(uri, cancellationToken).ConfigureAwait(false);
             return new WebSocketStream(_clientWebSocket);
         }
     }

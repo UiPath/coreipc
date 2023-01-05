@@ -30,6 +30,6 @@ public sealed class ServiceHost : IDisposable
         {
             endpoint.Scheduler = taskScheduler;
         }
-        return Task.Run(() => Task.WhenAll(Array.ConvertAll(_listeners, listener => listener.Listen(_cancellationTokenSource.Token))));
+        return Task.WhenAll(Array.ConvertAll(_listeners, listener => listener.Listen(_cancellationTokenSource.Token)));
     }
 }

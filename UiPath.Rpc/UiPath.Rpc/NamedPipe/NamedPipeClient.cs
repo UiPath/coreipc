@@ -40,7 +40,7 @@ class NamedPipeClient<TInterface> : ServiceClient<TInterface>, INamedPipeKey whe
         {
             var key = (INamedPipeKey)ConnectionKey;
             _pipe = new(key.ServerName, key.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous, key.AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
-            await _pipe.ConnectAsync(cancellationToken);
+            await _pipe.ConnectAsync(cancellationToken).ConfigureAwait(false);
             return _pipe;
         }
     }
