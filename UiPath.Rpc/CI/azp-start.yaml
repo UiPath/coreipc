@@ -23,7 +23,6 @@ trigger:
     include:
       - 'UiPath.Rpc/*'
 jobs:
-  # The following 3 jobs will run in parallel:
             
   - job:
     displayName: '.NET on Windows'
