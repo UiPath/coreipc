@@ -27,7 +27,7 @@ jobs:
   - job:
     displayName: '.NET on Windows'
     pool:
-      vmImage: 'windows-2022'
+      vmImage: 'windows-latest'
     steps:
       - template: azp-initialization.yaml
       - template: azp-dotnet.yaml
