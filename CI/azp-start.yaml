@@ -10,7 +10,7 @@ variables:
   DotNet_MainProjectName: 'UiPath.CoreIpc'
   DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
-  
+
   NodeJS_DotNet_BuildConfiguration: 'Debug'
   NodeJS_ProjectPath: './src/Clients/nodejs'
   NodeJS_ArchivePath: './src/Clients/nodejs.zip'
@@ -20,11 +20,13 @@ variables:
   NodeJS_DotNetNodeInteropSolution: './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop.sln'
 trigger:
   paths:
-    exclude: # Exclude!
+    include:
+      - 'src/*'
+    exclude:
       - 'UiPath.Rpc/*'
 jobs:
   # The following 3 jobs will run in parallel:
-            
+
   - job:
     displayName: '.NET on Windows'
     pool:
