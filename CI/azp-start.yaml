@@ -21,9 +21,9 @@ variables:
 trigger:
   paths:
     include:
-      - 'src/*'
+      - 'src'
     exclude:
-      - 'UiPath.Rpc/*'
+      - 'UiPath.Rpc'
 jobs:
   # The following 3 jobs will run in parallel:
 
