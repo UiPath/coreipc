@@ -1,0 +1,31 @@
+steps:
+  - task: CopyFiles@2
+    displayName: '$(Label_DotNet) Copy nupkg to $(Build.ArtifactStagingDirectory)'
+    inputs:
+      SourceFolder: 'src\UiPath.CoreIpc\bin\$(DotNet_BuildConfiguration)\'
+      Contents: '*.*nupkg'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)'
+      CleanTargetFolder: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: '$(Label_DotNet) Publish the $(DotNet_ArtifactName) to the pipeline instance'
+    inputs:
+      ArtifactName: '$(DotNet_ArtifactName)'
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactType: 'Container'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'dotnet push to UiPath-Internal'
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+    inputs:
+      command: push
+      packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg'
+      publishVstsFeed: 'Public.Feeds/UiPath-Internal'
+
+  - task: PublishSymbols@2
+    displayName: 'Publish Symbols to UiPath Azure Artifacts Symbol Server'
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+    inputs:
+      symbolsFolder: $(Build.SourcesDirectory)
+      searchPattern: '**/UiPath.CoreIpc/bin/**/UiPath.CoreIpc.pdb'
+      symbolServerType: teamServices

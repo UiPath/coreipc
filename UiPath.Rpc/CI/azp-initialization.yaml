@@ -1,0 +1,33 @@
+steps:
+
+    # Read $(Version) from the UiPath.CoreIpc.csproj file
+  - powershell: |
+      $xml = [Xml] ( Get-Content $env:DotNet_MainProjectPath )
+      $version = [String] $xml.Project.PropertyGroup.Version
+      $version = $version.Trim()
+      
+      Write-Host "##vso[task.setvariable variable=Version;]$version"
+
+    displayName: '$(Label_Initialization) Read $[Version] from the csproj'
+    env:
+      DotNet_MainProjectPath: $(DotNet_MainProjectPath)
+
+  # If $(PublishRelease) != "true" then compute $(FullVersion) as $(Version)-$(Build.BuildNumber)
+  - task: VariableTransformTask@1
+    displayName: '$(Label_Initialization) Compute $[FullVersion] when $[PublishRelease] is not true'
+    inputs:
+      value: '$(Version)-$(Build.BuildNumber)'
+      variableName: 'FullVersion'
+      IsSecret: false
+      transformAction: 'none'
+    condition: ne(variables['PublishRelease'], 'true')
+
+  # If $(PublishRelease) == "true" then compute $(FullVersion) as $(Version)
+  - task: VariableTransformTask@1
+    displayName: '$(Label_Initialization) Compute $[FullVersion] when $[PublishRelease] is "true"'
+    inputs:
+      value: '$(Version)'
+      variableName: 'FullVersion'
+      IsSecret: false
+      transformAction: 'none'
+    condition: eq(variables['PublishRelease'], 'true')
