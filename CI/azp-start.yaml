@@ -18,7 +18,10 @@ variables:
   NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.CoreIpc.NodeInterop/bin/Debug/net6.0'
   NodeJS_DotNetNodeInteropProject : './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop/UiPath.CoreIpc.NodeInterop.csproj'
   NodeJS_DotNetNodeInteropSolution: './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop.sln'
-
+trigger:
+  paths:
+    exclude: # Exclude!
+      - 'UiPath.Rpc/*'
 jobs:
   # The following 3 jobs will run in parallel:
             
