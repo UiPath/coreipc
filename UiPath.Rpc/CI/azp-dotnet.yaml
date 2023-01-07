@@ -1,0 +1,15 @@
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_DotNet) Restore, build and pack'
+    inputs:
+      projects: '$(DotNet_SessionSolution)'
+      arguments: '--configuration $(DotNet_BuildConfiguration) -p:Version="$(FullVersion)" -p:DefineConstantsEx="CI"'
+      
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_DotNet) Run unit tests'
+    inputs:
+      command: 'test'
+      projects: 'UiPath.Rpc/**/*Tests*.csproj'
+      publishTestResults: true
+      testRunTitle: '.NET tests'
+      arguments: '--no-build --configuration $(DotNet_BuildConfiguration) --logger "console;verbosity=detailed"'

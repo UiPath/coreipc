@@ -6,11 +6,11 @@ variables:
   Label_NodeJS: 'node.js:'
 
   DotNet_BuildConfiguration: 'Release'
-  DotNet_SessionSolution: 'CoreIpc.sln'
+  DotNet_SessionSolution: './src/CoreIpc.sln'
   DotNet_MainProjectName: 'UiPath.CoreIpc'
   DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
-  
+
   NodeJS_DotNet_BuildConfiguration: 'Debug'
   NodeJS_ProjectPath: './src/Clients/nodejs'
   NodeJS_ArchivePath: './src/Clients/nodejs.zip'
@@ -18,10 +18,9 @@ variables:
   NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.CoreIpc.NodeInterop/bin/Debug/net6.0'
   NodeJS_DotNetNodeInteropProject : './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop/UiPath.CoreIpc.NodeInterop.csproj'
   NodeJS_DotNetNodeInteropSolution: './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop.sln'
-
 jobs:
   # The following 3 jobs will run in parallel:
-            
+
   - job:
     displayName: '.NET on Windows'
     pool:
