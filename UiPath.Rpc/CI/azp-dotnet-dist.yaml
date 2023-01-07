@@ -2,7 +2,7 @@ steps:
   - task: CopyFiles@2
     displayName: '$(Label_DotNet) Copy nupkg to $(Build.ArtifactStagingDirectory)'
     inputs:
-      SourceFolder: 'src\UiPath.CoreIpc\bin\$(DotNet_BuildConfiguration)\'
+      SourceFolder: 'UiPath.Rpc\bin\$(DotNet_BuildConfiguration)\'
       Contents: '*.*nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
       CleanTargetFolder: true
@@ -27,5 +27,5 @@ steps:
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
     inputs:
       symbolsFolder: $(Build.SourcesDirectory)
-      searchPattern: '**/UiPath.CoreIpc/bin/**/UiPath.CoreIpc.pdb'
+      searchPattern: '**/UiPath.Rpc/bin/**/UiPath.Rpc.pdb'
       symbolServerType: teamServices
