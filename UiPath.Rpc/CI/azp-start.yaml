@@ -8,7 +8,7 @@ variables:
   DotNet_BuildConfiguration: 'Release'
   DotNet_SessionSolution: 'UiPath.Rpc.sln'
   DotNet_MainProjectName: 'UiPath.Rpc'
-  DotNet_MainProjectPath: './UiPath.Rpc/UiPath.Rpc.csproj'
+  DotNet_MainProjectPath: './UiPath.Rpc/UiPath.Rpc/UiPath.Rpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
   
   NodeJS_DotNet_BuildConfiguration: 'Debug'
