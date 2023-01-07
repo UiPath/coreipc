@@ -1,6 +1,6 @@
 steps:
 
-    # Read $(Version) from the UiPath.CoreIpc.csproj file
+    # Read $(Version) from the UiPath.Rpc.csproj file
   - powershell: |
       $xml = [Xml] ( Get-Content $env:DotNet_MainProjectPath )
       $version = [String] $xml.Project.PropertyGroup.Version
