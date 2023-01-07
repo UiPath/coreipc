@@ -6,7 +6,7 @@ variables:
   Label_NodeJS: 'node.js:'
 
   DotNet_BuildConfiguration: 'Release'
-  DotNet_SessionSolution: 'CoreIpc.sln'
+  DotNet_SessionSolution: './src/CoreIpc.sln'
   DotNet_MainProjectName: 'UiPath.CoreIpc'
   DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
