@@ -6,18 +6,18 @@ variables:
   Label_NodeJS: 'node.js:'
 
   DotNet_BuildConfiguration: 'Release'
-  DotNet_SessionSolution: 'CoreIpc.sln'
-  DotNet_MainProjectName: 'UiPath.CoreIpc'
-  DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
+  DotNet_SessionSolution: 'UiPath.Rpc.sln'
+  DotNet_MainProjectName: 'UiPath.Rpc'
+  DotNet_MainProjectPath: './src/UiPath.Rpc/UiPath.Rpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
   
   NodeJS_DotNet_BuildConfiguration: 'Debug'
   NodeJS_ProjectPath: './src/Clients/nodejs'
   NodeJS_ArchivePath: './src/Clients/nodejs.zip'
   NodeJS_ArtifactName: 'NPM package'
-  NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.CoreIpc.NodeInterop/bin/Debug/net6.0'
-  NodeJS_DotNetNodeInteropProject : './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop/UiPath.CoreIpc.NodeInterop.csproj'
-  NodeJS_DotNetNodeInteropSolution: './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop.sln'
+  NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.Rpc.NodeInterop/bin/Debug/net6.0'
+  NodeJS_DotNetNodeInteropProject : './src/Clients/nodejs/dotnet/UiPath.Rpc.NodeInterop/UiPath.Rpc.NodeInterop.csproj'
+  NodeJS_DotNetNodeInteropSolution: './src/Clients/nodejs/dotnet/UiPath.Rpc.NodeInterop.sln'
 trigger:
   paths:
     include:
