@@ -9,7 +9,7 @@ steps:
     displayName: '$(Label_DotNet) Run unit tests'
     inputs:
       command: 'test'
-      projects: '**/*Tests*.csproj'
+      projects: 'UiPath.Rpc/**/*Tests*.csproj'
       publishTestResults: true
       testRunTitle: '.NET tests'
       arguments: '--no-build --configuration $(DotNet_BuildConfiguration) --logger "console;verbosity=detailed"'
