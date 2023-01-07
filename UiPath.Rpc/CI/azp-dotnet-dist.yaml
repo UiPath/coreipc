@@ -2,7 +2,7 @@ steps:
   - task: CopyFiles@2
     displayName: '$(Label_DotNet) Copy nupkg to $(Build.ArtifactStagingDirectory)'
     inputs:
-      SourceFolder: 'UiPath.Rpc\bin\$(DotNet_BuildConfiguration)\'
+      SourceFolder: 'UiPath.Rpc\UiPath.Rpc\bin\$(DotNet_BuildConfiguration)\'
       Contents: '*.*nupkg'
       TargetFolder: '$(Build.ArtifactStagingDirectory)'
       CleanTargetFolder: true
