@@ -25,7 +25,7 @@ trigger:
 jobs:
             
   - job:
-    displayName: '.NET on Windows'
+    displayName: '.NET on Windows '
     pool:
       vmImage: 'windows-latest'
     steps:
