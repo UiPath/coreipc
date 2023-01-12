@@ -23,7 +23,6 @@ public sealed class ServiceHost : IDisposable
         _cancellationTokenSource.Cancel();
         _cancellationTokenSource.Dispose();
     }
-    public void Run() => RunAsync().Wait();
     public Task RunAsync(TaskScheduler taskScheduler = null)
     {
         foreach (var endpoint in _endpoints.Values)
