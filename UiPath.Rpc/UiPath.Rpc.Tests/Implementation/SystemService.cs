@@ -69,7 +69,7 @@ public class SystemService : ISystemService
     {
         const int Timeout =
 #if CI
-            100;
+            150;
 #else
             50;
 #endif

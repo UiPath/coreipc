@@ -20,7 +20,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     {
         base.Configure(listenerSettings);
         listenerSettings.ConcurrentAccepts = 10;
-        listenerSettings.RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1));
+        listenerSettings.RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(2));
         return listenerSettings;
     }
     public override void Dispose()
