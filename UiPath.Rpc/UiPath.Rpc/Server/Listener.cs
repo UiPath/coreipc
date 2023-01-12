@@ -2,7 +2,7 @@
 public class ListenerSettings
 {
     public ListenerSettings(string name) => Name = name;
-    public byte ConcurrentAccepts { get; set; } = 5;
+    public byte ConcurrentAccepts { get; set; } = 2;
     public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
     public string Name { get; }
     public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
