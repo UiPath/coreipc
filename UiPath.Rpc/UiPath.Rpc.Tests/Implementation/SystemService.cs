@@ -71,7 +71,7 @@ public class SystemService : ISystemService
 #if CI
             100;
 #else
-            10;
+            50;
 #endif
         await Task.Delay(Timeout);
         DidNothing = true;
