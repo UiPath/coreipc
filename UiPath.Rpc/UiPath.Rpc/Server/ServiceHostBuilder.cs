@@ -5,38 +5,31 @@ public class ServiceHostBuilder
     public ServiceHostBuilder(IServiceProvider serviceProvider) => ServiceProvider = serviceProvider;
     internal IServiceProvider ServiceProvider { get; }
     internal Dictionary<string, EndpointSettings> Endpoints { get; } = new();
-    public ServiceHostBuilder AddEndpoint(EndpointSettings settings)
-    {
-        settings.ServiceProvider = ServiceProvider;
-        Endpoints.Add(settings.Name, settings);
-        return this;
-    }
     internal ServiceHostBuilder AddListener(Listener listener)
     {
         listener.Settings.SetValues(ServiceProvider, Endpoints);
         _listeners.Add(listener);
         return this;
     }
-    public ServiceHost Build() => new(_listeners, Endpoints);
-}
-public static class ServiceHostBuilderExtensions
-{
-    public static ServiceHostBuilder AddEndpoints(this ServiceHostBuilder serviceHostBuilder, IEnumerable<EndpointSettings> endpoints)
+    public ServiceHostBuilder AddEndpointSettings(EndpointSettings settings)
+    {
+        settings.ServiceProvider = ServiceProvider;
+        Endpoints.Add(settings.Name, settings);
+        return this;
+    }
+    public ServiceHostBuilder AddEndpoints(IEnumerable<EndpointSettings> endpoints)
     {
         foreach (var endpoint in endpoints)
         {
-            serviceHostBuilder.AddEndpoint(endpoint);
+            AddEndpointSettings(endpoint);
         }
-        return serviceHostBuilder;
+        return this;
     }
-    public static ServiceHostBuilder AddEndpoint<TContract>(this ServiceHostBuilder serviceHostBuilder, TContract serviceInstance = null) where TContract : class => 
-        serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract>(serviceInstance));
-    public static ServiceHostBuilder AddEndpoint<TContract, TCallbackContract>(this ServiceHostBuilder serviceHostBuilder, TContract serviceInstance = null) where TContract : class where TCallbackContract : class =>
-        serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract, TCallbackContract>(serviceInstance));
-}
-public static class ServiceCollectionExtensions
-{
-    public static IServiceCollection AddRpc(this IServiceCollection services) => services;
+    public ServiceHostBuilder AddEndpoint<TContract>(TContract serviceInstance = null) where TContract : class =>
+        AddEndpointSettings(new EndpointSettings<TContract>(serviceInstance));
+    public ServiceHostBuilder AddEndpoint<TContract, TCallbackContract>(TContract serviceInstance = null) where TContract : class where TCallbackContract : class =>
+        AddEndpointSettings(new EndpointSettings<TContract, TCallbackContract>(serviceInstance));
+    public ServiceHost Build() => new(_listeners, Endpoints);
 }
 public class EndpointSettings
 {
@@ -63,4 +56,8 @@ public class EndpointSettings<TContract> : EndpointSettings where TContract : cl
 public class EndpointSettings<TContract, TCallbackContract> : EndpointSettings<TContract> where TContract : class where TCallbackContract : class
 {
     public EndpointSettings(TContract serviceInstance = null) : base(serviceInstance, typeof(TCallbackContract)) { }
+}
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddRpc(this IServiceCollection services) => services;
 }
