@@ -29,3 +29,4 @@ steps:
       symbolsFolder: $(Build.SourcesDirectory)
       searchPattern: '**/UiPath.Rpc/bin/**/UiPath.Rpc.pdb'
       symbolServerType: teamServices
+      indexSources: false
