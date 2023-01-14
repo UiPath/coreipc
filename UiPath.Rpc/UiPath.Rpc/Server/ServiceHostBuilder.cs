@@ -1,7 +1,8 @@
 ﻿namespace UiPath.Rpc;
 public class ServiceHostBuilder
 {
-    private readonly List<Listener> _listeners = new();
+    readonly List<Listener> _listeners = new();
+    TaskScheduler _taskScheduler;
     public ServiceHostBuilder(IServiceProvider serviceProvider) => ServiceProvider = serviceProvider;
     internal IServiceProvider ServiceProvider { get; }
     internal Dictionary<string, EndpointSettings> Endpoints { get; } = new();
@@ -9,6 +10,11 @@ public class ServiceHostBuilder
     {
         listener.Settings.SetValues(ServiceProvider, Endpoints);
         _listeners.Add(listener);
+        return this;
+    }
+    public ServiceHostBuilder TaskScheduler(TaskScheduler taskScheduler)
+    {
+        _taskScheduler = taskScheduler;
         return this;
     }
     public ServiceHostBuilder AddEndpointSettings(EndpointSettings settings)
@@ -29,7 +35,17 @@ public class ServiceHostBuilder
         AddEndpointSettings(new EndpointSettings<TContract>(serviceInstance));
     public ServiceHostBuilder AddEndpoint<TContract, TCallbackContract>(TContract serviceInstance = null) where TContract : class where TCallbackContract : class =>
         AddEndpointSettings(new EndpointSettings<TContract, TCallbackContract>(serviceInstance));
-    public ServiceHost Build() => new(_listeners, Endpoints);
+    public ServiceHost Build()
+    {
+        if (_taskScheduler != null)
+        {
+            foreach (var endpoint in Endpoints.Values)
+            {
+                endpoint.Scheduler = _taskScheduler;
+            }
+        }
+        return new(_listeners);
+    }
 }
 public class EndpointSettings
 {

@@ -11,9 +11,10 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
         _computingCallback = new ComputingCallback { Id = Guid.NewGuid().ToString() };
         _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
         _computingHost = Configure(new ServiceHostBuilder(_serviceProvider))
+            .TaskScheduler(GuiScheduler)
             .AddEndpoint<IComputingService, IComputingCallback>()
             .ValidateAndBuild();
-        _computingHost.RunAsync(GuiScheduler);
+        _computingHost.RunAsync();
         _computingClient = ComputingClientBuilder(GuiScheduler).ValidateAndBuild();
     }
     protected abstract TBuilder ComputingClientBuilder(TaskScheduler taskScheduler = null);

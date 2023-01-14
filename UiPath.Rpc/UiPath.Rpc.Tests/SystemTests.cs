@@ -11,9 +11,10 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     {
         _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
         _systemHost = Configure(new ServiceHostBuilder(_serviceProvider))
+            .TaskScheduler(GuiScheduler)
             .AddEndpoint<ISystemService>()
             .ValidateAndBuild();
-        _systemHost.RunAsync(GuiScheduler);
+        _systemHost.RunAsync();
         _systemClient = CreateSystemService();
     }
     protected override TSettings Configure<TSettings>(TSettings listenerSettings)
