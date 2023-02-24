@@ -16,8 +16,8 @@ internal static class Contracts
     {
         Task<string> Ping();
         Task<int> MultiplySimple(int x, int y);
-        Task<int> Multiply(int x, int y, Message message = default);
-        Task<bool> Sleep(int milliseconds, Message message = default, CancellationToken ct = default);
+        Task<int> Multiply(int x, int y, Message message = default!);
+        Task<bool> Sleep(int milliseconds, Message message = default!, CancellationToken ct = default);
         Task<bool> Timeout();
         Task<int> Echo(int x);
         Task<bool> TestMessage(Message<int> message);

@@ -18,7 +18,7 @@ internal static class ServiceImpls
             return x * y;
         }
 
-        public async Task<int> Multiply(int x, int y, Message message = default)
+        public async Task<int> Multiply(int x, int y, Message message = default!)
         {
             var arithmetics = message.GetCallback<IArithmetics>();
 
@@ -36,7 +36,7 @@ internal static class ServiceImpls
             return await arithmetics.SendMessage(message);
         }
 
-        public async Task<bool> Sleep(int milliseconds, Message message = default, CancellationToken ct = default)
+        public async Task<bool> Sleep(int milliseconds, Message message = default!, CancellationToken ct = default)
         {
             await Task.Delay(milliseconds, ct);
             return true;
