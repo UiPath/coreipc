@@ -5,6 +5,7 @@ import {
     TraceListener,
     ITraceCategory,
     PromisePal,
+    TimeSpan,
 } from '../../../src/std';
 
 import { expect } from 'chai';
@@ -330,12 +331,14 @@ describe(`${Trace.name}'s`, () => {
         });
     });
 
-    describe(`📞 "traceError" static method`, () => {
+    describe(`📞 "traceErrorNoThrow" static method`, () => {
         describe(`should throw for invalid args`, () => {
-            const argsList = [[], [123], [true], [{}]] as Parameters<typeof Trace.traceError>[];
+            const argsList = [[], [123], [true], [{}]] as Parameters<
+                typeof Trace.traceErrorNoThrow
+            >[];
             for (const args of argsList) {
                 it(`when called with ${JSON.stringify(args)}`, () => {
-                    const act = () => Trace.traceError(...args);
+                    const act = () => Trace.traceErrorNoThrow(...args);
                     expect(act).to.throw();
                 });
             }
@@ -343,7 +346,7 @@ describe(`${Trace.name}'s`, () => {
 
         it(`should not throw when called with valid args`, () => {
             const act = () =>
-                Trace.traceError(
+                Trace.traceErrorNoThrow(
                     new Promise<boolean>((resolve, reject) => {
                         resolve(true);
                     }),
@@ -362,7 +365,7 @@ describe(`${Trace.name}'s`, () => {
 
             let reject: ((reason: any) => void) | undefined = undefined;
 
-            Trace.traceError(
+            Trace.traceErrorNoThrow(
                 new Promise<number>((_, x) => {
                     reject = x;
                 }),
@@ -381,6 +384,23 @@ describe(`${Trace.name}'s`, () => {
 
             expect(calls).to.have.lengthOf(1);
             expect(calls[0][1]).to.equal(promiseTraceErrorCategory);
+        });
+
+        it(`should preempt unhandled rejections`, async () => {
+            const beforeThrow = TimeSpan.fromMilliseconds(1);
+            const leeway = TimeSpan.fromMilliseconds(200);
+
+            async function throwSite(): Promise<void> {
+                await PromisePal.delay(beforeThrow);
+                throw new Error();
+            }
+
+            async function logic(): Promise<void> {
+                const _ = Trace.traceErrorNoThrow(throwSite());
+                await PromisePal.delay(leeway);
+            }
+
+            await logic();
         });
     });
 });

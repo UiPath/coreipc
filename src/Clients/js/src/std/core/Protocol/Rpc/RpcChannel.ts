@@ -148,7 +148,7 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
         this._observer.error(err);
     }
     private dispatchNetworkComplete(): void {
-        Trace.traceError(this.disposeAsync());
+        Trace.traceErrorRethrow(this.disposeAsync());
     }
 
     private processIncommingResponse(message: Network.Message): void {

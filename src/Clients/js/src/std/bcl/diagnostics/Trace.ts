@@ -1,4 +1,4 @@
-import { assertArgument, IDisposable, ArgumentNullError } from '..';
+import { assertArgument, IDisposable, ArgumentNullError, PromisePal } from '..';
 
 export interface ITraceCategory {
     log(error: Error): void;
@@ -64,11 +64,24 @@ export class Trace {
 
     private static _cachedEmptyActionOfT<T = unknown>(value: T) {}
 
-    public static traceError<T = unknown>(promise: Promise<T>): void {
+    private static traceError<T>(promise: Promise<T>, reason?: any): void {
+        Trace._promiseTrace.log(`\r\n\tpromise: ${promise}\r\n\treason: ${reason}`);
+    }
+
+    public static async traceErrorRethrow<T = unknown>(promise: Promise<T>): Promise<T> {
         assertArgument({ promise }, Promise);
 
-        promise.then(Trace._cachedEmptyActionOfT, (reason: any) => {
-            Trace._promiseTrace.log(`\r\n\tpromise: ${promise}\r\n\treason: ${reason}`);
+        return promise.catch(reason => {
+            Trace.traceError(promise, reason);
+            throw reason;
+        });
+    }
+
+    public static traceErrorNoThrow<T = unknown>(promise: Promise<T>): Promise<T | void> {
+        assertArgument({ promise }, Promise);
+
+        return promise.catch(reason => {
+            Trace.traceError(promise, reason);
         });
     }
 }

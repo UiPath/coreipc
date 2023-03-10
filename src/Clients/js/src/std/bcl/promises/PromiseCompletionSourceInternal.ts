@@ -7,6 +7,7 @@ import {
     FinalStateCanceled,
     PromisePal,
 } from '.';
+import { Trace } from '../diagnostics';
 
 /* @internal */
 export interface IPromiseCompletionSourceInternal<T = unknown> {
@@ -35,7 +36,7 @@ export class PromiseCompletionSourceInternal<T = unknown>
         };
 
         this.promise = new Promise<T>(assignCompleter);
-        PromisePal.traceError(this.promise);
+        const _ = Trace.traceErrorNoThrow(this.promise);
     }
 
     public readonly promise: Promise<T>;

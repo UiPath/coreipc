@@ -1,4 +1,5 @@
 import { EmptyCancellationToken, CancellationTokenRegistration } from '.';
+import { Trace } from '..';
 import { PromiseCompletionSource, PromisePal } from '../promises';
 
 export abstract class CancellationToken {
@@ -23,7 +24,7 @@ export abstract class CancellationToken {
         }
 
         const reg = this.register(() => pcs.trySetCanceled());
-        PromisePal.traceError(
+        Trace.traceErrorNoThrow(
             (async () => {
                 try {
                     await pcs.promise;

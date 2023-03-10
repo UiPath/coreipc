@@ -4,6 +4,8 @@ import {
     OperationCanceledError,
     PromiseCompletionSource,
     PromisePal,
+    TimeSpan,
+    Trace,
 } from '../../../src/std';
 
 import { expect } from 'chai';
@@ -13,11 +15,15 @@ describe(`${CancellationToken.name}'s`, () => {
 
     describe(`📞 "${__('bind')}" instance method`, () => {
         it(`🚡 PromiseCompletionSource should not leave unobserved rejections`, async () => {
+            const leeway = TimeSpan.fromMilliseconds(200);
+
             const pcs = new PromiseCompletionSource<void>();
 
-            PromisePal.traceError(pcs.promise);
+            Trace.traceErrorNoThrow(pcs.promise);
 
             pcs.setCanceled();
+
+            await PromisePal.delay(leeway);
         });
 
         it(`🚡 CancellationToken.bind should not cause unobserved rejections`, async () => {

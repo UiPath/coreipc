@@ -2,6 +2,7 @@ import {
     ArgumentOutOfRangeError,
     assertArgument,
     CancellationToken,
+    OperationCanceledError,
     PromiseCompletionSource,
     TimeSpan,
 } from '..';
@@ -26,10 +27,6 @@ const promiseNever: Promise<never> = {
 };
 
 export class PromisePal {
-    public static traceError<T>(promise: Promise<T>): void {
-        promise.catch(emptyOnRejected);
-    }
-
     public static get never(): Promise<never> {
         return promiseNever;
     }
@@ -70,5 +67,17 @@ export class PromisePal {
             : null;
 
         return pcs.promise;
+    }
+
+    public static fromResult<T>(value: T): Promise<T> {
+        return new Promise<T>(resolve => resolve(value));
+    }
+
+    public static fromError<T = unknown>(reason?: any): Promise<T> {
+        return new Promise<T>((_, reject) => reject(reason));
+    }
+
+    public static fromCanceled<T = unknown>(): Promise<T> {
+        return PromisePal.fromError<T>(new OperationCanceledError());
     }
 }

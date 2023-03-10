@@ -1,3 +1,4 @@
+import { Trace } from '../diagnostics';
 import { ArgumentNullError, TimeoutError } from '../errors';
 import { assertArgument } from '../helpers';
 import { PromiseCompletionSource, PromisePal } from '../promises';
@@ -173,7 +174,7 @@ export class TimeSpan {
             trySetFaulted();
         }
 
-        const _ = PromisePal.traceError(
+        const _ = Trace.traceErrorNoThrow(
             (async () => {
                 const reg = setTimeout(() => {
                     trySetFaulted();
