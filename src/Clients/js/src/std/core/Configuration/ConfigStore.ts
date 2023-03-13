@@ -32,7 +32,13 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         assertArgument({ address }, Address, 'undefined');
         assertArgument({ value }, 'function', 'undefined');
 
-        const key = address?.key ?? ConfigStore.EmptyKey;
+        const key = (!address
+            ? ConfigStore.EmptyKey
+            : ConfigStore.computeCompositeKey<
+                TAddressBuilder,
+                TAddress,
+                any
+            >(this._serviceProvider, address, undefined));
 
         if (!value) {
             this._connectHelpers.delete(key);

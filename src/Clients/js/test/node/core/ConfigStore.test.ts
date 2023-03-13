@@ -47,11 +47,19 @@ describe(`${ConfigStore.name}'s`, () => {
             expect(actual).to.equal(undefined);
         });
 
-        it(`should return whatever was configured`, () => {
+        it(`should return the fallback ConnectHelper for any address`, () => {
             const expected: ConnectHelper<Address> = async context => {};
 
             const sut = createConfigStore();
             sut.setConnectHelper(undefined, expected);
+            expect(sut.getConnectHelper(mockAddress)).to.equal(expected);
+        });
+
+        it(`should return the ConnectHelper that was configured for a particular address`, () => {
+            const expected: ConnectHelper<Address> = async context => {};
+
+            const sut = createConfigStore();
+            sut.setConnectHelper(mockAddress, expected);
             expect(sut.getConnectHelper(mockAddress)).to.equal(expected);
         });
     });
