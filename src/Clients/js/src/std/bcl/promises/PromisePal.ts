@@ -88,4 +88,10 @@ export class PromisePal {
         assertArgument({ promise }, Promise);
         return new PromiseSpyImpl<T>(promise);
     }
+
+    public static yield(): Promise<void> {
+        const pcs = new PromiseCompletionSource<void>();
+        setTimeout(pcs.setResult.bind(pcs), 0);
+        return pcs.promise;
+    }
 }
