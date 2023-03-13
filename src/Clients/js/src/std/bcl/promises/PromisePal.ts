@@ -1,4 +1,5 @@
 import {
+    ArgumentNullError,
     ArgumentOutOfRangeError,
     assertArgument,
     CancellationToken,
@@ -6,6 +7,8 @@ import {
     PromiseCompletionSource,
     TimeSpan,
 } from '..';
+import { PromiseSpy } from './PromiseSpy';
+import { PromiseSpyImpl } from './PromiseSpyImpl';
 
 function emptyOnRejected(reason: any) {}
 
@@ -79,5 +82,10 @@ export class PromisePal {
 
     public static fromCanceled<T = unknown>(): Promise<T> {
         return PromisePal.fromError<T>(new OperationCanceledError());
+    }
+
+    public static spy<T>(promise: Promise<T>): PromiseSpy<T> {
+        assertArgument({ promise }, Promise);
+        return new PromiseSpyImpl<T>(promise);
     }
 }

@@ -1,4 +1,6 @@
 import {
+    ArgumentNullError,
+    AsyncAutoResetEvent,
     CancellationTokenSource,
     OperationCanceledError,
     PromisePal,
@@ -7,6 +9,7 @@ import {
 } from '../../../src/std';
 
 import { expect } from 'chai';
+import { PromiseStatus } from '../../../src/std/bcl/promises/PromiseStatus';
 
 describe(`${PromisePal.name}'s`, () => {
     describe(`🌿 "never" static property`, () => {
@@ -172,6 +175,114 @@ describe(`${PromisePal.name}'s`, () => {
 
                 expect(completedSuccessfully).to.equal(true);
             });
+        });
+    });
+
+    describe(`📞 "spy" static method`, () => {
+        it(`should not throw when called with a promise`, () => {
+            async function stateMachine(): Promise<void> {}
+
+            const promise = stateMachine();
+
+            const act = () => {
+                const _ = PromisePal.spy(promise);
+            };
+            expect(act).not.to.throw();
+        });
+
+        for (const promise of [null as any as Promise<void>, undefined as any as Promise<void>]) {
+            it(`should throw when called with a falsy promise`, () => {
+                const act = () => {
+                    const _ = PromisePal.spy(promise);
+                };
+                expect(act).to.throw(ArgumentNullError);
+            });
+        }
+
+        it(`should return a PromiseSpy that successfully tracks the resolution of the promise`, async () => {
+            const result = 100;
+            const event = new AsyncAutoResetEvent();
+
+            async function machine(): Promise<number> {
+                await event.waitOne();
+                return result;
+            }
+
+            const promise = machine();
+
+            const spy = PromisePal.spy(promise);
+
+            expect(spy.status).to.eq(PromiseStatus.Running);
+
+            await PromisePal.delay(10);
+
+            expect(spy.status).to.eq(PromiseStatus.Running);
+
+            event.set();
+
+            await PromisePal.delay(10);
+
+            expect(spy.status).to.eq(PromiseStatus.Succeeded);
+            expect(spy.error).to.be.undefined;
+            expect(spy.result).to.eq(result);
+        });
+
+        it(`should return a PromiseSpy that successfully tracks the rejection of the promise`, async () => {
+            const reason = new Error();
+            const event = new AsyncAutoResetEvent();
+
+            async function machine(): Promise<number> {
+                await event.waitOne();
+                throw reason;
+            }
+
+            const promise = machine();
+
+            const spy = PromisePal.spy(promise);
+
+            expect(spy.status).to.eq(PromiseStatus.Running);
+
+            await PromisePal.delay(10);
+
+            expect(spy.status).to.eq(PromiseStatus.Running);
+
+            event.set();
+
+            await PromisePal.delay(10);
+
+            expect(spy.status).to.eq(PromiseStatus.Faulted);
+            expect(spy.result).to.be.undefined;
+            expect(spy.error).to.eq(reason);
+        });
+
+        it(`should return a PromiseSpy that successfully tracks the cancellation of the promise`, async () => {
+            const cts = new CancellationTokenSource();
+            try {
+                async function machine(): Promise<number> {
+                    await PromisePal.delay(TimeSpan.fromHours(2), cts.token);
+                    return 100;
+                }
+
+                const promise = machine();
+
+                const spy = PromisePal.spy(promise);
+
+                expect(spy.status).to.eq(PromiseStatus.Running);
+
+                await PromisePal.delay(10);
+
+                expect(spy.status).to.eq(PromiseStatus.Running);
+
+                cts.cancel();
+
+                await PromisePal.delay(10);
+
+                expect(spy.status).to.eq(PromiseStatus.Canceled);
+                expect(spy.result).to.be.undefined;
+                expect(spy.error).to.be.instanceOf(OperationCanceledError);
+            } finally {
+                cts.dispose();
+            }
         });
     });
 });
