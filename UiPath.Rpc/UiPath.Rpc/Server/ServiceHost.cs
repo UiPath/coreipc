@@ -15,7 +15,7 @@ public sealed class ServiceHost : IDisposable
             listener.Dispose();
         }
         _cancellationTokenSource.Cancel();
-        _cancellationTokenSource.Dispose();
+        _cancellationTokenSource.AssertDisposed();
     }
     public Task RunAsync() => Task.WhenAll(Array.ConvertAll(_listeners, listener => listener.Listen(_cancellationTokenSource.Token)));
 }

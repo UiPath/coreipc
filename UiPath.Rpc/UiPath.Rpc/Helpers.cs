@@ -31,8 +31,16 @@ public static class Helpers
     private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
     public static bool Enabled(this ILogger logger) => logger != null && logger.IsEnabled(LogLevel.Information);
     [Conditional("DEBUG")]
-    public static void AssertDisposed(this SemaphoreSlim semaphore) =>
-        Debug.Assert(typeof(SemaphoreSlim).GetField("m_waitHandle", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(semaphore) == null);
+    public static void AssertDisposed(this SemaphoreSlim semaphore) => semaphore.AssertFieldNull("m_waitHandle");
+    [Conditional("DEBUG")]
+    public static void AssertDisposed(this CancellationTokenSource cts)
+    {
+        cts.AssertFieldNull("_kernelEvent");
+        cts.AssertFieldNull("_timer");
+    }
+    [Conditional("DEBUG")]
+    static void AssertFieldNull(this object obj, string field) => 
+        Debug.Assert(obj.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(obj) == null);
     public static TDelegate MakeGenericDelegate<TDelegate>(this MethodInfo genericMethod, Type genericArgument) where TDelegate : Delegate =>
         (TDelegate)genericMethod.MakeGenericMethod(genericArgument).CreateDelegate(typeof(TDelegate));
     public static MethodInfo GetStaticMethod(this Type type, string name) => type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
