@@ -20,7 +20,7 @@ public sealed class ServiceHost : IDisposable
             listener.Dispose();
         }
         _cancellationTokenSource.Cancel();
-        _cancellationTokenSource.Dispose();
+        _cancellationTokenSource.AssertDisposed();
     }
     public void Run() => RunAsync().Wait();
     public Task RunAsync(TaskScheduler taskScheduler = null)
