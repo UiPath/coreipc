@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using Newtonsoft.Json;
 namespace UiPath.CoreIpc;
+
 public class Message
 {
     internal bool ObjectParameters { get; set; }
