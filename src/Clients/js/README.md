@@ -6,27 +6,33 @@
 
 ## Introduction
 
-The [![npm](readme-assets/npm.png) `@uipath/coreipc` npm package](https://github.com/UiPath/coreipc/packages/71523) is used to connect Node.js clients to .NET servers via CoreIpc and named pipes (unix sockets).
+The [![npm](readme-assets/npm.png) `@uipath/coreipc`](https://github.com/UiPath/coreipc/packages/71523) **NPM package** is used to connect Node.js clients to .NET servers via CoreIpc and named pipes (unix sockets).
 
 ![diagram](readme-assets/diagram.png)
 
+Similarly, the [![npm](readme-assets/npm.png) `@uipath/coreipc-web`](https://uipath.visualstudio.com/CoreIpc/_artifacts/feed/EddiesExperimentalFeed/Npm/@uipath%2Fcoreipc-web/overview/2.5.1-20230313-05) **NPM package** is used to connect JavaScript clients to .NET servers, but the clients are Web browsers and the connection is done via WebSockets.
+
+
 ---
-## Installing the package
+## Installing the packages
 
 1. Configure your `.npmrc` according to  [GitHub's documentation](https://docs.github.com/en/free-pro-team@latest/packages/using-github-packages-with-your-projects-ecosystem/configuring-npm-for-use-with-github-packages).
 
 > Your `.npmrc` should be similar to:
-> 
+>
 > ```elixir
 > //npm.pkg.github.com/:_authToken=<ANY VALID AUTH TOKEN>
 > @uipath:registry=https://npm.pkg.github.com/
-> 
+>
 > ```
 
-2. Install the [![npm](readme-assets/npm.png) `@uipath/coreipc` npm package](https://github.com/UiPath/coreipc/packages/71523) as a runtime dependency.
+> **NOTE**: ❗️Before merging the the [Feat/js multitargeting](https://github.com/UiPath/coreipc/pull/87) PR, the **@uipath/coreipc-web** is not yet available on the GitHub Packages feed. Until that time, please check the Azure Artifacts specific configuration.
+
+2. Install the [![npm](readme-assets/npm.png) `@uipath/coreipc`](https://github.com/UiPath/coreipc/packages/71523) and/or [![npm](readme-assets/npm.png) `@uipath/coreipc-web`](https://uipath.visualstudio.com/CoreIpc/_artifacts/feed/EddiesExperimentalFeed/Npm/@uipath%2Fcoreipc-web/overview/2.5.1-20230313-05) the  **NPM package** as a runtime dependency.
 
 ```elixir
 npm install @uipath/coreipc@<SPECIFIC VERSION>
+npm install @uipath/coreipc-web@<SPECIFIC VERSION>
 ```
 
 3. Import the module and start using it:
@@ -95,7 +101,9 @@ async function main(): Promise<void> {
     const pipeName = 'In-The-Pipe-5by5';
 
     // synchronously obtain a liteweight proxy around the pipe name the service contract
-    const proxy = ipc.proxy.get(pipeName, IComputingService);
+    const proxy = ipc.proxy
+        .withAddress(options => options.isPipe(pipeName))
+        .withService(IComputingService);
 
     // use the proxy
     await use(proxy);
@@ -177,27 +185,32 @@ import { ipc, TimeSpan } from '@uipath/coreipc';
 
 const _3seconds = TimeSpan.fromSeconds(3);
 
-ipc.config(
-    options => {
-        options.setRequestTimeout(_3seconds);
-    }
-);
+ipc.config
+    .forAnyAddress()
+    .forAnyService()
+    .setRequestTimeout(_3seconds);
 ```
 
-For a particular pipe name:
+For a particular pipe name or Web socket URL:
 
 ```typescript
 import { ipc, TimeSpan } from '@uipath/coreipc';
 
-const whichPipe = 'this one';
 const _3seconds = TimeSpan.fromSeconds(3);
+const whichPipe = 'this one';
 
-ipc.config(
-    whichPipe,
-    options => {
-        options.setRequestTimeout(_3seconds);
-    }
-);
+ipc.config
+    .forAddress(options => options.isPipe(whichPipe))
+    .forAnyService()
+    .setRequestTimeout(_3seconds);
+
+// alternatively, for Web sockets:
+
+ipc.config
+    .forAddress(options => options.isWebSocket("...URL..."))
+    .forAnyService()
+    .setRequestTimeout(_3seconds);
+
 ```
 
 For a particular contract:
@@ -208,15 +221,13 @@ import { ISample } from './SampleContract';
 
 const _3seconds = TimeSpan.fromSeconds(3);
 
-ipc.config(
-    ISample,
-    options => {
-        options.setRequestTimeout(_3seconds);
-    }
-);
+ipc.config
+    .forAnyAddress()
+    .forService(ISample)
+    .setRequestTimeout(_3seconds);
 ```
 
-For a particular contract and pipe name:
+For a particular contract and pipe name/Web socket URL:
 
 ```typescript
 import { ipc, TimeSpan } from '@uipath/coreipc';
@@ -225,16 +236,20 @@ import { ISample } from './SampleContract';
 const whichPipe = 'this one';
 const _3seconds = TimeSpan.fromSeconds(3);
 
-ipc.config(
-    ISample,
-    whichPipe,
-    options => {
-        options.setRequestTimeout(_3seconds);
-    }
-);
+ipc.config
+    .forAddress(options => options.isPipe(whichPipe))
+    .forService(ISample)
+    .setRequestTimeout(_3seconds);
+
+// alternatively, for Web Sockets:
+
+ipc.config
+    .forAddress(options => options.isWebSocket("...URL..."))
+    .forService(ISample)
+    .setRequestTimeout(_3seconds);
 ```
 
-> **NOTES:** 
+> **NOTES:**
 > - All configurations are stored but choosing the same pipe name / contract in a 2nd configuration call will overwrite the previous configuration.
 >
 > - Specific configurations outweigh generic ones, i.e, given the following configurations:
@@ -242,7 +257,7 @@ ipc.config(
 >   - set the request timeout in general to 1 second
 >   - set the request timeout for pipe name "foo" to 2 seconds
 >   - set the request timeout for pipe name "foo" and contract ISample to 3 seconds
->   ``` 
+>   ```
 >   the following facts are correct:
 >   ```
 >   - the request timeout for pipe name "bar" and contract IAlgebra is 1 second
@@ -250,4 +265,26 @@ ipc.config(
 >   - the request timeout for pipe name "foo" and contract ISample is 3 seconds
 >   ```
 
+---
+## Notes for Contributors
 
+### Regarding the Codebase anatomy
+
+The `src/node` and `src/std` directories together produce the Node.js NPM package, while the `src/web` and `src/std` directories together produce the Web package.
+
+```
+📂 src
+  📂 node ─┐
+    📂 ..  ├───────────┐
+  📂 std ──┼───────────┼───────┐
+    📂 .. ─┘           │       ├─────────┐
+  📂 web               │       │         │
+    📂 .. ─────────────┼───────┘         │
+📂 test                │             produces
+  📂 ..            produces              │
+📂 dist                │                 │
+  📂 ..                │                 │
+📂 dist-packages       ↓                 │
+  💻 uipath-coreipc-{Version}.tgz        │
+  🕸️ uipath-coreipc-web-{Version}.tgz ←──┘
+```
