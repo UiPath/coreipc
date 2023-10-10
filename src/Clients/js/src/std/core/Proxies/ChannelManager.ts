@@ -18,40 +18,30 @@ import { Observer } from 'rxjs';
 
 /* @internal */
 export class ChannelManager<TAddress extends Address = Address> {
-    private _channel: IRpcChannel | undefined;
+    private _latestChannel: IRpcChannel | undefined;
 
     constructor(
-        private readonly _domain: IServiceProvider,
+        private readonly _sp: IServiceProvider,
         private readonly _address: TAddress,
         private readonly _rpcChannelFactory: IRpcChannelFactory,
         private readonly _messageStreamFactory?: IMessageStream.Factory,
     ) {}
 
-    async invokeMethod<TService>(
-        service: PublicCtor<TService>,
-        methodName: keyof TService & string,
-        args: unknown[],
-    ): Promise<unknown> {
-        const [rpcRequest, returnsPromiseOf, ct, timeout] =
-            RpcRequestFactory.create({
-                domain: this._domain,
-                service: service,
-                address: this._address,
-                methodName,
-                args,
-            });
+    async invokeMethod<TService>(service: PublicCtor<TService>, methodName: keyof TService & string, args: unknown[]): Promise<unknown> {
+        const [rpcRequest, returnsPromiseOf, ct, timeout] = RpcRequestFactory.create(
+        {
+            sp: this._sp,
+            service,
+            address: this._address,
+            methodName,
+            args,
+        });
 
-        const channel = await this.ensureConnection(
-            Timeout.infiniteTimeSpan,
-            ct,
-        );
+        const channel = await this.ensureConnection(Timeout.infiniteTimeSpan, ct);
 
         const rpcResponse = await channel.call(rpcRequest, timeout, ct);
 
-        const result = Converter.fromRpcResponse(
-            rpcResponse,
-            rpcRequest,
-        ) as any;
+        const result = Converter.unwrapRpcResponse(rpcResponse, rpcRequest) as any;
 
         if (returnsPromiseOf instanceof Function) {
             result.constructor = returnsPromiseOf;
@@ -60,16 +50,13 @@ export class ChannelManager<TAddress extends Address = Address> {
         return result;
     }
 
-    private async ensureConnection(
-        timeout: TimeSpan,
-        ct: CancellationToken,
-    ): Promise<IRpcChannel> {
-        if (!this._channel || this._channel.isDisposed) {
+    private async ensureConnection(timeout: TimeSpan, ct: CancellationToken): Promise<IRpcChannel> {
+        if (!this._latestChannel || this._latestChannel.isDisposed) {
             const connectHelper =
-                this._domain.configStore.getConnectHelper(this._address) ??
+                this._sp.configStore.getConnectHelper(this._address) ??
                 defaultConnectHelper;
 
-            this._channel = this._rpcChannelFactory.create(
+            this._latestChannel = this._rpcChannelFactory.create(
                 this._address,
                 connectHelper,
                 timeout,
@@ -79,13 +66,13 @@ export class ChannelManager<TAddress extends Address = Address> {
             );
         }
 
-        return this._channel;
+        return this._latestChannel;
     }
 
     private async invokeCallback(
         request: RpcMessage.Request,
     ): Promise<RpcMessage.Response> {
-        const callback = this._domain.callbackStore.get(
+        const callback = this._sp.callbackStore.get(
             request.Endpoint,
             this._address,
         ) as any;
@@ -118,7 +105,6 @@ export class ChannelManager<TAddress extends Address = Address> {
 
         return new RpcMessage.Response(request.Id, data, error);
     }
-
     private readonly _incommingCallObserver = new (class
         implements Observer<RpcCallContext.Incomming>
     {

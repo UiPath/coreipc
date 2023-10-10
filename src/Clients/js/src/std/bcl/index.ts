@@ -10,3 +10,4 @@ export * from './reflection';
 export * from './serialization';
 export * from './synchronization';
 export * from './system';
+export * from './collections';

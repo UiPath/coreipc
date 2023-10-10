@@ -1,6 +1,6 @@
 import { ICallInterceptor, ICallInterceptorContainer } from '.';
 
 /* @internal */
-export type DispatchProxy<TService> = new (
+export type DispatchProxyClass<TService = unknown> = new (
     callInterceptor: ICallInterceptor<TService>,
 ) => TService & ICallInterceptorContainer<TService>;

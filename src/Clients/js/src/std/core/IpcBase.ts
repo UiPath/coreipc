@@ -16,10 +16,10 @@ import {
 
 import {
     ProxyId,
-    ProxyStore,
+    ProxySource,
     IServiceProvider,
-    DispatchProxyStore,
-    ChannelManagerStore,
+    DispatchProxyClassStore,
+    Wire,
     CallbackStoreImpl,
 } from './Proxies';
 import { ContractStore, IContractStore } from './Contract';
@@ -94,8 +94,6 @@ export abstract class IpcBaseImpl<TAddressBuilder extends AddressBuilder = any>
         return new this.addressBuilder();
     }
 
-    readonly symbolofServiceAttachment: symbol = Symbol('ServiceAttachment');
-
     public readonly proxy: IpcBaseImpl.ProxySource<TAddressBuilder> =
         new IpcBaseImpl.ProxySource<TAddressBuilder>(this);
 
@@ -110,17 +108,13 @@ export abstract class IpcBaseImpl<TAddressBuilder extends AddressBuilder = any>
     );
 
     /* @internal */
-    public readonly proxyStore: ProxyStore<TAddressBuilder> = new ProxyStore<TAddressBuilder>(this);
+    public readonly proxySource: ProxySource<TAddressBuilder> = new ProxySource<TAddressBuilder>(this);
 
     /* @internal */
-    public readonly dispatchProxyStore: DispatchProxyStore = new DispatchProxyStore(this);
+    public readonly dispatchProxies: DispatchProxyClassStore = new DispatchProxyClassStore();
 
     /* @internal */
-    public readonly channelStore: ChannelManagerStore = new ChannelManagerStore(
-        this,
-        RpcChannel,
-        new MessageStream.Factory(),
-    );
+    public readonly wire: Wire = new Wire(this);
 
     /* @internal */
     public readonly contractStore: IContractStore = new ContractStore();
@@ -155,7 +149,7 @@ export module IpcBaseImpl {
         public withService<TService>(service: PublicCtor<TService>): TService {
             const proxyId = new ProxyId<TService, TAddress>(service, this._address);
 
-            const proxy = this._ipc.proxyStore.resolve(proxyId);
+            const proxy = this._ipc.proxySource.resolve(proxyId);
             return proxy;
         }
     }

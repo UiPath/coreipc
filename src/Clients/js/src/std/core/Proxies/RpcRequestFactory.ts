@@ -11,7 +11,7 @@ import { IServiceProvider } from '.';
 /* @internal */
 export class RpcRequestFactory {
     public static create<TService, TAddress extends Address>(params: {
-        domain: IServiceProvider;
+        sp: IServiceProvider;
         service: PublicCtor<TService>;
         address: TAddress;
         methodName: keyof TService & string;
@@ -22,7 +22,7 @@ export class RpcRequestFactory {
         CancellationToken,
         TimeSpan,
     ] {
-        const maybeServiceContract = params.domain.contractStore.maybeGet(
+        const maybeServiceContract = params.sp.contractStore.maybeGet(
             params.service,
         );
         const maybeOperationContract =
@@ -55,7 +55,7 @@ export class RpcRequestFactory {
 
         const timeout =
             message?.RequestTimeout ??
-            params.domain.configStore.getRequestTimeout(
+            params.sp.configStore.getRequestTimeout(
                 params.address,
                 params.service,
             ) ??

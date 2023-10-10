@@ -7,3 +7,7 @@ dist-packages/**/*
 dist
 reports
 !dist-packages/.gitkeep
+.vscode
+
+# Mac Finder
+.DS_Store

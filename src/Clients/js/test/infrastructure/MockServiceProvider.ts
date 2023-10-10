@@ -1,12 +1,12 @@
 import {
     AddressBuilder,
     CallbackStoreImpl,
-    ChannelManagerStore,
+    Wire,
     ConfigStore,
-    DispatchProxyStore,
+    DispatchProxyClassStore,
     IContractStore,
     IServiceProvider,
-    ProxyStore,
+    ProxySource,
 } from '../../src/std';
 
 export class MockServiceProvider<TAddressBuilder extends AddressBuilder>
@@ -31,20 +31,17 @@ export class MockServiceProvider<TAddressBuilder extends AddressBuilder>
         throw new Error('Method not implemented.');
     }
 
-    get symbolofServiceAttachment(): symbol {
-        return this.read('symbolofServiceAttachment');
-    }
     get configStore(): ConfigStore<any> {
         return this.read('configStore');
     }
-    get proxyStore(): ProxyStore<any> {
-        return this.read('proxyStore');
+    get proxySource(): ProxySource<any> {
+        return this.read('proxySource');
     }
-    get dispatchProxyStore(): DispatchProxyStore {
-        return this.read('dispatchProxyStore');
+    get dispatchProxies(): DispatchProxyClassStore {
+        return this.read('dispatchProxies');
     }
-    get channelStore(): ChannelManagerStore {
-        return this.read('channelStore');
+    get wire(): Wire {
+        return this.read('wire');
     }
     get contractStore(): IContractStore {
         return this.read('contractStore');

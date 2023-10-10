@@ -1,7 +1,7 @@
 import { PublicCtor } from '../../..';
 
 import {
-    DispatchProxy,
+    DispatchProxyClass,
     ICallInterceptor,
     ICallInterceptorContainer,
     MethodNameEnumerator,
@@ -10,7 +10,7 @@ import {
 
 /* @internal */
 export class Weaver<TService> {
-    public static weave<TService>(service: PublicCtor<TService>): DispatchProxy<TService> {
+    public static weave<TService>(service: PublicCtor<TService>): DispatchProxyClass<TService> {
         const instance = new Weaver<TService>(service);
 
         return instance.run();
@@ -18,7 +18,7 @@ export class Weaver<TService> {
 
     constructor(private readonly _service: PublicCtor<TService>) {}
 
-    private run(): DispatchProxy<TService> {
+    private run(): DispatchProxyClass<TService> {
         // 1. Weaving a new "class"
 
         // 1.1. Weaving the constructor: receive the ICallInterceptor and assign it to this.<symbol>
@@ -35,7 +35,7 @@ export class Weaver<TService> {
         EmittedClass.prototype = new this._service();
 
         // 1.3. Cast the new "class" to DispatchProxyCtor<TService>
-        const dispatchProxy = EmittedClass as unknown as DispatchProxy<TService>;
+        const dispatchProxy = EmittedClass as unknown as DispatchProxyClass<TService>;
 
         // 1.4. Weave overrides for all the methods in the base class
         const methodNames = MethodNameEnumerator.enumerate(this._service);

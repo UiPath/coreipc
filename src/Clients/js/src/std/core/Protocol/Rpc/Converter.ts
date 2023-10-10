@@ -62,10 +62,7 @@ export class Converter {
         }
     }
 
-    public static fromRpcResponse(
-        response: RpcMessage.Response,
-        request: RpcMessage.Request,
-    ): unknown {
+    public static unwrapRpcResponse(response: RpcMessage.Response, request: RpcMessage.Request): unknown {
         if (response.Error) {
             throw Converter.createRemoteError(request, response.Error);
         } else {

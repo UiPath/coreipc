@@ -1,10 +1,10 @@
 import {
     ConfigStore,
     IContractStore,
-    DispatchProxyStore,
+    DispatchProxyClassStore,
     CallbackStoreImpl,
-    ChannelManagerStore,
-    ProxyStore,
+    Wire,
+    ProxySource,
     AddressBuilder,
 } from '.';
 
@@ -12,12 +12,10 @@ import {
 export interface IServiceProvider<
     TAddressBuilder extends AddressBuilder = any,
 > {
-    readonly symbolofServiceAttachment: symbol;
-
     readonly configStore: ConfigStore<TAddressBuilder>;
-    readonly proxyStore: ProxyStore<TAddressBuilder>;
-    readonly dispatchProxyStore: DispatchProxyStore;
-    readonly channelStore: ChannelManagerStore;
+    readonly proxySource: ProxySource<TAddressBuilder>;
+    readonly dispatchProxies: DispatchProxyClassStore;
+    readonly wire: Wire;
     readonly contractStore: IContractStore;
     readonly callbackStore: CallbackStoreImpl;
 

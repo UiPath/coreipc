@@ -9,7 +9,12 @@ describe('node:end-to-end', () => {
         let algebraProxy: IAlgebra = null!;
 
         beforeAll(() => {
-            algebraProxy = algebraProxyFactory();
+            try {
+                algebraProxy = algebraProxyFactory();
+            } catch (err) {
+                console.error(err);
+                throw err;
+            }
         });
 
         it('should work', async () => {
