@@ -5,6 +5,7 @@ export class ConditionalWeakTable<K, V> {
 
     public getOrCreateValue(key: K, factory: (key: K) => V): V {
         assertArgument({ key }, 'object', 'function');
+        assertArgument({ factory }, 'function');
 
         return (key as any)[this._symbol] ??= factory(key);
     }

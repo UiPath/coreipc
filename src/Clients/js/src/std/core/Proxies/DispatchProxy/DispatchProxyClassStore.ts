@@ -8,6 +8,6 @@ export class DispatchProxyClassStore {
     public getOrCreate<TService>(service: PublicCtor<TService>): DispatchProxyClass<TService> {
         assertArgument({ service }, 'function');
 
-        return this._map.getOrCreateValue(service, x => Weaver.weave(x)) as any;
+        return this._map.getOrCreateValue(service, _ => Weaver.weave(service)) as any;
     }
 }

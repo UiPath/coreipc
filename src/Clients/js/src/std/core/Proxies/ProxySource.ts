@@ -19,13 +19,13 @@ export class ProxySource<TAddressBuilder extends AddressBuilder> {
     }
 
     private createProxy<TService, TAddress extends Address>(proxyId: ProxyId<TService, TAddress>): TService {
-        const _this = this;
+        const me = this;
 
         // The following inline class captures the proxyId parameter.
         const InterceptorClass = class implements ICallInterceptor<TService>
         {
             invokeMethod(methodName: keyof TService & string, args: unknown[]): Promise<unknown> {
-                return _this._sp.wire.invokeMethod(
+                return me._sp.wire.invokeMethod(
                     proxyId,
                     methodName,
                     args,
