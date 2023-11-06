@@ -13,16 +13,16 @@ import { MessageStream, IMessageStream, Network } from '..';
 import { IRpcChannel, RpcCallContext, RpcMessage } from '.';
 
 /* @internal */
-export class RpcChannel<TAddress extends Address> implements IRpcChannel {
-    public static create<TAddress extends Address>(
-        address: TAddress,
-        connectHelper: ConnectHelper<TAddress>,
+export class RpcChannel implements IRpcChannel {
+    public static create(
+        address: Address,
+        connectHelper: ConnectHelper,
         connectTimeout: TimeSpan,
         ct: CancellationToken,
         observer: Observer<RpcCallContext.Incomming>,
         messageStreamFactory?: IMessageStream.Factory,
     ): IRpcChannel {
-        return new RpcChannel<TAddress>(
+        return new RpcChannel(
             address,
             connectHelper,
             connectTimeout,
@@ -33,12 +33,11 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
     }
 
     constructor(
-        address: TAddress,
-        connectHelper: ConnectHelper<TAddress>,
+        address: Address,
+        connectHelper: ConnectHelper,
         connectTimeout: TimeSpan,
         ct: CancellationToken,
         private readonly _observer: Observer<RpcCallContext.Incomming>,
-
         messageStreamFactory?: IMessageStream.Factory,
     ) {
         this._$messageStream = RpcChannel.createMessageStream(
@@ -81,9 +80,9 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
 
     private _isDisposed = false;
 
-    private static async createMessageStream<TAddress extends Address>(
-        address: TAddress,
-        connectHelper: ConnectHelper<TAddress>,
+    private static async createMessageStream(
+        address: Address,
+        connectHelper: ConnectHelper,
         connectTimeout: TimeSpan,
         ct: CancellationToken,
         networkObserver: Observer<Network.Message>,
@@ -109,7 +108,7 @@ export class RpcChannel<TAddress extends Address> implements IRpcChannel {
     private readonly _outgoingCalls = new RpcChannel.OutgoingCallTable();
 
     private readonly _networkObserver = new (class implements Observer<Network.Message> {
-        constructor(private readonly _owner: RpcChannel<TAddress>) {}
+        constructor(private readonly _owner: RpcChannel) {}
 
         public closed?: boolean;
         public next(value: Network.Message): void {

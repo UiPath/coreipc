@@ -7,6 +7,8 @@ import {
     IContractStore,
     IServiceProvider,
     ProxySource,
+    Address,
+    AddressSelectionDelegate,
 } from '../../src/std';
 
 export class MockServiceProvider<TAddressBuilder extends AddressBuilder>
@@ -19,13 +21,15 @@ export class MockServiceProvider<TAddressBuilder extends AddressBuilder>
         },
     ) {}
 
-    createAddressBuilder(): TAddressBuilder {
-        if (this._params?.implementation?.createAddressBuilder) {
-            return this._params.implementation.createAddressBuilder();
+    getAddress(configure: AddressSelectionDelegate<TAddressBuilder>): Address {
+        if (this._params?.implementation?.getAddress) {
+            return this._params.implementation.getAddress(configure);
         }
 
         if (this._params?.addressBuilderCtor) {
-            return new this._params.addressBuilderCtor();
+            const builder = new this._params.addressBuilderCtor();
+            configure(builder);
+            return builder.assertAddress();
         }
 
         throw new Error('Method not implemented.');

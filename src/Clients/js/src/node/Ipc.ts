@@ -1,6 +1,5 @@
 import { IpcBaseImpl, AddressSelectionDelegate, IpcBase } from '../std';
 import { NodeAddressBuilder } from './NodeAddressBuilder';
-import { NamedPipeAddress } from './Transport';
 
 /* @internal */
 export class IpcNodeImpl extends IpcBaseImpl<NodeAddressBuilder> implements Ipc {
@@ -8,13 +7,14 @@ export class IpcNodeImpl extends IpcBaseImpl<NodeAddressBuilder> implements Ipc 
         super(NodeAddressBuilder);
     }
 
-    public namedPipe(name: string): AddressSelectionDelegate<NodeAddressBuilder, NamedPipeAddress> {
+    public namedPipe(name: string): AddressSelectionDelegate<NodeAddressBuilder> {
         return builder => builder.isPipe(name);
     }
 }
 
 export interface Ipc extends IpcBase<NodeAddressBuilder> {
-    namedPipe(name: string): AddressSelectionDelegate<NodeAddressBuilder, NamedPipeAddress>;
+    namedPipe(name: string): AddressSelectionDelegate<NodeAddressBuilder>;
 }
 
 export const ipc: Ipc = new IpcNodeImpl();
+

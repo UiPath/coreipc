@@ -28,8 +28,9 @@ describe(`${DispatchProxyClassStore.name}'s`, () => {
             }
         });
 
-        it(`should not throw when "service" is a function`, () => {
-            const act = () => sut.getOrCreate((() => {}) as any);
+        it(`should not throw when "service" is a constructor`, () => {
+            class MockClass {}
+            const act = () => sut.getOrCreate(MockClass);
             expect(act).not.to.throw();
         });
 

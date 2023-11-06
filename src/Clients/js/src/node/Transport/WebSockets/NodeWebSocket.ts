@@ -25,7 +25,7 @@ import {
 /* @internal */
 export class NodeWebSocket extends Socket {
     public static async connectWithHelper(
-        connectHelper: ConnectHelper<NodeWebSocketAddress>,
+        connectHelper: ConnectHelper,
         url: string,
         timeout: TimeSpan,
         ct: CancellationToken,

@@ -9,38 +9,30 @@ export class CallbackImpl<TAddressBuilder extends AddressBuilder>
 {
     constructor(public readonly _serviceProvider: IServiceProvider<TAddressBuilder>) {}
 
-    forAddress<TAddress extends Address>(
-        configure: AddressSelectionDelegate<TAddressBuilder, TAddress>,
-    ): CallbackForAddress {
-        const builder = this._serviceProvider.createAddressBuilder();
-        const type = configure(builder);
-        const address = builder.assertAddress<TAddress>(type);
+    forAddress(configure: AddressSelectionDelegate<TAddressBuilder>): CallbackForAddress {
+        const address = this._serviceProvider.getAddress(configure);
 
-        return new CallbackForAddressImpl<TAddress>(this._serviceProvider, address);
+        return new CallbackForAddressImpl(this._serviceProvider, address);
     }
 }
 
 /* @internal */
-export class CallbackForAddressImpl<TAddress extends Address> implements CallbackForAddress {
+export class CallbackForAddressImpl implements CallbackForAddress {
     constructor(
         private readonly _serviceProvider: IServiceProvider,
-        private readonly _address: TAddress,
+        private readonly _address: Address,
     ) {}
 
-    forService<TService>(
-        callbackService: PublicCtor<TService>,
-    ): CallbackForAddressService<TService>;
+    forService<TService>(callbackService: PublicCtor<TService>): CallbackForAddressService<TService>;
     forService<TService>(callbackEndpointName: string): CallbackForAddressService<TService>;
-    forService<TService>(
-        callbackServiceOrEndpointName: PublicCtor<TService> | string,
-    ): CallbackForAddressService<TService> {
+    forService<TService>(callbackServiceOrEndpointName: PublicCtor<TService> | string): CallbackForAddressService<TService> {
         assertArgument({ callbackServiceOrEndpointName }, 'function', 'string');
 
         if (typeof callbackServiceOrEndpointName === 'function') {
             callbackServiceOrEndpointName = callbackServiceOrEndpointName.name;
         }
 
-        return new CallbackForAddressServiceImpl<TService, TAddress>(
+        return new CallbackForAddressServiceImpl<TService>(
             this._serviceProvider,
             this._address,
             callbackServiceOrEndpointName,
@@ -49,12 +41,12 @@ export class CallbackForAddressImpl<TAddress extends Address> implements Callbac
 }
 
 /* @internal */
-export class CallbackForAddressServiceImpl<TService, TAddress extends Address>
+export class CallbackForAddressServiceImpl<TService>
     implements CallbackForAddressService<TService>
 {
     constructor(
         private readonly _serviceProvider: IServiceProvider,
-        private readonly _address: TAddress,
+        private readonly _address: Address,
         private readonly _callbackEndpointName: string,
     ) {}
 

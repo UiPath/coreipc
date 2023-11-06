@@ -1,14 +1,22 @@
-import { AddressBuilder, PublicCtor } from '../std';
+import { Address, AddressBuilder, PublicCtor } from '../std';
 import { NamedPipeAddress, NodeWebSocketAddress } from './Transport';
 
-export class NodeAddressBuilder extends AddressBuilder {
-    public isPipe(name: string): PublicCtor<NamedPipeAddress> {
+export class NodeAddressBuilder extends AddressBuilder<NamedPipeAddress | NodeWebSocketAddress> {
+    public isPipe(name: string): void {
         super._address = new NamedPipeAddress(name);
-        return NamedPipeAddress;
     }
 
-    public isWebSocket(url: string): PublicCtor<NodeWebSocketAddress> {
+    public isWebSocket(url: string): void {
         super._address = new NodeWebSocketAddress(url);
-        return NodeWebSocketAddress;
+    }
+
+    /* @internal */
+    public assertAddress(): NamedPipeAddress | NodeWebSocketAddress {
+        if (this._address instanceof NamedPipeAddress ||
+            this._address instanceof NodeWebSocketAddress) {
+            return this._address;
+        }
+
+        throw new Error('Neither method isPipe nor isWebSocket was called in the address callback.');
     }
 }

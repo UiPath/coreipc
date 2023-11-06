@@ -5,5 +5,5 @@ import { ServiceDescriptor } from './ServiceDescriptor';
 export interface IContractStore {
     getOrCreate<TService>($class: PublicCtor<TService>): ServiceDescriptor<TService>;
 
-    maybeGet<TService>($class: PublicCtor<TService>): ServiceDescriptor<TService> | undefined;
+    maybeGet<TService = unknown>($class: PublicCtor<TService>): ServiceDescriptor<TService> | undefined;
 }

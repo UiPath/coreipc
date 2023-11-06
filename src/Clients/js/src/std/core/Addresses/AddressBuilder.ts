@@ -1,15 +1,8 @@
-import { PublicCtor } from '../../bcl';
 import { Address } from '.';
 
-export class AddressBuilder {
+export abstract class AddressBuilder<TAddress extends Address = Address> {
     /* @internal */
-    public assertAddress<TAddress extends Address>(type: PublicCtor<TAddress>): TAddress {
-        if (!(this._address instanceof type)) {
-            throw new Error();
-        }
+    public abstract assertAddress(): Address;
 
-        return this._address;
-    }
-
-    protected _address: Address | undefined;
+    protected _address: TAddress | undefined;
 }

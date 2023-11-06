@@ -10,7 +10,7 @@ export class ProxySource<TAddressBuilder extends AddressBuilder> {
         private readonly _sp: IServiceProvider<TAddressBuilder>,
     ) { }
 
-    public resolve<TService, TAddress extends Address = Address>(proxyId: ProxyId<TService, TAddress>): TService {
+    public resolve<TService>(proxyId: ProxyId<TService>): TService {
         return ProxySource
             ._serviceToAddressToProxy
             .getOrCreateValue(proxyId.service, Dictionary.create)
@@ -18,7 +18,7 @@ export class ProxySource<TAddressBuilder extends AddressBuilder> {
             ;
     }
 
-    private createProxy<TService, TAddress extends Address>(proxyId: ProxyId<TService, TAddress>): TService {
+    private createProxy<TService>(proxyId: ProxyId<TService>): TService {
         const me = this;
 
         // The following inline class captures the proxyId parameter.

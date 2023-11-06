@@ -2,26 +2,19 @@ import { Address } from '../Addresses';
 
 /* @internal */
 export class CallbackStoreImpl {
-    public get<TAddress extends Address, TService = any>(
-        callbackEndpointName: string,
-        address: TAddress,
-    ): TService | undefined {
+    public get(callbackEndpointName: string, address: Address): any | undefined {
         const compositeKey = CallbackStoreImpl.computeCompositeKey(callbackEndpointName, address);
 
         return this._map.get(compositeKey);
     }
 
-    public set<TAddress extends Address, TService = any>(
-        callbackEndpointName: string,
-        address: TAddress,
-        instance: TService,
-    ): void {
+    public set(callbackEndpointName: string, address: Address, instance: any): void {
         const compositeKey = CallbackStoreImpl.computeCompositeKey(callbackEndpointName, address);
 
         this._map.set(compositeKey, instance);
     }
 
-    private static computeCompositeKey<TAddress extends Address>(callbackEndpointName: string, address: TAddress): string {
+    private static computeCompositeKey(callbackEndpointName: string, address: Address): string {
         return `${callbackEndpointName}@${address.key}`;
     }
 

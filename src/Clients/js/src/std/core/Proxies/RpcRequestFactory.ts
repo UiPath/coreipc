@@ -10,10 +10,10 @@ import { IServiceProvider } from '.';
 
 /* @internal */
 export class RpcRequestFactory {
-    public static create<TService, TAddress extends Address>(params: {
+    public static create<TService>(params: {
         sp: IServiceProvider;
         service: PublicCtor<TService>;
-        address: TAddress;
+        address: Address;
         methodName: keyof TService & string;
         args: unknown[];
     }): [

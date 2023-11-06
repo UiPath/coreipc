@@ -5,8 +5,6 @@ import {
     AddressBuilder,
     AddressSelectionDelegate,
     ConfigStore,
-    RpcChannel,
-    MessageStream,
     ConnectHelper,
     ServiceAnnotations,
     OperationAnnotations,
@@ -36,9 +34,7 @@ export interface IpcBase<TAddressBuilder extends AddressBuilder> {
 
 export module IpcBase {
     export interface ProxySource<TAddressBuilder extends AddressBuilder> {
-        withAddress<TAddress extends Address>(
-            configure: AddressSelectionDelegate<TAddressBuilder, TAddress>,
-        ): ProxySourceWithAddress;
+        withAddress(configure: AddressSelectionDelegate<TAddressBuilder>): ProxySourceWithAddress;
     }
 
     export interface ProxySourceWithAddress {
@@ -48,10 +44,10 @@ export module IpcBase {
     export interface Configuration<TAddressBuilder extends AddressBuilder> {
         forAnyAddress(): ConfigurationWithAddress;
 
-        forAddress<TAddress extends Address>(
-            configure: AddressSelectionDelegate<TAddressBuilder, TAddress>,
-        ): ConfigurationWithAddress<TAddress>;
+        forAddress<TAddress extends Address>(configure: AddressSelectionDelegate<TAddressBuilder>): ConfigurationWithAddress<TAddress>;
     }
+
+
 
     export interface ConfigurationWithAddress<TAddress extends Address = Address> {
         setConnectHelper(value: ConnectHelper<TAddress>): void;
@@ -71,13 +67,19 @@ export module IpcBase {
     }
 }
 
+export abstract class IpcCoreBase {
+    // DB
+    /* @internal */
+    public readonly _db: Map<string, any> = new Map<string, any>();
+}
+
 /* @internal */
 export abstract class IpcBaseImpl<TAddressBuilder extends AddressBuilder = any>
     implements IpcBase<TAddressBuilder>, IServiceProvider<TAddressBuilder>
 {
     constructor(
         /* @internal */
-        public readonly addressBuilder: ParameterlessPublicCtor<TAddressBuilder>,
+        private readonly addressBuilder: ParameterlessPublicCtor<TAddressBuilder>,
         /* @internal */
         $service?: ServiceAnnotations,
         /* @internal */
@@ -90,22 +92,14 @@ export abstract class IpcBaseImpl<TAddressBuilder extends AddressBuilder = any>
     readonly $service: ServiceAnnotations;
     readonly $operation: OperationAnnotations;
 
-    createAddressBuilder(): TAddressBuilder {
-        return new this.addressBuilder();
-    }
+    public readonly proxy: IpcBaseImpl.ProxySource<TAddressBuilder> = new IpcBaseImpl.ProxySource<TAddressBuilder>(this);
 
-    public readonly proxy: IpcBaseImpl.ProxySource<TAddressBuilder> =
-        new IpcBaseImpl.ProxySource<TAddressBuilder>(this);
-
-    public readonly config: IpcBaseImpl.Configuration<TAddressBuilder> =
-        new IpcBaseImpl.Configuration<TAddressBuilder>(this);
+    public readonly config: IpcBase.Configuration<TAddressBuilder> = new IpcBaseImpl.Configuration<TAddressBuilder>(this);
 
     public readonly callback: Callback<TAddressBuilder> = new CallbackImpl<TAddressBuilder>(this);
 
     /* @internal */
-    public readonly configStore: ConfigStore<TAddressBuilder> = new ConfigStore<TAddressBuilder>(
-        this,
-    );
+    public readonly configStore: ConfigStore<TAddressBuilder> = new ConfigStore<TAddressBuilder>(this);
 
     /* @internal */
     public readonly proxySource: ProxySource<TAddressBuilder> = new ProxySource<TAddressBuilder>(this);
@@ -121,6 +115,13 @@ export abstract class IpcBaseImpl<TAddressBuilder extends AddressBuilder = any>
 
     /* @internal */
     public readonly callbackStore = new CallbackStoreImpl();
+
+    /* @internal */
+    public getAddress(configure: AddressSelectionDelegate<TAddressBuilder>): Address {
+        const builder = new this.addressBuilder();
+        configure(builder);
+        return builder.assertAddress();
+    }
 }
 
 /* @internal */
@@ -128,76 +129,65 @@ export module IpcBaseImpl {
     export class ProxySource<TAddressBuilder extends AddressBuilder>
         implements IpcBase.ProxySource<TAddressBuilder>
     {
-        constructor(private readonly _ipc: IpcBaseImpl<TAddressBuilder>) {}
+        constructor(private readonly _serviceProvider: IServiceProvider<TAddressBuilder>) {}
 
-        public withAddress<TAddress extends Address>(
-            configure: AddressSelectionDelegate<TAddressBuilder, TAddress>,
-        ): ProxySourceWithAddress<TAddress> {
-            const builder = new this._ipc.addressBuilder();
-            const type = configure(builder);
-            const address = builder.assertAddress<TAddress>(type);
+        public withAddress(configure: AddressSelectionDelegate<TAddressBuilder>): ProxySourceWithAddress {
+            const address = this._serviceProvider.getAddress(configure);
 
-            return new ProxySourceWithAddress(this._ipc, address);
+            return new ProxySourceWithAddress(this._serviceProvider, address);
         }
     }
 
-    export class ProxySourceWithAddress<TAddress extends Address>
+    export class ProxySourceWithAddress
         implements IpcBase.ProxySourceWithAddress
     {
-        constructor(private readonly _ipc: IpcBaseImpl, private readonly _address: TAddress) {}
+        constructor(
+            private readonly _serviceProvider: IServiceProvider,
+            private readonly _address: Address) {}
 
         public withService<TService>(service: PublicCtor<TService>): TService {
-            const proxyId = new ProxyId<TService, TAddress>(service, this._address);
+            const proxyId = new ProxyId<TService>(service, this._address);
 
-            const proxy = this._ipc.proxySource.resolve(proxyId);
+            const proxy = this._serviceProvider.proxySource.resolve(proxyId);
             return proxy;
         }
     }
 
     export class Configuration<TAddressBuilder extends AddressBuilder> {
-        constructor(private readonly _ipc: IpcBaseImpl<TAddressBuilder>) {}
+        constructor(private readonly _ipc: IServiceProvider<TAddressBuilder>) {}
 
         public forAnyAddress(): ConfigurationWithAddress {
             return new ConfigurationWithAddress(this._ipc);
         }
 
-        public forAddress<TAddress extends Address>(
-            configure: AddressSelectionDelegate<TAddressBuilder, TAddress>,
-        ): ConfigurationWithAddress<TAddress> {
-            const builder = new this._ipc.addressBuilder();
-            const type = configure(builder);
-            const address = builder.assertAddress<TAddress>(type);
+        public forAddress(configure: AddressSelectionDelegate<TAddressBuilder>): ConfigurationWithAddress {
+            const address = this._ipc.getAddress(configure);
 
             return new ConfigurationWithAddress(this._ipc, address);
         }
     }
 
-    export class ConfigurationWithAddress<TAddress extends Address = Address> {
-        constructor(private readonly _ipc: IpcBaseImpl, private readonly _address?: TAddress) {}
+    export class ConfigurationWithAddress implements IpcBase.ConfigurationWithAddress<any> {
+        constructor(private readonly _ipc: IServiceProvider, private readonly _address?: Address) {}
 
-        public setConnectHelper(value: ConnectHelper<TAddress>): void {
+        public setConnectHelper(value: ConnectHelper): void {
             assertArgument({ value }, 'function');
             this._ipc.configStore.setConnectHelper(this._address, value);
         }
 
-        public forAnyService(): ConfigurationWithAddressService<TAddress> {
+        public forAnyService(): ConfigurationWithAddressService {
             return new ConfigurationWithAddressService(this._ipc, this._address);
         }
 
-        public forService<TService>(
-            service: PublicCtor<TService>,
-        ): ConfigurationWithAddressService<TAddress, TService> {
+        public forService<TService>(service: PublicCtor<TService>): ConfigurationWithAddressService<TService> {
             return new ConfigurationWithAddressService(this._ipc, this._address, service);
         }
     }
 
-    export class ConfigurationWithAddressService<
-        TAddress extends Address = Address,
-        TService = any,
-    > {
+    export class ConfigurationWithAddressService<TService = unknown> {
         constructor(
-            private readonly _ipc: IpcBaseImpl,
-            private readonly _address: TAddress | undefined,
+            private readonly _ipc: IServiceProvider,
+            private readonly _address: Address | undefined,
             private readonly _service?: PublicCtor<TService>,
         ) {}
 

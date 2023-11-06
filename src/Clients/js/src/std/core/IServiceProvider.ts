@@ -6,12 +6,12 @@ import {
     Wire,
     ProxySource,
     AddressBuilder,
+    AddressSelectionDelegate,
+    Address,
 } from '.';
 
 /* @internal */
-export interface IServiceProvider<
-    TAddressBuilder extends AddressBuilder = any,
-> {
+export interface IServiceProvider<TAddressBuilder extends AddressBuilder = AddressBuilder> {
     readonly configStore: ConfigStore<TAddressBuilder>;
     readonly proxySource: ProxySource<TAddressBuilder>;
     readonly dispatchProxies: DispatchProxyClassStore;
@@ -19,5 +19,5 @@ export interface IServiceProvider<
     readonly contractStore: IContractStore;
     readonly callbackStore: CallbackStoreImpl;
 
-    createAddressBuilder(): TAddressBuilder;
+    getAddress(configure: AddressSelectionDelegate<TAddressBuilder>): Address;
 }

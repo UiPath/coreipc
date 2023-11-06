@@ -4,12 +4,10 @@ import { Dictionary } from '../../bcl';
 
 /* @internal */
 export class Wire {
-    invokeMethod<TService, TAddress extends Address>(proxyId: ProxyId<TService, TAddress>, methodName: keyof TService & string, args: unknown[]): Promise<unknown> {
-        const channelManager = this.getOrCreateChannelManager<TAddress>(proxyId.address);
+    invokeMethod<TService>(proxyId: ProxyId<TService>, methodName: keyof TService & string, args: unknown[]): Promise<unknown> {
+        const channelManager = this.getOrCreateChannelManager(proxyId.address);
 
-        const result = channelManager.invokeMethod(proxyId.service, methodName, args);
-
-        return result;
+        return channelManager.invokeMethod(proxyId.service, methodName, args);
     }
 
     constructor(
@@ -18,15 +16,15 @@ export class Wire {
         private readonly _messageStreamFactory: IMessageStream.Factory = new MessageStream.Factory(),
     ) { }
 
-    private getOrCreateChannelManager<TAddress extends Address>(address: TAddress): ChannelManager {
+    private getOrCreateChannelManager(address: Address): ChannelManager {
         return this._map.getOrCreateValue(
             address.key,
-            () => new ChannelManager<TAddress>(
+            () => new ChannelManager(
                 this._sp,
                 address,
                 this._rpcChannelFactory,
                 this._messageStreamFactory));
     }
 
-    private readonly _map = new Dictionary<string, ChannelManager<any>>();
+    private readonly _map = new Dictionary<string, ChannelManager>();
 }

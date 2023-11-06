@@ -6,9 +6,9 @@ import { IRpcChannel, RpcCallContext } from '.';
 
 /* @internal */
 export interface IRpcChannelFactory {
-    create<TAddress extends Address>(
-        address: TAddress,
-        connectHelper: ConnectHelper<TAddress>,
+    create(
+        address: Address,
+        connectHelper: ConnectHelper,
         connectTimeout: TimeSpan,
         ct: CancellationToken,
         observer: Observer<RpcCallContext.Incomming>,

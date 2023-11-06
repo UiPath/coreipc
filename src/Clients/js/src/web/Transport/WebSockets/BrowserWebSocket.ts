@@ -24,7 +24,7 @@ import {
 /* @internal */
 export class BrowserWebSocket extends Socket {
     public static async connectWithHelper(
-        connectHelper: ConnectHelper<BrowserWebSocketAddress>,
+        connectHelper: ConnectHelper,
         url: string,
         timeout: TimeSpan,
         ct: CancellationToken,

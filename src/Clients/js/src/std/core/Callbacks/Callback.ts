@@ -1,17 +1,12 @@
 import { PublicCtor } from '../..';
-import { Address, AddressBuilder, AddressSelectionDelegate } from '../Addresses';
+import { AddressBuilder, AddressSelectionDelegate } from '../Addresses';
 
 export interface Callback<TAddressBuilder extends AddressBuilder> {
-    forAddress<TAddress extends Address>(
-        configure: AddressSelectionDelegate<TAddressBuilder, TAddress>,
-    ): CallbackForAddress;
+    forAddress(configure: AddressSelectionDelegate<TAddressBuilder>): CallbackForAddress;
 }
 
 export interface CallbackForAddress {
-    forService<TService>(
-        callbackService: PublicCtor<TService>,
-    ): CallbackForAddressService<TService>;
-
+    forService<TService>(callbackService: PublicCtor<TService>): CallbackForAddressService<TService>;
     forService<TService>(callbackEndpointName: string): CallbackForAddressService<TService>;
 }
 

@@ -10,14 +10,8 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         private readonly _serviceProvider: IServiceProvider<TAddressBuilder>,
     ) {}
 
-    public getConnectHelper<TAddress extends Address>(
-        address: TAddress,
-    ): ConnectHelper<TAddress> | undefined {
-        const key = ConfigStore.computeCompositeKey<
-            TAddressBuilder,
-            TAddress,
-            any
-        >(this._serviceProvider, address, undefined);
+    public getConnectHelper(address: Address): ConnectHelper | undefined {
+        const key = ConfigStore.computeCompositeKey(this._serviceProvider, address, undefined);
 
         return (
             this._connectHelpers.get(key) ??
@@ -25,20 +19,16 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         );
     }
 
-    public setConnectHelper<TAddress extends Address>(
-        address: TAddress | undefined,
-        value: ConnectHelper<TAddress> | undefined,
+    public setConnectHelper(
+        address: Address | undefined,
+        value: ConnectHelper | undefined,
     ): void {
         assertArgument({ address }, Address, 'undefined');
         assertArgument({ value }, 'function', 'undefined');
 
         const key = (!address
             ? ConfigStore.EmptyKey
-            : ConfigStore.computeCompositeKey<
-                TAddressBuilder,
-                TAddress,
-                any
-            >(this._serviceProvider, address, undefined));
+            : ConfigStore.computeCompositeKey(this._serviceProvider, address));
 
         if (!value) {
             this._connectHelpers.delete(key);
@@ -48,10 +38,7 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         this._connectHelpers.set(key, value);
     }
 
-    public getRequestTimeout<TService, TAddress extends Address>(
-        address: TAddress,
-        service: PublicCtor<TService>,
-    ): TimeSpan | undefined {
+    public getRequestTimeout(address: Address, service: PublicCtor): TimeSpan | undefined {
         for (const key of enumerateCandidateKeys(this._serviceProvider)) {
             const result = this._requestTimeouts.get(key);
             if (result) {
@@ -65,14 +52,10 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
             serviceProvider: IServiceProvider<TAddressBuilder>,
         ) {
             function make(
-                address: TAddress | undefined,
-                service: PublicCtor<TService> | undefined,
+                address: Address | undefined,
+                service: PublicCtor | undefined,
             ): string {
-                return ConfigStore.computeCompositeKey<
-                    TAddressBuilder,
-                    TAddress,
-                    TService
-                >(serviceProvider, address, service);
+                return ConfigStore.computeCompositeKey(serviceProvider, address, service);
             }
 
             yield make(address, service);
@@ -82,20 +65,16 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         }
     }
 
-    public setRequestTimeout<TService, TAddress extends Address>(
-        address: TAddress | undefined,
-        service: PublicCtor<TService> | undefined,
+    public setRequestTimeout(
+        address: Address | undefined,
+        service: PublicCtor | undefined,
         value: TimeSpan | undefined,
     ): void {
         assertArgument({ address }, Address, 'undefined');
         assertArgument({ service }, 'function', 'undefined');
         assertArgument({ value }, TimeSpan, 'undefined');
 
-        const key = ConfigStore.computeCompositeKey<
-            TAddressBuilder,
-            TAddress,
-            TService
-        >(this._serviceProvider, address, service);
+        const key = ConfigStore.computeCompositeKey(this._serviceProvider, address, service);
 
         if (!value) {
             this._requestTimeouts.delete(key);
@@ -105,24 +84,19 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         this._requestTimeouts.set(key, value);
     }
 
-    private static computeCompositeKey<
-        TAddressBuilder extends AddressBuilder,
-        TAddress extends Address,
-        TService,
-    >(
-        serviceProvider: IServiceProvider<TAddressBuilder>,
-        address: TAddress | undefined,
-        service: PublicCtor<TService> | undefined,
-    ) {
+    private static computeCompositeKey(
+        serviceProvider: IServiceProvider,
+        address: Address | undefined,
+        service?: PublicCtor,
+    ): string {
         const addressKey = address?.key ?? ConfigStore.EmptyKey;
 
         const serviceKey = !service
             ? ConfigStore.EmptyKey
-            : serviceProvider.contractStore.maybeGet<TService>(service)
+            : serviceProvider.contractStore.maybeGet(service)
                   ?.endpoint ?? service.name;
 
-        const compositeKey = `[${addressKey}][${serviceKey}]`;
-        return compositeKey;
+        return `[${addressKey}][${serviceKey}]`;
     }
 
     private readonly _requestTimeouts = new Map<string, TimeSpan>();

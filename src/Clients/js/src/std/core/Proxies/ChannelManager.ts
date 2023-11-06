@@ -17,12 +17,12 @@ import { RpcRequestFactory } from '.';
 import { Observer } from 'rxjs';
 
 /* @internal */
-export class ChannelManager<TAddress extends Address = Address> {
+export class ChannelManager {
     private _latestChannel: IRpcChannel | undefined;
 
     constructor(
         private readonly _sp: IServiceProvider,
-        private readonly _address: TAddress,
+        private readonly _address: Address,
         private readonly _rpcChannelFactory: IRpcChannelFactory,
         private readonly _messageStreamFactory?: IMessageStream.Factory,
     ) {}
@@ -108,14 +108,11 @@ export class ChannelManager<TAddress extends Address = Address> {
     private readonly _incommingCallObserver = new (class
         implements Observer<RpcCallContext.Incomming>
     {
-        constructor(
-            private readonly _channelManager: ChannelManager<TAddress>,
-        ) {}
+        constructor(private readonly _channelManager: ChannelManager) {}
 
         public closed?: boolean;
-        public async next(
-            incommingContext: RpcCallContext.Incomming,
-        ): Promise<void> {
+
+        public async next(incommingContext: RpcCallContext.Incomming): Promise<void> {
             incommingContext.respond(
                 await this._channelManager.invokeCallback(
                     incommingContext.request,

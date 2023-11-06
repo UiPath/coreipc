@@ -10,17 +10,7 @@ export class BrowserWebSocketAddress extends Address {
         return `websocket:${this.url}`;
     }
 
-    public override async connect<TSelf extends Address>(
-        this: TSelf,
-        helper: ConnectHelper<TSelf>,
-        timeout: TimeSpan,
-        ct: CancellationToken,
-    ): Promise<Socket> {
-        return await BrowserWebSocket.connectWithHelper(
-            helper as any,
-            (this as unknown as BrowserWebSocketAddress).url,
-            timeout,
-            ct,
-        );
+    public override async connect(helper: ConnectHelper, timeout: TimeSpan, ct: CancellationToken): Promise<Socket> {
+        return await BrowserWebSocket.connectWithHelper(helper, this.url, timeout, ct);
     }
 }
