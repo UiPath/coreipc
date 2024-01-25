@@ -125,7 +125,7 @@ function createConfig(params) {
         const generatePackageJson = new GeneratePackageJsonPlugin(package);
         const packNpm = new WebpackShellPluginNext({
             onBuildEnd: {
-                scripts: [`npm pack ./dist/prepack/${params.name} --pack-destination ./dist-packages`],
+                scripts: [`npm pack ./dist/prepack/${params.name} --pack-destination="./dist-packages"`],
                 blocking: true,
                 parallel: false,
             },

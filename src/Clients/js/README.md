@@ -50,7 +50,8 @@ npm install @uipath/coreipc-web
 3. Import the module and start using it:
 
 ```typescript
-import { ipc } from '@uipath/coreipc';
+import { ipc } from '@uipath/coreipc'; // for Node.js
+import { ipc } from '@uipath/coreipc-web'; // for Web
 
 async function main(): Promise<void> {
     ipc...
@@ -123,7 +124,8 @@ Consider an example where a **.NET CoreIpc Server** exposes the `IComputingServi
 Connecting and calling its method remotely can be achieved thusly:
 
 ```typescript
-import { ipc } from '@uipath/coreipc';
+import { ipc } from '@uipath/coreipc'; // for Node.js
+import { ipc } from '@uipath/coreipc-web'; // for Web
 import { IComputingService } from './translated-contract';
 
 async function main(): Promise<void> {
@@ -162,10 +164,11 @@ public class Operations : IOperations
 }
 ```
 
-a Javascript client can cancel calls easily:
+a Javascript client >>rethink wording<< can cancel calls easily:
 
 ```typescript
-import { ipc, CancellationToken, CancellationTokenSource, OperationCanceledError } from '@uipath/coreipc';
+import { ipc, CancellationToken, CancellationTokenSource, OperationCanceledError } from '@uipath/coreipc';     // for Node.js
+import { ipc, CancellationToken, CancellationTokenSource, OperationCanceledError } from '@uipath/coreipc-web'; // for Web
 
 class IOperations {
     public LongRunningOperation(x: number, y: boolean, z: string, ct: CancellationToken): Promise<number> {

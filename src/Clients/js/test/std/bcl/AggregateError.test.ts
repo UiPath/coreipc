@@ -11,13 +11,16 @@ import { _jsargs, __for, __fact, cover } from '../../infrastructure';
 __for(`${AggregateError.name}'s`, () => {
     __for(`ctor`, () => {
         __for(`should not throw`, () => {
+
             for (const args of [
                 [],
                 [undefined, new Error()],
                 [undefined, new Error(), new ArgumentError()],
                 ['some message'],
                 ['some message', new Error(), new ArgumentError()],
-            ] as ConstructorParameters<typeof AggregateError>[]) {
+            ] as ConstructorParameters<typeof AggregateError>[])
+
+            {
                 __fact(`should not throw when called with: (${_jsargs(args)})`, () => {
                     const act = () => new AggregateError(...args);
 
@@ -80,9 +83,11 @@ __for(`${AggregateError.name}'s`, () => {
                 ['some message', new Error(), Symbol()],
                 ['some message', new Error(), []],
                 ['some message', new Error(), {}],
-            ] as ConstructorParameters<typeof AggregateError>[]) {
+            ] as any as ConstructorParameters<typeof AggregateError>[]) {
                 __fact(`should throw when called with: ${_jsargs(args)}`, () => {
+
                     const act = () => new AggregateError(...args);
+
                     expect(act)
                         .to.throw(
                             ArgumentOutOfRangeError,
@@ -91,7 +96,7 @@ __for(`${AggregateError.name}'s`, () => {
                         .with.property('paramName', 'errors');
                 });
             }
-        });
+    });
 
         __for(`should set errors accordingly`, () => {
             for (const args of [
