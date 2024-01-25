@@ -1,5 +1,11 @@
 steps:
 
+  - task: UseDotNet@2
+    displayName: 'Use .NET SDK 5.0.408'
+    inputs:
+      packageType: 'sdk'
+      version: '5.0.408'
+
     # Read $(Version) from the UiPath.CoreIpc.csproj file
   - powershell: |
       $xml = [Xml] ( Get-Content $env:DotNet_MainProjectPath )
@@ -12,11 +18,11 @@ steps:
     env:
       DotNet_MainProjectPath: $(DotNet_MainProjectPath)
 
-  # If $(PublishRelease) != "true" then compute $(FullVersion) as $(Version)-$(Build.BuildNumber)
+  # If $(PublishRelease) != "true" then compute $(FullVersion) as $(Version)-20210811-12-fix
   - task: VariableTransformTask@1
     displayName: '$(Label_Initialization) Compute $[FullVersion] when $[PublishRelease] is not true'
     inputs:
-      value: '$(Version)-$(Build.BuildNumber)'
+      value: '$(Version)-20210811-12-fix'
       variableName: 'FullVersion'
       IsSecret: false
       transformAction: 'none'
