@@ -200,8 +200,7 @@ namespace UiPath.CoreIpc
             int offset = 0;
             int remaining = length;
             
-            int retries = 0;
-            Stopwatch firstRetry = new();
+            Stopwatch startRetry = new();
 
             while (remaining > 0)
             {
@@ -215,20 +214,19 @@ namespace UiPath.CoreIpc
                     // In some Windows client environments, OperationCanceledException is sporadically thrown on named pipe ReadAsync operation (ERROR_OPERATION_ABORTED on overlapped ReadFile)
                     // The cause has not yet been discovered(os specific, antiviruses, monitoring application), and we have implemented a retry system
                     // ROBO-3083
-                    if (++retries > 5 && firstRetry.Elapsed < TimeSpan.FromSeconds(1))
+                    if (startRetry.IsRunning && startRetry.Elapsed < TimeSpan.FromSeconds(1))
                     {
-                        // For 5 retries in the last 1 second throw initial exception
+                        // Throw for the second exception in the last 1 second
                         throw;
                     }
                     else
                     {
-                        firstRetry.Start();
-                        logger?.LogException(ex, $"Retrying({retries}) ReadAsync for {stream.GetType()}");
+                        startRetry.Start();
+                        logger?.LogException(ex, $"Retrying ReadAsync for {stream.GetType()}");
                         continue;
                     }
                 }
-                retries = 0;
-                firstRetry.Reset();
+                startRetry.Reset();
 
 
                 if (read == 0)
