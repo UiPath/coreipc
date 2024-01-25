@@ -2,7 +2,10 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.IO.Pipes;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,6 +30,8 @@ namespace UiPath.CoreIpc.Tests
         Task<Stream> Download(string text, CancellationToken cancellationToken = default);
         Task<Stream> Echo(Stream input, CancellationToken cancellationToken = default);
         Task<string> UploadNoRead(Stream memoryStream, int delay = 0, CancellationToken cancellationToken = default);
+        Task<bool> CancelIoPipe(Message message = null, CancellationToken cancellationToken = default);
+        Task<bool> Delay(int delay = 0, CancellationToken cancellationToken = default);
     }
 
     public class SystemMessage : Message
@@ -174,6 +179,28 @@ namespace UiPath.CoreIpc.Tests
             await input.CopyToAsync(result);
             result.Position = 0;
             return result;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool CancelIoEx(IntPtr handle, IntPtr lpOverlapped);
+        public async Task<bool> CancelIoPipe(Message message = null, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(10);
+#if WINDOWS
+            var networkPropertyInfo = message.Client.GetType().GetProperty("Network", BindingFlags.NonPublic | BindingFlags.Instance);
+            var pipeStream = networkPropertyInfo.GetValue(message.Client, null) as PipeStream;
+            var canceled = CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero);
+            await Task.Delay(10);
+            return canceled;
+#else
+            return false;
+#endif
+        }
+
+        public async Task<bool> Delay(int delay = 0, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(delay, cancellationToken);
+            return true;
         }
     }
 }

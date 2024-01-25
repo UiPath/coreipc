@@ -12,7 +12,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -26,7 +25,7 @@ namespace UiPath.CoreIpc
         public static MethodInfo GetStaticMethod(this Type type, string name) => type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
         public static MethodInfo GetInterfaceMethod(this Type type, string name)
         {
-            var method = type.GetMethod(name, InstanceFlags) ?? 
+            var method = type.GetMethod(name, InstanceFlags) ??
                 type.GetInterfaces().Select(t => t.GetMethod(name, InstanceFlags)).FirstOrDefault(m => m != null) ??
                 throw new ArgumentOutOfRangeException(nameof(name), name, $"Method '{name}' not found in interface '{type}'.");
             if (method.IsGenericMethod)
@@ -130,7 +129,7 @@ namespace UiPath.CoreIpc
                 {
                     return pipeSecurity;
                 }
-                pipeSecurity.Allow(currentIdentity.User, PipeAccessRights.ReadWrite|PipeAccessRights.CreateNewInstance);
+                pipeSecurity.Allow(currentIdentity.User, PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance);
             }
             return pipeSecurity;
         }
@@ -161,23 +160,23 @@ namespace UiPath.CoreIpc
             await stream.WriteBuffer(header, cancellationToken);
             await stream.WriteAsync(message.Buffer, 0, message.Length, cancellationToken);
         }
-        internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
+        internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) =>
             stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
 
-        internal static async Task<WireMessage> ReadMessage(this Stream stream, int maxMessageSize, CancellationToken cancellationToken = default)
+        internal static async Task<WireMessage> ReadMessage(this Stream stream, int maxMessageSize, ILogger logger, CancellationToken cancellationToken = default)
         {
-            var header = await stream.ReadBufferCore(sizeof(int)+1, cancellationToken);
+            var header = await stream.ReadBufferCore(sizeof(int) + 1, logger, cancellationToken);
             if (header.Length == 0)
             {
                 return new();
             }
             var messageType = (MessageType)header[0];
             var length = BitConverter.ToInt32(header, 1);
-            if(length > maxMessageSize)
+            if (length > maxMessageSize)
             {
-                throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize/(1024*1024)} megabytes.");
+                throw new InvalidDataException($"Message too large. The maximum message size is {maxMessageSize / (1024 * 1024)} megabytes.");
             }
-            var data = await stream.ReadBufferCore(length, cancellationToken);
+            var data = await stream.ReadBufferCore(length, logger, cancellationToken);
             if (data.Length == 0)
             {
                 return new();
@@ -185,9 +184,9 @@ namespace UiPath.CoreIpc
             return new(messageType, new MemoryStream(data));
         }
 
-        internal static async Task<byte[]> ReadBuffer(this Stream stream, int length, CancellationToken cancellationToken)
+        internal static async Task<byte[]> ReadBuffer(this Stream stream, int length, ILogger logger, CancellationToken cancellationToken)
         {
-            var messageData = await stream.ReadBufferCore(length, cancellationToken);
+            var messageData = await stream.ReadBufferCore(length, logger, cancellationToken);
             if (messageData.Length == 0)
             {
                 throw new IOException("Connection closed.");
@@ -195,15 +194,44 @@ namespace UiPath.CoreIpc
             return messageData;
         }
 
-        private static async Task<byte[]> ReadBufferCore(this Stream stream, int length, CancellationToken cancellationToken)
+        private static async Task<byte[]> ReadBufferCore(this Stream stream, int length, ILogger logger, CancellationToken cancellationToken)
         {
             var bytes = new byte[length];
             int offset = 0;
             int remaining = length;
-            while(remaining > 0)
+            
+            int retries = 0;
+            Stopwatch firstRetry = new();
+
+            while (remaining > 0)
             {
-                var read = await stream.ReadAsync(bytes, offset, remaining, cancellationToken);
-                if(read == 0)
+                int read;
+                try
+                {
+                    read = await stream.ReadAsync(bytes, offset, remaining, cancellationToken);
+                }
+                catch (OperationCanceledException ex) when (stream is PipeStream && !cancellationToken.IsCancellationRequested)
+                {
+                    // In some Windows client environments, OperationCanceledException is sporadically thrown on named pipe ReadAsync operation (ERROR_OPERATION_ABORTED on overlapped ReadFile)
+                    // The cause has not yet been discovered(os specific, antiviruses, monitoring application), and we have implemented a retry system
+                    // ROBO-3083
+                    if (++retries > 5 && firstRetry.Elapsed < TimeSpan.FromSeconds(1))
+                    {
+                        // For 5 retries in the last 1 second throw initial exception
+                        throw;
+                    }
+                    else
+                    {
+                        firstRetry.Start();
+                        logger?.LogException(ex, $"Retrying({retries}) ReadAsync for {stream.GetType()}");
+                        continue;
+                    }
+                }
+                retries = 0;
+                firstRetry.Reset();
+
+
+                if (read == 0)
                 {
                     return Array.Empty<byte>();
                 }

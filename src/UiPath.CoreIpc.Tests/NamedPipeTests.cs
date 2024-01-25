@@ -43,6 +43,29 @@ namespace UiPath.CoreIpc.Tests
             _ = protectedService.RunAsync();
             await CreateSystemService().DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
         }
+
+        [Fact]
+        public async Task PipeCancelIoOnServer()
+        {
+            (await _systemClient.CancelIoPipe(new())).ShouldBeTrue();
+
+            (await _systemClient.Delay()).ShouldBeTrue();
+        }
+
+        [Fact]
+        public async Task PipeCancelIoOnClient()
+        {
+            (await _systemClient.Delay()).ShouldBeTrue();
+
+            var delayTask = _systemClient.Delay(500);
+            await Task.Delay(100);
+            var pipeStream = ((IpcProxy)_systemClient).Connection.Network as PipeStream;
+            SystemService.CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero).ShouldBeTrue();
+
+            (await delayTask).ShouldBeTrue();
+
+            (await _systemClient.Delay()).ShouldBeTrue();
+        }
 #endif
     }
     public class ComputingNamedPipeTests : ComputingTests<NamedPipeClientBuilder<IComputingService, IComputingCallback>>
