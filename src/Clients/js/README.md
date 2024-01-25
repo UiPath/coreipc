@@ -1,22 +1,31 @@
 [![Build Status](https://uipath.visualstudio.com/CoreIpc/_apis/build/status/CI?branchName=master)](https://uipath.visualstudio.com/CoreIpc/_build/latest?definitionId=637&branchName=master)
 [![npm](https://img.shields.io/badge/%40uipath%2Fcoreipc-GitHub%20Packages-brightgreen)](https://github.com/UiPath/coreipc/packages/71523)
 
-# CoreIpc client for Node.js
----
+# CoreIpc client for Javascript
 
 ## Introduction
 
-The [![npm](readme-assets/npm.png) `@uipath/coreipc`](https://github.com/UiPath/coreipc/packages/71523) **NPM package** is used to connect Node.js clients to .NET servers via CoreIpc and named pipes (unix sockets).
+The **CoreIpc client for Javascript** API offers RPC interop between **[.NET CoreIpc servers](../../../README.md)** and **Javascript CoreIpc clients**.
 
-![diagram](readme-assets/diagram.png)
-
-Similarly, the [![npm](readme-assets/npm.png) `@uipath/coreipc-web`](https://uipath.visualstudio.com/CoreIpc/_artifacts/feed/EddiesExperimentalFeed/Npm/@uipath%2Fcoreipc-web/overview/2.5.1-20230313-05) **NPM package** is used to connect JavaScript clients to .NET servers, but the clients are Web browsers and the connection is done via WebSockets.
+![diagram](readme-assets/diagram.png) |
 
 
----
-## Installing the packages
+## NPM Packages
 
-1. Configure your `.npmrc` according to  [GitHub's documentation](https://docs.github.com/en/free-pro-team@latest/packages/using-github-packages-with-your-projects-ecosystem/configuring-npm-for-use-with-github-packages).
+The API is provided via two NPM packages:
+
+| Target | NPM Package | Transports |
+| - | - | - |
+| Node.js (includes Electron) | [![npm](readme-assets/npm.png) `@uipath/coreipc`](https://github.com/UiPath/coreipc/packages/71523)     | Named Pipes, Web Sockets |
+| Web (Angular, React)        | [![npm](readme-assets/npm.png) `@uipath/coreipc-web`](https://github.com/UiPath/coreipc/packages/71523) | Web Sockets              |
+
+These packages are available on the [GitHub Packages NPM Feed](https://npm.pkg.github.com/).
+
+> ❗️Before merging the the [Feat/js multitargeting](https://github.com/UiPath/coreipc/pull/87) PR, the **@uipath/coreipc-web** is not yet available on the GitHub Packages feed.
+>
+> Until that time, please check the Azure Artifacts specific configuration.
+
+To install the packages, configure your `.npmrc` as described in [GitHub's documentation](https://docs.github.com/en/free-pro-team@latest/packages/using-github-packages-with-your-projects-ecosystem/configuring-npm-for-use-with-github-packages).
 
 > Your `.npmrc` should be similar to:
 >
@@ -26,13 +35,16 @@ Similarly, the [![npm](readme-assets/npm.png) `@uipath/coreipc-web`](https://uip
 >
 > ```
 
-> **NOTE**: ❗️Before merging the the [Feat/js multitargeting](https://github.com/UiPath/coreipc/pull/87) PR, the **@uipath/coreipc-web** is not yet available on the GitHub Packages feed. Until that time, please check the Azure Artifacts specific configuration.
-
-2. Install the [![npm](readme-assets/npm.png) `@uipath/coreipc`](https://github.com/UiPath/coreipc/packages/71523) and/or [![npm](readme-assets/npm.png) `@uipath/coreipc-web`](https://uipath.visualstudio.com/CoreIpc/_artifacts/feed/EddiesExperimentalFeed/Npm/@uipath%2Fcoreipc-web/overview/2.5.1-20230313-05) the  **NPM package** as a runtime dependency.
+For a Node.js app run:
 
 ```elixir
-npm install @uipath/coreipc@<SPECIFIC VERSION>
-npm install @uipath/coreipc-web@<SPECIFIC VERSION>
+npm install @uipath/coreipc
+```
+
+and for a Web app run:
+
+```elixir
+npm install @uipath/coreipc-web
 ```
 
 3. Import the module and start using it:
@@ -41,7 +53,7 @@ npm install @uipath/coreipc-web@<SPECIFIC VERSION>
 import { ipc } from '@uipath/coreipc';
 
 async function main(): Promise<void> {
-    ipc... // <--- use it wisely
+    ipc...
 }
 
 const _ = main();
@@ -49,13 +61,14 @@ const _ = main();
 
 ---
 
-## Basic usage
+## Using the API
 
-This NPM package can be used to connect a Node.js client to a .NET server. The .NET server would host a service over named pipes (unix sockets) via the [![Nuget](readme-assets/nuget.png)`UiPath.CoreIpc` Nuget package](https://www.myget.org/feed/uipath-dev/package/nuget/UiPath.CoreIpc) and the Node.js client would connect to it and call its methods remotely.
+### Contracts
 
-## Translating a simple contract to TypeScript
+**.NET CoreIpc** contracts are defined in the form of .NET interfaces which are reflected on at runtime.
+Each interface leveraged by the **.NET CoreIpc Server** must be translated to a TypeScript class so that the **JavaScript CoreIpc client** can reflect on it at runtime (TypeScript interfaces aren't available at runtime because/and Vanilla-JS doesn't have concept of interfaces).
 
-Consider the following C# contract:
+For example, consider the following .NET interface:
 
 ```csharp
 using System.Threading.Tasks;
@@ -66,7 +79,7 @@ public interface IComputingService
 }
 ```
 
-Its Typescript translation would be a class:
+It's translation to TypeScript will be:
 
 ```typescript
 import { ipc } from '@uipath/coreipc';
@@ -75,106 +88,148 @@ import { ipc } from '@uipath/coreipc';
 export class IComputingService {
 
     @ipc.$operation
-    public Sum(x: number, y: number): Promise<number> { throw void 0; /* making the compiler happy 😁 */ }
+    public Sum(x: number, y: number): Promise<number> {
+        /* this method body will never be executed */
+        throw void 0;
+    }
 
 }
 ```
 
-> **NOTES**:
+> **Classes vs interfaces**:
 >
-> - Contracts may only contain `Task`-returning methods.
+> The contract classes' methods' bodies will never be called at runtime.
+> What's happening here is that:
+>   - a contract is made in such a way so that it survives TypeScript-Javascript compilation and be accessible at runtime
+>   - the contract is available as a compile-time Type which guide the user programmer through Intellisense and compilation errors
 >
-> - `Task`(non generic)-returning methods (and their Node.js `Promise<void>`-returning counterparts) are fire & forget methods.
->
-> - TypeScript contract methods' actual implementations do not matter. These methods are never called, only reflected upon. The reason these contracts aren't interfaces is because their metadata is needed at runtime and interfaces evaporate well before that.
+> Classes are used because while a Typescript interface checks the 2nd bullet it doesn't check the 1st.
 
-## Connecting via named pipes to exposed services and calling their methods
+
+> **`Task<T>` → `Promise<T>` and `Task` → `Promise<void>`**:
+>
+> **.NET CoreIpc** requires that all contract methods return either `Task<T>` or `Task` where `Task` (non-generic) is a marker for fire-and-forget operations. If an operation should be awaited by the client, even though it doesn't return a value, then `Task<T>` (traditionally, users of CoreIpc use `Task<bool>`) should be used nevertheless to go around the fire-and-forget connotation.
+>
+> The **CoreIpc client for Javascript** follows the same logic and restrictions as **.NET CoreIpc** and it uses the idiomatic `Promise<T>` thusly:
+>
+> | .NET Type | Javascript counterpart | Notes |
+> | - | - | - |
+> | `Task<T>` | `Promise<T>`    | `Task<int>` and `Task<double>` would both be translated to `Promise<number>` |
+> | `Task`    | `Promise<void>` | Typescript uses erasure for generics meaning that `Promise` is not distinct from `Promise<T>`. It also allows `void` to be a generic argument. |
+
+### Basic usage
+
+Consider an example where a **.NET CoreIpc Server** exposes the `IComputingService` contract over the `"DemoServer"` named pipe and our Javascript code is part of a Node.js app.
+Connecting and calling its method remotely can be achieved thusly:
 
 ```typescript
 import { ipc } from '@uipath/coreipc';
-
-// define your contract (see above)
-import { IComputingService } from './contract';
+import { IComputingService } from './translated-contract';
 
 async function main(): Promise<void> {
-    // decide on a pipe name
-    const pipeName = 'In-The-Pipe-5by5';
-
-    // synchronously obtain a liteweight proxy around the pipe name the service contract
     const proxy = ipc.proxy
-        .withAddress(options => options.isPipe(pipeName))
+        .withAddress(options => options.isPipe("DemoServer"))
         .withService(IComputingService);
 
-    // use the proxy
-    await use(proxy);
-}
-
-async function use(computingService: IComputingService): Promise<void> {
-    const expecting3 = await computingService.Sum(1, 2);
-
-    console.log(`expecting3 === ${expecting3}`)
+    console.log(`1 + 2 === ${await computingService.Sum(1, 2)}`);
 }
 
 const _ = main();
-
 ```
 
 ## Canceling a call
 
-When a contract method accepts a `CancellationToken` as its last parameter it might be the case that the operation triggered by calling the method can be canceled by means of a `CancellationTokenSource`.
+**CoreIpc client for Javascript** exports `CancellationToken` and `CancellationTokenSource`. These types mirror their .NET counterparts and are employed in **CoreIpc** contracts.
 
-Given the C# contract:
+Considering the following .NET operation exposed over **CoreIpc**:
 
 ```csharp
-// SampleContract.cs
-public interface ISample
+public class Operations : IOperations
 {
-    Task<bool> WaitForever(CancellationToken ct);
+    public async Task<int> LongRunningOperation(int x, bool y, string z, CancellationToken ct)
+    {
+        ...
+        while (true)
+        {
+            ...
+            await Task.Delay(1000, ct);
+            ...
+            ct.ThrowIfCancellationRequested();
+            ...
+        }
+        ...
+    }
 }
 ```
 
-One can translate it to TypeScript like so:
+a Javascript client can cancel calls easily:
 
 ```typescript
-// SampleContract.ts
-import { ipc, CancellationToken } from '@uipath/coreipc';
-
-export class ISample {
-    public WaitForever(ct: CancellationToken): Promise<boolean> { throw void 0; }
-}
-```
-
-And call it like:
-
-```typescript
-// index.ts
 import { ipc, CancellationToken, CancellationTokenSource, OperationCanceledError } from '@uipath/coreipc';
-import { ISample } from './SampleContract';
 
-async function main(): Promise<void> {
-    const sample = ipc.proxy.get('some-pipe', ISample);
+class IOperations {
+    public LongRunningOperation(x: number, y: boolean, z: string, ct: CancellationToken): Promise<number> {
+        throw void 0;
+    }
+}
 
-    const cts = new CancellationTokenSource();
+export class Mechanism {
+    private _latest: number | undefined;
+    private _cts: CancellationTokenSource | undefined;
 
-    setTimeout(() => {
-        // this will run after 1 second
-        cts.cancel(); // calling this will notify the .NET server
-    }, 1000);
+    public get latest(): number | undefined { return this._latest; }
 
-    const ct = cts.token;
-
-    try {
-        await sample.WaitForever(ct);
-    } catch (err) {
-        const willBeTrue = err instanceof OperationCanceledError;
-        console.log(`willBeTrue === ${willBeTrue}`);
+    constructor(private readonly _proxy: IOperations) {
     }
 
-    console.log('done');
+    public EnsureRefreshStarted(): void {
+        if (this._cts !== undefined) {
+            return;
+        }
+
+        (async function Refresh(): Promise<void> {
+            this._cts = new CancellationTokenSource();
+
+            try {
+                try {
+                    this._latest = await this._proxy.LongRunningOperation(1, true, "foo", this._cts.token);
+                } catch (err) {
+                    if (err instanceof OperationCanceledError) {
+                        console.log('OCE was caught.');
+                    }
+                }
+            } finally {
+                this._cts.dispose();
+                this._cts = undefined;
+            }
+
+        })();
+    }
+
+    public MaybeCancel(): void {
+        if (this._cts !== undefined) {
+            this._cts.cancel();
+        }
+    }
 }
 
-const _ = main();
+const proxy = ipc.proxy
+    .withAddress(options => options.isPipe("DemoServer"))
+    .withService(IOperations);
+
+const mechanism = new Mechanism(proxy);
+
+mechanism.Refresh();
+
+setTimeout(
+    () => {
+        mechanism.MaybeCancel();
+        console.log(`latest === ${mechanism.latest}`);
+    },
+    1000);
 ```
+
+
 
 ## Configuring the CoreIpc default request timeout
 
@@ -268,23 +323,72 @@ ipc.config
 ---
 ## Notes for Contributors
 
-### Regarding the Codebase anatomy
+### Codebase structure
 
-The `src/node` and `src/std` directories together produce the Node.js NPM package, while the `src/web` and `src/std` directories together produce the Web package.
+From a top level, the folders are:
+
+| Folder   | Remarks |
+| -------- | ------- |
+| 📂 src            | ✅checked in source ✅produces deliverables        |
+| 📂 test           | ✅checked in source 🛑doesn't produce deliverables |
+| 📂 dist           | 🛑git-ignored       ⭐temporary artifacts during build  |
+| 📂 dist-packages  | 🛑git-ignored       ⭐the NPM packages  |
+
+
+### The **`src`** folder
+
+The **`src`** folder is split into 3 subfolders: **`node`**, **`web`** and **`std`**.
+
+> **`std`** is the largest and is used in the production of both NPM packages.
+>
+> **`node`** and **`web`** are specific to their respective NPM packages: the on targeting Node.js and the one targeting Web respectively.
+
 
 ```
 📂 src
-  📂 node ─┐
-    📂 ..  ├───────────┐
-  📂 std ──┼───────────┼───────┐
-    📂 .. ─┘           │       ├─────────┐
-  📂 web               │       │         │
-    📂 .. ─────────────┼───────┘         │
-📂 test                │             produces
-  📂 ..            produces              │
-📂 dist                │                 │
-  📂 ..                │                 │
-📂 dist-packages       ↓                 │
-  💻 uipath-coreipc-{Version}.tgz        │
-  🕸️ uipath-coreipc-web-{Version}.tgz ←──┘
+   ╔════════════════╗
+   ║  ✅📂 node    ║
+   ║    ✅📄 ..    ║
+   ║    ✅📄 ..    ║
+   ║    ✅📄 ..    ║
+ ┌─╫─────────────┐  ║
+ │ ║  ✅📂 std  │  ║
+ │ ║    ✅📄 .. │  ╠════════╗
+ │ ║    ✅📄.   │  ║        ║
+ │ ║    ✅📄 .. │  ║        ║
+ │ ╚═════════════╪══╝        ║
+ │    ✅📂 web  │           ║
+ │      ✅📄 .. ├───────────╫─────────────────┐
+ │      ✅📄 .. │           ║                 │
+ │      ✅📄 .. │           ║             web + std
+ └───────────────┘      node + std        produce the
+      📂 test          produce the        Web package
+        📄 ..        Node.js package           │
+        📄 ..                ║                 │
+      📂 dist                ║                 │
+        📄 ..                ║                 │
+        📄 ..                ║                 │
+      📂 dist-packages       ↓                 │
+        💻 uipath-coreipc-{Version}.tgz        │
+        🕸️ uipath-coreipc-web-{Version}.tgz ←──┘
 ```
+
+### General Guide for contributors
+
+#### Prerequisites
+
+- Visual Studio Code
+- Node.js and NPM
+- .NET SDK
+
+#### Steps from cloning the repo to running the integration tests
+
+- Clone the repo
+
+- Open a terminal and navigate to `$(REPO)/src/Clients/js/dotnet`.
+- Run `dotnet build`.
+
+- Navigate up, to `$(REPO)/src/Clients/js`.
+- Run `npm ci`.
+- Run `npm run build`
+- Run `npm test`

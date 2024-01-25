@@ -14,8 +14,8 @@
     "prettier.singleQuote": true,
 
     "editor.codeActionsOnSave": {
-        "source.organizeImports": false,
-        "source.fixAll": true
+        "source.organizeImports": "never",
+        "source.fixAll": "explicit"
     },
 
     "karmaTestExplorer.testFiles": ["test/std/**/*.test.ts", "test/web/**/*.test.ts"],
