@@ -217,12 +217,14 @@ namespace UiPath.CoreIpc
                     if (startRetry.IsRunning && startRetry.Elapsed < TimeSpan.FromSeconds(1))
                     {
                         // Throw for the second exception in the last 1 second
+                        logger?.LogException(ex, $"Second exception ReadAsync for {stream.GetType()}");
                         throw;
                     }
                     else
                     {
                         startRetry.Start();
                         logger?.LogException(ex, $"Retrying ReadAsync for {stream.GetType()}");
+                        await Task.Delay(10); //Without this delay, on net framework can get OperationCanceledException on the second ReadAsync call
                         continue;
                     }
                 }
