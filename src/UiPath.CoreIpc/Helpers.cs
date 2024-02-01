@@ -222,7 +222,7 @@ namespace UiPath.CoreIpc
                     }
                     else
                     {
-                        startRetry.Start();
+                        startRetry.Restart();
                         logger?.LogException(ex, $"Retrying ReadAsync for {stream.GetType()}");
                         await Task.Delay(10); //Without this delay, on net framework can get OperationCanceledException on the second ReadAsync call
                         continue;
