@@ -228,7 +228,7 @@ namespace UiPath.CoreIpc
                         continue;
                     }
                 }
-                startRetry.Reset();
+                startRetry.Stop();
 
 
                 if (read == 0)
