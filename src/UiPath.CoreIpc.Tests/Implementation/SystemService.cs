@@ -1,4 +1,6 @@
 ﻿using System.Globalization;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace UiPath.CoreIpc.Tests;
@@ -22,12 +24,22 @@ public interface ISystemService
     Task<Stream> Download(string text, CancellationToken cancellationToken = default);
     Task<Stream> Echo(Stream input, CancellationToken cancellationToken = default);
     Task<string> UploadNoRead(Stream memoryStream, int delay = 0, CancellationToken cancellationToken = default);
+    Task<bool> CancelIoPipe(CancelIoPipeMessage message = null, CancellationToken cancellationToken = default);
+    Task<bool> Delay(int delay = 0, CancellationToken cancellationToken = default);
 }
 
 public class SystemMessage : Message
 {
     public string Text { get; set; }
     public int Delay { get; set; }
+}
+public class CancelIoPipeMessage : Message
+{
+    public CancelIoPipeMessage(int delayScecondCancel = 0)
+    {
+        DelayScecondCancel = delayScecondCancel;
+    }
+    public int DelayScecondCancel { get; set; }
 }
 public class SystemService : ISystemService
 {
@@ -171,5 +183,35 @@ public class SystemService : ISystemService
         await input.CopyToAsync(result);
         result.Position = 0;
         return result;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool CancelIoEx(IntPtr handle, IntPtr lpOverlapped);
+    public async Task<bool> CancelIoPipe(CancelIoPipeMessage message = null, CancellationToken cancellationToken = default)
+    {
+        await Task.Delay(50);
+#if WINDOWS
+            var networkPropertyInfo = message.Client.GetType().GetProperty("Network", BindingFlags.NonPublic | BindingFlags.Instance);
+            var pipeStream = networkPropertyInfo.GetValue(message.Client, null) as PipeStream;
+
+            var canceled = CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero);
+
+            if (message.DelayScecondCancel > 0)
+            {
+                await Task.Delay(message.DelayScecondCancel);
+                canceled = CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero);
+            }
+
+            await Task.Delay(50);
+            return canceled;
+#else
+        return false;
+#endif
+    }
+
+    public async Task<bool> Delay(int delay = 0, CancellationToken cancellationToken = default)
+    {
+        await Task.Delay(delay, cancellationToken);
+        return true;
     }
 }

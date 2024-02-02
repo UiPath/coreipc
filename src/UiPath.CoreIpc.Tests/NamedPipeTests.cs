@@ -1,4 +1,5 @@
-﻿using System.IO.Pipes;
+﻿using System.IO;
+using System.IO.Pipes;
 using System.Security.Principal;
 namespace UiPath.CoreIpc.Tests;
 
@@ -6,14 +7,14 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
 {
     string _pipeName = "system";
     protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder) =>
-        serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings(_pipeName+GetHashCode())));
-    protected override NamedPipeClientBuilder<ISystemService> CreateSystemClientBuilder() => 
-        new NamedPipeClientBuilder<ISystemService>(_pipeName+GetHashCode()).AllowImpersonation();
+        serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings(_pipeName + GetHashCode())));
+    protected override NamedPipeClientBuilder<ISystemService> CreateSystemClientBuilder() =>
+        new NamedPipeClientBuilder<ISystemService>(_pipeName + GetHashCode()).AllowImpersonation();
     [Fact]
     public void PipeExists()
     {
         IOHelpers.PipeExists(System.Guid.NewGuid().ToString()).ShouldBeFalse();
-        IOHelpers.PipeExists("system"+GetHashCode(), 50).ShouldBeTrue();
+        IOHelpers.PipeExists("system" + GetHashCode(), 50).ShouldBeTrue();
     }
     [Fact]
     public Task ServerName() => SystemClientBuilder().ValidateAndBuild().GetGuid(System.Guid.Empty);
@@ -38,6 +39,29 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
         _ = protectedService.RunAsync();
         await CreateSystemService().DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
     }
+
+    [Fact]
+        public async Task PipeCancelIoOnServer_TwiceTightly()
+        {
+            //Two cancel with less than 1 second in between should fail
+            await _systemClient.CancelIoPipe(new(100)).ShouldThrowAsync<IOException>();
+        }
+
+        [Fact]
+        public async Task PipeCancelIoOnClient()
+        {
+            (await _systemClient.Delay()).ShouldBeTrue();
+
+            var delayTask = _systemClient.Delay(500);
+            await Task.Delay(100);
+            var pipeStream = ((IpcProxy)_systemClient).Connection.Network as PipeStream;
+            SystemService.CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero).ShouldBeTrue();
+
+            (await delayTask).ShouldBeTrue();
+
+            //Make sure the connection is still working
+            (await _systemClient.Delay()).ShouldBeTrue();
+        }
 #endif
 }
 public class ComputingNamedPipeTests : ComputingTests<NamedPipeClientBuilder<IComputingService, IComputingCallback>>
