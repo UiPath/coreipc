@@ -1,4 +1,10 @@
 {
     "extends": "./tsconfig.common.json",
-    "include": ["src/**/*"]
+    "include": ["src/**/*"],
+    "ts-node": {
+        "compilerOptions": {
+            "target": "ESNext",
+            "module": "ES2022"
+        }
+    },
 }

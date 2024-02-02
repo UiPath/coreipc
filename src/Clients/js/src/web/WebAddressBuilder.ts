@@ -1,4 +1,4 @@
-import { Address, AddressBuilder, PublicCtor } from '../std';
+import { AddressBuilder, PublicCtor } from '../std';
 import { BrowserWebSocketAddress } from './Transport';
 
 export class WebAddressBuilder extends AddressBuilder<BrowserWebSocketAddress> {
@@ -12,7 +12,7 @@ export class WebAddressBuilder extends AddressBuilder<BrowserWebSocketAddress> {
     }
 
     public isWebSocket(url: string): PublicCtor<BrowserWebSocketAddress> {
-        super._address = new BrowserWebSocketAddress(url);
+        this._address = new BrowserWebSocketAddress(url);
         return BrowserWebSocketAddress;
     }
 }

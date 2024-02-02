@@ -1,13 +1,13 @@
-import { Address, AddressBuilder, PublicCtor } from '../std';
+import { AddressBuilder } from '../std';
 import { NamedPipeAddress, NodeWebSocketAddress } from './Transport';
 
 export class NodeAddressBuilder extends AddressBuilder<NamedPipeAddress | NodeWebSocketAddress> {
     public isPipe(name: string): void {
-        super._address = new NamedPipeAddress(name);
+        this._address = new NamedPipeAddress(name);
     }
 
     public isWebSocket(url: string): void {
-        super._address = new NodeWebSocketAddress(url);
+        this._address = new NodeWebSocketAddress(url);
     }
 
     /* @internal */

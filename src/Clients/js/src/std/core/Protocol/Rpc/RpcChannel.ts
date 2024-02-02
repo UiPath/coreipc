@@ -14,6 +14,36 @@ import { IRpcChannel, RpcCallContext, RpcMessage } from '.';
 
 /* @internal */
 export class RpcChannel implements IRpcChannel {
+    private static readonly OutgoingCallTable = class {
+        private _sequence = 0;
+        private readonly _map = new Map<string, RpcCallContext.Outgoing>();
+
+        public async register(
+            request: RpcMessage.Request,
+            timeout: TimeSpan,
+            ct: CancellationToken,
+        ): Promise<RpcMessage.Response> {
+            request.Id = this.generateId();
+
+            const context = new RpcCallContext.Outgoing(timeout, ct);
+            this._map.set(request.Id, context);
+
+            try {
+                return await context.promise;
+            } finally {
+                this._map.delete(request.Id);
+            }
+        }
+
+        public tryComplete(response: RpcMessage.Response) {
+            this._map.get(response.RequestId)?.complete(response);
+        }
+
+        private generateId(): string {
+            return `${this._sequence++}`;
+        }
+    };
+
     public static create(
         address: Address,
         connectHelper: ConnectHelper,
@@ -174,34 +204,4 @@ export class RpcChannel implements IRpcChannel {
     private processIncommingCancellationRequest(message: Network.Message): void {
         throw new Error('Method not implemented.');
     }
-
-    private static readonly OutgoingCallTable = class {
-        private _sequence = 0;
-        private readonly _map = new Map<string, RpcCallContext.Outgoing>();
-
-        public async register(
-            request: RpcMessage.Request,
-            timeout: TimeSpan,
-            ct: CancellationToken,
-        ): Promise<RpcMessage.Response> {
-            request.Id = this.generateId();
-
-            const context = new RpcCallContext.Outgoing(timeout, ct);
-            this._map.set(request.Id, context);
-
-            try {
-                return await context.promise;
-            } finally {
-                this._map.delete(request.Id);
-            }
-        }
-
-        public tryComplete(response: RpcMessage.Response) {
-            this._map.get(response.RequestId)?.complete(response);
-        }
-
-        private generateId(): string {
-            return `${this._sequence++}`;
-        }
-    };
 }
