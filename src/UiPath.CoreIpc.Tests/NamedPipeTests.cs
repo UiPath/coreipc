@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.IO.Pipes;
 using System.Security.Principal;
 using System.Threading.Tasks;
@@ -42,6 +43,48 @@ namespace UiPath.CoreIpc.Tests
                 .ValidateAndBuild();
             _ = protectedService.RunAsync();
             await CreateSystemService().DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
+        }
+
+        [Fact]
+        public async Task PipeCancelIoOnServer()
+        {
+            (await _systemClient.CancelIoPipe(new())).ShouldBeTrue();
+
+            //Make sure the connection is still working
+            (await _systemClient.Delay()).ShouldBeTrue();
+        }
+
+        [Fact]
+        public async Task PipeCancelIoOnServer_TwiceSlowly()
+        {
+            //Two cancel with more than 1 second in between should work
+            (await _systemClient.CancelIoPipe(new(1100))).ShouldBeTrue();
+
+            //Make sure the connection is still working
+            (await _systemClient.Delay()).ShouldBeTrue();
+        }
+
+        [Fact]
+        public async Task PipeCancelIoOnServer_TwiceTightly()
+        {
+            //Two cancel with less than 1 second in between should fail
+            await _systemClient.CancelIoPipe(new(100)).ShouldThrowAsync<IOException>();
+        }
+
+        [Fact]
+        public async Task PipeCancelIoOnClient()
+        {
+            (await _systemClient.Delay()).ShouldBeTrue();
+
+            var delayTask = _systemClient.Delay(500);
+            await Task.Delay(100);
+            var pipeStream = ((IpcProxy)_systemClient).Connection.Network as PipeStream;
+            SystemService.CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero).ShouldBeTrue();
+
+            (await delayTask).ShouldBeTrue();
+
+            //Make sure the connection is still working
+            (await _systemClient.Delay()).ShouldBeTrue();
         }
 #endif
     }

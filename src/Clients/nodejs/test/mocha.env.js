@@ -34,6 +34,3 @@ Mock.configure({
         chai.spy.on(object, key);
     },
 });
-
-require('temp')
-    .track();

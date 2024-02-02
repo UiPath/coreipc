@@ -143,7 +143,7 @@ namespace UiPath.CoreIpc
             WireMessage message;
             try
             {
-                while (!(message = await Network.ReadMessage(_maxMessageSize)).Empty)
+                while (!(message = await Network.ReadMessage(_maxMessageSize, Logger)).Empty)
                 {
                     await HandleMessage(message);
                 }
@@ -204,7 +204,7 @@ namespace UiPath.CoreIpc
 
         private async Task<NestedStream> WrapNetworkStream()
         {
-            var lengthBytes = await Network.ReadBuffer(sizeof(long), default);
+            var lengthBytes = await Network.ReadBuffer(sizeof(long), Logger, default);
             var userStreamLength = BitConverter.ToInt64(lengthBytes, 0);
             return new NestedStream(Network, userStreamLength);
         }
