@@ -91,7 +91,7 @@ export class BrowserWebSocket extends Socket {
         const WebSocketCtor = socketLikeCtor ?? WebSocket;
 
         /* istanbul ignore next */
-        const socket = new WebSocketCtor(url, 'coreipc');
+        const socket = new WebSocketCtor(url);
         socket.binaryType = 'arraybuffer';
 
         const pcs = new PromiseCompletionSource<void>();

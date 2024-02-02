@@ -40,4 +40,11 @@ internal static class Signalling
             Type = exception.GetType().Name,
             Message = exception.Message
         }));
+
+    public static void CannotConnect(Exception exception)
+        => Send(MakeSignal(SignalKind.ReadyToConnect, new
+        {
+            Type = exception.GetType().Name,
+            Message = exception.Message            
+        }));
 }

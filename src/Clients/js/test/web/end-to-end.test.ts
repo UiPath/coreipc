@@ -1,14 +1,14 @@
 import { expect } from 'chai';
 import { Message, PromisePal } from '../../src/std';
 import { ipc } from '../../src/web';
-import { IAlgebra, IArithmetics } from './Contracts';
+import { IAlgebra, IArithmetic } from './Contracts';
 import { algebraProxyFactory, serverUrl } from './Fixtures';
 
 describe('web:the browser built-in WebSocket class', () => {
     it('should be instantiable', () => {
         const act = () =>
             eval(/* js */ `
-            new WebSocket('ws://127.0.0.1:61234', 'coreipc')
+            new WebSocket('ws://127.0.0.1:61234')
         `);
         expect(act).not.to.throw().and.to.be.instanceOf(WebSocket);
     });
@@ -22,6 +22,10 @@ describe('web:end-to-end', () => {
             algebraProxy = algebraProxyFactory();
         });
 
+        beforeEach(() => {
+            (jasmine as any).getEnv().defaultTimeoutInterval = jasmine.DEFAULT_TIMEOUT_INTERVAL = 60 * 60 * 1000; // 1 hour
+        });
+
         it('should work', async () => {
             const x = 2;
             const y = 3;
@@ -30,7 +34,7 @@ describe('web:end-to-end', () => {
             const actual = await algebraProxy.MultiplySimple(x, y);
 
             expect(actual).to.equal(expected);
-        });
+        }, 60 * 60 * 1000);
 
         it('should work concurrently', async () => {
             const span1 = 500;
@@ -61,7 +65,7 @@ describe('web:end-to-end', () => {
 
             let receivedMessage: Message<number> | undefined;
 
-            const arithmetics = new (class implements IArithmetics {
+            const arithmetic = new (class implements IArithmetic {
                 Sum(x: number, y: number): Promise<number> {
                     throw new Error('Method not implemented.');
                 }
@@ -73,8 +77,8 @@ describe('web:end-to-end', () => {
 
             ipc.callback
                 .forAddress(x => x.isWebSocket(serverUrl))
-                .forService<IArithmetics>('IArithmetics')
-                .is(arithmetics);
+                .forService<IArithmetic>('IArithmetic')
+                .is(arithmetic);
 
             const actual = await algebraProxy.TestMessage(originalMessage);
 

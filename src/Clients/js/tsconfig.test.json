@@ -4,6 +4,7 @@
         "outDir": "./dist/obj/test",
         "rootDir": ".", /* Specify the root folder within your source files. */
         "inlineSourceMap": true,
+        "moduleResolution": "node"
     },
     "include": [
         "test/**/*.ts",

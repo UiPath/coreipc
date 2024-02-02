@@ -43,7 +43,11 @@ export class CoreIpcServer {
             Paths.entryPoint,
             ...interopAddress.commandLineArgs()
         );
-        await dotNetScript.waitForSignal(Signal.Kind.ReadyToConnect);
+
+        const details = await dotNetScript.waitForSignal<Signal.ExceptionDetails | null>(Signal.Kind.ReadyToConnect);
+        if (details != null) {
+            throw new Error(`The CoreIpc server couldn't test it's own connectivity. The .NET exception was "${details.Type}" with message "${details.Message}"`);
+        }
 
         return new CoreIpcServer(dotNetScript);
     }

@@ -22,11 +22,13 @@
 
     "jasmineExplorer.config": "jasmine.node.json",
     "jasmineExplorer.nodeArgv": [
-        "--require",
-        "ts-node/register",
-        "--require",
-        "tsconfig-paths/register"
+        "--experimental-specifier-resolution=node",
+        "--loader",
+        "ts-node/esm",
     ],
+    "jasmineExplorer.env": {
+        "TS_NODE_COMPILER_OPTIONS": "{\"module\":\"ES2022\",\"moduleResolution\":\"node\"}"
+    },
 
     "editor.tokenColorCustomizations": {
         "[windows-xp]": {

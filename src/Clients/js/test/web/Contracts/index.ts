@@ -1,2 +1,2 @@
 export * from './IAlgebra';
-export * from './IArithmetics';
+export * from './IArithmetic';

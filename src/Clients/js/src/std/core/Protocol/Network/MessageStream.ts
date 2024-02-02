@@ -20,7 +20,9 @@ export class MessageStream implements IMessageStream {
     constructor(
         private readonly _stream: Stream,
         private readonly _observer: Observer<Network.Message>,
-    ) {}
+    ) {
+        this._loop = this.loop();
+    }
 
     public async writeMessageAsync(message: Network.Message, ct: CancellationToken): Promise<void> {
         const bytes = Buffer.from([
@@ -86,7 +88,7 @@ export class MessageStream implements IMessageStream {
     private get ctLoop(): CancellationToken {
         return this._ctsLoop.token;
     }
-    private readonly _loop: Promise<void> = this.loop();
+    private readonly _loop: Promise<void>;
 
     private async loop(): Promise<void> {
         try {

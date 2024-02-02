@@ -20,20 +20,20 @@ internal static class ServiceImpls
 
         public async Task<int> Multiply(int x, int y, Message message = default!)
         {
-            var arithmetics = message.GetCallback<IArithmetics>();
+            var arithmetic = message.GetCallback<IArithmetic>();
 
             int result = 0;
             for (int i = 0; i < x; i++)
             {
-                result = await arithmetics.Sum(result, y);
+                result = await arithmetic.Sum(result, y);
             }
 
             return result;
         }
         public async Task<bool> TestMessage(Message<int> message)
         {
-            var arithmetics = message.GetCallback<IArithmetics>();
-            return await arithmetics.SendMessage(message);
+            var arithmetic = message.GetCallback<IArithmetic>();
+            return await arithmetic.SendMessage(message);
         }
 
         public async Task<bool> Sleep(int milliseconds, Message message = default!, CancellationToken ct = default)

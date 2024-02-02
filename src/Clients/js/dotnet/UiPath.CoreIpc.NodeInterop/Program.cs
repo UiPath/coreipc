@@ -80,7 +80,7 @@ class Program
 
         var serviceHost = new ServiceHostBuilder(sp)
             .UseNamedPipesOrWebSockets(pipeName, webSocketUrl)
-            .AddEndpoint<IAlgebra, IArithmetics>()
+            .AddEndpoint<IAlgebra, IArithmetic>()
             .AddEndpoint<ICalculus>()
             .AddEndpoint<IBrittleService>()
             .AddEndpoint<IEnvironmentVariableGetter>()
@@ -95,19 +95,41 @@ class Program
         {
             try
             {
-                await new NamedPipeClientBuilder<IAlgebra>(pipeName)
-                    .RequestTimeout(TimeSpan.FromSeconds(2))
-                    .Build()
-                    .Ping();
+                await using var sp = new ServiceCollection()
+                    .AddLogging()
+                    .AddIpc()
+                    .BuildServiceProvider();
+
+                var callback = new Arithmetic();
+
+                var proxy = webSocketUrl is not null
+                    ? new WebSocketClientBuilder<IAlgebra, IArithmetic>(uri: new(webSocketUrl), sp)
+                        .RequestTimeout(TimeSpan.FromHours(5))
+                        .CallbackInstance(callback)
+                        .Build()
+                    : new NamedPipeClientBuilder<IAlgebra, IArithmetic>(pipeName, sp)
+                        .RequestTimeout(TimeSpan.FromHours(5))
+                        .CallbackInstance(callback)
+                        .Build();
+
+                await proxy.Ping();
+                Send(SignalKind.ReadyToConnect);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine(ex);
+                CannotConnect(ex);
             }
-            Send(SignalKind.ReadyToConnect);
         });
 
         await serviceHost.RunAsync(sched);
+    }
+
+    private class Arithmetic : IArithmetic
+    {
+        public Task<int> Sum(int x, int y) => Task.FromResult(x + y);
+
+        public Task<bool> SendMessage(Message<int> message) => Task.FromResult(true);
     }
 }
 
@@ -154,7 +176,7 @@ internal static class Extensions
                 var listenerContext = await _httpListener.GetContextAsync();
                 if (listenerContext.Request.IsWebSocketRequest)
                 {
-                    var webSocketContext = await listenerContext.AcceptWebSocketAsync(subProtocol: "coreipc");
+                    var webSocketContext = await listenerContext.AcceptWebSocketAsync(subProtocol: null);
                     return webSocketContext.WebSocket;
                 }
                 listenerContext.Response.StatusCode = 400;

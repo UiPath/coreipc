@@ -6,7 +6,7 @@ namespace UiPath.CoreIpc.NodeInterop;
 
 internal static class Contracts
 {
-    public interface IArithmetics
+    public interface IArithmetic
     {
         Task<int> Sum(int x, int y);
         Task<bool> SendMessage(Message<int> message);

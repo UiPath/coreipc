@@ -184,7 +184,7 @@ export class DotNetProcess implements IAsyncDisposable {
         return result as PromiseCompletionSource<T>;
     }
 
-    public async waitForSignal(signalKind: Signal.Kind): Promise<void> {
+    public async waitForSignal<T = void>(signalKind: Signal.Kind): Promise<T> {
         const process = this._process as ChildProcessWithoutNullStreams;
 
         if (this._disposed || process.killed) {
@@ -195,7 +195,7 @@ export class DotNetProcess implements IAsyncDisposable {
             throw this._error;
         }
 
-        return await this.getCompletionSource<void>(signalKind).promise;
+        return await this.getCompletionSource<T>(signalKind).promise;
     }
 
     public async disposeAsync(): Promise<void> {
