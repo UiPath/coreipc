@@ -154,7 +154,7 @@ public class Operations : IOperations
 }
 ```
 
-a JavaScript client >>rethink wording<< can cancel calls easily:
+a JavaScript client can cancel calls by using the `CancellationTokenSource` and `CancellationToken` classes:
 
 ```typescript
 import { ipc, CancellationToken, CancellationTokenSource, OperationCanceledError } from '@uipath/coreipc';     // for Node.js
