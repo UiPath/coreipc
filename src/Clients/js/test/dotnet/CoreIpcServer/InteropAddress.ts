@@ -5,7 +5,7 @@ import { BrowserWebSocketAddress } from '../../../src/web';
 export abstract class InteropAddress {
     public static from(address: Address): InteropAddress {
         switch (
-            assertArgument({ address }, BrowserWebSocketAddress, NamedPipeAddress)
+        assertArgument({ address }, BrowserWebSocketAddress, NamedPipeAddress)
         ) {
             case BrowserWebSocketAddress: {
                 return new InteropAddress.WebSocket(
@@ -23,7 +23,11 @@ export abstract class InteropAddress {
         }
     }
 
-    public abstract commandLineArgs(): Iterable<string>;
+    public static computeCommandLineArgs(interopAddresses: InteropAddress[]): string[] {
+        return interopAddresses.flatMap(x => x.commandLineArgs());
+    }
+
+    public abstract commandLineArgs(): string[];
 
     public get underlyingAddress(): Address {
         return this.getUnderlyingAddress();
@@ -38,9 +42,8 @@ export module InteropAddress {
             super();
         }
 
-        public override *commandLineArgs(): Iterable<string> {
-            yield '--websocket';
-            yield this._underlyingAddress.url;
+        public override commandLineArgs() {
+            return ['--websocket', this._underlyingAddress.url];
         }
 
         public get underlyingAddress(): BrowserWebSocketAddress {
@@ -57,9 +60,8 @@ export module InteropAddress {
             super();
         }
 
-        public override *commandLineArgs(): Iterable<string> {
-            yield '--pipe';
-            yield this._underlyingAddress.name;
+        public override commandLineArgs() {
+            return ['--pipe', this._underlyingAddress.name];
         }
 
         public get underlyingAddress(): NamedPipeAddress {

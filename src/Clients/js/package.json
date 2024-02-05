@@ -22,7 +22,7 @@
         "clean:coverage": "rimraf ./coverage/**/*",
         "clean:coverage:node": "rimraf ./coverage/node/**/*",
         "clean:coverage:web": "rimraf ./coverage/web/**/*",
-        "with-dotnet": "node --experimental-modules ./dist/obj/dotnet/test/dotnet/index.js host --websocket-url ws://127.0.0.1:61234",
+        "with-dotnet": "node --experimental-modules ./dist/obj/dotnet/test/dotnet/index.js host --websocket-url ws://127.0.0.1:61234 --pipe uipath-coreipc-test-pipe",
         "test": "npm run with-dotnet -- --script quick-test",
         "test:node": "npm run with-dotnet -- --script quick-test:node",
         "test:web": "npm run with-dotnet -- --script quick-test:web",

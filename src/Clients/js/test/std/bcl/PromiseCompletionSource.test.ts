@@ -1,7 +1,7 @@
-import { PromiseCompletionSource, PromisePal } from '../../src/std';
+import { PromiseCompletionSource, PromisePal } from '../../../src/std';
 import { expect } from 'chai';
 
-describe('PromiseCompletionSource', function () {
+describe(`${PromiseCompletionSource.name}`, function () {
     it('should work', async () => {
         const pcs = new PromiseCompletionSource<number>();
         const act = async () => {

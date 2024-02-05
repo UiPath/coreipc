@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Nito.AsyncEx;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Net.WebSockets;
@@ -32,7 +33,7 @@ class Program
     {
         if ((pipe, websocket) is (null, null))
         {
-            Console.Error.WriteLine($"Expecting either a non-null pipe name or a non-null websocket url.");
+            Console.Error.WriteLine($"Expecting either a non-null pipe name or a non-null websocket url or both.");
             return 1;
         }
 
@@ -79,7 +80,7 @@ class Program
             .BuildServiceProvider();
 
         var serviceHost = new ServiceHostBuilder(sp)
-            .UseNamedPipesOrWebSockets(pipeName, webSocketUrl)
+            .UseNamedPipesAndOrWebSockets(pipeName, webSocketUrl)
             .AddEndpoint<IAlgebra, IArithmetic>()
             .AddEndpoint<ICalculus>()
             .AddEndpoint<IBrittleService>()
@@ -102,17 +103,29 @@ class Program
 
                 var callback = new Arithmetic();
 
-                var proxy = webSocketUrl is not null
-                    ? new WebSocketClientBuilder<IAlgebra, IArithmetic>(uri: new(webSocketUrl), sp)
-                        .RequestTimeout(TimeSpan.FromHours(5))
-                        .CallbackInstance(callback)
-                        .Build()
-                    : new NamedPipeClientBuilder<IAlgebra, IArithmetic>(pipeName, sp)
-                        .RequestTimeout(TimeSpan.FromHours(5))
-                        .CallbackInstance(callback)
-                        .Build();
+                IEnumerable<Task> EnumeratePings()
+                {
+                    if (webSocketUrl is not null)
+                    {
+                        yield return new WebSocketClientBuilder<IAlgebra, IArithmetic>(uri: new(webSocketUrl), sp)
+                            .RequestTimeout(TimeSpan.FromHours(5))
+                            .CallbackInstance(callback)
+                            .Build()
+                            .Ping();
+                    }
 
-                await proxy.Ping();
+                    if (pipeName is not null)
+                    {
+                        yield return new NamedPipeClientBuilder<IAlgebra, IArithmetic>(pipeName, sp)
+                            .RequestTimeout(TimeSpan.FromHours(5))
+                            .CallbackInstance(callback)
+                            .Build()
+                            .Ping();
+                    }
+                }
+
+                await Task.WhenAll(EnumeratePings());
+                
                 Send(SignalKind.ReadyToConnect);
             }
             catch (Exception ex)
@@ -135,11 +148,16 @@ class Program
 
 internal static class Extensions
 {
-    public static ServiceHostBuilder UseNamedPipesOrWebSockets(this ServiceHostBuilder builder, string? pipeName, string? webSocketUrl)
+    public static ServiceHostBuilder UseNamedPipesAndOrWebSockets(this ServiceHostBuilder builder, string? pipeName, string? webSocketUrl)
     {
+        if (pipeName is null && webSocketUrl is null)
+        {
+            throw new ArgumentOutOfRangeException();
+        }                
+
         if (pipeName is not null)
         {
-            return builder.UseNamedPipes(new NamedPipeSettings(pipeName));
+            builder = builder.UseNamedPipes(new NamedPipeSettings(pipeName));
         }
 
         if (webSocketUrl is not null)
@@ -148,10 +166,10 @@ internal static class Extensions
             var accept = new HttpSysWebSocketsListener(url).Accept;
             WebSocketSettings settings = new(accept);
 
-            return builder.UseWebSockets(settings);
+            builder = builder.UseWebSockets(settings);
         }
 
-        throw new ArgumentOutOfRangeException();
+        return builder;
     }
 
     private static string CurateWebSocketUrl(string raw)

@@ -1,73 +1,70 @@
 [![Build Status](https://uipath.visualstudio.com/CoreIpc/_apis/build/status/CI?branchName=master)](https://uipath.visualstudio.com/CoreIpc/_build/latest?definitionId=637&branchName=master)
 [![npm](https://img.shields.io/badge/%40uipath%2Fcoreipc-GitHub%20Packages-brightgreen)](https://github.com/UiPath/coreipc/packages/71523)
 
-# CoreIpc client for Javascript
+# UiPath CoreIpc client for JavaScript
 
 ## Introduction
 
-The **CoreIpc client for Javascript** API offers RPC interop between **[.NET CoreIpc servers](../../../README.md)** and **Javascript CoreIpc clients**.
+The **UiPath CoreIpc client for JavaScript** API is complementary to the **[UiPath CoreIpc for .NET](../../../README.md)** API. It facilitates Node.js and Web apps to interop with .NET servers via RPC.
+
+The JavaScript API is provided as two NPM packages:
+
+| NPM Package | Target | Transports |
+| - | - | - |
+| [![npm](readme-assets/npm.png) `@uipath/coreipc`](https://github.com/UiPath/coreipc/packages/71523)     | Node.js (includes Electron) | Named Pipes, Web Sockets |
+| [![npm](readme-assets/npm.png) `@uipath/coreipc-web`](https://github.com/UiPath/coreipc/packages/71523) | Web (Angular, React)        | Web Sockets              |
 
 ![diagram](readme-assets/diagram.png) |
-
-
-## NPM Packages
-
-The API is provided via two NPM packages:
-
-| Target | NPM Package | Transports |
-| - | - | - |
-| Node.js (includes Electron) | [![npm](readme-assets/npm.png) `@uipath/coreipc`](https://github.com/UiPath/coreipc/packages/71523)     | Named Pipes, Web Sockets |
-| Web (Angular, React)        | [![npm](readme-assets/npm.png) `@uipath/coreipc-web`](https://github.com/UiPath/coreipc/packages/71523) | Web Sockets              |
-
-These packages are available on the [GitHub Packages NPM Feed](https://npm.pkg.github.com/).
 
 > ❗️Before merging the the [Feat/js multitargeting](https://github.com/UiPath/coreipc/pull/87) PR, the **@uipath/coreipc-web** is not yet available on the GitHub Packages feed.
 >
 > Until that time, please check the Azure Artifacts specific configuration.
 
-To install the packages, configure your `.npmrc` as described in [GitHub's documentation](https://docs.github.com/en/free-pro-team@latest/packages/using-github-packages-with-your-projects-ecosystem/configuring-npm-for-use-with-github-packages).
+## Getting started
 
-> Your `.npmrc` should be similar to:
->
-> ```elixir
-> //npm.pkg.github.com/:_authToken=<ANY VALID AUTH TOKEN>
-> @uipath:registry=https://npm.pkg.github.com/
->
-> ```
+- To install the packages, configure your `.npmrc` as described in [GitHub's documentation](https://docs.github.com/en/free-pro-team@latest/packages/using-github-packages-with-your-projects-ecosystem/configuring-npm-for-use-with-github-packages).
 
-For a Node.js app run:
+    > Your `.npmrc` should be similar to:
+    >
+    > ```elixir
+    > //npm.pkg.github.com/:_authToken=<ANY VALID AUTH TOKEN>
+    > @uipath:registry=https://npm.pkg.github.com/
+    > ```
 
-```elixir
-npm install @uipath/coreipc
-```
 
-and for a Web app run:
+- For a Node.js app, run:
 
-```elixir
-npm install @uipath/coreipc-web
-```
+    ```elixir
+    npm install @uipath/coreipc
+    ```
 
-3. Import the module and start using it:
+    while for a Web app, run:
 
-```typescript
-import { ipc } from '@uipath/coreipc'; // for Node.js
-import { ipc } from '@uipath/coreipc-web'; // for Web
+    ```elixir
+    npm install @uipath/coreipc-web
+    ```
 
-async function main(): Promise<void> {
-    ipc...
-}
+- Import the module and start using it:
 
-const _ = main();
-```
+    ```typescript
+    import { ipc } from '@uipath/coreipc'; // for Node.js
+    import { ipc } from '@uipath/coreipc-web'; // for Web
 
----
+    async function main(): Promise<void> {
+        ipc...
+    }
+
+    const _ = main();
+    ```
+
+    ---
 
 ## Using the API
 
 ### Contracts
 
 **.NET CoreIpc** contracts are defined in the form of .NET interfaces which are reflected on at runtime.
-Each interface leveraged by the **.NET CoreIpc Server** must be translated to a TypeScript class so that the **JavaScript CoreIpc client** can reflect on it at runtime (TypeScript interfaces aren't available at runtime because/and Vanilla-JS doesn't have concept of interfaces).
+Each interface leveraged by the **.NET CoreIpc Server** must be translated to a TypeScript class so that the **JavaScript CoreIpc client** can reflect on it at runtime.
 
 For example, consider the following .NET interface:
 
@@ -97,30 +94,23 @@ export class IComputingService {
 }
 ```
 
-> **Classes vs interfaces**:
->
-> The contract classes' methods' bodies will never be called at runtime.
-> What's happening here is that:
->   - a contract is made in such a way so that it survives TypeScript-Javascript compilation and be accessible at runtime
->   - the contract is available as a compile-time Type which guide the user programmer through Intellisense and compilation errors
->
-> Classes are used because while a Typescript interface checks the 2nd bullet it doesn't check the 1st.
+> **NOTE**: The contract class methods bodies will never be called at runtime.
 
 
 > **`Task<T>` → `Promise<T>` and `Task` → `Promise<void>`**:
 >
 > **.NET CoreIpc** requires that all contract methods return either `Task<T>` or `Task` where `Task` (non-generic) is a marker for fire-and-forget operations. If an operation should be awaited by the client, even though it doesn't return a value, then `Task<T>` (traditionally, users of CoreIpc use `Task<bool>`) should be used nevertheless to go around the fire-and-forget connotation.
 >
-> The **CoreIpc client for Javascript** follows the same logic and restrictions as **.NET CoreIpc** and it uses the idiomatic `Promise<T>` thusly:
+> The **CoreIpc client for JavaScript** follows the same logic and restrictions as **.NET CoreIpc** and it uses the idiomatic `Promise<T>` thusly:
 >
-> | .NET Type | Javascript counterpart | Notes |
+> | .NET Type | JavaScript counterpart | Notes |
 > | - | - | - |
 > | `Task<T>` | `Promise<T>`    | `Task<int>` and `Task<double>` would both be translated to `Promise<number>` |
 > | `Task`    | `Promise<void>` | Typescript uses erasure for generics meaning that `Promise` is not distinct from `Promise<T>`. It also allows `void` to be a generic argument. |
 
 ### Basic usage
 
-Consider an example where a **.NET CoreIpc Server** exposes the `IComputingService` contract over the `"DemoServer"` named pipe and our Javascript code is part of a Node.js app.
+Consider an example where a **.NET CoreIpc Server** exposes the `IComputingService` contract over the `"DemoServer"` named pipe and our JavaScript code is part of a Node.js app.
 Connecting and calling its method remotely can be achieved thusly:
 
 ```typescript
@@ -141,7 +131,7 @@ const _ = main();
 
 ## Canceling a call
 
-**CoreIpc client for Javascript** exports `CancellationToken` and `CancellationTokenSource`. These types mirror their .NET counterparts and are employed in **CoreIpc** contracts.
+**CoreIpc client for JavaScript** exports `CancellationToken` and `CancellationTokenSource`. These types mirror their .NET counterparts and are employed in **CoreIpc** contracts.
 
 Considering the following .NET operation exposed over **CoreIpc**:
 
@@ -164,7 +154,7 @@ public class Operations : IOperations
 }
 ```
 
-a Javascript client >>rethink wording<< can cancel calls easily:
+a JavaScript client >>rethink wording<< can cancel calls easily:
 
 ```typescript
 import { ipc, CancellationToken, CancellationTokenSource, OperationCanceledError } from '@uipath/coreipc';     // for Node.js

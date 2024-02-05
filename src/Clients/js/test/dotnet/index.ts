@@ -3,6 +3,8 @@ import { BrowserWebSocketAddress } from '../../src/web';
 import cliColor from 'cli-color';
 import commandLineArgs from 'command-line-args';
 import { NonZeroExitError } from './CoreIpcServer/NonZeroExitError';
+import { Address } from '../../src/std';
+import { NamedPipeAddress } from '../../src/node';
 
 async function main(args: string[]): Promise<number> {
     const pathHome = process.cwd(); // path.dirname(pathNpmPackageJson);
@@ -17,6 +19,8 @@ async function main(args: string[]): Promise<number> {
     switch (headOptions.command) {
         case 'host': {
             const keyWebsocketUrl = 'websocket-url';
+            const keyPipe = 'pipe';
+
             const keyScript = 'script';
 
             const hostOptions = commandLineArgs(
@@ -24,6 +28,11 @@ async function main(args: string[]): Promise<number> {
                     {
                         name: keyWebsocketUrl,
                         alias: 'w',
+                        type: String,
+                    },
+                    {
+                        name: keyPipe,
+                        alias: 'p',
                         type: String,
                     },
                     {
@@ -36,10 +45,21 @@ async function main(args: string[]): Promise<number> {
             );
 
             const websocketUrl = hostOptions[keyWebsocketUrl] as string;
+            const pipe = hostOptions[keyPipe] as string;
             const script = hostOptions[keyScript] as string;
 
+            let addresses = new Array<Address>();
+
+            if (websocketUrl) {
+                addresses.push(new BrowserWebSocketAddress(websocketUrl));
+            }
+
+            if (pipe) {
+                addresses.push(new NamedPipeAddress(pipe));
+            }
+
             try {
-                await CoreIpcServer.host(new BrowserWebSocketAddress(websocketUrl), async () => {
+                await CoreIpcServer.host(addresses, async () => {
                     await NpmProcess.runAsync('𝒏𝒑𝒎 𝒓𝒖𝒏', pathHome, script);
                 });
 

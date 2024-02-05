@@ -3,10 +3,10 @@ import { DotNetProcess, Signal, Paths, InteropAddress } from '.';
 
 export class CoreIpcServer {
     public static async host(
-        address: Address,
+        addresses: Address[],
         action: () => Promise<void>
     ): Promise<void> {
-        const runner = await CoreIpcServer.start(address);
+        const runner = await CoreIpcServer.start(addresses);
         try {
             let error: Error | undefined;
             try {
@@ -34,14 +34,14 @@ export class CoreIpcServer {
         }
     }
 
-    private static async start(address: Address): Promise<CoreIpcServer> {
-        const interopAddress = InteropAddress.from(address);
+    private static async start(addresses: Address[]): Promise<CoreIpcServer> {
+        const commandLineArgs = InteropAddress.computeCommandLineArgs(addresses.map(InteropAddress.from));
 
         const dotNetScript = new DotNetProcess(
             '𝒄𝒐𝒓𝒆𝒊𝒑𝒄 𝒔𝒆𝒓𝒗𝒆𝒓',
             Paths.absoluteTargetDir,
             Paths.entryPoint,
-            ...interopAddress.commandLineArgs()
+            ...commandLineArgs,
         );
 
         const details = await dotNetScript.waitForSignal<Signal.ExceptionDetails | null>(Signal.Kind.ReadyToConnect);
