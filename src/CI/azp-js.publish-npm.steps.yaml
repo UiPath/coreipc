@@ -22,13 +22,11 @@ steps:
   inputs:
     command: 'publish'
     workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/node'
-    publishRegistry: 'useFeed'
-    publishFeed: '06d72d2b-c76a-4d0a-be03-d2ba3a5a3f60/9a5bdfb1-0ab4-40b9-b9d2-de4cf6c011eb'
+    publishEndpoint: PublishNPM
 
 - task: Npm@1
   displayName: 'Publish NPM (Web)'
   inputs:
     command: 'publish'
     workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/web'
-    publishRegistry: 'useFeed'
-    publishFeed: '06d72d2b-c76a-4d0a-be03-d2ba3a5a3f60/9a5bdfb1-0ab4-40b9-b9d2-de4cf6c011eb'
+    publishEndpoint: PublishNPM

@@ -16,10 +16,6 @@ The JavaScript API is provided as two NPM packages:
 
 ![diagram](readme-assets/diagram.png) |
 
-> ❗️Before merging the the [Feat/js multitargeting](https://github.com/UiPath/coreipc/pull/87) PR, the **@uipath/coreipc-web** is not yet available on the GitHub Packages feed.
->
-> Until that time, please check the Azure Artifacts specific configuration.
-
 ## Getting started
 
 - To install the packages, configure your `.npmrc` as described in [GitHub's documentation](https://docs.github.com/en/free-pro-team@latest/packages/using-github-packages-with-your-projects-ecosystem/configuring-npm-for-use-with-github-packages).
@@ -119,8 +115,14 @@ import { ipc } from '@uipath/coreipc-web'; // for Web
 import { IComputingService } from './translated-contract';
 
 async function main(): Promise<void> {
+    // connecting via NamedPipes (exclusive to Node.js)
     const proxy = ipc.proxy
-        .withAddress(options => options.isPipe("DemoServer"))
+        .withAddress(options => options.isPipe("TestPipe"))
+        .withService(IComputingService);
+
+    // alternatively, connecting via WebSockets (for both Web and Node.js)
+    const proxy = ipc.proxy
+        .withAddress(options => options.isWebSocket("ws://127.0.0.1:61234"))
         .withService(IComputingService);
 
     console.log(`1 + 2 === ${await computingService.Sum(1, 2)}`);
