@@ -32,3 +32,6 @@ project.lock.json
 # Read the Docs
 docs/_build
 /src/LastMajorVersionBinary
+
+# Mac Finder
+.DS_Store

@@ -12,39 +12,55 @@ variables:
   DotNet_ArtifactName: 'NuGet package'
   
   NodeJS_DotNet_BuildConfiguration: 'Debug'
-  NodeJS_ProjectPath: './src/Clients/nodejs'
-  NodeJS_ArchivePath: './src/Clients/nodejs.zip'
+  NodeJS_ProjectPath: './src/Clients/js'
+  NodeJS_ArchivePath: './src/Clients/js/dist/pack/nodejs.zip'
   NodeJS_ArtifactName: 'NPM package'
   NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.CoreIpc.NodeInterop/bin/Debug/net5.0'
-  NodeJS_DotNetNodeInteropProject : './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop/UiPath.CoreIpc.NodeInterop.csproj'
-  NodeJS_DotNetNodeInteropSolution: './src/Clients/nodejs/dotnet/UiPath.CoreIpc.NodeInterop.sln'
+  NodeJS_DotNetNodeInteropProject : './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop/UiPath.CoreIpc.NodeInterop.csproj'
+  NodeJS_DotNetNodeInteropSolution: './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop.sln'
 
-jobs:
-  # The following 3 jobs will run in parallel:
-            
-  - job:
-    displayName: '.NET on Windows'
+stages:
+- stage: Build
+  displayName: '🏭 Build' 
+  jobs:
+    # The following 3 jobs will run in parallel:  
+    - job:
+      displayName: '.NET on Windows'
+      pool:
+        vmImage: 'windows-2022'
+      steps:
+        - template: azp-initialization.yaml
+        - template: azp-dotnet.yaml
+        - template: azp-dotnet-dist.yaml
+  
+    - job:
+      displayName: 'node.js on Windows'
+      pool:
+        vmImage: 'windows-2022'
+      steps:
+        - template: azp-initialization.yaml
+        - template: azp-nodejs.yaml
+        - template: azp-nodejs-dist.yaml
+  
+    - job:
+      displayName: 'node.js on Ubuntu'
+      pool:
+        vmImage: 'ubuntu-20.04'
+      steps:
+        - template: azp-initialization.yaml
+        - template: azp-nodejs.yaml
+
+- stage: Publish
+  displayName: 🚚 Publish
+  dependsOn: Build
+  jobs:
+  - deployment: Publish_NPM_Packages
+    displayName: '📦 Publish NPM Packages'
+    environment: 'NPM-Packages'
     pool:
-      vmImage: 'windows-2019'
-    steps:
-      - template: azp-initialization.yaml
-      - template: azp-dotnet.yaml
-      - template: azp-dotnet-dist.yaml
-
-  - job:
-    displayName: 'node.js on Windows'
-    pool:
-      vmImage: 'windows-2019'
-    steps:
-      - template: azp-initialization.yaml
-      - template: azp-nodejs.yaml
-      - template: azp-nodejs-dist.yaml
-
-  - job:
-    displayName: 'node.js on Ubuntu'
-    pool:
-      vmImage: 'ubuntu-20.04'
-    steps:
-      - template: azp-initialization.yaml
-      - template: azp-nodejs.yaml
-
+      vmImage: ubuntu-latest
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - template: azp-js.publish-npm.steps.yaml

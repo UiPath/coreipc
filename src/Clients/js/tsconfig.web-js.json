@@ -1,0 +1,7 @@
+{
+    "extends": "./tsconfig.web.json",
+    "compilerOptions": {
+        "outDir": "./dist/prepack/web-js/",
+        "declaration": false
+    }
+}

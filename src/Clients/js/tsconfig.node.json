@@ -1,0 +1,21 @@
+{
+    "extends": "./tsconfig.common.json",
+    "include": [
+        "src/std/**/*",
+        "src/node/**/*"
+    ],
+    "exclude": [
+        "src/web/**",
+        "**/*.web.ts"
+    ],
+    "compilerOptions": {
+        "outDir": "./dist/prepack/node/",
+        "declaration": true,
+        "paths": {
+            "@foundation": [ "node/foundation" ],
+            "@foundation/*": [ "node/foundation/*" ],
+            "@core": [ "node/core" ],
+            "@core/*": [ "node/core/*" ]
+        }
+    }
+}
