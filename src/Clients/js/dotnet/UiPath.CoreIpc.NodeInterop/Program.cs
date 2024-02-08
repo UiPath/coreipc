@@ -8,7 +8,6 @@ using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 using UiPath.CoreIpc.NamedPipe;
-using UiPath.CoreIpc.WebSockets;
 
 namespace UiPath.CoreIpc.NodeInterop;
 
@@ -31,6 +30,12 @@ class Program
         string? mutex = null,
         int? delay = null)
     {
+        if (websocket is not null)
+        {
+            Console.Error.WriteLine("WebSockets are not supported yet.");
+            return 1;
+        }
+
         if ((pipe, websocket) is (null, null))
         {
             Console.Error.WriteLine($"Expecting either a non-null pipe name or a non-null websocket url or both.");
@@ -105,14 +110,14 @@ class Program
 
                 IEnumerable<Task> EnumeratePings()
                 {
-                    if (webSocketUrl is not null)
-                    {
-                        yield return new WebSocketClientBuilder<IAlgebra, IArithmetic>(uri: new(webSocketUrl), sp)
-                            .RequestTimeout(TimeSpan.FromHours(5))
-                            .CallbackInstance(callback)
-                            .Build()
-                            .Ping();
-                    }
+                    //if (webSocketUrl is not null)
+                    //{
+                    //    yield return new WebSocketClientBuilder<IAlgebra, IArithmetic>(uri: new(webSocketUrl), sp)
+                    //        .RequestTimeout(TimeSpan.FromHours(5))
+                    //        .CallbackInstance(callback)
+                    //        .Build()
+                    //        .Ping();
+                    //}
 
                     if (pipeName is not null)
                     {
@@ -160,14 +165,14 @@ internal static class Extensions
             builder = builder.UseNamedPipes(new NamedPipeSettings(pipeName));
         }
 
-        if (webSocketUrl is not null)
-        {
-            string url = CurateWebSocketUrl(webSocketUrl);
-            var accept = new HttpSysWebSocketsListener(url).Accept;
-            WebSocketSettings settings = new(accept);
+        //if (webSocketUrl is not null)
+        //{
+        //    string url = CurateWebSocketUrl(webSocketUrl);
+        //    var accept = new HttpSysWebSocketsListener(url).Accept;
+        //    WebSocketSettings settings = new(accept);
 
-            builder = builder.UseWebSockets(settings);
-        }
+        //    builder = builder.UseWebSockets(settings);
+        //}
 
         return builder;
     }

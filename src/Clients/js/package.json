@@ -21,12 +21,10 @@
         "clean:obj:dotnet": "rimraf ./dist/obj/dotnet/**/*",
         "clean:coverage": "rimraf ./coverage/**/*",
         "clean:coverage:node": "rimraf ./coverage/node/**/*",
-        "clean:coverage:web": "rimraf ./coverage/web/**/*",
-        "with-dotnet": "node --experimental-modules ./dist/obj/dotnet/test/dotnet/index.js host --websocket-url ws://127.0.0.1:61234 --pipe uipath-coreipc-test-pipe",
+        "with-dotnet": "node --experimental-modules ./dist/obj/dotnet/test/dotnet/index.js host --pipe uipath-coreipc-test-pipe",
         "test": "npm run with-dotnet -- --script quick-test",
         "test:node": "npm run with-dotnet -- --script quick-test:node",
-        "test:web": "npm run with-dotnet -- --script quick-test:web",
-        "quick-test": "npm run quick-test:node && npm run quick-test:web && npm run quick-test:arrange",
+        "quick-test": "npm run quick-test:node && npm run quick-test:arrange",
         "quick-test:arrange": "istanbul-merge --out reports/coverage/merged/json/coverage.raw.json .nyc_output/*.json reports/coverage/web/json/coverage-final.json && nyc report -t ./reports/coverage/merged/json --reporter=html --report-dir ./reports/coverage/merged/html && nyc report -t ./reports/coverage/merged/json --reporter=cobertura --report-dir ./reports/coverage/merged/cobertura",
         "quick-test:node": "nyc ts-node --project tsconfig.jasmine.json jasmine.node.ts && npm run quick-test:node:arrange",
         "quick-test:node:arrange": "npm run quick-test:node:ensure-dir && npm run quick-test:node:move",
@@ -34,8 +32,7 @@
         "quick-test:node:move": "npm run quick-test:node:move-cobertura && npm run quick-test:node:move-lcov && npm run quick-test:node:rename-junit",
         "quick-test:node:move-cobertura": "move-file ./reports/coverage/node/html/cobertura-coverage.xml ./reports/coverage/node/cobertura/cobertura-coverage.xml",
         "quick-test:node:move-lcov": "move-file ./reports/coverage/node/html/lcov.info ./reports/coverage/node/lcov/lcov.info",
-        "quick-test:node:rename-junit": "move-file ./reports/test/node/junitresults.xml ./reports/test/node/test-results.xml",
-        "quick-test:web": "nyc karma start --single-run"
+        "quick-test:node:rename-junit": "move-file ./reports/test/node/junitresults.xml ./reports/test/node/test-results.xml"
     },
     "repository": {
         "type": "git",

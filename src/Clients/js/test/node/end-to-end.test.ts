@@ -5,7 +5,7 @@ import { IAlgebra, IArithmetic } from './Contracts';
 import { AddressHelper as TestContext } from './Fixtures';
 
 describe('node:end-to-end', () => {
-    for (const context of [TestContext.WebSocket, TestContext.NamedPipe]) {
+    for (const context of [/*TestContext.WebSocket, */TestContext.NamedPipe]) {
 
         describe(`RPC with context: ${context}`, () => {
             let algebraProxy: IAlgebra = null!;
