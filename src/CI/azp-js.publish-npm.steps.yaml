@@ -1,0 +1,32 @@
+steps:
+- checkout: none
+
+- download: current
+  artifact: 'NPM package'
+  # The destination path is $(Pipeline.Workspace)
+
+- task: NodeTool@0
+  displayName: 'Install Node.js 19.x'
+  inputs:
+    versionSpec: '19.x'
+
+- task: ExtractFiles@1
+  displayName: 'Extract Files'
+  inputs:
+    archiveFilePatterns: '$(Pipeline.Workspace)/NPM package/*.zip'
+    destinationFolder: '$(System.DefaultWorkingDirectory)/unzipped'
+    cleanDestinationFolder: true
+
+- task: Npm@1
+  displayName: 'Publish NPM (NodeJS)'
+  inputs:
+    command: 'publish'
+    workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/node'
+    publishEndpoint: PublishNPM
+
+- task: Npm@1
+  displayName: 'Publish NPM (Web)'
+  inputs:
+    command: 'publish'
+    workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/web'
+    publishEndpoint: PublishNPM

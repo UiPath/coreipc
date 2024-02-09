@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "UiPath.CoreIpc.NodeInterop": {
+      "commandName": "Project",
+      "commandLineArgs": "--websocket ws://127.0.0.1:61234 --pipe uipath-coreipc-test-pipe"
+    }
+  }
+}

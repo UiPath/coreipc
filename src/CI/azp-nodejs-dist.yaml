@@ -1,6 +1,6 @@
 steps:
   - task: ArchiveFiles@2
-    displayName: '$(Label_NodeJS) Archive project directory'
+    displayName: 'Archive the project directory'
     inputs:
       archiveType: 'zip'
       includeRootFolder: false
@@ -8,7 +8,7 @@ steps:
       archiveFile: '$(NodeJS_ArchivePath)'
 
   - task: PublishBuildArtifacts@1
-    displayName: '$(Label_NodeJS) Publish the $(NodeJS_ArtifactName) to the pipeline instance'
+    displayName: 'Publish the $(NodeJS_ArtifactName) to the pipeline instance'
     inputs:
       ArtifactName: '$(NodeJS_ArtifactName)'
       PathtoPublish: '$(NodeJS_ArchivePath)'

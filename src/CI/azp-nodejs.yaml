@@ -1,63 +1,72 @@
-steps:
+﻿steps:
   - task: UseDotNet@2
     inputs:
       version: 6.0.x
 
   - task: NodeTool@0 
     inputs:
-      versionSpec: '14.18.2'
+      versionSpec: '20.11.0'
     
   - task: DotNetCoreCLI@2
-    displayName: '$(Label_NodeJS) Restore and build "UiPath.CoreIpc.csproj"'
+    displayName: 'Build "UiPath.CoreIpc.csproj"'
     inputs:
       projects: '$(DotNet_MainProjectPath)'
       arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net6.0 -p:Version="$(FullVersion)"'
 
   - task: DotNetCoreCLI@2
-    displayName: '$(Label_NodeJS) Restore and build "UiPath.CoreIpc.NodeInterop.csproj"'
+    displayName: 'Build "UiPath.CoreIpc.NodeInterop.csproj"'
     inputs:
       projects: '$(NodeJS_DotNetNodeInteropProject)'
       arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net6.0 -p:Version="$(FullVersion)"'
 
-  - task: Npm@1
-    displayName: '$(Label_NodeJS) Write $[FullVersion] to package.json'
+  - task: CmdLine@2
+    displayName: 'Set $[FullVersion] in package.json'
+    condition: succeeded()
     inputs:
-      command: 'custom'
-      workingDir: '$(NodeJS_ProjectPath)'
-      customCommand: 'version $(FullVersion) --allow-same-version'
+      workingDirectory: '$(NodeJS_ProjectPath)'
+      script: 'npm version $(FullVersion) --allow-same-version'
 
   - task: Npm@1
-    displayName: '$(Label_NodeJS) Restore'
+    displayName: 'Npm Install'
     inputs:
         command: 'install'
         workingDir: $(NodeJS_ProjectPath)
         customRegistry: 'useFeed'
         customFeed: '424ca518-1f12-456b-a4f6-888197fc15ee'
     
-  - task: Npm@1
-    displayName: '$(Label_NodeJS) Build'
+  - task: CmdLine@2
+    displayName: 'Npm Run Build'
+    condition: succeeded()
     inputs:
-        command: 'custom'
-        workingDir: $(NodeJS_ProjectPath)
-        customCommand: 'run build'
+        workingDirectory: $(NodeJS_ProjectPath)
+        script: 'npm run build'
     
-  - task: Npm@1
-    displayName: '$(Label_NodeJS) Run unit tests'
+  - task: CmdLine@2
+    displayName: 'Npm Test'
+    condition: succeeded()
     inputs:
-        command: 'custom'
-        workingDir: $(NodeJS_ProjectPath)
-        customCommand: 'run test'
+        workingDirectory: $(NodeJS_ProjectPath)
+        script: 'npm test'
 
   - task: PublishTestResults@2
-    displayName: '$(Label_NodeJS) Publish test results'
+    displayName: 'Publish Web Test Results'
     condition: succeededOrFailed()
     inputs:
       testRunner: JUnit
       workingDir: $(NodeJS_ProjectPath)
-      testResultsFiles: './src/Clients/nodejs/reports/test-results.xml'
+      testResultsFiles: './src/Clients/js/reports/test/web/test-results.xml'
+
+  - task: PublishTestResults@2
+    displayName: 'Publish NodeJS Test Results'
+    condition: succeededOrFailed()
+    inputs:
+      testRunner: JUnit
+      workingDir: $(NodeJS_ProjectPath)
+      testRunTitle: '🌲 NodeJs ($(Agent.OS) $(Agent.OSArchitecture))'
+      testResultsFiles: './src/Clients/js/reports/test/node/test-results.xml'
 
   - task: PublishCodeCoverageResults@1
-    displayName: '$(Label_NodeJS) Publish code coverage results'
+    displayName: 'Publish Code Coverage Results'
     inputs:
       codeCoverageTool: 'cobertura'
-      summaryFileLocation: './src/Clients/nodejs/reports/coverage/cobertura-coverage.xml'
+      summaryFileLocation: './src/Clients/js/reports/coverage/merged/cobertura/cobertura-coverage.xml'
