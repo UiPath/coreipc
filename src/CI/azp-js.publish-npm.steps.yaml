@@ -5,10 +5,10 @@ steps:
   artifact: 'NPM package'
   # The destination path is $(Pipeline.Workspace)
 
-- task: NodeTool@0
-  displayName: 'Install Node.js 19.x'
+- task: NodeTool@0 
+  displayName: 'Use Node.js 20.11.0'
   inputs:
-    versionSpec: '19.x'
+    versionSpec: '20.11.0'
 
 - task: ExtractFiles@1
   displayName: 'Extract Files'
