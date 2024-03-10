@@ -44,7 +44,16 @@ namespace UiPath.CoreIpc
             _requests[request.Id] = requestCompletion;
             try
             {
-                await SendRequest(requestBytes, uploadStream, token);
+                try
+                {
+                    await SendRequest(requestBytes, uploadStream, token);
+                }
+                catch
+                {
+                    _requests.TryRemove(request.Id, out _);
+                    _ = requestCompletion.Task.ContinueWith(task => { var x = task.Exception; }, TaskContinuationOptions.NotOnRanToCompletion);
+                    throw;
+                }
                 using (token.Register(CancelRequest))
                 {
                     return await requestCompletion.Task;
@@ -66,7 +75,7 @@ namespace UiPath.CoreIpc
                 }
                 requestCompletion.TrySetCanceled();
             }
-            async Task CancelServerCall(string requestId) => 
+            async Task CancelServerCall(string requestId) =>
                 await SendMessage(MessageType.CancellationRequest, await SerializeToStream(new CancellationRequest(requestId)), default);
         }
         private Task SendRequest(MemoryStream requestBytes, Stream uploadStream, CancellationToken cancellationToken) => uploadStream == null ?
@@ -100,7 +109,7 @@ namespace UiPath.CoreIpc
             }
         }
 
-        private Task SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken) => 
+        private Task SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken) =>
             SendMessage(new(messageType, data), cancellationToken).WaitAsync(cancellationToken);
 
         private async Task SendMessage(WireMessage wireMessage, CancellationToken cancellationToken)
