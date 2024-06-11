@@ -46,7 +46,7 @@ record Response(string RequestId, string Data = null, object ObjectData = null, 
 [Serializable]
 public record Error(string Message, string StackTrace, string Type, Error InnerError)
 {
-    [return: NotNullIfNotNull(nameof(exception))]
+    [return: NotNullIfNotNull("exception")]
     public static Error? FromException(Exception? exception)
     => exception is null 
         ? null 
