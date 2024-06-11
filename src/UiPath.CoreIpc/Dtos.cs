@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using Newtonsoft.Json;
 namespace UiPath.CoreIpc;
 public class Message
@@ -45,7 +46,18 @@ record Response(string RequestId, string Data = null, object ObjectData = null, 
 [Serializable]
 public record Error(string Message, string StackTrace, string Type, Error InnerError)
 {
+    [return: NotNullIfNotNull(nameof(exception))]
+    public static Error? FromException(Exception? exception)
+    => exception is null 
+        ? null 
+        : new(
+            Message: exception.Message, 
+            StackTrace: exception.StackTrace ?? exception.GetBaseException().StackTrace, 
+            Type: GetExceptionType(exception), 
+            InnerError: FromException(exception.InnerException));
     public override string ToString() => new RemoteException(this).ToString();
+
+    private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
 }
 [Serializable]
 public class RemoteException : Exception

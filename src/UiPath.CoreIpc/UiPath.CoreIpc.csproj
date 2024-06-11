@@ -16,6 +16,7 @@
     <NoWarn>CA1416</NoWarn>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>true</ImplicitUsings>
+    <Nullable>annotations</Nullable>
   </PropertyGroup>
   <ItemGroup Condition="$(TargetFramework) == 'net461'">
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
@@ -25,7 +26,7 @@
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>UiPath.CoreIpc.Tests</_Parameter1>
     </AssemblyAttribute>
-    <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="2.2.1" />
+    <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.0" />
