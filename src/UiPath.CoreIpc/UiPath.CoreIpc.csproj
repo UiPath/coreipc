@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFrameworks>net6.0;net461;net6.0-windows</TargetFrameworks>
     <RootNamespace>UiPath.CoreIpc</RootNamespace>
+    <AssemblyName>UiPath.Ipc</AssemblyName>
     <GeneratePackageOnBuild Condition="$(Configuration)=='Release'">true</GeneratePackageOnBuild>
     <Authors>UiPath</Authors>
     <Version>2.5.1</Version>
