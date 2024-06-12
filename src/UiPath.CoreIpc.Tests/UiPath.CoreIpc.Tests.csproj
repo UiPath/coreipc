@@ -6,6 +6,7 @@
     <DefineConstants>$(DefineConstants);$(DefineConstantsEx)</DefineConstants>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>true</ImplicitUsings>
+    <Nullable>annotations</Nullable>
   </PropertyGroup>
 
   <ItemGroup>

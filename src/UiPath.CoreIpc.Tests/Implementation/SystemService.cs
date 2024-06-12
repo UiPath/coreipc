@@ -36,11 +36,7 @@ public class SystemMessage : Message
 }
 public class CancelIoPipeMessage : Message
 {
-    public CancelIoPipeMessage(int delayScecondCancel = 0)
-    {
-        DelayScecondCancel = delayScecondCancel;
-    }
-    public int DelayScecondCancel { get; set; }
+    public int[]? MsDelays { get; set; }
 }
 public class SystemService : ISystemService
 {
@@ -190,16 +186,17 @@ public class SystemService : ISystemService
     public static extern bool CancelIoEx(IntPtr handle, IntPtr lpOverlapped);
     public async Task<bool> CancelIoPipe(CancelIoPipeMessage message = null, CancellationToken cancellationToken = default)
     {
+        Debug.WriteLine("###################### CancelIoPipe");
         await Task.Delay(50);
 #if WINDOWS
-            var networkPropertyInfo = message.Client.GetType().GetProperty("Network", BindingFlags.NonPublic | BindingFlags.Instance);
-            var pipeStream = networkPropertyInfo.GetValue(message.Client, null) as PipeStream;
+            var serverFieldInfo = message.Client.GetType().GetField("_server", BindingFlags.NonPublic | BindingFlags.Instance);
+            var pipeStream = serverFieldInfo.GetValue(message.Client) as PipeStream;
 
             var canceled = CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero);
-
-            if (message.DelayScecondCancel > 0)
+            
+            foreach (var msDelay in message.MsDelays ?? [])
             {
-                await Task.Delay(message.DelayScecondCancel);
+                await Task.Delay(msDelay);
                 canceled = CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero);
             }
 

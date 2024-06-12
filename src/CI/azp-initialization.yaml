@@ -1,10 +1,20 @@
 steps:
+  - powershell: |
+      Write-Host "##vso[task.setvariable variable=DotnetRuntimeVersion;]8.0.0"
+      Write-Host "##vso[task.setvariable variable=DOTNET_NOLOGO;]true"
+    displayName: 'Use .NET Runtime 8.0.0'
 
   - task: UseDotNet@2
-    displayName: 'Use .NET SDK 5.0.408'
+    displayName: 'Use .NET SDK 6.0.317'
     inputs:
       packageType: 'sdk'
-      version: '5.0.408'
+      version: '6.0.317'
+
+  - task: UseDotNet@2
+    displayName: 'Use .NET SDK 8.x'
+    inputs:
+      packageType: 'sdk'
+      version: 8.x
 
     # Read $(Version) from the UiPath.CoreIpc.csproj file
   - powershell: |

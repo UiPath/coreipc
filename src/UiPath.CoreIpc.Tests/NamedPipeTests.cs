@@ -40,28 +40,35 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
         await CreateSystemService().DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
     }
 
+    [Theory]
+    [InlineData(new int[0])]
+    [InlineData(100)]
+    [InlineData(1100)]
+    [InlineData(10, 10, 10, 10)]
+    public async Task PipeCancelIoOnServer_AnyNoOfTimes(params int[] msDelays)
+    {
+        // Any number of kernel32.CancelIoEx calls should not cause the client to give up on the connection.
+        (await _systemClient.CancelIoPipe(new() { MsDelays = msDelays })).ShouldBeTrue();
+
+        //Make sure the connection is still working
+        (await _systemClient.Delay()).ShouldBeTrue();
+    }
+
     [Fact]
-        public async Task PipeCancelIoOnServer_TwiceTightly()
-        {
-            //Two cancel with less than 1 second in between should fail
-            await _systemClient.CancelIoPipe(new(100)).ShouldThrowAsync<IOException>();
-        }
+    public async Task PipeCancelIoOnClient()
+    {
+        (await _systemClient.Delay()).ShouldBeTrue();
 
-        [Fact]
-        public async Task PipeCancelIoOnClient()
-        {
-            (await _systemClient.Delay()).ShouldBeTrue();
+        var delayTask = _systemClient.Delay(500);
+        await Task.Delay(100);
+        var pipeStream = ((IpcProxy)_systemClient).Connection.Network as PipeStream;
+        SystemService.CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero).ShouldBeTrue();
 
-            var delayTask = _systemClient.Delay(500);
-            await Task.Delay(100);
-            var pipeStream = ((IpcProxy)_systemClient).Connection.Network as PipeStream;
-            SystemService.CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero).ShouldBeTrue();
+        (await delayTask).ShouldBeTrue();
 
-            (await delayTask).ShouldBeTrue();
-
-            //Make sure the connection is still working
-            (await _systemClient.Delay()).ShouldBeTrue();
-        }
+        //Make sure the connection is still working
+        (await _systemClient.Delay()).ShouldBeTrue();
+    }
 #endif
 }
 public class ComputingNamedPipeTests : ComputingTests<NamedPipeClientBuilder<IComputingService, IComputingCallback>>

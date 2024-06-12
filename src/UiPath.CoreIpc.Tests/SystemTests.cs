@@ -5,7 +5,7 @@ namespace UiPath.CoreIpc.Tests;
 public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceClientBuilder<TBuilder, ISystemService>
 {
     protected ServiceHost _systemHost;
-    protected ISystemService _systemClient;
+    protected readonly ISystemService _systemClient;
     protected readonly SystemService _systemService;
     public SystemTests()
     {

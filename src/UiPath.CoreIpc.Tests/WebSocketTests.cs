@@ -2,7 +2,7 @@
 namespace UiPath.CoreIpc.Tests;
 public class SystemWebSocketTests : SystemTests<WebSocketClientBuilder<ISystemService>>
 {
-    int _port = 1313 + GetCount();
+    int _port = 51313 + GetCount();
     HttpSysWebSocketsListener _listener;
     protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder)
     {

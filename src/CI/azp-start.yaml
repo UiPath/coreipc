@@ -22,9 +22,8 @@ variables:
 stages:
 - stage: Build
   displayName: '🏭 Build' 
-jobs:
-  # The following 3 jobs will run in parallel:
-            
+  jobs:
+  # The following 3 jobs will run in parallel:            
   - job:
     displayName: '.NET on Windows'
     pool:
