@@ -1,6 +1,11 @@
 ﻿namespace UiPath.CoreIpc;
 using static TaskCompletionPool<Response>;
 using static IOHelpers;
+using System.IO.Pipes;
+using System.IO;
+using System.Threading;
+using Microsoft.Extensions.Logging;
+
 public sealed class Connection : IDisposable
 {
     private static readonly IOException ClosedException = new("Connection closed.");
@@ -183,14 +188,32 @@ public sealed class Connection : IDisposable
     {
         int offset = 0;
         int toRead = length;
+
         do
         {
-            var read = await Network.ReadAsync(
+            int read;
+            try
+            {
+                read = await Network.ReadAsync(
 #if NET461
-                _buffer, offset, toRead);
+                    _buffer, offset, toRead);
 #else
-                _buffer.AsMemory(offset, toRead));
+                    _buffer.AsMemory(offset, toRead));
 #endif
+            }
+            catch (OperationCanceledException ex) when (Network is PipeStream)
+            {
+                // Originally we decided to throw this exception the 2nd time we caught it, but later it was discovered that the NodeJS runtime continuosly retries.
+
+                // In some Windows client environments, OperationCanceledException is sporadically thrown on named pipe ReadAsync operation (ERROR_OPERATION_ABORTED on overlapped ReadFile)
+                // The cause has not yet been discovered(os specific, antiviruses, monitoring application), and we have implemented a retry system
+                // ROBO-3083
+
+                Logger.LogException(ex, $"Retrying ReadAsync for {Network.GetType()}");
+                await Task.Delay(10); //Without this delay, on net framework can get OperationCanceledException on the second ReadAsync call
+                continue;
+            }
+
             if (read == 0)
             {
                 return false;
@@ -319,7 +342,7 @@ public sealed class Connection : IDisposable
         {
             CancellationReceived(requestId);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             Log(ex);
         }
