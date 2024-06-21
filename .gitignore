@@ -4,6 +4,7 @@ scripts/
 artifacts/
 .dotnet
 TestResults/
+*.diagsession
 *.suo
 *.user
 bin
@@ -32,3 +33,6 @@ project.lock.json
 # Read the Docs
 docs/_build
 /src/LastMajorVersionBinary
+
+# Mac Finder
+.DS_Store

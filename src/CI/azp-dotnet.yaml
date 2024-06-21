@@ -1,0 +1,9 @@
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_DotNet) Run unit tests'
+    inputs:
+      command: 'test'
+      projects: '$(DotNet_SessionSolution)'
+      publishTestResults: true
+      testRunTitle: '.NET tests'
+      arguments: ' --configuration $(DotNet_BuildConfiguration) --logger "console;verbosity=detailed" -p:Version="$(FullVersion)" -p:DefineConstantsEx="CI"'

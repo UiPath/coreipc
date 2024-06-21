@@ -1,61 +1,34 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace UiPath.CoreIpc
+﻿namespace UiPath.CoreIpc;
+public sealed class ServiceHost : IDisposable
 {
-    public class ServiceHost : IDisposable
+    private readonly CancellationTokenSource _cancellationTokenSource = new();
+    private readonly IDictionary<string, EndpointSettings> _endpoints;
+    private readonly IReadOnlyCollection<Listener> _listeners;
+    internal ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, EndpointSettings> endpoints)
     {
-        private readonly CancellationTokenSource _cancellationTokenSource = new();
-        private readonly IDictionary<string, EndpointSettings> _endpoints;
-        private readonly IReadOnlyCollection<Listener> _listeners;
-        private readonly ILogger<ServiceHost> _logger;
-
-        internal ServiceHost(IEnumerable<Listener> listeners, IDictionary<string, EndpointSettings> endpoints, IServiceProvider serviceProvider)
+        _endpoints = endpoints.ToReadOnlyDictionary();
+        _listeners = listeners.ToArray();
+    }
+    public void Dispose()
+    {
+        if(_cancellationTokenSource.IsCancellationRequested)
         {
-            _endpoints = endpoints.ToReadOnlyDictionary();
-            _listeners = listeners.ToArray();
-            _logger = serviceProvider.GetRequiredService<ILogger<ServiceHost>>();
+            return;
         }
-
-        public IServiceProvider ServiceProvider => _endpoints.Values.FirstOrDefault()?.ServiceProvider;
-
-        public void Dispose()
+        foreach (var listener in _listeners)
         {
-            if(_cancellationTokenSource.IsCancellationRequested)
-            {
-                return;
-            }
-            foreach (var listener in _listeners)
-            {
-                listener.Dispose();
-            }
-            _cancellationTokenSource.Cancel();
-            _cancellationTokenSource.Dispose();
+            listener.Dispose();
         }
-
-        public void Run()
+        _cancellationTokenSource.Cancel();
+        _cancellationTokenSource.AssertDisposed();
+    }
+    public void Run() => RunAsync().Wait();
+    public Task RunAsync(TaskScheduler taskScheduler = null)
+    {
+        foreach (var endpoint in _endpoints.Values)
         {
-            RunAsync().Wait();
+            endpoint.Scheduler = taskScheduler;
         }
-
-        public Task RunAsync(TaskScheduler taskScheduler = null)
-        {
-            foreach (var endpoint in _endpoints.Values)
-            {
-                endpoint.Scheduler = taskScheduler;
-            }
-            var tasks = _listeners.Select(listener => Task.Run(() =>
-            {
-                _logger.LogDebug($"Starting endpoint '{listener}'...");
-                _cancellationTokenSource.Token.Register(() => _logger.LogInformation($"Stopping endpoint '{listener}'..."));
-                return listener.Listen(_cancellationTokenSource.Token).ContinueWith(_ => _logger.LogInformation($"Endpoint '{listener}' stopped."));
-            }));
-            return Task.WhenAll(tasks);
-        }
+        return Task.Run(() => Task.WhenAll(_listeners.Select(listener => listener.Listen(_cancellationTokenSource.Token))));
     }
 }

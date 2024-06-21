@@ -1,0 +1,66 @@
+name: $(Date:yyyyMMdd)$(Rev:-rr)
+
+variables:
+  Label_Initialization: 'Initialization:'
+  Label_DotNet: '.NET:'
+  Label_NodeJS: 'node.js:'
+
+  DotNet_BuildConfiguration: 'Release'
+  DotNet_SessionSolution: './src/CoreIpc.sln'
+  DotNet_MainProjectName: 'UiPath.CoreIpc'
+  DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
+  DotNet_ArtifactName: 'NuGet package'
+
+  NodeJS_DotNet_BuildConfiguration: 'Debug'
+  NodeJS_ProjectPath: './src/Clients/js'
+  NodeJS_ArchivePath: './src/Clients/js/dist/pack/nodejs.zip'
+  NodeJS_ArtifactName: 'NPM package'
+  NodeJS_NetCoreAppTargetDir_RelativePath: 'dotnet/UiPath.CoreIpc.NodeInterop/bin/Debug/net6.0'
+  NodeJS_DotNetNodeInteropProject : './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop/UiPath.CoreIpc.NodeInterop.csproj'
+  NodeJS_DotNetNodeInteropSolution: './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop.sln'
+
+stages:
+- stage: Build
+  displayName: '🏭 Build' 
+  jobs:
+    # The following 3 jobs will run in parallel:  
+    - job:
+      displayName: '.NET on Windows'
+      pool:
+        vmImage: 'windows-2022'
+      steps:
+        - template: azp-initialization.yaml
+        - template: azp-dotnet.yaml
+        - template: azp-dotnet-dist.yaml
+  
+    - job:
+      displayName: 'node.js on Windows'
+      pool:
+        vmImage: 'windows-2022'
+      steps:
+        - template: azp-initialization.yaml
+        - template: azp-nodejs.yaml
+        - template: azp-nodejs-dist.yaml
+  
+    - job:
+      displayName: 'node.js on Ubuntu'
+      pool:
+        vmImage: 'ubuntu-20.04'
+      steps:
+        - template: azp-initialization.yaml
+        - template: azp-nodejs.yaml
+
+- stage: Publish
+  displayName: 🚚 Publish
+  dependsOn: Build
+  jobs:
+  - deployment: Publish_NPM_Packages
+    displayName: '📦 Publish NPM Packages'
+    environment: 'NPM-Packages'
+    pool:
+      vmImage: ubuntu-latest
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - template: azp-js.publish-npm.steps.yaml

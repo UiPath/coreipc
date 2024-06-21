@@ -1,18 +1,15 @@
 ﻿using System.Text;
 using System.Diagnostics;
-using UiPath.CoreIpc.Tcp;
+using UiPath.CoreIpc.WebSockets;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net;
-
 namespace UiPath.CoreIpc.Tests;
-
-class TcpClient
+class WebSocketClient
 {
-    static readonly IPEndPoint SystemEndPoint = new(IPAddress.Loopback, 3131);
     static async Task _Main(string[] args)
     {
         Console.WriteLine(typeof(int).Assembly);
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
+        Thread.Sleep(1000);
         var source = new CancellationTokenSource();
         try
         {
@@ -32,18 +29,18 @@ class TcpClient
 
     private static async Task RunTestsAsync(CancellationToken cancellationToken)
     {
+        Uri uri = new("ws://localhost:1212/wsDemo/");
         var serviceProvider = ConfigureServices();
         var callback = new ComputingCallback { Id = "custom made" };
-        var computingClientBuilder = new TcpClientBuilder<IComputingService, IComputingCallback>(SystemEndPoint, serviceProvider)
-            .SerializeParametersAsObjects().CallbackInstance(callback)/*.EncryptAndSign("localhost")*/.RequestTimeout(TimeSpan.FromSeconds(2));
+        var computingClientBuilder = new WebSocketClientBuilder<IComputingService, IComputingCallback>(uri, serviceProvider).SerializeParametersAsObjects()
+            .CallbackInstance(callback)/*.EncryptAndSign("localhost")*/.RequestTimeout(TimeSpan.FromSeconds(2));
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
         try
         {
             var computingClient = computingClientBuilder.ValidateAndBuild();
             var systemClient =
-                new TcpClientBuilder<ISystemService>(SystemEndPoint)
-                .SerializeParametersAsObjects()
+                new WebSocketClientBuilder<ISystemService>(uri).SerializeParametersAsObjects()
                 //.EncryptAndSign("localhost")
                 .RequestTimeout(TimeSpan.FromSeconds(2))
                 .Logger(serviceProvider)
