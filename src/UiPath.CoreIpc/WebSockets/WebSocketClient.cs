@@ -8,7 +8,7 @@ interface IWebSocketsKey : IConnectionKey
 }
 class WebSocketClient<TInterface> : ServiceClient<TInterface>, IWebSocketsKey where TInterface : class
 {
-    public WebSocketClient(Uri uri, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, bool objectParameters, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, sslServer, beforeCall, objectParameters, serviceEndpoint)
+    public WebSocketClient(Uri uri, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, sslServer, beforeCall, serviceEndpoint)
     {
         Uri = uri;
         HashCode = (uri, sslServer).GetHashCode();

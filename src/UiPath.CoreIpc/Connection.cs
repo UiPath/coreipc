@@ -80,7 +80,6 @@ public sealed class Connection : IDisposable
     }
     internal ValueTask Send(Request request, CancellationToken token)
     {
-        Debug.Assert(request.Parameters == null || request.ObjectParameters == null);
         var uploadStream = request.UploadStream;
         var requestBytes = SerializeToStream(request);
         return uploadStream == null ?
@@ -100,7 +99,6 @@ public sealed class Connection : IDisposable
     }
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
     {
-        Debug.Assert(response.Data == null || response.ObjectData == null);
         var responseBytes = SerializeToStream(response);
         return response.DownloadStream == null ?
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
