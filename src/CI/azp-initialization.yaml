@@ -28,11 +28,11 @@ steps:
     env:
       DotNet_MainProjectPath: $(DotNet_MainProjectPath)
 
-  # If $(PublishRelease) != "true" then compute $(FullVersion) as $(Version)-20210811-12-fix
+  # If $(PublishRelease) != "true" then compute $(FullVersion) as $(Version)-$(Build.BuildNumber)
   - task: VariableTransformTask@1
     displayName: '$(Label_Initialization) Compute $[FullVersion] when $[PublishRelease] is not true'
     inputs:
-      value: '$(Version)-20210811-12-fix'
+      value: '$(Version)-$(Build.BuildNumber)'
       variableName: 'FullVersion'
       IsSecret: false
       transformAction: 'none'
