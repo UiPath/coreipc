@@ -63,11 +63,6 @@ class Server
                 return;
             }
             var method = GetMethod(endpoint.Contract, request.MethodName);
-            if (request.HasObjectParameters && !method.ReturnType.IsGenericType)
-            {
-                await HandleRequest(method, endpoint, request, default);
-                return;
-            }
             Response response = null;
             var requestCancellation = Rent();
             _requests[request.Id] = requestCancellation;
@@ -111,7 +106,6 @@ class Server
 #endif
     async ValueTask<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
     {
-        var objectParameters = request.HasObjectParameters;
         var contract = endpoint.Contract;
         var arguments = GetArguments();
         var beforeCall = endpoint.BeforeCall;
@@ -152,12 +146,12 @@ class Server
                 {
                     return Response.Success(request, downloadStream);
                 }
-                return objectParameters ? new Response(request.Id, ObjectData: returnValue) : Response.Success(request, Serializer.Serialize(returnValue));
+                return Response.Success(request, Serializer.Serialize(returnValue));
             }
             else
             {
                 (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method.MethodInfo);
-                return objectParameters ? null : Response.Success(request, "");
+                return Response.Success(request, "");
             }
             Task MethodCall() => method.Invoke(service, arguments, cancellationToken);
             Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
@@ -166,12 +160,12 @@ class Server
         {
             var parameters = method.Parameters;
             var allParametersLength = parameters.Length;
-            var requestParametersLength = objectParameters ? request.ObjectParameters.Length : request.Parameters.Length;
+            var requestParametersLength = request.Parameters.Length;
             if (requestParametersLength > allParametersLength)
             {
                 throw new ArgumentException("Too many parameters for " + method.MethodInfo);
             }
-            var allArguments = objectParameters && requestParametersLength == allParametersLength ? request.ObjectParameters : new object[allParametersLength];
+            var allArguments = new object[allParametersLength];
             Deserialize();
             SetOptionalArguments();
             return allArguments;
@@ -191,9 +185,7 @@ class Server
                     }
                     else
                     {
-                        argument = objectParameters ? 
-                            Serializer.Deserialize(request.ObjectParameters[index], parameterType) :
-                            Serializer.Deserialize(request.Parameters[index], parameterType);
+                        argument = Serializer.Deserialize(request.Parameters[index], parameterType);
                         argument = CheckMessage(argument, parameterType);
                     }
                     allArguments[index] = argument;
@@ -209,7 +201,6 @@ class Server
                 {
                     message.CallbackContract = endpoint.CallbackContract;
                     message.Client = _client;
-                    message.ObjectParameters = objectParameters;
                 }
                 return argument;
             }

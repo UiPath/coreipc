@@ -47,11 +47,16 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
     [InlineData(10, 10, 10, 10)]
     public async Task PipeCancelIoOnServer_AnyNoOfTimes(params int[] msDelays)
     {
+        bool cancelIoResult = false;
+
         // Any number of kernel32.CancelIoEx calls should not cause the client to give up on the connection.
-        (await _systemClient.CancelIoPipe(new() { MsDelays = msDelays })).ShouldBeTrue();
+        var act = async () => cancelIoResult = await _systemClient.CancelIoPipe(new() { MsDelays = msDelays });
+        await act.ShouldNotThrowAsync();
 
         //Make sure the connection is still working
         (await _systemClient.Delay()).ShouldBeTrue();
+
+        cancelIoResult.ShouldBeTrue();
     }
 
     [Fact]
