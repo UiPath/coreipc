@@ -1,9 +1,9 @@
 ﻿using System.Text;
 using System.Diagnostics;
-using UiPath.CoreIpc.NamedPipe;
+using UiPath.Ipc.NamedPipe;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 class Client
 {

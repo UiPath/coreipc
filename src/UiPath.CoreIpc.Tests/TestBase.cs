@@ -1,6 +1,6 @@
 ﻿using Nito.AsyncEx;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public abstract class TestBase : IDisposable
 {

@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc;
+﻿namespace UiPath.Ipc;
 using static TaskCompletionPool<Response>;
 using static IOHelpers;
 using System.IO.Pipes;

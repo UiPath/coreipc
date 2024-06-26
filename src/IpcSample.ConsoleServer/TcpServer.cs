@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
 using System.Net;
-using UiPath.CoreIpc.Tcp;
+using UiPath.Ipc.Tcp;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 class TcpServer
 {

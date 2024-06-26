@@ -1,5 +1,5 @@
-﻿using UiPath.CoreIpc.WebSockets;
-namespace UiPath.CoreIpc.Tests;
+﻿using UiPath.Ipc.WebSockets;
+namespace UiPath.Ipc.Tests;
 public class SystemWebSocketTests : SystemTests<WebSocketClientBuilder<ISystemService>>
 {
     int _port = 51313 + GetCount();

@@ -1,5 +1,5 @@
 ﻿using System.Linq.Expressions;
-namespace UiPath.CoreIpc;
+namespace UiPath.Ipc;
 using GetTaskResultFunc = Func<Task, object>;
 using MethodExecutor = Func<object, object[], CancellationToken, Task>;
 using static Expression;

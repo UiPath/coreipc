@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.WebSockets;
-using UiPath.CoreIpc.Tests;
+using UiPath.Ipc.Tests;
 
-namespace UiPath.CoreIpc;
+namespace UiPath.Ipc;
 
 public static class IpcHelpers
 {

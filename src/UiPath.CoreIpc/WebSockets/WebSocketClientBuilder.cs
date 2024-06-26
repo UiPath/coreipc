@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc.WebSockets;
+﻿namespace UiPath.Ipc.WebSockets;
 public abstract class WebSocketClientBuilderBase<TDerived, TInterface> : ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
 {
     private readonly Uri _uri;

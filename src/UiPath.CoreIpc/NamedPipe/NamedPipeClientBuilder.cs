@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc.NamedPipe;
+﻿namespace UiPath.Ipc.NamedPipe;
 
 public abstract class NamedPipeClientBuilderBase<TDerived, TInterface> : ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
 {

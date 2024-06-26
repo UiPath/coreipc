@@ -1,4 +1,4 @@
-namespace UiPath.CoreIpc;
+namespace UiPath.Ipc;
 // https://github.com/dotnet/aspnetcore/blob/main/src/Shared/CancellationTokenSourcePool.cs
 internal static class CancellationTokenSourcePool
 {

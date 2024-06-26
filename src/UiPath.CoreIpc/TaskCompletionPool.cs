@@ -1,5 +1,5 @@
 using System.Threading.Tasks.Sources;
-namespace UiPath.CoreIpc;
+namespace UiPath.Ipc;
 internal static class TaskCompletionPool<T>
 {
     public static ManualResetValueTaskSource Rent() => ObjectPool<ManualResetValueTaskSource>.Rent();

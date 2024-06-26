@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFrameworks>net6.0;net461;net6.0-windows</TargetFrameworks>
+    <RootNamespace>UiPath.Ipc.Tests</RootNamespace>
     <NoWarn>$(NoWarn);1998</NoWarn>
     <DefineConstants>$(DefineConstants);$(DefineConstantsEx)</DefineConstants>
     <LangVersion>latest</LangVersion>
@@ -26,6 +27,6 @@
     <Using Include="Microsoft.Extensions.DependencyInjection" />
     <Using Include="System.Reflection" />
     <Using Include="System.Diagnostics" />
-    <Using Include="UiPath.CoreIpc.NamedPipe" />
+    <Using Include="UiPath.Ipc.NamedPipe" />
   </ItemGroup>
 </Project>

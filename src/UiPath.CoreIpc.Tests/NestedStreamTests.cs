@@ -1,6 +1,6 @@
 ﻿using System.IO.Compression;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public class NestedStreamTests
 {

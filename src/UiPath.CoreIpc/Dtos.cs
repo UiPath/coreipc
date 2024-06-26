@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Newtonsoft.Json;
-namespace UiPath.CoreIpc;
+namespace UiPath.Ipc;
 public class Message
 {
     internal Type CallbackContract { get; set; }

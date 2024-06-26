@@ -1,5 +1,5 @@
 ﻿using System.Net.Security;
-namespace UiPath.CoreIpc;
+namespace UiPath.Ipc;
 
 public interface IClient
 {
