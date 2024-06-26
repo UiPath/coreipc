@@ -24,18 +24,16 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     private Server _server;
     private ClientConnection _clientConnection;
 
-    internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
+    internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
     {
         _serializer = serializer;
         _requestTimeout = requestTimeout;
         _logger = logger;
         _connectionFactory = connectionFactory;
-        SslServer = sslServer;
         _beforeCall = beforeCall;
         _serviceEndpoint = serviceEndpoint;
     }
     protected int HashCode { get; init; }
-    public string SslServer { get; init; }
     public virtual string Name => _connection?.Name;
     private bool LogEnabled => _logger.Enabled();
     Connection IServiceClient.Connection => _connection;
@@ -190,9 +188,8 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             {
                 clientConnection.Dispose();
                 throw;
-            }
-            var stream = SslServer == null ? network : await AuthenticateAsClient(network);
-            OnNewConnection(new(stream, _serializer, _logger, Name));
+            }            
+            OnNewConnection(new(network, _serializer, _logger, Name));
             if (LogEnabled)
             {
                 Log($"CreateConnection {Name}.");
@@ -204,21 +201,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             clientConnection.Release();
         }
         return true;
-        async Task<Stream> AuthenticateAsClient(Stream network)
-        {
-            var sslStream = new SslStream(network);
-            try
-            {
-                await sslStream.AuthenticateAsClientAsync(SslServer);
-            }
-            catch
-            {
-                sslStream.Dispose();
-                throw;
-            }
-            Debug.Assert(sslStream.IsEncrypted && sslStream.IsSigned);
-            return sslStream;
-        }
     }
 
     private void ReuseClientConnection(ClientConnection clientConnection)
@@ -276,7 +258,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
 
     public override string ToString() => Name;
 
-    public virtual bool Equals(IConnectionKey other) => SslServer == other.SslServer;
+    public virtual bool Equals(IConnectionKey other) => true;
 
     public virtual ClientConnection CreateClientConnection() => throw new NotImplementedException();
 }
