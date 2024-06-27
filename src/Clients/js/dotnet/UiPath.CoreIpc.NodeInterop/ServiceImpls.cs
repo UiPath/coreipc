@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace UiPath.CoreIpc.NodeInterop;
+namespace UiPath.Ipc.NodeInterop;
 
 using static Contracts;
 

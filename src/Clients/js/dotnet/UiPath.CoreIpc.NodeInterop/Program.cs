@@ -7,10 +7,10 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
-using UiPath.CoreIpc.NamedPipe;
-using UiPath.CoreIpc.WebSockets;
+using UiPath.Ipc.NamedPipe;
+using UiPath.Ipc.WebSockets;
 
-namespace UiPath.CoreIpc.NodeInterop;
+namespace UiPath.Ipc.NodeInterop;
 
 using static Contracts;
 using static ServiceImpls;

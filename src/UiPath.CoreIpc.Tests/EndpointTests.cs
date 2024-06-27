@@ -87,7 +87,7 @@ public class EndpointTests : IDisposable
         {
             exception = ex;
         }
-        exception.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.CoreIpc.Tests.ISystemCallback.");
+        exception.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.Ipc.Tests.ISystemCallback.");
         exception.Is<ArgumentException>().ShouldBeTrue();
     }
     [Fact]
