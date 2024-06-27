@@ -35,7 +35,6 @@ static class ClientConnectionsRegistry
 }
 interface IConnectionKey : IEquatable<IConnectionKey>
 {
-    string SslServer { get; }
     ClientConnection CreateClientConnection();
 }
 abstract class ClientConnection : IDisposable
