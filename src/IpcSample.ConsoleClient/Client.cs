@@ -66,7 +66,7 @@ class Client
                 Console.WriteLine($"[TEST 3] sum of 3 complexe number is: {result3.A}+{result3.B}i", cancellationToken);
 
                 // test 4: call IPC service method without parameter or return
-                await systemClient.DoNothing(cancellationToken);
+                await systemClient.FireAndForget(cancellationToken);
                 Console.WriteLine($"[TEST 4] invoked DoNothing()");
                 //((IDisposable)systemClient).Dispose();
 

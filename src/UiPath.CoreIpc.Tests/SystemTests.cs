@@ -55,10 +55,10 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     [Fact]
     public async Task Void()
     {
-        _systemService.DidNothing = false;
-        await _systemClient.DoNothing();
-        _systemService.DidNothing.ShouldBeFalse();
-        while (!_systemService.DidNothing)
+        _systemService.FireAndForgetDone = false;
+        await _systemClient.FireAndForget();
+        _systemService.FireAndForgetDone.ShouldBeFalse();
+        while (!_systemService.FireAndForgetDone)
         {
             await Task.Delay(10);
             Trace.WriteLine(this + " Void");
@@ -202,15 +202,15 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         var proxy = SystemClientBuilder().BeforeCall(async (c, _) =>
         {
             newConnection = c.NewConnection;
-            c.Method.ShouldBe(typeof(ISystemService).GetMethod(nameof(ISystemService.DoNothing)));
+            c.Method.ShouldBe(typeof(ISystemService).GetMethod(nameof(ISystemService.FireAndForget)));
             c.Arguments.Single().ShouldBe(""); // cancellation token
         }).ValidateAndBuild();
         newConnection.ShouldBeFalse();
 
-        await proxy.DoNothing();
+        await proxy.FireAndForget();
         newConnection.ShouldBeTrue();
 
-        await proxy.DoNothing();
+        await proxy.FireAndForget();
         newConnection.ShouldBeFalse();
         var ipcProxy = (IpcProxy)proxy;
         var closed = false;
@@ -218,10 +218,10 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         ipcProxy.CloseConnection();
         closed.ShouldBeTrue();
         newConnection.ShouldBeFalse();
-        await proxy.DoNothing();
+        await proxy.FireAndForget();
         newConnection.ShouldBeTrue();
 
-        await proxy.DoNothing();
+        await proxy.FireAndForget();
         newConnection.ShouldBeFalse();
         ipcProxy.CloseConnection();
     }

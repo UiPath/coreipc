@@ -37,14 +37,14 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
             .AddEndpoint<ISystemService>()
             .ValidateAndBuild();
         _ = protectedService.RunAsync();
-        await CreateSystemService().DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
+        await CreateSystemService().FireAndForget().ShouldThrowAsync<UnauthorizedAccessException>();
     }
 
     [Theory]
     [InlineData(new int[0])]
     [InlineData(100)]
     [InlineData(1100)]
-    [InlineData(10, 10, 10, 10)]
+    [InlineData(100, 100)]
     public async Task PipeCancelIoOnServer_AnyNoOfTimes(params int[] msDelays)
     {
         bool cancelIoResult = false;

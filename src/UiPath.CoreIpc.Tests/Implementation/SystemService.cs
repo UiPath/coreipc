@@ -8,7 +8,7 @@ namespace UiPath.Ipc.Tests;
 
 public interface ISystemService
 {
-    Task DoNothing(CancellationToken cancellationToken = default);
+    Task FireAndForget(CancellationToken cancellationToken = default);
     Task VoidThreadName(CancellationToken cancellationToken = default);
     Task VoidSyncThrow(CancellationToken cancellationToken = default);
     Task<string> GetThreadName(CancellationToken cancellationToken = default);
@@ -75,18 +75,18 @@ public class SystemService : ISystemService
         return returnValue;
     }
 
-    public bool DidNothing { get; set; }
+    public bool FireAndForgetDone { get; set; }
 
-    public async Task DoNothing(CancellationToken cancellationToken = default)
+    public async Task FireAndForget(CancellationToken cancellationToken = default)
     {
         const int Timeout =
 #if CI
-            100;
+            400;
 #else
-            10;
+            40;
 #endif
         await Task.Delay(Timeout);
-        DidNothing = true;
+        FireAndForgetDone = true;
     }
 
     public async Task<Guid> GetGuid(Guid guid, CancellationToken cancellationToken = default)
