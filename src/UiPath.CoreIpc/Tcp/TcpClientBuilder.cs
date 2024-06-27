@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace UiPath.CoreIpc.Tcp;
+namespace UiPath.Ipc.Tcp;
 
 public abstract class TcpClientBuilderBase<TDerived, TInterface> : ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
 {

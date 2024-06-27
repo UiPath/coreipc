@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public interface ISystemService
 {

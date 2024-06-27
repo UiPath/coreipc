@@ -1,5 +1,5 @@
 ﻿using System.Net.WebSockets;
-namespace UiPath.CoreIpc.WebSockets;
+namespace UiPath.Ipc.WebSockets;
 using Accept = Func<CancellationToken, Task<WebSocket>>;
 public class WebSocketSettings : ListenerSettings
 {

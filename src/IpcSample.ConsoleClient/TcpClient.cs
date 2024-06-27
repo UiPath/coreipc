@@ -1,10 +1,10 @@
 ﻿using System.Text;
 using System.Diagnostics;
-using UiPath.CoreIpc.Tcp;
+using UiPath.Ipc.Tcp;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 class TcpClient
 {

@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc;
+﻿namespace UiPath.Ipc;
 
 /// <summary>
 /// A stream that allows for reading from another stream up to a given number of bytes.

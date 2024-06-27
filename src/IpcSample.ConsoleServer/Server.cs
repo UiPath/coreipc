@@ -1,8 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.CoreIpc.NamedPipe;
+using UiPath.Ipc.NamedPipe;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 class Server
 {

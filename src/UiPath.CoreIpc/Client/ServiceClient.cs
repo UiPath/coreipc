@@ -1,5 +1,4 @@
-﻿using System.Net.Security;
-namespace UiPath.CoreIpc;
+﻿namespace UiPath.Ipc;
 
 using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;

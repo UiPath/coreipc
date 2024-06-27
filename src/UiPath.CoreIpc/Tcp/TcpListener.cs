@@ -1,5 +1,5 @@
 ﻿using System.Net;
-namespace UiPath.CoreIpc.Tcp;
+namespace UiPath.Ipc.Tcp;
 
 public class TcpSettings : ListenerSettings
 {

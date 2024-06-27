@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc.Tests;
+﻿namespace UiPath.Ipc.Tests;
 
 public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : ServiceClientBuilder<TBuilder, IComputingService>
 {

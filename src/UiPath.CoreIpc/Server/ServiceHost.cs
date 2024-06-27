@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc;
+﻿namespace UiPath.Ipc;
 public sealed class ServiceHost : IDisposable
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();

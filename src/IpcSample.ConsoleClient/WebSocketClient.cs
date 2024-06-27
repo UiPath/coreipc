@@ -1,8 +1,8 @@
 ﻿using System.Text;
 using System.Diagnostics;
-using UiPath.CoreIpc.WebSockets;
+using UiPath.Ipc.WebSockets;
 using Microsoft.Extensions.DependencyInjection;
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 class WebSocketClient
 {
     static async Task _Main(string[] args)

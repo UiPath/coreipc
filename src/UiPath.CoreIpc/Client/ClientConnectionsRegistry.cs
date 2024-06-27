@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc;
+﻿namespace UiPath.Ipc;
 
 static class ClientConnectionsRegistry
 {

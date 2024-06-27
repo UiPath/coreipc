@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.IO.Pipes;
 using System.Security.Principal;
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemService>>
 {

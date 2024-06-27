@@ -6,7 +6,7 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
-namespace UiPath.CoreIpc;
+namespace UiPath.Ipc;
 using static CancellationTokenSourcePool;
 public static class Helpers
 {

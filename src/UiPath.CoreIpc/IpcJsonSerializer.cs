@@ -3,7 +3,8 @@ using Newtonsoft.Json.Linq;
 using System.Buffers;
 using System.Globalization;
 using System.Text;
-namespace UiPath.CoreIpc;
+
+namespace UiPath.Ipc;
 
 public interface ISerializer
 {

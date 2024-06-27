@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 
-namespace UiPath.CoreIpc.Tcp;
+namespace UiPath.Ipc.Tcp;
 
 using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;

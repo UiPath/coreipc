@@ -2,8 +2,8 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.WebSockets;
-using UiPath.CoreIpc.WebSockets;
-namespace UiPath.CoreIpc.Tests;
+using UiPath.Ipc.WebSockets;
+namespace UiPath.Ipc.Tests;
 class WebSocketServer
 {
     //private static readonly Timer _timer = new Timer(_ =>
