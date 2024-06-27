@@ -19,13 +19,13 @@ public static class Helpers
         await tcpClient.ConnectAsync(address, port);
     }
 #endif
-    public static Error ToError(this Exception ex) => new(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace, GetExceptionType(ex), ex.InnerException?.ToError());
+    internal static Error ToError(this Exception ex) => new(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace, GetExceptionType(ex), ex.InnerException?.ToError());
     private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
-    public static bool Enabled(this ILogger logger) => logger != null && logger.IsEnabled(LogLevel.Information);
+    internal static bool Enabled(this ILogger logger) => logger != null && logger.IsEnabled(LogLevel.Information);
     [Conditional("DEBUG")]
-    public static void AssertDisposed(this SemaphoreSlim semaphore) => semaphore.AssertFieldNull("m_waitHandle");
+    internal static void AssertDisposed(this SemaphoreSlim semaphore) => semaphore.AssertFieldNull("m_waitHandle");
     [Conditional("DEBUG")]
-    public static void AssertDisposed(this CancellationTokenSource cts)
+    internal static void AssertDisposed(this CancellationTokenSource cts)
     {
 #if NET461
         cts.AssertFieldNull("m_kernelEvent");
@@ -38,10 +38,10 @@ public static class Helpers
     [Conditional("DEBUG")]
     static void AssertFieldNull(this object obj, string field) =>
         Debug.Assert(obj.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(obj) == null);
-    public static TDelegate MakeGenericDelegate<TDelegate>(this MethodInfo genericMethod, Type genericArgument) where TDelegate : Delegate =>
+    internal static TDelegate MakeGenericDelegate<TDelegate>(this MethodInfo genericMethod, Type genericArgument) where TDelegate : Delegate =>
         (TDelegate)genericMethod.MakeGenericMethod(genericArgument).CreateDelegate(typeof(TDelegate));
-    public static MethodInfo GetStaticMethod(this Type type, string name) => type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
-    public static MethodInfo GetInterfaceMethod(this Type type, string name)
+    internal static MethodInfo GetStaticMethod(this Type type, string name) => type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
+    internal static MethodInfo GetInterfaceMethod(this Type type, string name)
     {
         var method = type.GetMethod(name, InstanceFlags) ?? 
             type.GetInterfaces().Select(t => t.GetMethod(name, InstanceFlags)).FirstOrDefault(m => m != null) ??
@@ -52,15 +52,15 @@ public static class Helpers
         }
         return method;
     }
-    public static IEnumerable<MethodInfo> GetInterfaceMethods(this Type type) =>
+    internal static IEnumerable<MethodInfo> GetInterfaceMethods(this Type type) =>
         type.GetMethods().Concat(type.GetInterfaces().SelectMany(i => i.GetMethods()));
-    public static object GetDefaultValue(this ParameterInfo parameter) => parameter switch
+    internal static object GetDefaultValue(this ParameterInfo parameter) => parameter switch
     {
         { HasDefaultValue: false } => null,
         { ParameterType: { IsValueType: true }, DefaultValue: null } => Activator.CreateInstance(parameter.ParameterType),
         _ => parameter.DefaultValue
     };
-    public static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
+    internal static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
     public static void LogException(this ILogger logger, Exception ex, object tag)
     {
         var message = $"{tag} # {ex}";
@@ -167,7 +167,7 @@ public static class IOHelpers
     internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
         stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
 }
-public static class Validator
+internal static class Validator
 {
     public static void Validate(ServiceHostBuilder serviceHostBuilder)
     {
@@ -267,7 +267,7 @@ public static class Validator
         }
     }
 }
-public readonly struct TimeoutHelper : IDisposable
+internal readonly struct TimeoutHelper : IDisposable
 {
     private static readonly Action<object> LinkedTokenCancelDelegate = static s => ((CancellationTokenSource)s).Cancel();
     private readonly PooledCancellationTokenSource _timeoutCancellationSource;
