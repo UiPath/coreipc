@@ -1,19 +1,20 @@
-﻿using System.IO.Pipes;
+﻿using System.IO;
+using System.IO.Pipes;
 using System.Security.Principal;
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemService>>
 {
     string _pipeName = "system";
     protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder) =>
-        serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings(_pipeName+GetHashCode())));
-    protected override NamedPipeClientBuilder<ISystemService> CreateSystemClientBuilder() => 
-        new NamedPipeClientBuilder<ISystemService>(_pipeName+GetHashCode()).AllowImpersonation();
+        serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings(_pipeName + GetHashCode())));
+    protected override NamedPipeClientBuilder<ISystemService> CreateSystemClientBuilder() =>
+        new NamedPipeClientBuilder<ISystemService>(_pipeName + GetHashCode()).AllowImpersonation();
     [Fact]
     public void PipeExists()
     {
         IOHelpers.PipeExists(System.Guid.NewGuid().ToString()).ShouldBeFalse();
-        IOHelpers.PipeExists("system"+GetHashCode(), 50).ShouldBeTrue();
+        IOHelpers.PipeExists("system" + GetHashCode(), 50).ShouldBeTrue();
     }
     [Fact]
     public Task ServerName() => SystemClientBuilder().ValidateAndBuild().GetGuid(System.Guid.Empty);
@@ -36,7 +37,42 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
             .AddEndpoint<ISystemService>()
             .ValidateAndBuild();
         _ = protectedService.RunAsync();
-        await CreateSystemService().DoNothing().ShouldThrowAsync<UnauthorizedAccessException>();
+        await CreateSystemService().FireAndForget().ShouldThrowAsync<UnauthorizedAccessException>();
+    }
+
+    [Theory]
+    [InlineData(new int[0])]
+    [InlineData(100)]
+    [InlineData(1100)]
+    [InlineData(100, 100)]
+    public async Task PipeCancelIoOnServer_AnyNoOfTimes(params int[] msDelays)
+    {
+        bool cancelIoResult = false;
+
+        // Any number of kernel32.CancelIoEx calls should not cause the client to give up on the connection.
+        var act = async () => cancelIoResult = await _systemClient.CancelIoPipe(new() { MsDelays = msDelays });
+        await act.ShouldNotThrowAsync();
+
+        //Make sure the connection is still working
+        (await _systemClient.Delay()).ShouldBeTrue();
+
+        cancelIoResult.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task PipeCancelIoOnClient()
+    {
+        (await _systemClient.Delay()).ShouldBeTrue();
+
+        var delayTask = _systemClient.Delay(500);
+        await Task.Delay(100);
+        var pipeStream = ((IpcProxy)_systemClient).Connection.Network as PipeStream;
+        SystemService.CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero).ShouldBeTrue();
+
+        (await delayTask).ShouldBeTrue();
+
+        //Make sure the connection is still working
+        (await _systemClient.Delay()).ShouldBeTrue();
     }
 #endif
 }

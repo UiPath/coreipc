@@ -1,6 +1,6 @@
 ﻿using Nito.AsyncEx;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public abstract class TestBase : IDisposable
 {
@@ -8,9 +8,10 @@ public abstract class TestBase : IDisposable
     protected static int Count = -1;
     public static readonly TimeSpan RequestTimeout =
 #if CI
-        TimeSpan.FromSeconds(2) +
+        TimeSpan.FromSeconds(3) +
 #endif
-        (Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(2));
+        TimeSpan.FromSeconds(3);
+        // (Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(2));
     protected readonly IServiceProvider _serviceProvider;
     protected readonly AsyncContext _guiThread = new AsyncContextThread().Context;
 

@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc.Tests;
+﻿namespace UiPath.Ipc.Tests;
 
 public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : ServiceClientBuilder<TBuilder, IComputingService>
 {
@@ -14,7 +14,7 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
             .AddEndpoint<IComputingService, IComputingCallback>()
             .ValidateAndBuild();
         _computingHost.RunAsync(GuiScheduler);
-        _computingClient = ComputingClientBuilder(GuiScheduler).SerializeParametersAsObjects().ValidateAndBuild();
+        _computingClient = ComputingClientBuilder(GuiScheduler).ValidateAndBuild();
     }
     protected abstract TBuilder ComputingClientBuilder(TaskScheduler taskScheduler = null);
     [Fact]
@@ -58,7 +58,7 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
     [Fact]
     public async Task ClientTimeout()
     {
-        var proxy = ComputingClientBuilder().SerializeParametersAsObjects().RequestTimeout(TimeSpan.FromMilliseconds(10)).ValidateAndBuild();
+        var proxy = ComputingClientBuilder().RequestTimeout(TimeSpan.FromMilliseconds(10)).ValidateAndBuild();
         proxy.Infinite().ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.Infinite)} timed out.");
         await proxy.GetCallbackThreadName(new Message { RequestTimeout = RequestTimeout });
         ((IDisposable)proxy).Dispose();

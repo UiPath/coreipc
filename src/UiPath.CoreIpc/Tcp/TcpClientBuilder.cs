@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace UiPath.CoreIpc.Tcp;
+namespace UiPath.Ipc.Tcp;
 
 public abstract class TcpClientBuilderBase<TDerived, TInterface> : ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
 {
@@ -10,7 +10,7 @@ public abstract class TcpClientBuilderBase<TDerived, TInterface> : ServiceClient
         _endPoint = endPoint;
 
     protected override TInterface BuildCore(EndpointSettings serviceEndpoint) =>
-        new TcpClient<TInterface>(_endPoint, _serializer, _requestTimeout, _logger, _connectionFactory, _sslServer, _beforeCall, _objectParameters, serviceEndpoint).CreateProxy();
+        new TcpClient<TInterface>(_endPoint, _serializer, _requestTimeout, _logger, _connectionFactory, _beforeCall, serviceEndpoint).CreateProxy();
 }
 
 public class TcpClientBuilder<TInterface> : TcpClientBuilderBase<TcpClientBuilder<TInterface>, TInterface> where TInterface : class

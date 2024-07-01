@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc.Tests;
+﻿namespace UiPath.Ipc.Tests;
 
 public class EndpointTests : IDisposable
 {
@@ -34,13 +34,11 @@ public class EndpointTests : IDisposable
             .AllowImpersonation()
             .RequestTimeout(RequestTimeout)
             .CallbackInstance(_computingCallback)
-            .SerializeParametersAsObjects()
             .TaskScheduler(taskScheduler);
     private ISystemService CreateSystemService() => SystemClientBuilder().ValidateAndBuild();
     private NamedPipeClientBuilder<ISystemService, ISystemCallback> SystemClientBuilder() =>
         new NamedPipeClientBuilder<ISystemService, ISystemCallback>(PipeName, _serviceProvider)
         .CallbackInstance(_systemCallback)
-        .SerializeParametersAsObjects()
         .RequestTimeout(RequestTimeout)
         .AllowImpersonation();
     public void Dispose()
@@ -66,7 +64,7 @@ public class EndpointTests : IDisposable
     private async Task CallbackCore()
     {
         var proxy = new NamedPipeClientBuilder<IComputingServiceBase>(PipeName)
-            .SerializeParametersAsObjects().RequestTimeout(RequestTimeout).AllowImpersonation().ValidateAndBuild();
+            .RequestTimeout(RequestTimeout).AllowImpersonation().ValidateAndBuild();
         var message = new SystemMessage { Text = Guid.NewGuid().ToString() };
         var computingTask = _computingClient.SendMessage(message);
         var systemTask = _systemClient.SendMessage(message);
@@ -89,7 +87,7 @@ public class EndpointTests : IDisposable
         {
             exception = ex;
         }
-        exception.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.CoreIpc.Tests.ISystemCallback.");
+        exception.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.Ipc.Tests.ISystemCallback.");
         exception.Is<ArgumentException>().ShouldBeTrue();
     }
     [Fact]

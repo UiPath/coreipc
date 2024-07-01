@@ -1,7 +1,7 @@
 ﻿using System.IO.Pipes;
 using System.Security.Principal;
 
-namespace UiPath.CoreIpc.NamedPipe;
+namespace UiPath.Ipc.NamedPipe;
 
 public class NamedPipeSettings : ListenerSettings
 {

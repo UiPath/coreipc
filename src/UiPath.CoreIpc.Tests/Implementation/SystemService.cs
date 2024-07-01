@@ -1,11 +1,14 @@
 ﻿using System.Globalization;
+using System.IO.Pipes;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public interface ISystemService
 {
-    Task DoNothing(CancellationToken cancellationToken = default);
+    Task FireAndForget(CancellationToken cancellationToken = default);
     Task VoidThreadName(CancellationToken cancellationToken = default);
     Task VoidSyncThrow(CancellationToken cancellationToken = default);
     Task<string> GetThreadName(CancellationToken cancellationToken = default);
@@ -22,12 +25,18 @@ public interface ISystemService
     Task<Stream> Download(string text, CancellationToken cancellationToken = default);
     Task<Stream> Echo(Stream input, CancellationToken cancellationToken = default);
     Task<string> UploadNoRead(Stream memoryStream, int delay = 0, CancellationToken cancellationToken = default);
+    Task<bool> CancelIoPipe(CancelIoPipeMessage message = null, CancellationToken cancellationToken = default);
+    Task<bool> Delay(int delay = 0, CancellationToken cancellationToken = default);
 }
 
 public class SystemMessage : Message
 {
     public string Text { get; set; }
     public int Delay { get; set; }
+}
+public class CancelIoPipeMessage : Message
+{
+    public int[]? MsDelays { get; set; }
 }
 public class SystemService : ISystemService
 {
@@ -66,18 +75,18 @@ public class SystemService : ISystemService
         return returnValue;
     }
 
-    public bool DidNothing { get; set; }
+    public bool FireAndForgetDone { get; set; }
 
-    public async Task DoNothing(CancellationToken cancellationToken = default)
+    public async Task FireAndForget(CancellationToken cancellationToken = default)
     {
         const int Timeout =
 #if CI
-            100;
+            400;
 #else
-            10;
+            40;
 #endif
         await Task.Delay(Timeout);
-        DidNothing = true;
+        FireAndForgetDone = true;
     }
 
     public async Task<Guid> GetGuid(Guid guid, CancellationToken cancellationToken = default)
@@ -171,5 +180,36 @@ public class SystemService : ISystemService
         await input.CopyToAsync(result);
         result.Position = 0;
         return result;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool CancelIoEx(IntPtr handle, IntPtr lpOverlapped);
+    public async Task<bool> CancelIoPipe(CancelIoPipeMessage message = null, CancellationToken cancellationToken = default)
+    {
+        Debug.WriteLine("###################### CancelIoPipe");
+        await Task.Delay(50);
+#if WINDOWS
+            var serverFieldInfo = message.Client.GetType().GetField("_server", BindingFlags.NonPublic | BindingFlags.Instance);
+            var pipeStream = serverFieldInfo.GetValue(message.Client) as PipeStream;
+
+            var canceled = CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero);
+            
+            foreach (var msDelay in message.MsDelays ?? [])
+            {
+                await Task.Delay(msDelay);
+                canceled = CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero);
+            }
+
+            await Task.Delay(50);
+            return canceled;
+#else
+        return false;
+#endif
+    }
+
+    public async Task<bool> Delay(int delay = 0, CancellationToken cancellationToken = default)
+    {
+        await Task.Delay(delay, cancellationToken);
+        return true;
     }
 }

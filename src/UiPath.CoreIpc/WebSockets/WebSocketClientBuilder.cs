@@ -1,11 +1,11 @@
-﻿namespace UiPath.CoreIpc.WebSockets;
+﻿namespace UiPath.Ipc.WebSockets;
 public abstract class WebSocketClientBuilderBase<TDerived, TInterface> : ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
 {
     private readonly Uri _uri;
     protected WebSocketClientBuilderBase(Uri uri, Type callbackContract = null, IServiceProvider serviceProvider = null) : base(callbackContract, serviceProvider) =>
         _uri = uri;
     protected override TInterface BuildCore(EndpointSettings serviceEndpoint) =>
-        new WebSocketClient<TInterface>(_uri, _serializer, _requestTimeout, _logger, _connectionFactory, _sslServer, _beforeCall, _objectParameters, serviceEndpoint).CreateProxy();
+        new WebSocketClient<TInterface>(_uri, _serializer, _requestTimeout, _logger, _connectionFactory, _beforeCall, serviceEndpoint).CreateProxy();
 }
 public class WebSocketClientBuilder<TInterface> : WebSocketClientBuilderBase<WebSocketClientBuilder<TInterface>, TInterface> where TInterface : class
 {

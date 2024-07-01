@@ -1,9 +1,9 @@
 ﻿using System.Net.Security;
-namespace UiPath.CoreIpc;
+namespace UiPath.Ipc;
 
 public interface IClient
 {
-    TCallbackInterface GetCallback<TCallbackInterface>(Type callbackContract, bool objectParameters) where TCallbackInterface : class;
+    TCallbackInterface GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class;
     void Impersonate(Action action);
 }
 abstract class ServerConnection : IClient, IDisposable
@@ -18,7 +18,7 @@ abstract class ServerConnection : IClient, IDisposable
     public ListenerSettings Settings => _listener.Settings;
     public abstract Task<Stream> AcceptClient(CancellationToken cancellationToken);
     public virtual void Impersonate(Action action) => action();
-    TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract, bool objectParameters) where TCallbackInterface : class
+    TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class
     {
         if (callbackContract == null)
         {
@@ -36,10 +36,7 @@ abstract class ServerConnection : IClient, IDisposable
                 _listener.Log($"Create callback {callbackContract} {_listener.Name}");
             }
             _connectionAsTask ??= Task.FromResult(_connection);
-            var serviceClient = new ServiceClient<TCallbackInterface>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, _) => _connectionAsTask)
-            {
-                ObjectParameters = objectParameters
-            };
+            var serviceClient = new ServiceClient<TCallbackInterface>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, _) => _connectionAsTask);
             return serviceClient.CreateProxy();
         }
     }

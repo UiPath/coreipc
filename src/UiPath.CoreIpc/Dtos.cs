@@ -1,16 +1,16 @@
-﻿using System.Text;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using Newtonsoft.Json;
-namespace UiPath.CoreIpc;
+namespace UiPath.Ipc;
 public class Message
 {
-    internal bool ObjectParameters { get; set; }
     internal Type CallbackContract { get; set; }
     [JsonIgnore]
     public IClient Client { get; set; }
     [JsonIgnore]
     public TimeSpan RequestTimeout { get; set; }
     public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => 
-        Client.GetCallback<TCallbackInterface>(CallbackContract, ObjectParameters);
+        Client.GetCallback<TCallbackInterface>(CallbackContract);
     public void ImpersonateClient(Action action) => Client.Impersonate(action);
 }
 public class Message<TPayload> : Message
@@ -18,34 +18,43 @@ public class Message<TPayload> : Message
     public Message(TPayload payload) => Payload = payload;
     public TPayload Payload { get; }
 }
-record Request(string Endpoint, string Id, string MethodName, string[] Parameters, object[] ObjectParameters, double TimeoutInSeconds)
+record Request(string Endpoint, string Id, string MethodName, string[] Parameters, double TimeoutInSeconds)
 {
     internal Stream UploadStream { get; set; }
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
-    internal bool HasObjectParameters => ObjectParameters is not null;
     internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
 record CancellationRequest(string RequestId);
-record Response(string RequestId, string Data = null, object ObjectData = null, Error Error = null)
+record Response(string RequestId, string Data = null, Error Error = null)
 {
     internal Stream DownloadStream { get; set; }
     public static Response Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());
     public static Response Success(Request request, string data) => new(request.Id, data);
     public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
-    public TResult Deserialize<TResult>(ISerializer serializer, bool objectParameters)
+    public TResult Deserialize<TResult>(ISerializer serializer)
     {
         if (Error != null)
         {
             throw new RemoteException(Error);
         }
-        return (TResult)(DownloadStream ?? (objectParameters ?
-            serializer.Deserialize(ObjectData, typeof(TResult)) : serializer.Deserialize(Data ?? "", typeof(TResult))));
+        return (TResult)(DownloadStream ?? serializer.Deserialize(Data ?? "", typeof(TResult)));
     }
 }
 [Serializable]
 public record Error(string Message, string StackTrace, string Type, Error InnerError)
 {
+    [return: NotNullIfNotNull("exception")]
+    public static Error? FromException(Exception? exception)
+    => exception is null 
+        ? null 
+        : new(
+            Message: exception.Message, 
+            StackTrace: exception.StackTrace ?? exception.GetBaseException().StackTrace, 
+            Type: GetExceptionType(exception), 
+            InnerError: FromException(exception.InnerException));
     public override string ToString() => new RemoteException(this).ToString();
+
+    private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
 }
 [Serializable]
 public class RemoteException : Exception

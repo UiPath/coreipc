@@ -1,5 +1,5 @@
 ﻿using System.Net.WebSockets;
-namespace UiPath.CoreIpc.WebSockets;
+namespace UiPath.Ipc.WebSockets;
 using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
 using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 interface IWebSocketsKey : IConnectionKey
@@ -8,10 +8,10 @@ interface IWebSocketsKey : IConnectionKey
 }
 class WebSocketClient<TInterface> : ServiceClient<TInterface>, IWebSocketsKey where TInterface : class
 {
-    public WebSocketClient(Uri uri, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer, BeforeCallHandler beforeCall, bool objectParameters, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, sslServer, beforeCall, objectParameters, serviceEndpoint)
+    public WebSocketClient(Uri uri, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, beforeCall, serviceEndpoint)
     {
         Uri = uri;
-        HashCode = (uri, sslServer).GetHashCode();
+        HashCode = uri.GetHashCode();
     }
     public override string Name => base.Name ?? Uri.ToString();
     public Uri Uri { get; }

@@ -1,6 +1,6 @@
 ﻿using System.IO.Compression;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public class NestedStreamTests
 {
@@ -358,7 +358,7 @@ public class NestedStreamTests
         await Assert.ThrowsAsync<ArgumentException>(() => this.stream.ReadAsync(buffer, 1, buffer.Length));
     }
 }
-public static class StreamExtensions
+internal static class StreamExtensions
 {
     /// <summary>
     /// Creates a <see cref="Stream"/> that can read no more than a given number of bytes from an underlying stream.
