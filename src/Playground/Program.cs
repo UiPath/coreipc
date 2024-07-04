@@ -1,4 +1,7 @@
 ﻿// See https://aka.ms/new-console-template for more information
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Playground;
 using UiPath.Ipc;
 using UiPath.Ipc.NamedPipe;
@@ -29,6 +32,30 @@ Callback.Set<Contracts.IClientOperations>(
         Console.WriteLine($"V2 Server: {text}");
         return true;
     }));
+
+await using var serviceProvider = new ServiceCollection()
+    .AddSingleton(() => DateTime.Now)
+    .AddScoped<Contracts.IClientOperations2, Impl.Client2>()
+    .AddLogging(builder => builder.AddConsole())
+    .BuildServiceProvider();
+
+IpcClient.Config[new NamedPipeChannel(Contracts.PipeName)] = new()
+{
+    ServiceProvider = serviceProvider,
+    Callbacks = new()
+    {
+        typeof(Contracts.IClientOperations2),
+        new Impl.Client(async text =>
+        {
+            Console.WriteLine($"V3 Server: {text}");
+            return true;
+        }) as Contracts.IClientOperations
+    },
+};
+
+var proxy0 = IpcClient.Connect<Contracts.IServerOperations>(new NamedPipeChannel(Contracts.PipeName));
+await proxy0.Register();
+await proxy0.Broadcast("Hello World!");
 
 var proxy = new NamedPipeClientBuilder<Contracts.IServerOperations>(Contracts.PipeName).Build();
 await proxy.Register();

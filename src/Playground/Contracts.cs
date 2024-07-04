@@ -16,4 +16,9 @@ public static class Contracts
     {
         Task<bool> Greet(string text);
     }
+
+    public interface IClientOperations2
+    {
+        Task<DateTime> GetTheTime();
+    }
 }

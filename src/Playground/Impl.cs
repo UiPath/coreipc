@@ -43,4 +43,9 @@ internal static class Impl
     {
         public Task<bool> Greet(string text) => greet(text);
     }
+
+    public sealed class Client2 : Contracts.IClientOperations2
+    {
+        public Task<DateTime> GetTheTime() => Task.FromResult(DateTime.Now);
+    }
 }
