@@ -3,9 +3,6 @@ using System.Security.Principal;
 
 namespace UiPath.Ipc.NamedPipe;
 
-using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
-using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
-
 interface INamedPipeKey : IConnectionKey
 {
     string ServerName { get; }
@@ -15,8 +12,8 @@ interface INamedPipeKey : IConnectionKey
 
 class NamedPipeClient<TInterface> : ServiceClient<TInterface>, INamedPipeKey where TInterface : class
 {
-    public NamedPipeClient(string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint)
-        : base(serializer, requestTimeout, logger, connectionFactory, beforeCall, serviceEndpoint)
+    public NamedPipeClient(string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall)
+        : base(serializer, requestTimeout, logger, connectionFactory, beforeCall)
     {
         ServerName = serverName;
         PipeName = pipeName;

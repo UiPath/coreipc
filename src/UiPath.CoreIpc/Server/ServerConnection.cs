@@ -3,7 +3,7 @@ namespace UiPath.Ipc;
 
 public interface IClient
 {
-    TCallbackInterface GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class;
+    TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class;
     void Impersonate(Action action);
 }
 abstract class ServerConnection : IClient, IDisposable
@@ -18,19 +18,12 @@ abstract class ServerConnection : IClient, IDisposable
     public ListenerSettings Settings => _listener.Settings;
     public abstract Task<Stream> AcceptClient(CancellationToken cancellationToken);
     public virtual void Impersonate(Action action) => action();
-    TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract) where TCallbackInterface : class
+    TCallbackInterface IClient.GetCallback<TCallbackInterface>() where TCallbackInterface : class
     {
-        if (callbackContract == null)
-        {
-            throw new InvalidOperationException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's not configured.");
-        }
-        return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, CreateCallback);
+        return (TCallbackInterface)_callbacks.GetOrAdd(typeof(TCallbackInterface), CreateCallback);
+
         TCallbackInterface CreateCallback(Type callbackContract)
         {
-            if (!typeof(TCallbackInterface).IsAssignableFrom(callbackContract))
-            {
-                throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's {callbackContract}.");
-            }
             if (_listener.LogEnabled)
             {
                 _listener.Log($"Create callback {callbackContract} {_listener.Name}");
@@ -40,12 +33,14 @@ abstract class ServerConnection : IClient, IDisposable
             return serviceClient.CreateProxy();
         }
     }
-    public async Task Listen(Stream network, CancellationToken cancellationToken)
+    public async Task Listen(IServiceProvider serviceProvider, Stream network, CancellationToken cancellationToken)
     {
         var stream = await AuthenticateAsServer();
-        var serializer = Settings.ServiceProvider.GetRequiredService<ISerializer>();
+        var serializer = serviceProvider.GetRequiredService<ISerializer>();
         _connection = new(stream, serializer, Logger, _listener.Name, _listener.MaxMessageSize);
-        _server = new(Settings, _connection, this);
+        _server = new Server(
+            new Router(serviceProvider, Settings.RouterConfig), 
+            Settings, _connection, client: this);
         // close the connection when the service host closes
         using (cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), _connection))
         {

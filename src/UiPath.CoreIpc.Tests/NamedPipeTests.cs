@@ -76,14 +76,17 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
     }
 #endif
 }
-public class ComputingNamedPipeTests : ComputingTests<NamedPipeClientBuilder<IComputingService, IComputingCallback>>
+public class ComputingNamedPipeTests : ComputingTests<NamedPipeClientBuilder<IComputingService>>
 {
     protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder) =>
         serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings("computing" + GetHashCode())));
-    protected override NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
-        new NamedPipeClientBuilder<IComputingService, IComputingCallback>("computing" + GetHashCode(), _serviceProvider)
+
+    protected override NamedPipeClientBuilder<IComputingService> ComputingClientBuilder(TaskScheduler taskScheduler = null)
+    {
+        Ipc.Callback.Set<IComputingCallback>(_serviceProvider, taskScheduler);
+
+        return new NamedPipeClientBuilder<IComputingService>("computing" + GetHashCode())
             .AllowImpersonation()
-            .RequestTimeout(RequestTimeout)
-            .CallbackInstance(_computingCallback)
-            .TaskScheduler(taskScheduler);
+            .RequestTimeout(RequestTimeout);
+    }
 }

@@ -1,19 +1,26 @@
 ﻿using System.Linq.Expressions;
+
 namespace UiPath.Ipc;
+
 using GetTaskResultFunc = Func<Task, object>;
-using MethodExecutor = Func<object, object[], CancellationToken, Task>;
+using MethodExecutor = Func<object, object?[], CancellationToken, Task>;
 using static Expression;
 using static CancellationTokenSourcePool;
-class Server
+
+internal class Server
 {
     private static readonly MethodInfo GetResultMethod = typeof(Server).GetStaticMethod(nameof(GetTaskResultImpl));
-    private static readonly ConcurrentDictionary<(Type,string), Method> Methods = new();
+    private static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
     private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
+
+    private readonly Router _router;
     private readonly Connection _connection;
-    private readonly IClient _client;
+    private readonly IClient? _client;
     private readonly ConcurrentDictionary<string, PooledCancellationTokenSource> _requests = new();
-    public Server(ListenerSettings settings, Connection connection, IClient client = null)
+
+    public Server(Router router, ListenerSettingsBase settings, Connection connection, IClient? client = null)
     {
+        _router = router;
         Settings = settings;
         _connection = connection;
         _client = client;
@@ -57,13 +64,13 @@ class Server
             {
                 Log($"{Name} received request {request}");
             }
-            if (!Endpoints.TryGetValue(request.Endpoint, out var endpoint))
+            if (!_router.TryResolve(request.Endpoint, out var route))
             {
                 await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
                 return;
             }
-            var method = GetMethod(endpoint.Contract, request.MethodName);
-            Response response = null;
+            var method = GetMethod(route.Service.Type, request.MethodName);
+            Response? response = null;
             var requestCancellation = Rent();
             _requests[request.Id] = requestCancellation;
             var timeout = request.GetTimeout(Settings.RequestTimeout);
@@ -71,14 +78,14 @@ class Server
             try
             {
                 var token = timeoutHelper.Token;
-                response = await HandleRequest(method, endpoint, request, token);
+                response = await HandleRequest(method, route, request, token);
                 if (LogEnabled)
                 {
                     Log($"{Name} sending response for {request}");
                 }
                 await SendResponse(response, token);
             }
-            catch (Exception ex) when(response == null)
+            catch (Exception ex) when (response is null)
             {
                 await OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName));
             }
@@ -104,29 +111,17 @@ class Server
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-    async ValueTask<Response> HandleRequest(Method method, EndpointSettings endpoint, Request request, CancellationToken cancellationToken)
+    async ValueTask<Response> HandleRequest(Method method, Route route, Request request, CancellationToken cancellationToken)
     {
-        var contract = endpoint.Contract;
         var arguments = GetArguments();
-        var beforeCall = endpoint.BeforeCall;
-        if (beforeCall != null)
+
+        var callInfo = new CallInfo(newConnection: false, method.MethodInfo, arguments);
+        await route.MaybeBeforeCall(callInfo, cancellationToken);
+
+        object service;
+        using (route.Service.Get(out service))
         {
-            await beforeCall(new(default, method.MethodInfo, arguments), cancellationToken);
-        }
-        IServiceScope scope = null;
-        var service = endpoint.ServiceInstance;
-        try
-        {
-            if (service == null)
-            {
-                scope = ServiceProvider.CreateScope();
-                service = scope.ServiceProvider.GetRequiredService(contract);
-            }
             return await InvokeMethod();
-        }
-        finally
-        {
-            scope?.Dispose();
         }
 #if !NET461
         [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
@@ -134,7 +129,7 @@ class Server
         async ValueTask<Response> InvokeMethod()
         {
             var returnTaskType = method.ReturnType;
-            var scheduler = endpoint.Scheduler;
+            var scheduler = route.Scheduler;
             Debug.Assert(scheduler != null);
             var defaultScheduler = scheduler == TaskScheduler.Default;
             if (returnTaskType.IsGenericType)
@@ -156,7 +151,7 @@ class Server
             Task MethodCall() => method.Invoke(service, arguments, cancellationToken);
             Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
         }
-        object[] GetArguments()
+        object?[] GetArguments()
         {
             var parameters = method.Parameters;
             var allParametersLength = parameters.Length;
@@ -165,7 +160,7 @@ class Server
             {
                 throw new ArgumentException("Too many parameters for " + method.MethodInfo);
             }
-            var allArguments = new object[allParametersLength];
+            var allArguments = new object?[allParametersLength];
             Deserialize();
             SetOptionalArguments();
             return allArguments;
@@ -199,7 +194,6 @@ class Server
                 }
                 if (argument is Message message)
                 {
-                    message.CallbackContract = endpoint.CallbackContract;
                     message.Client = _client;
                 }
                 return argument;
@@ -216,18 +210,16 @@ class Server
     private void Log(string message) => _connection.Log(message);
     private ILogger Logger => _connection.Logger;
     private bool LogEnabled => Logger.Enabled();
-    private ListenerSettings Settings { get; }
-    public IServiceProvider ServiceProvider => Settings.ServiceProvider;
+    private ListenerSettingsBase Settings { get; }
     public ISerializer Serializer => _connection.Serializer;
     public string Name => _connection.Name;
-    public IDictionary<string, EndpointSettings> Endpoints => Settings.Endpoints;
     ValueTask SendResponse(Response response, CancellationToken responseCancellation) => _connection.Send(response, responseCancellation);
     static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
-    static object GetTaskResult(Type taskType, Task task) => 
-        GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0], 
+    static object GetTaskResult(Type taskType, Task task) =>
+        GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0],
             resultType => GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType))(task);
-    static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName), 
-        ((Type contract,string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
+    static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
+        ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
     readonly struct Method
     {
         static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
@@ -249,7 +241,7 @@ class Server
             {
                 var parameter = parameters[index];
                 defaults[index] = parameter.GetDefaultValue();
-                callParameters[index] = parameter.ParameterType == typeof(CancellationToken) ? TokenParameter : 
+                callParameters[index] = parameter.ParameterType == typeof(CancellationToken) ? TokenParameter :
                     Convert(ArrayIndex(ParametersParameter, Constant(index, typeof(int))), parameter.ParameterType);
             }
             var instanceCast = Convert(TargetParameter, method.DeclaringType);
@@ -260,7 +252,7 @@ class Server
             Parameters = parameters;
             Defaults = defaults;
         }
-        public Task Invoke(object service, object[] arguments, CancellationToken cancellationToken) => _executor.Invoke(service, arguments, cancellationToken);
+        public Task Invoke(object service, object?[] arguments, CancellationToken cancellationToken) => _executor.Invoke(service, arguments, cancellationToken);
         public override string ToString() => MethodInfo.ToString();
     }
 }

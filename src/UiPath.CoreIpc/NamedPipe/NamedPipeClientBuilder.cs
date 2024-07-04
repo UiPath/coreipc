@@ -6,12 +6,13 @@ public abstract class NamedPipeClientBuilderBase<TDerived, TInterface> : Service
     private string _serverName = ".";
     private bool _allowImpersonation;
 
-    protected NamedPipeClientBuilderBase(string pipeName, Type callbackContract = null, IServiceProvider serviceProvider = null) : base(callbackContract, serviceProvider) => _pipeName = pipeName;
+    protected NamedPipeClientBuilderBase(string pipeName)
+    => _pipeName = pipeName;
 
     public TDerived ServerName(string serverName)
     {
         _serverName = serverName;
-        return this as TDerived;
+        return (this as TDerived)!;
     }
 
     /// <summary>
@@ -23,31 +24,14 @@ public abstract class NamedPipeClientBuilderBase<TDerived, TInterface> : Service
     public TDerived AllowImpersonation()
     {
         _allowImpersonation = true;
-        return this as TDerived;
+        return (this as TDerived)!;
     }
 
-    protected override TInterface BuildCore(EndpointSettings serviceEndpoint) =>
-        new NamedPipeClient<TInterface>(_serverName, _pipeName, _serializer, _requestTimeout, _allowImpersonation, _logger, _connectionFactory, _beforeCall, serviceEndpoint).CreateProxy();
+    protected override TInterface BuildCore()
+    => new NamedPipeClient<TInterface>(_serverName, _pipeName, _serializer, _requestTimeout, _allowImpersonation, _logger, _connectionFactory, _beforeCall).CreateProxy();
 }
 
 public class NamedPipeClientBuilder<TInterface> : NamedPipeClientBuilderBase<NamedPipeClientBuilder<TInterface>, TInterface> where TInterface : class
 {
     public NamedPipeClientBuilder(string pipeName) : base(pipeName){}
-}
-
-public class NamedPipeClientBuilder<TInterface, TCallbackInterface> : NamedPipeClientBuilderBase<NamedPipeClientBuilder<TInterface, TCallbackInterface>, TInterface> where TInterface : class where TCallbackInterface : class
-{
-    public NamedPipeClientBuilder(string pipeName, IServiceProvider serviceProvider) : base(pipeName, typeof(TCallbackInterface), serviceProvider) { }
-
-    public NamedPipeClientBuilder<TInterface, TCallbackInterface> CallbackInstance(TCallbackInterface singleton)
-    {
-        _callbackInstance = singleton;
-        return this;
-    }
-
-    public NamedPipeClientBuilder<TInterface, TCallbackInterface> TaskScheduler(TaskScheduler taskScheduler)
-    {
-        _taskScheduler = taskScheduler;
-        return this;
-    }
 }

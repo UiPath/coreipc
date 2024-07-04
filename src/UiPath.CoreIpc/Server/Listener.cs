@@ -2,32 +2,36 @@
 
 namespace UiPath.Ipc;
 
-public class ListenerSettings
+public class ListenerSettingsBase
 {
-    public ListenerSettings(string name) => Name = name;
+    public required string Name { get; init; }
+
     public byte ConcurrentAccepts { get; set; } = 5;
     public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
-    public X509Certificate Certificate { get; set; }
-    public string Name { get; }
+    public X509Certificate? Certificate { get; set; }
     public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
-    internal IServiceProvider ServiceProvider { get; set; }
-    internal IDictionary<string, EndpointSettings> Endpoints { get; set; }
+}
+
+public abstract class ListenerSettings : ListenerSettingsBase
+{
+    internal RouterConfig RouterConfig { get; set; }
 }
 abstract class Listener : IDisposable
 {
+    public string Name => Settings.Name;
+    public ILogger? Logger { get; private set; }
+    public ListenerSettings Settings { get; }
+    public int MaxMessageSize { get; }
+
     protected Listener(ListenerSettings settings)
     {
         Settings = settings;
         MaxMessageSize = settings.MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
     }
-    public string Name => Settings.Name;
-    public ILogger Logger { get; private set; }
-    public IServiceProvider ServiceProvider => Settings.ServiceProvider;
-    public ListenerSettings Settings { get; }
-    public int MaxMessageSize { get; }
-    public Task Listen(CancellationToken token)
+
+    public Task Listen(IServiceProvider serviceProvider, CancellationToken token)
     {
-        Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
+        Logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
         if (LogEnabled)
         {
             Log($"Starting listener {Name}...");
@@ -36,18 +40,18 @@ abstract class Listener : IDisposable
         {
             while (!token.IsCancellationRequested)
             {
-                await AcceptConnection(token);
+                await AcceptConnection(serviceProvider, token);
             }
         }));
     }
     protected abstract ServerConnection CreateServerConnection();
-    async Task AcceptConnection(CancellationToken token)
+    async Task AcceptConnection(IServiceProvider serviceProvider, CancellationToken token)
     {
         var serverConnection = CreateServerConnection();
         try
         {
             var network = await serverConnection.AcceptClient(token);
-            serverConnection.Listen(network, token).LogException(Logger, Name);
+            serverConnection.Listen(serviceProvider, network, token).LogException(Logger, Name);
         }
         catch (Exception ex)
         {

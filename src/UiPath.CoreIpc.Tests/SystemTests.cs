@@ -279,7 +279,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         var newGuid = System.Guid.NewGuid();
         MethodInfo method = null;
         using var protectedService = Configure(new ServiceHostBuilder(_serviceProvider))
-            .AddEndpoint(new EndpointSettings<ISystemService>
+            .AddEndpoint(new EndpointSettings<ISystemService>()
             {
                 BeforeCall = async (call, ct) =>
                 {

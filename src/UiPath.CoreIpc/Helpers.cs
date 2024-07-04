@@ -178,9 +178,12 @@ internal static class Validator
     }
 
     public static void Validate<TDerived, TInterface>(ServiceClientBuilder<TDerived, TInterface> builder) where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
-        => Validate(typeof(TInterface), builder.CallbackContract);
+    => Validate(typeof(TInterface));
 
     public static void Validate(params Type[] contracts)
+    => Validate(contracts.AsEnumerable());
+
+    public static void Validate(IEnumerable<Type> contracts)
     {
         foreach (var contract in contracts.Where(c => c != null))
         {

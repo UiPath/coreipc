@@ -1,11 +1,7 @@
 ﻿namespace UiPath.Ipc;
 
-using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
-using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
-
 public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
 {
-    protected readonly IServiceProvider _serviceProvider;
     protected ISerializer _serializer = new IpcJsonSerializer();
     protected TimeSpan _requestTimeout = Timeout.InfiniteTimeSpan;
     protected ILogger _logger;
@@ -13,14 +9,6 @@ public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterfac
     protected BeforeCallHandler _beforeCall;
     protected object _callbackInstance;
     protected TaskScheduler _taskScheduler;
-
-    protected ServiceClientBuilder(Type callbackContract, IServiceProvider serviceProvider)
-    {
-        CallbackContract = callbackContract;
-        _serviceProvider = serviceProvider;
-    }
-
-    internal Type CallbackContract { get; }
 
     public TDerived DontReconnect() => ConnectionFactory((connection, _) => Task.FromResult(connection));
 
@@ -47,34 +35,23 @@ public abstract class ServiceClientBuilder<TDerived, TInterface> where TInterfac
     public TDerived Serializer(ISerializer serializer)
     {
         _serializer = serializer;
-        return (TDerived) this;
+        return (TDerived)this;
     }
 
     public TDerived RequestTimeout(TimeSpan timeout)
     {
         _requestTimeout = timeout;
-        return (TDerived) this;
+        return (TDerived)this;
     }
 
-    protected abstract TInterface BuildCore(EndpointSettings serviceEndpoint);
+    protected abstract TInterface BuildCore();
 
-    public TInterface Build()
-    {
-        if (CallbackContract == null)
-        {
-            return BuildCore(null);
-        }
-        if (_logger == null)
-        {
-            Logger(_serviceProvider);
-        }
-        return BuildCore(new(CallbackContract, _callbackInstance) { Scheduler = _taskScheduler, ServiceProvider = _serviceProvider });
-    }
+    public TInterface Build() => BuildCore();
 }
 
 public readonly struct CallInfo
 {
-    public CallInfo(bool newConnection, MethodInfo method, object[] arguments)
+    public CallInfo(bool newConnection, MethodInfo method, object?[] arguments)
     {
         NewConnection = newConnection;
         Method = method;
@@ -82,5 +59,5 @@ public readonly struct CallInfo
     }
     public bool NewConnection { get; }
     public MethodInfo Method { get; }
-    public object[] Arguments { get; }
+    public object?[] Arguments { get; }
 }

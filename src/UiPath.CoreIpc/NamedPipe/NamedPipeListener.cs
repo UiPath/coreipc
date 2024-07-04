@@ -1,12 +1,18 @@
-﻿using System.IO.Pipes;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.IO.Pipes;
 using System.Security.Principal;
 
 namespace UiPath.Ipc.NamedPipe;
 
 public class NamedPipeSettings : ListenerSettings
 {
-    public NamedPipeSettings(string pipeName) : base(pipeName) { }
-    public Action<PipeSecurity> AccessControl { get; set; }
+    [SetsRequiredMembers]
+    public NamedPipeSettings(string pipeName)
+    {
+        Name = pipeName;
+    }
+
+    public Action<PipeSecurity>? AccessControl { get; set; }
 }
 class NamedPipeListener : Listener
 {
@@ -25,7 +31,7 @@ class NamedPipeListener : Listener
             await _server.WaitForConnectionAsync(cancellationToken);
             return _server;
         }
-        public override void Impersonate(Action action) => _server.RunAsClient(()=>action());
+        public override void Impersonate(Action action) => _server.RunAsClient(() => action());
         protected override void Dispose(bool disposing)
         {
             _server.Dispose();
@@ -50,6 +56,6 @@ class NamedPipeListener : Listener
 }
 public static class NamedPipeServiceExtensions
 {
-    public static ServiceHostBuilder UseNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings) => 
+    public static ServiceHostBuilder UseNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings) =>
         builder.AddListener(new NamedPipeListener(settings));
 }

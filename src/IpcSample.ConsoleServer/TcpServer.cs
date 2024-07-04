@@ -30,8 +30,9 @@ class TcpServer
                 RequestTimeout = TimeSpan.FromSeconds(2),
                 //Certificate = new X509Certificate(data, "1"),
             })
-            .AddEndpoint<IComputingService, IComputingCallback>()
+            .AddEndpoint<IComputingService>()
             .AddEndpoint<ISystemService>()
+            .AllowCallback(typeof(IComputingCallback))
             .ValidateAndBuild();
 
         await await Task.WhenAny(host.RunAsync(), Task.Run(() =>

@@ -11,7 +11,8 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
         _computingCallback = new ComputingCallback { Id = Guid.NewGuid().ToString() };
         _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
         _computingHost = Configure(new ServiceHostBuilder(_serviceProvider))
-            .AddEndpoint<IComputingService, IComputingCallback>()
+            .AddEndpoint<IComputingService>()
+            .AllowCallback(typeof(IComputingCallback))
             .ValidateAndBuild();
         _computingHost.RunAsync(GuiScheduler);
         _computingClient = ComputingClientBuilder(GuiScheduler).ValidateAndBuild();

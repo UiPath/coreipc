@@ -3,15 +3,13 @@ using System.Net.Sockets;
 
 namespace UiPath.Ipc.Tcp;
 
-using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
-using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
 interface ITcpKey : IConnectionKey
 {
     IPEndPoint EndPoint { get; }
 }
 class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterface : class
 {
-    public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall, EndpointSettings serviceEndpoint) : base(serializer, requestTimeout, logger, connectionFactory, beforeCall, serviceEndpoint)
+    public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall) : base(serializer, requestTimeout, logger, connectionFactory, beforeCall)
     {
         EndPoint = endPoint;
         HashCode = EndPoint.GetHashCode();

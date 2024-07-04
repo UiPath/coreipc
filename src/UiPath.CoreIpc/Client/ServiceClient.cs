@@ -1,9 +1,5 @@
 ﻿namespace UiPath.Ipc;
 
-using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
-using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
-using InvokeDelegate = Func<IServiceClient, MethodInfo, object[], object>;
-
 interface IServiceClient : IDisposable
 {
     Task<TResult> Invoke<TResult>(MethodInfo method, object[] args);
@@ -17,20 +13,18 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     private readonly ILogger _logger;
     private readonly ConnectionFactory _connectionFactory;
     private readonly BeforeCallHandler _beforeCall;
-    private readonly EndpointSettings _serviceEndpoint;
     private readonly SemaphoreSlim _connectionLock = new(1);
     private Connection _connection;
-    private Server _server;
+    internal Server? _server;
     private ClientConnection _clientConnection;
 
-    internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall = null, EndpointSettings serviceEndpoint = null)
+    internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall = null)
     {
         _serializer = serializer;
         _requestTimeout = requestTimeout;
         _logger = logger;
         _connectionFactory = connectionFactory;
         _beforeCall = beforeCall;
-        _serviceEndpoint = serviceEndpoint;
     }
     protected int HashCode { get; init; }
     public virtual string Name => _connection?.Name;
@@ -50,14 +44,21 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     {
         _connection?.Dispose();
         _connection = connection;
-        if (alreadyHasServer || _serviceEndpoint == null)
+        if (alreadyHasServer)
         {
             return;
         }
+
         connection.Logger ??= _logger;
-        var endpoints = new ConcurrentDictionary<string, EndpointSettings> { [_serviceEndpoint.Name] = _serviceEndpoint };
-        var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
-        _server = new(listenerSettings, connection);
+
+        _server = new Server(
+            Router.Callbacks,
+            settings: new()
+            {
+                Name = Name,
+                RequestTimeout = _requestTimeout,
+            },
+            connection);
     }
 
     public Task<TResult> Invoke<TResult>(MethodInfo method, object[] args)
@@ -187,7 +188,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             {
                 clientConnection.Dispose();
                 throw;
-            }            
+            }
             OnNewConnection(new(network, _serializer, _logger, Name));
             if (LogEnabled)
             {
@@ -205,7 +206,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
     private void ReuseClientConnection(ClientConnection clientConnection)
     {
         _clientConnection = clientConnection;
-        var alreadyHasServer = clientConnection.Server != null;
+        var alreadyHasServer = clientConnection.Server is not null;
         if (LogEnabled)
         {
             Log(nameof(ReuseClientConnection) + " " + clientConnection);
@@ -215,14 +216,9 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         {
             clientConnection.Server = _server;
         }
-        else if (_serviceEndpoint != null)
+        else
         {
             _server = clientConnection.Server;
-            if (_server.Endpoints.ContainsKey(_serviceEndpoint.Name))
-            {
-                throw new InvalidOperationException($"Duplicate callback proxy instance {Name} <{typeof(TInterface).Name}, {_serviceEndpoint.Contract.Name}>. Consider using a singleton callback proxy.");
-            }
-            _server.Endpoints.Add(_serviceEndpoint.Name, _serviceEndpoint);
         }
     }
 
@@ -248,10 +244,6 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         if (LogEnabled)
         {
             Log($"Dispose {Name}");
-        }
-        if (disposing)
-        {
-            _server?.Endpoints.Remove(_serviceEndpoint.Name);
         }
     }
 
@@ -284,4 +276,65 @@ public class IpcProxy : DispatchProxy, IDisposable
     });
 
     private static object GenericInvoke<T>(IServiceClient serviceClient, MethodInfo method, object[] args) => serviceClient.Invoke<T>(method, args);
+}
+
+public static class Callback
+{
+    private static readonly ConcurrentDictionary<string, CallbackRegistration> Registrations = new();
+
+    internal static bool TryResolveRoute(string endpointName, out Route route)
+    {
+        if (!Registrations.TryGetValue(endpointName, out var registration))
+        {
+            route = default;
+            return false;
+        }
+
+        route = Route.From(registration);
+        return true;
+    }
+
+    public static void Set<TCallback>(IServiceProvider serviceProvider, TaskScheduler? taskScheduler = null, ILoggerFactory? loggerFactory = null, ISerializer? serializer = null) where TCallback : class
+    => Set(
+        typeof(TCallback),
+        service: new ServiceFactory.Injected()
+        {
+            ServiceProvider = serviceProvider,
+            Type = typeof(TCallback)
+        },
+        taskScheduler, loggerFactory, serializer);
+    public static void Set<TCallback>(TCallback instance, TaskScheduler? taskScheduler = null, ILoggerFactory? loggerFactory = null, ISerializer? serializer = null) where TCallback : class
+    => Set(
+        typeof(TCallback),
+        service: new ServiceFactory.Instance()
+        {
+            ServiceInstance = instance,
+            Type = typeof(TCallback)
+        },
+        taskScheduler, loggerFactory, serializer);
+    public static void Set(Type callbackType, IServiceProvider serviceProvider, TaskScheduler? taskScheduler = null, ILoggerFactory? loggerFactory = null, ISerializer? serializer = null)
+    => Set(
+        callbackType,
+        service: new ServiceFactory.Injected()
+        {
+            ServiceProvider = serviceProvider,
+            Type = callbackType
+        },
+        taskScheduler, loggerFactory, serializer);
+
+    private static void Set(Type callbackType, ServiceFactory service, TaskScheduler? taskScheduler = null, ILoggerFactory? loggerFactory = null, ISerializer? serializer = null)
+    {
+        var cr = new CallbackRegistration(callbackType, service, taskScheduler, loggerFactory, serializer);
+        Registrations[callbackType.Name] = cr;
+    }
+
+    internal static bool TryGet(Type callbackType, out CallbackRegistration callbackRegistration)
+    => Registrations.TryGetValue(callbackType.Name, out callbackRegistration);
+
+    internal readonly record struct CallbackRegistration(
+        Type Type, 
+        ServiceFactory Service, 
+        TaskScheduler? Scheduler, 
+        ILoggerFactory? Logger, 
+        ISerializer? Serializer);
 }

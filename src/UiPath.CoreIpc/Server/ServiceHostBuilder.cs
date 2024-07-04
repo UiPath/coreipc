@@ -1,26 +1,33 @@
 ﻿namespace UiPath.Ipc;
 
-using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
+using System;
 public class ServiceHostBuilder
 {
     private readonly List<Listener> _listeners = new();
-    public ServiceHostBuilder(IServiceProvider serviceProvider) => ServiceProvider = serviceProvider;
     internal IServiceProvider ServiceProvider { get; }
     internal Dictionary<string, EndpointSettings> Endpoints { get; } = new();
+    private readonly HashSet<Type> _allowedCallbacks = new();
+
+    public ServiceHostBuilder(IServiceProvider serviceProvider)
+    => ServiceProvider = serviceProvider;
+
     public ServiceHostBuilder AddEndpoint(EndpointSettings settings)
     {
-        settings.ServiceProvider = ServiceProvider;
         Endpoints.Add(settings.Name, settings);
+        return this;
+    }
+    public ServiceHostBuilder AllowCallback(Type callbackType)
+    {
+        _ = _allowedCallbacks.Add(callbackType);
         return this;
     }
     internal ServiceHostBuilder AddListener(Listener listener)
     {
-        listener.Settings.ServiceProvider = ServiceProvider;
-        listener.Settings.Endpoints = Endpoints;
+        listener.Settings.RouterConfig = new(Endpoints);
         _listeners.Add(listener);
         return this;
     }
-    public ServiceHost Build() => new(_listeners, Endpoints);
+    public ServiceHost Build() => new(ServiceProvider, _listeners, Endpoints);
 }
 public static class ServiceHostBuilderExtensions
 {
@@ -32,10 +39,8 @@ public static class ServiceHostBuilderExtensions
         }
         return serviceHostBuilder;
     }
-    public static ServiceHostBuilder AddEndpoint<TContract>(this ServiceHostBuilder serviceHostBuilder, TContract serviceInstance = null) where TContract : class => 
+    public static ServiceHostBuilder AddEndpoint<TContract>(this ServiceHostBuilder serviceHostBuilder, TContract? serviceInstance = null) where TContract : class =>
         serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract>(serviceInstance));
-    public static ServiceHostBuilder AddEndpoint<TContract, TCallbackContract>(this ServiceHostBuilder serviceHostBuilder, TContract serviceInstance = null) where TContract : class where TCallbackContract : class =>
-        serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract, TCallbackContract>(serviceInstance));
 }
 public static class ServiceCollectionExtensions
 {
@@ -45,30 +50,46 @@ public static class ServiceCollectionExtensions
         return services;
     }
 }
+
 public class EndpointSettings
 {
-    private TaskScheduler _scheduler;
-    public EndpointSettings(Type contract, object serviceInstance = null, Type callbackContract = null)
-    {
-        Contract = contract ?? throw new ArgumentNullException(nameof(contract));
-        Name = contract.Name;
-        ServiceInstance = serviceInstance;
-        CallbackContract = callbackContract;
-    }
-    internal string Name { get; }
-    internal TaskScheduler Scheduler { get => _scheduler; set => _scheduler = value ?? TaskScheduler.Default; }
-    internal object ServiceInstance { get; }
-    internal Type Contract { get; }
-    internal Type CallbackContract { get; }
-    internal IServiceProvider ServiceProvider { get; set; }
-    public BeforeCallHandler BeforeCall { get; set; }
-    public void Validate() => Validator.Validate(Contract, CallbackContract);
+    private TaskScheduler? _scheduler;
+    internal void SetScheduler(TaskScheduler? scheduler) => _scheduler = scheduler;
+    internal TaskScheduler Scheduler => _scheduler ?? TaskScheduler.Default;
+
+    public BeforeCallHandler? BeforeCall { get; set; }
+    internal ServiceFactory Service { get; }
+
+    internal string Name => Service.Type.Name;
+
+    public EndpointSettings(Type contractType, object? serviceInstance) : this(
+        serviceInstance is not null
+            ? new ServiceFactory.Instance()
+            {
+                Type = contractType ?? throw new ArgumentNullException(nameof(contractType)),
+                ServiceInstance = serviceInstance
+            }
+            : new ServiceFactory.Deferred()
+            {
+                Type = contractType ?? throw new ArgumentNullException(nameof(contractType)),
+            })
+    { }
+
+    public EndpointSettings(Type contractType, IServiceProvider serviceProvider) : this(
+        new ServiceFactory.Injected()
+        {
+            Type = contractType ?? throw new ArgumentNullException(nameof(contractType)),
+            ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider))
+        })
+    { }
+
+    private protected EndpointSettings(ServiceFactory service) => Service = service;
+
+    public void Validate() => Validator.Validate(Service.Type);
 }
+
 public class EndpointSettings<TContract> : EndpointSettings where TContract : class
 {
-    public EndpointSettings(TContract serviceInstance = null, Type callbackContract = null) : base(typeof(TContract), serviceInstance, callbackContract) { }
-}
-public class EndpointSettings<TContract, TCallbackContract> : EndpointSettings<TContract> where TContract : class where TCallbackContract : class
-{
-    public EndpointSettings(TContract serviceInstance = null) : base(serviceInstance, typeof(TCallbackContract)) { }
+    public EndpointSettings(TContract? serviceInstance = null) : base(typeof(TContract), serviceInstance) { }
+    public EndpointSettings(IServiceProvider serviceProvider) : base(typeof(TContract), serviceProvider) { }
 }

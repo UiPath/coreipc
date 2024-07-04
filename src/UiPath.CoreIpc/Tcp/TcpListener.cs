@@ -1,12 +1,16 @@
-﻿using System.Net;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Net;
 namespace UiPath.Ipc.Tcp;
 
 public class TcpSettings : ListenerSettings
 {
-    public TcpSettings(IPEndPoint endPoint) : base(endPoint.ToString())
+    [SetsRequiredMembers]
+    public TcpSettings(IPEndPoint endPoint)
     {
+        Name = endPoint.ToString();
         EndPoint = endPoint;
     }
+
     public IPEndPoint EndPoint { get; }
 }
 class TcpListener : Listener

@@ -1,10 +1,9 @@
-﻿namespace UiPath.Ipc;
+﻿using System.IO.Pipes;
+
+namespace UiPath.Ipc;
+
 using static TaskCompletionPool<Response>;
 using static IOHelpers;
-using System.IO.Pipes;
-using System.IO;
-using System.Threading;
-using Microsoft.Extensions.Logging;
 
 public sealed class Connection : IDisposable
 {
@@ -20,6 +19,12 @@ public sealed class Connection : IDisposable
     private readonly Action<object> _cancelRequest;
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
+    public Stream Network { get; }
+    public ILogger Logger { get; internal set; }
+    public bool LogEnabled => Logger.Enabled();
+    public string Name { get; }
+    public ISerializer Serializer { get; }
+
     public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
     {
         Network = network;
@@ -34,11 +39,7 @@ public sealed class Connection : IDisposable
         _onCancellation = requestId => OnCancellationReceived((string)requestId);
         _cancelRequest = requestId => CancelRequest((string)requestId);
     }
-    public Stream Network { get; }
-    public ILogger Logger { get; internal set; }
-    public bool LogEnabled => Logger.Enabled();
-    public string Name { get; }
-    public ISerializer Serializer { get; }
+
     public override string ToString() => Name;
     public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
     public Task Listen() => _receiveLoop.Value;

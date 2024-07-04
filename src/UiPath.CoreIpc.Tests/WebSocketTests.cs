@@ -27,15 +27,18 @@ public class SystemWebSocketTests : SystemTests<WebSocketClientBuilder<ISystemSe
 #endif
     string GetEndPoint() => $"://localhost:{_port}/";
 }
-public class ComputingWebSocketsTests : ComputingTests<WebSocketClientBuilder<IComputingService, IComputingCallback>>
+public class ComputingWebSocketsTests : ComputingTests<WebSocketClientBuilder<IComputingService>>
 {
     protected static readonly string ComputingEndPoint = $"://localhost:{1212+GetCount()}/";
     HttpSysWebSocketsListener _listener;
-    protected override WebSocketClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
-        new WebSocketClientBuilder<IComputingService, IComputingCallback>(new("ws"+ComputingEndPoint), _serviceProvider)
-            .RequestTimeout(RequestTimeout)
-            .CallbackInstance(_computingCallback)
-            .TaskScheduler(taskScheduler);
+    protected override WebSocketClientBuilder<IComputingService> ComputingClientBuilder(TaskScheduler taskScheduler = null)
+    {
+        Ipc.Callback.Set<IComputingCallback>(_computingCallback, taskScheduler);
+
+        return new WebSocketClientBuilder<IComputingService>(new Uri("ws" + ComputingEndPoint))
+            .RequestTimeout(RequestTimeout);
+    }
+
     protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder)
     {
         _listener = new HttpSysWebSocketsListener("http" + ComputingEndPoint);

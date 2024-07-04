@@ -2,7 +2,9 @@
 using System.Diagnostics;
 using UiPath.Ipc.WebSockets;
 using Microsoft.Extensions.DependencyInjection;
+
 namespace UiPath.Ipc.Tests;
+
 class WebSocketClient
 {
     static async Task _Main(string[] args)

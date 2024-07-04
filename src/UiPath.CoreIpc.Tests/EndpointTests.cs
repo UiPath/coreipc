@@ -21,26 +21,35 @@ public class EndpointTests : IDisposable
         _host = new ServiceHostBuilder(_serviceProvider)
             .UseNamedPipes(new NamedPipeSettings(PipeName) { RequestTimeout = RequestTimeout })
             .AddEndpoint<IComputingServiceBase>()
-            .AddEndpoint<IComputingService, IComputingCallback>()
-            .AddEndpoint<ISystemService, ISystemCallback>()
+            .AddEndpoint<IComputingService>()
+            .AddEndpoint<ISystemService>()
+            .AllowCallback(typeof(IComputingCallback))
+            .AllowCallback(typeof(ISystemCallback))
             .ValidateAndBuild();
         _host.RunAsync();
         _computingClient = ComputingClientBuilder().ValidateAndBuild();
         _systemClient = CreateSystemService();
     }
     public string PipeName => nameof(EndpointTests)+GetHashCode();
-    private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
-        new NamedPipeClientBuilder<IComputingService, IComputingCallback>(PipeName, _serviceProvider)
+    private NamedPipeClientBuilder<IComputingService> ComputingClientBuilder(TaskScheduler taskScheduler = null)
+    {
+        Ipc.Callback.Set<IComputingCallback>(_computingCallback, taskScheduler);
+
+        return new NamedPipeClientBuilder<IComputingService>(PipeName)
             .AllowImpersonation()
-            .RequestTimeout(RequestTimeout)
-            .CallbackInstance(_computingCallback)
-            .TaskScheduler(taskScheduler);
+            .RequestTimeout(RequestTimeout);
+    }
+
     private ISystemService CreateSystemService() => SystemClientBuilder().ValidateAndBuild();
-    private NamedPipeClientBuilder<ISystemService, ISystemCallback> SystemClientBuilder() =>
-        new NamedPipeClientBuilder<ISystemService, ISystemCallback>(PipeName, _serviceProvider)
-        .CallbackInstance(_systemCallback)
-        .RequestTimeout(RequestTimeout)
-        .AllowImpersonation();
+    private NamedPipeClientBuilder<ISystemService> SystemClientBuilder()
+    {
+        Ipc.Callback.Set<ISystemCallback>(_systemCallback);
+
+        return new NamedPipeClientBuilder<ISystemService>(PipeName)
+            .RequestTimeout(RequestTimeout)
+            .AllowImpersonation();
+    }
+
     public void Dispose()
     {
         ((IDisposable)_computingClient).Dispose();
