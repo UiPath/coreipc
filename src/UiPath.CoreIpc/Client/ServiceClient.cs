@@ -1,80 +1,79 @@
-﻿namespace UiPath.Ipc;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace UiPath.Ipc;
 
 interface IServiceClient : IDisposable
 {
-    Task<TResult> Invoke<TResult>(MethodInfo method, object[] args);
-    Connection Connection { get; }
+    Task<TResult> Invoke<TResult>(MethodInfo method, object?[] args);
+
+    Connection? Connection { get; }
 }
 
-class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterface : class
+class ServiceClient<TInterface> : IServiceClient where TInterface : class
 {
-    private readonly ISerializer _serializer;
-    private readonly TimeSpan _requestTimeout;
-    private readonly ILogger _logger;
-    private readonly ConnectionFactory _connectionFactory;
-    private readonly BeforeCallHandler _beforeCall;
-    private readonly SemaphoreSlim _connectionLock = new(1);
-    private Connection _connection;
-    internal Server? _server;
-    private ClientConnection _clientConnection;
+    private readonly ConnectionKey? _key;
+    private readonly ConnectionConfig _config;
 
-    internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall = null)
-    {
-        _serializer = serializer;
-        _requestTimeout = requestTimeout;
-        _logger = logger;
-        _connectionFactory = connectionFactory;
-        _beforeCall = beforeCall;
-    }
+    private readonly SemaphoreSlim _connectionLock = new(initialCount: 1);
+
+    internal Server? _server;
+    private Connection? _connection;
+    private ClientConnection? _clientConnection;
+
     protected int HashCode { get; init; }
-    public virtual string Name => _connection?.Name;
-    private bool LogEnabled => _logger.Enabled();
-    Connection IServiceClient.Connection => _connection;
+    public virtual string DebugName => _connection?.DebugName ?? "";
+    private bool LogEnabled => _config.Logger.Enabled();
+    Connection? IServiceClient.Connection => _connection;
+
+    internal ServiceClient(ConnectionConfig config, ConnectionKey? key = null)
+    {
+        _config = config;
+        _key = key;
+    }
 
     public TInterface CreateProxy()
     {
         var proxy = DispatchProxy.Create<TInterface, IpcProxy>();
-        (proxy as IpcProxy).ServiceClient = this;
+        (proxy as IpcProxy)!.ServiceClient = this;
         return proxy;
     }
 
     public override int GetHashCode() => HashCode;
 
+    [MemberNotNull(nameof(_connection))]
     private void OnNewConnection(Connection connection, bool alreadyHasServer = false)
     {
         _connection?.Dispose();
         _connection = connection;
+
         if (alreadyHasServer)
         {
             return;
         }
 
-        connection.Logger ??= _logger;
+        connection.Logger ??= _config.Logger;
 
         _server = new Server(
-            Router.Callbacks,
-            settings: new()
-            {
-                Name = Name,
-                RequestTimeout = _requestTimeout,
-            },
-            connection);
+            new Router(_config.CreateCallbackRouterConfig(), _config.ServiceProvider), 
+            _config.RequestTimeout, connection);
     }
 
-    public Task<TResult> Invoke<TResult>(MethodInfo method, object[] args)
+    public Task<TResult> Invoke<TResult>(MethodInfo method, object?[] args)
     {
         var syncContext = SynchronizationContext.Current;
         var defaultContext = syncContext == null || syncContext.GetType() == typeof(SynchronizationContext);
         return defaultContext ? Invoke() : Task.Run(Invoke);
+
         async Task<TResult> Invoke()
         {
             CancellationToken cancellationToken = default;
             TimeSpan messageTimeout = default;
-            TimeSpan clientTimeout = _requestTimeout;
-            Stream uploadStream = null;
-            string[] serializedArguments = null;
+            TimeSpan clientTimeout = _config.RequestTimeout;
+            Stream? uploadStream = null;            
             var methodName = method.Name;
-            SerializeArguments();
+
+            var serializedArguments = SerializeArguments();
+
             var timeoutHelper = new TimeoutHelper(clientTimeout, cancellationToken);
             try
             {
@@ -89,9 +88,9 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 {
                     _connectionLock.Release();
                 }
-                if (_beforeCall != null)
+                if (_config.BeforeCall is not null)
                 {
-                    await _beforeCall(new(newConnection, method, args), token);
+                    await _config.BeforeCall(new CallInfo(newConnection, method, args), token);
                 }
                 var requestId = _connection.NewRequestId();
                 var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds)
@@ -100,14 +99,14 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 };
                 if (LogEnabled)
                 {
-                    Log($"IpcClient calling {methodName} {requestId} {Name}.");
+                    Log($"IpcClient calling {methodName} {requestId} {DebugName}.");
                 }
                 var response = await _connection.RemoteCall(request, token);
                 if (LogEnabled)
                 {
-                    Log($"IpcClient called {methodName} {requestId} {Name}.");
+                    Log($"IpcClient called {methodName} {requestId} {DebugName}.");
                 }
-                return response.Deserialize<TResult>(_serializer);
+                return response.Deserialize<TResult>(_config.Serializer);
             }
             catch (Exception ex)
             {
@@ -118,9 +117,10 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
             {
                 timeoutHelper.Dispose();
             }
-            void SerializeArguments()
+            
+            string[] SerializeArguments()
             {
-                serializedArguments = new string[args.Length];
+                var result = new string[args.Length];
 
                 for (int index = 0; index < args.Length; index++)
                 {
@@ -140,37 +140,48 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                             break;
                     }
 
-                    serializedArguments[index] = _serializer.Serialize(args[index]);
+                    result[index] = _config.Serializer.OrDefault().Serialize(args[index]);
                 }
+
+                return result;
             }
         }
     }
 
+    [MemberNotNull(nameof(_connection))]
     private async Task<bool> EnsureConnection(CancellationToken cancellationToken)
     {
-        if (_connectionFactory != null)
+        if (_config.ConnectionFactory is not null)
         {
-            var externalConnection = await _connectionFactory(_connection, cancellationToken);
-            if (externalConnection != null)
+            var userConnection = await _config.ConnectionFactory(_connection, cancellationToken);
+            if (userConnection is not null)
             {
-                if (_connection == null)
+                if (_connection is null)
                 {
-                    OnNewConnection(externalConnection);
+                    OnNewConnection(userConnection);
                     return true;
                 }
                 return false;
             }
         }
-        if (_clientConnection?.Connected is true)
+
+        if (_clientConnection is { Connected: true })
         {
             return false;
         }
+
         return await Connect(cancellationToken);
     }
 
+    [MemberNotNull(nameof(_clientConnection))]
     private async Task<bool> Connect(CancellationToken cancellationToken)
     {
-        var clientConnection = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
+        if (_key is null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        var clientConnection = await ClientConnectionsRegistry.GetOrCreate(_key, cancellationToken);
         try
         {
             if (clientConnection.Connected)
@@ -189,12 +200,15 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                 clientConnection.Dispose();
                 throw;
             }
-            OnNewConnection(new(network, _serializer, _logger, Name));
+            OnNewConnection(new Connection(network, _config.Serializer, _config.Logger, DebugName));
             if (LogEnabled)
             {
-                Log($"CreateConnection {Name}.");
+                Log($"CreateConnection {DebugName}.");
             }
-            InitializeClientConnection(clientConnection);
+
+            _connection.Listen().LogException(_config.Logger, DebugName);
+            clientConnection.Initialize(_connection, _server);
+            _clientConnection = clientConnection;
         }
         finally
         {
@@ -203,6 +217,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         return true;
     }
 
+    [MemberNotNull(nameof(_clientConnection))]
     private void ReuseClientConnection(ClientConnection clientConnection)
     {
         _clientConnection = clientConnection;
@@ -211,10 +226,10 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         {
             Log(nameof(ReuseClientConnection) + " " + clientConnection);
         }
-        OnNewConnection(clientConnection.Connection, alreadyHasServer);
+        OnNewConnection(clientConnection.Connection!, alreadyHasServer);
         if (!alreadyHasServer)
         {
-            clientConnection.Server = _server;
+            clientConnection.Initialize(clientConnection.Connection, _server);            
         }
         else
         {
@@ -222,15 +237,7 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         }
     }
 
-    public void Log(string message) => _logger.LogInformation(message);
-
-    private void InitializeClientConnection(ClientConnection clientConnection)
-    {
-        _connection.Listen().LogException(_logger, Name);
-        clientConnection.Connection = _connection;
-        clientConnection.Server = _server;
-        _clientConnection = clientConnection;
-    }
+    public void Log(string message) => _config.Logger.OrDefault().LogInformation(message);
 
     public void Dispose()
     {
@@ -243,29 +250,31 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
         _connectionLock.AssertDisposed();
         if (LogEnabled)
         {
-            Log($"Dispose {Name}");
+            Log($"Dispose {DebugName}");
         }
     }
 
-    public override string ToString() => Name;
-
-    public virtual bool Equals(IConnectionKey other) => true;
-
-    public virtual ClientConnection CreateClientConnection() => throw new NotImplementedException();
+    public override string ToString() => DebugName;
 }
 
 public class IpcProxy : DispatchProxy, IDisposable
 {
-    private static readonly MethodInfo InvokeMethod = typeof(IpcProxy).GetStaticMethod(nameof(GenericInvoke));
+    static IpcProxy()
+    {
+        var prototype = GenericInvoke<object>;
+        InvokeMethod = prototype.Method.GetGenericMethodDefinition();
+    }
+
+    private static readonly MethodInfo InvokeMethod;
     private static readonly ConcurrentDictionary<Type, InvokeDelegate> InvokeByType = new();
 
-    internal IServiceClient ServiceClient { get; set; }
+    internal IServiceClient ServiceClient { get; set; } = null!;
 
-    public Connection Connection => ServiceClient.Connection;
+    public Connection? Connection => ServiceClient.Connection;
 
-    protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvoke(targetMethod)(ServiceClient, targetMethod, args);
+    protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) => GetInvoke(targetMethod!)(ServiceClient, targetMethod!, args!);
 
-    public void Dispose() => ServiceClient.Dispose();
+    public void Dispose() => ServiceClient?.Dispose();
 
     public void CloseConnection() => Connection?.Dispose();
 
@@ -275,66 +284,5 @@ public class IpcProxy : DispatchProxy, IDisposable
         return InvokeMethod.MakeGenericDelegate<InvokeDelegate>(resultType);
     });
 
-    private static object GenericInvoke<T>(IServiceClient serviceClient, MethodInfo method, object[] args) => serviceClient.Invoke<T>(method, args);
-}
-
-public static class Callback
-{
-    private static readonly ConcurrentDictionary<string, CallbackRegistration> Registrations = new();
-
-    internal static bool TryResolveRoute(string endpointName, out Route route)
-    {
-        if (!Registrations.TryGetValue(endpointName, out var registration))
-        {
-            route = default;
-            return false;
-        }
-
-        route = Route.From(registration);
-        return true;
-    }
-
-    public static void Set<TCallback>(IServiceProvider serviceProvider, TaskScheduler? taskScheduler = null, ILoggerFactory? loggerFactory = null, ISerializer? serializer = null) where TCallback : class
-    => Set(
-        typeof(TCallback),
-        service: new ServiceFactory.Injected()
-        {
-            ServiceProvider = serviceProvider,
-            Type = typeof(TCallback)
-        },
-        taskScheduler, loggerFactory, serializer);
-    public static void Set<TCallback>(TCallback instance, TaskScheduler? taskScheduler = null, ILoggerFactory? loggerFactory = null, ISerializer? serializer = null) where TCallback : class
-    => Set(
-        typeof(TCallback),
-        service: new ServiceFactory.Instance()
-        {
-            ServiceInstance = instance,
-            Type = typeof(TCallback)
-        },
-        taskScheduler, loggerFactory, serializer);
-    public static void Set(Type callbackType, IServiceProvider serviceProvider, TaskScheduler? taskScheduler = null, ILoggerFactory? loggerFactory = null, ISerializer? serializer = null)
-    => Set(
-        callbackType,
-        service: new ServiceFactory.Injected()
-        {
-            ServiceProvider = serviceProvider,
-            Type = callbackType
-        },
-        taskScheduler, loggerFactory, serializer);
-
-    private static void Set(Type callbackType, ServiceFactory service, TaskScheduler? taskScheduler = null, ILoggerFactory? loggerFactory = null, ISerializer? serializer = null)
-    {
-        var cr = new CallbackRegistration(callbackType, service, taskScheduler, loggerFactory, serializer);
-        Registrations[callbackType.Name] = cr;
-    }
-
-    internal static bool TryGet(Type callbackType, out CallbackRegistration callbackRegistration)
-    => Registrations.TryGetValue(callbackType.Name, out callbackRegistration);
-
-    internal readonly record struct CallbackRegistration(
-        Type Type, 
-        ServiceFactory Service, 
-        TaskScheduler? Scheduler, 
-        ILoggerFactory? Logger, 
-        ISerializer? Serializer);
+    private static object? GenericInvoke<T>(IServiceClient serviceClient, MethodInfo method, object?[] args) => serviceClient.Invoke<T>(method, args);
 }

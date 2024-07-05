@@ -1,84 +1,101 @@
-﻿using System.Security.Cryptography.X509Certificates;
+﻿namespace UiPath.Ipc;
 
-namespace UiPath.Ipc;
-
-public class ListenerSettingsBase
+internal abstract class Listener : IAsyncDisposable
 {
-    public required string Name { get; init; }
+    private const int Megabyte = 1024 * 1024;
 
-    public byte ConcurrentAccepts { get; set; } = 5;
-    public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
-    public X509Certificate? Certificate { get; set; }
-    public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
-}
+    private readonly CancellationTokenSource _cts = new();
+    private readonly TaskCompletionSource<object?> _ready = new();
+    private readonly Task _listeningTask;
+    private readonly Lazy<Task> _disposeTask;
 
-public abstract class ListenerSettings : ListenerSettingsBase
-{
-    internal RouterConfig RouterConfig { get; set; }
-}
-abstract class Listener : IDisposable
-{
-    public string Name => Settings.Name;
-    public ILogger? Logger { get; private set; }
-    public ListenerSettings Settings { get; }
-    public int MaxMessageSize { get; }
+    public string DebugName => Config.DebugName;
+    public int MaxMessageSize => Config.MaxReceivedMessageSizeInMegabytes * Megabyte;
+    public ILogger Logger { get; }
 
-    protected Listener(ListenerSettings settings)
+    public IpcServer Server { get; }
+    public ListenerConfig Config { get; }
+
+    protected Listener(IpcServer server, ListenerConfig listenerConfig)
     {
-        Settings = settings;
-        MaxMessageSize = settings.MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
+        Server = server;
+        Config = listenerConfig;
+
+        Logger = Server.Config.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
+
+        _listeningTask = Listen(_cts.Token);
+        _disposeTask = new(DisposeCore);
+    }
+    public ValueTask DisposeAsync() => new ValueTask(_disposeTask.Value);
+
+    protected void EnsureListening() => _ = _ready.TrySetResult(null);
+
+    public void Log(string message)
+    {
+        if (!Logger.Enabled())
+        {
+            return;
+        }
+
+        Logger.LogInformation(message);
+    }
+    public void LogError(Exception exception, string message)
+    {
+        if (!Logger.Enabled(LogLevel.Error))
+        {
+            return;
+        }
+
+        Logger.LogError(exception, message);
     }
 
-    public Task Listen(IServiceProvider serviceProvider, CancellationToken token)
+    protected abstract ServerConnection CreateServerConnection();
+    protected virtual async Task DisposeCore()
     {
-        Logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
-        if (LogEnabled)
+        Log($"Stopping listener {DebugName}...");
+        _cts.Cancel();
+        try
         {
-            Log($"Starting listener {Name}...");
+            await _listeningTask;
         }
-        return Task.WhenAll(Enumerable.Range(1, Settings.ConcurrentAccepts).Select(async _ =>
+        catch (OperationCanceledException ex) when (ex.CancellationToken == _cts.Token)
         {
-            while (!token.IsCancellationRequested)
+            Log($"Stopping listener {DebugName} threw OCE.");
+        }
+        catch (Exception ex)
+        {
+            LogError(ex, $"Stopping listener {DebugName} failed.");
+        }
+        _cts.Dispose();
+    }
+    private async Task Listen(CancellationToken ct)
+    {
+        await _ready.Task.WaitAsync(ct);
+        Log($"Starting listener {DebugName}...");
+
+        await Task.WhenAll(Enumerable.Range(1, Config.ConcurrentAccepts).Select(async _ =>
+        {
+            while (!ct.IsCancellationRequested)
             {
-                await AcceptConnection(serviceProvider, token);
+                await AcceptConnection(ct);
             }
         }));
     }
-    protected abstract ServerConnection CreateServerConnection();
-    async Task AcceptConnection(IServiceProvider serviceProvider, CancellationToken token)
+    private async Task AcceptConnection(CancellationToken token)
     {
         var serverConnection = CreateServerConnection();
         try
         {
             var network = await serverConnection.AcceptClient(token);
-            serverConnection.Listen(serviceProvider, network, token).LogException(Logger, Name);
+            serverConnection.Listen(network, token).LogException(Logger, DebugName);
         }
         catch (Exception ex)
         {
             serverConnection.Dispose();
             if (!token.IsCancellationRequested)
             {
-                Logger.LogException(ex, Settings.Name);
+                Logger.LogException(ex, Config.DebugName);
             }
         }
     }
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!disposing)
-        {
-            return;
-        }
-        Settings.Certificate?.Dispose();
-    }
-    public void Dispose()
-    {
-        if (LogEnabled)
-        {
-            Log($"Stopping listener {Name}...");
-        }
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
-    public void Log(string message) => Logger.LogInformation(message);
-    public bool LogEnabled => Logger.Enabled();
 }

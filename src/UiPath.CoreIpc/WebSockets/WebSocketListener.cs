@@ -1,34 +1,31 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Net.WebSockets;
+﻿namespace UiPath.Ipc.WebSockets;
 
-namespace UiPath.Ipc.WebSockets;
-
-using Accept = Func<CancellationToken, Task<WebSocket>>;
-
-public class WebSocketSettings : ListenerSettings
+internal sealed class WebSocketListener : Listener
 {
-    [SetsRequiredMembers]
-    public WebSocketSettings(Accept accept)
+    public new WebSocketListenerConfig Config { get; }
+
+    public WebSocketListener(IpcServer server, WebSocketListenerConfig config) : base(server, config)
     {
-        Name = "";
-        Accept = accept;
+        Config = config;
+
+        EnsureListening();
     }
 
-    public Accept Accept { get; }
-}
-class WebSocketListener : Listener
-{
-    public WebSocketListener(ListenerSettings settings) : base(settings){}
     protected override ServerConnection CreateServerConnection() => new WebSocketConnection(this);
-    class WebSocketConnection : ServerConnection
+
+    private sealed class WebSocketConnection : ServerConnection
     {
-        public WebSocketConnection(Listener listener) : base(listener){}
-        public override async Task<Stream> AcceptClient(CancellationToken cancellationToken) => 
-            new WebSocketStream(await ((WebSocketSettings)_listener.Settings).Accept(cancellationToken));
+        private new readonly WebSocketListener _listener;
+
+        public WebSocketConnection(WebSocketListener listener) : base(listener)
+        {
+            _listener = listener;
+        }
+
+        public override async Task<Stream> AcceptClient(CancellationToken cancellationToken)
+        {
+            var webSocket = await _listener.Config.Accept(cancellationToken);
+            return new WebSocketStream(webSocket);
+        }
     }
-}
-public static class WebSocketServiceExtensions
-{
-    public static ServiceHostBuilder UseWebSockets(this ServiceHostBuilder builder, WebSocketSettings settings) => 
-        builder.AddListener(new WebSocketListener(settings));
 }

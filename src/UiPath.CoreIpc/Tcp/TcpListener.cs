@@ -1,51 +1,50 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Net;
-namespace UiPath.Ipc.Tcp;
+﻿namespace UiPath.Ipc.Tcp;
 
-public class TcpSettings : ListenerSettings
+internal class TcpListener : Listener
 {
-    [SetsRequiredMembers]
-    public TcpSettings(IPEndPoint endPoint)
+    private readonly System.Net.Sockets.TcpListener _tcpServer;
+
+    public new TcpListenerConfig Config { get; }
+
+    public TcpListener(IpcServer server, TcpListenerConfig config) : base(server, config)
     {
-        Name = endPoint.ToString();
-        EndPoint = endPoint;
+        Config = config;
+        _tcpServer = new(Config.EndPoint);
+        _tcpServer.Start(backlog: Config.ConcurrentAccepts);
+
+        EnsureListening();
     }
 
-    public IPEndPoint EndPoint { get; }
-}
-class TcpListener : Listener
-{
-    readonly System.Net.Sockets.TcpListener _tcpServer;
-    public TcpListener(ListenerSettings settings) : base(settings)
-    {
-        _tcpServer = new(Settings.EndPoint);
-        _tcpServer.Start(backlog: Settings.ConcurrentAccepts);
-    }
-    public new TcpSettings Settings => (TcpSettings)base.Settings;
     protected override ServerConnection CreateServerConnection() => new TcpServerConnection(this);
-    protected override void Dispose(bool disposing)
+
+    protected override async Task DisposeCore()
     {
-        base.Dispose(disposing);
+        await base.DisposeCore();
         _tcpServer.Stop();
     }
-    Task<System.Net.Sockets.TcpClient> AcceptClient(CancellationToken cancellationToken) => _tcpServer.AcceptTcpClientAsync();
-    class TcpServerConnection : ServerConnection
+
+    private Task<System.Net.Sockets.TcpClient> AcceptClient(CancellationToken cancellationToken) => _tcpServer.AcceptTcpClientAsync();
+
+    private sealed class TcpServerConnection : ServerConnection
     {
-        System.Net.Sockets.TcpClient _tcpClient;
-        public TcpServerConnection(Listener listener) : base(listener){}
+        private new readonly TcpListener _listener;
+        private System.Net.Sockets.TcpClient? _tcpClient;
+
+        public TcpServerConnection(TcpListener listener) : base(listener)
+        {
+            _listener = listener;
+        }
+
         public override async Task<Stream> AcceptClient(CancellationToken cancellationToken)
         {
-            _tcpClient = await ((TcpListener)_listener).AcceptClient(cancellationToken);
+            _tcpClient = await _listener.AcceptClient(cancellationToken);
             return _tcpClient.GetStream();
         }
+
         protected override void Dispose(bool disposing)
         {
             _tcpClient?.Dispose();
             base.Dispose(disposing);
         }
     }
-}
-public static class TcpServiceExtensions
-{
-    public static ServiceHostBuilder UseTcp(this ServiceHostBuilder builder, TcpSettings settings) => builder.AddListener(new TcpListener(settings));
 }

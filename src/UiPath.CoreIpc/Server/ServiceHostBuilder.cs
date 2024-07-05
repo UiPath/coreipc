@@ -1,61 +1,60 @@
 ﻿namespace UiPath.Ipc;
 
 using System;
-public class ServiceHostBuilder
-{
-    private readonly List<Listener> _listeners = new();
-    internal IServiceProvider ServiceProvider { get; }
-    internal Dictionary<string, EndpointSettings> Endpoints { get; } = new();
-    private readonly HashSet<Type> _allowedCallbacks = new();
+//public class ServiceHostBuilder
+//{
+//    private readonly List<Listener> _listeners = new();
+//    internal IServiceProvider ServiceProvider { get; }
+//    internal Dictionary<string, EndpointSettings> Endpoints { get; } = new();
+//    private readonly HashSet<Type> _allowedCallbacks = new();
 
-    public ServiceHostBuilder(IServiceProvider serviceProvider)
-    => ServiceProvider = serviceProvider;
+//    public ServiceHostBuilder(IServiceProvider serviceProvider)
+//    => ServiceProvider = serviceProvider;
 
-    public ServiceHostBuilder AddEndpoint(EndpointSettings settings)
-    {
-        Endpoints.Add(settings.Name, settings);
-        return this;
-    }
-    public ServiceHostBuilder AllowCallback(Type callbackType)
-    {
-        _ = _allowedCallbacks.Add(callbackType);
-        return this;
-    }
-    internal ServiceHostBuilder AddListener(Listener listener)
-    {
-        listener.Settings.RouterConfig = new(Endpoints);
-        _listeners.Add(listener);
-        return this;
-    }
-    public ServiceHost Build() => new(ServiceProvider, _listeners, Endpoints);
-}
-public static class ServiceHostBuilderExtensions
-{
-    public static ServiceHostBuilder AddEndpoints(this ServiceHostBuilder serviceHostBuilder, IEnumerable<EndpointSettings> endpoints)
-    {
-        foreach (var endpoint in endpoints)
-        {
-            serviceHostBuilder.AddEndpoint(endpoint);
-        }
-        return serviceHostBuilder;
-    }
-    public static ServiceHostBuilder AddEndpoint<TContract>(this ServiceHostBuilder serviceHostBuilder, TContract? serviceInstance = null) where TContract : class =>
-        serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract>(serviceInstance));
-}
-public static class ServiceCollectionExtensions
-{
-    public static IServiceCollection AddIpc(this IServiceCollection services)
-    {
-        services.AddSingleton<ISerializer, IpcJsonSerializer>();
-        return services;
-    }
-}
+//    public ServiceHostBuilder AddEndpoint(EndpointSettings settings)
+//    {
+//        Endpoints.Add(settings.Name, settings);
+//        return this;
+//    }
+//    public ServiceHostBuilder AllowCallback(Type callbackType)
+//    {
+//        _ = _allowedCallbacks.Add(callbackType);
+//        return this;
+//    }
+//    internal ServiceHostBuilder AddListener(Listener listener)
+//    {
+//        listener.
+//        listener.Settings.RouterConfig = new(Endpoints);
+//        _listeners.Add(listener);
+//        return this;
+//    }
+//    public ServiceHost Build() => new(ServiceProvider, _listeners, Endpoints);
+//}
+//public static class ServiceHostBuilderExtensions
+//{
+//    public static ServiceHostBuilder AddEndpoints(this ServiceHostBuilder serviceHostBuilder, IEnumerable<EndpointSettings> endpoints)
+//    {
+//        foreach (var endpoint in endpoints)
+//        {
+//            serviceHostBuilder.AddEndpoint(endpoint);
+//        }
+//        return serviceHostBuilder;
+//    }
+//    public static ServiceHostBuilder AddEndpoint<TContract>(this ServiceHostBuilder serviceHostBuilder, TContract? serviceInstance = null) where TContract : class =>
+//        serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract>(serviceInstance));
+//}
+//public static class ServiceCollectionExtensions
+//{
+//    public static IServiceCollection AddIpc(this IServiceCollection services)
+//    {
+//        services.AddSingleton<ISerializer, IpcJsonSerializer>();
+//        return services;
+//    }
+//}
 
 public class EndpointSettings
 {
-    private TaskScheduler? _scheduler;
-    internal void SetScheduler(TaskScheduler? scheduler) => _scheduler = scheduler;
-    internal TaskScheduler Scheduler => _scheduler ?? TaskScheduler.Default;
+    internal TaskScheduler Scheduler { get; set; }
 
     public BeforeCallHandler? BeforeCall { get; set; }
     internal ServiceFactory Service { get; }

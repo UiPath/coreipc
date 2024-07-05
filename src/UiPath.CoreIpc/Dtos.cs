@@ -1,7 +1,9 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Newtonsoft.Json;
+
 namespace UiPath.Ipc;
+
 public class Message
 {
     [JsonIgnore]
@@ -17,30 +19,35 @@ public class Message<TPayload> : Message
     public Message(TPayload payload) => Payload = payload;
     public TPayload Payload { get; }
 }
-record Request(string Endpoint, string Id, string MethodName, string[] Parameters, double TimeoutInSeconds)
+internal record Request(string Endpoint, string Id, string MethodName, string[] Parameters, double TimeoutInSeconds)
 {
-    internal Stream UploadStream { get; set; }
+    public Stream? UploadStream { get; set; }
+
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
-    internal TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
+
+    public  TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
 record CancellationRequest(string RequestId);
-record Response(string RequestId, string Data = null, Error Error = null)
+
+internal record Response(string RequestId, string? Data = null, Error? Error = null)
 {
-    internal Stream DownloadStream { get; set; }
+    public Stream? DownloadStream { get; set; }
+
     public static Response Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());
     public static Response Success(Request request, string data) => new(request.Id, data);
     public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
-    public TResult Deserialize<TResult>(ISerializer serializer)
-    {
+    public TResult Deserialize<TResult>(ISerializer? serializer)
+    {        
         if (Error != null)
         {
             throw new RemoteException(Error);
         }
-        return (TResult)(DownloadStream ?? serializer.Deserialize(Data ?? "", typeof(TResult)));
+
+        return (TResult)(DownloadStream ?? serializer.OrDefault().Deserialize(Data ?? "", typeof(TResult)))!;
     }
 }
 [Serializable]
-public record Error(string Message, string StackTrace, string Type, Error InnerError)
+public record Error(string Message, string StackTrace, string Type, Error? InnerError)
 {
     [return: NotNullIfNotNull("exception")]
     public static Error? FromException(Exception? exception)
@@ -48,12 +55,12 @@ public record Error(string Message, string StackTrace, string Type, Error InnerE
         ? null 
         : new(
             Message: exception.Message, 
-            StackTrace: exception.StackTrace ?? exception.GetBaseException().StackTrace, 
+            StackTrace: exception.StackTrace ?? exception.GetBaseException().StackTrace!, 
             Type: GetExceptionType(exception), 
             InnerError: FromException(exception.InnerException));
     public override string ToString() => new RemoteException(this).ToString();
 
-    private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
+    private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName!;
 }
 [Serializable]
 public class RemoteException : Exception
@@ -65,7 +72,7 @@ public class RemoteException : Exception
     }
     public string Type { get; }
     public override string StackTrace { get; }
-    public new RemoteException InnerException => (RemoteException)base.InnerException;
+    public new RemoteException? InnerException => base.InnerException as RemoteException;
     public override string ToString()
     {
         var result = new StringBuilder();
@@ -89,4 +96,4 @@ public class RemoteException : Exception
     }
     public bool Is<TException>() where TException : Exception => Type == typeof(TException).FullName;
 }
-enum MessageType : byte { Request, Response, CancellationRequest, UploadRequest, DownloadResponse }
+internal enum MessageType : byte { Request, Response, CancellationRequest, UploadRequest, DownloadResponse }

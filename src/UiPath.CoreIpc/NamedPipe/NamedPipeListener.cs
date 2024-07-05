@@ -1,29 +1,30 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Security.Principal;
 
 namespace UiPath.Ipc.NamedPipe;
 
-public class NamedPipeSettings : ListenerSettings
+internal sealed class NamedPipeListener : Listener
 {
-    [SetsRequiredMembers]
-    public NamedPipeSettings(string pipeName)
+    public new NamedPipeListenerConfig Config { get; }
+
+    public NamedPipeListener(IpcServer server, NamedPipeListenerConfig config) : base(server, config)
     {
-        Name = pipeName;
+        Config = config;
+
+        EnsureListening();
     }
 
-    public Action<PipeSecurity>? AccessControl { get; set; }
-}
-class NamedPipeListener : Listener
-{
-    public NamedPipeListener(NamedPipeSettings settings) : base(settings) { }
     protected override ServerConnection CreateServerConnection() => new NamedPipeServerConnection(this);
-    class NamedPipeServerConnection : ServerConnection
+
+    private sealed class NamedPipeServerConnection : ServerConnection
     {
-        readonly NamedPipeServerStream _server;
-        public NamedPipeServerConnection(Listener listener) : base(listener)
+        private readonly NamedPipeServerStream _server;
+        private new readonly NamedPipeListener _listener;
+
+        public NamedPipeServerConnection(NamedPipeListener listener) : base(listener)
         {
-            _server = IOHelpers.NewNamedPipeServerStream(Settings.Name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+            _listener = listener;
+            _server = IOHelpers.NewNamedPipeServerStream(listener.Config.PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
                 PipeTransmissionMode.Byte, PipeOptions.Asynchronous, GetPipeSecurity);
         }
         public override async Task<Stream> AcceptClient(CancellationToken cancellationToken)
@@ -37,13 +38,14 @@ class NamedPipeListener : Listener
             _server.Dispose();
             base.Dispose(disposing);
         }
-        PipeSecurity GetPipeSecurity()
+        PipeSecurity? GetPipeSecurity()
         {
-            var setAccessControl = ((NamedPipeSettings)Settings).AccessControl;
-            if (setAccessControl == null)
+            var setAccessControl = _listener.Config.AccessControl;
+            if (setAccessControl is null)
             {
                 return null;
             }
+
             var pipeSecurity = new PipeSecurity();
             FullControlFor(WellKnownSidType.BuiltinAdministratorsSid);
             FullControlFor(WellKnownSidType.LocalSystemSid);
@@ -53,9 +55,4 @@ class NamedPipeListener : Listener
             void FullControlFor(WellKnownSidType sid) => pipeSecurity.Allow(sid, PipeAccessRights.FullControl);
         }
     }
-}
-public static class NamedPipeServiceExtensions
-{
-    public static ServiceHostBuilder UseNamedPipes(this ServiceHostBuilder builder, NamedPipeSettings settings) =>
-        builder.AddListener(new NamedPipeListener(settings));
 }

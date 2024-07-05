@@ -21,7 +21,7 @@ public static class Helpers
 #endif
     internal static Error ToError(this Exception ex) => new(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace, GetExceptionType(ex), ex.InnerException?.ToError());
     private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
-    internal static bool Enabled(this ILogger logger) => logger != null && logger.IsEnabled(LogLevel.Information);
+    internal static bool Enabled(this ILogger? logger, LogLevel logLevel = LogLevel.Information) => logger is not null && logger.IsEnabled(logLevel);
     [Conditional("DEBUG")]
     internal static void AssertDisposed(this SemaphoreSlim semaphore) => semaphore.AssertFieldNull("m_waitHandle");
     [Conditional("DEBUG")]
@@ -37,13 +37,13 @@ public static class Helpers
     }
     [Conditional("DEBUG")]
     static void AssertFieldNull(this object obj, string field) =>
-        Debug.Assert(obj.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(obj) == null);
+        Debug.Assert(obj.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(obj) is null);
     internal static TDelegate MakeGenericDelegate<TDelegate>(this MethodInfo genericMethod, Type genericArgument) where TDelegate : Delegate =>
         (TDelegate)genericMethod.MakeGenericMethod(genericArgument).CreateDelegate(typeof(TDelegate));
     internal static MethodInfo GetStaticMethod(this Type type, string name) => type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
     internal static MethodInfo GetInterfaceMethod(this Type type, string name)
     {
-        var method = type.GetMethod(name, InstanceFlags) ?? 
+        var method = type.GetMethod(name, InstanceFlags) ??
             type.GetInterfaces().Select(t => t.GetMethod(name, InstanceFlags)).FirstOrDefault(m => m != null) ??
             throw new ArgumentOutOfRangeException(nameof(name), name, $"Method '{name}' not found in interface '{type}'.");
         if (method.IsGenericMethod)
@@ -54,26 +54,26 @@ public static class Helpers
     }
     internal static IEnumerable<MethodInfo> GetInterfaceMethods(this Type type) =>
         type.GetMethods().Concat(type.GetInterfaces().SelectMany(i => i.GetMethods()));
-    internal static object GetDefaultValue(this ParameterInfo parameter) => parameter switch
+    internal static object? GetDefaultValue(this ParameterInfo parameter) => parameter switch
     {
         { HasDefaultValue: false } => null,
         { ParameterType: { IsValueType: true }, DefaultValue: null } => Activator.CreateInstance(parameter.ParameterType),
         _ => parameter.DefaultValue
     };
-    internal static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) => new(dictionary);
-    public static void LogException(this ILogger logger, Exception ex, object tag)
+    internal static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) where TKey : notnull => new(dictionary);
+    public static void LogException(this ILogger? logger, Exception ex, object tag)
     {
         var message = $"{tag} # {ex}";
-        if (logger != null)
+
+        if (logger is not null)
         {
             logger.LogError(message);
+            return;
         }
-        else
-        {
-            Trace.TraceError(message);
-        }
+
+        Trace.TraceError(message);
     }
-    public static void LogException(this Task task, ILogger logger, object tag) => task.ContinueWith(result => logger.LogException(result.Exception, tag), TaskContinuationOptions.NotOnRanToCompletion);
+    public static void LogException(this Task task, ILogger? logger, object tag) => task.ContinueWith(result => logger.LogException(result.Exception!, tag), TaskContinuationOptions.NotOnRanToCompletion);
 }
 public static class IOHelpers
 {
@@ -81,7 +81,7 @@ public static class IOHelpers
     private static readonly RecyclableMemoryStreamManager Pool = new(MaxBytes, MaxBytes);
     internal static MemoryStream GetStream(int size = 0) => Pool.GetStream("IpcMessage", size);
     internal const int HeaderLength = sizeof(int) + 1;
-    internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity> pipeSecurity)
+    internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity?> pipeSecurity)
     {
 #if NET461
         return new(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options, inBufferSize: 0, outBufferSize: 0, pipeSecurity());
@@ -120,7 +120,7 @@ public static class IOHelpers
             {
                 return pipeSecurity;
             }
-            pipeSecurity.Allow(currentIdentity.User, PipeAccessRights.ReadWrite|PipeAccessRights.CreateNewInstance);
+            pipeSecurity.Allow(currentIdentity.User, PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance);
         }
         return pipeSecurity;
     }
@@ -164,18 +164,18 @@ public static class IOHelpers
             await recyclableStream.CopyToAsync(stream, 0, cancellationToken);
         }
     }
-    internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) => 
+    internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) =>
         stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
 }
 internal static class Validator
 {
-    public static void Validate(ServiceHostBuilder serviceHostBuilder)
-    {
-        foreach (var endpointSettings in serviceHostBuilder.Endpoints.Values)
-        {
-            endpointSettings.Validate();
-        }
-    }
+    //public static void Validate(ServiceHostBuilder serviceHostBuilder)
+    //{
+    //    foreach (var endpointSettings in serviceHostBuilder.Endpoints.Values)
+    //    {
+    //        endpointSettings.Validate();
+    //    }
+    //}
 
     public static void Validate<TDerived, TInterface>(ServiceClientBuilder<TDerived, TInterface> builder) where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
     => Validate(typeof(TInterface));

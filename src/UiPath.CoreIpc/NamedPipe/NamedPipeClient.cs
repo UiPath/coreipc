@@ -3,46 +3,39 @@ using System.Security.Principal;
 
 namespace UiPath.Ipc.NamedPipe;
 
-interface INamedPipeKey : IConnectionKey
+internal class NamedPipeClient<TInterface> : ServiceClient<TInterface> where TInterface : class
 {
-    string ServerName { get; }
-    string PipeName { get; }
-    bool AllowImpersonation { get; }
+    private readonly NamedPipeConnectionKey _key;
+
+    public NamedPipeClient(NamedPipeConnectionKey key, ConnectionConfig config) : base(config, key)
+    {
+        _key = key;
+    }
+
+    public override string DebugName => base.DebugName ?? _key.PipeName;
 }
 
-class NamedPipeClient<TInterface> : ServiceClient<TInterface>, INamedPipeKey where TInterface : class
+internal class NamedPipeClientConnection : ClientConnection
 {
-    public NamedPipeClient(string serverName, string pipeName, ISerializer serializer, TimeSpan requestTimeout, bool allowImpersonation, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall)
-        : base(serializer, requestTimeout, logger, connectionFactory, beforeCall)
+    private readonly NamedPipeConnectionKey _key;
+    private NamedPipeClientStream? _pipe;
+
+    public NamedPipeClientConnection(NamedPipeConnectionKey key) : base(key)
     {
-        ServerName = serverName;
-        PipeName = pipeName;
-        AllowImpersonation = allowImpersonation;
-        HashCode = (serverName, pipeName, allowImpersonation).GetHashCode();
+        _key = key;
     }
-    public override string Name => base.Name ?? PipeName;
-    public string ServerName { get; }
-    public string PipeName { get; }
-    public bool AllowImpersonation { get; }
-    public override bool Equals(IConnectionKey other) => other == this || (other is INamedPipeKey otherClient &&
-        otherClient.ServerName == ServerName && otherClient.PipeName == PipeName && otherClient.AllowImpersonation == AllowImpersonation && base.Equals(other));
-    public override ClientConnection CreateClientConnection() => new NamedPipeClientConnection(this);
-    class NamedPipeClientConnection : ClientConnection
+    protected override void Dispose(bool disposing)
     {
-        private NamedPipeClientStream _pipe;
-        public NamedPipeClientConnection(IConnectionKey connectionKey) : base(connectionKey) { }
-        public override bool Connected => _pipe?.IsConnected is true;
-        protected override void Dispose(bool disposing)
-        {
-            _pipe?.Dispose();
-            base.Dispose(disposing);
-        }
-        public override async Task<Stream> Connect(CancellationToken cancellationToken)
-        {
-            var key = (INamedPipeKey)ConnectionKey;
-            _pipe = new(key.ServerName, key.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous, key.AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
-            await _pipe.ConnectAsync(cancellationToken);
-            return _pipe;
-        }
+        _pipe?.Dispose();
+        base.Dispose(disposing);
+    }
+
+    public override bool Connected => _pipe is { IsConnected: true };
+
+    public override async Task<Stream> Connect(CancellationToken cancellationToken)
+    {
+        _pipe = new(_key.ServerName, _key.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous, _key.AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
+        await _pipe.ConnectAsync(cancellationToken);
+        return _pipe;
     }
 }

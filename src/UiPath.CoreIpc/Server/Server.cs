@@ -10,7 +10,7 @@ using static CancellationTokenSourcePool;
 internal class Server
 {
     private static readonly MethodInfo GetResultMethod = typeof(Server).GetStaticMethod(nameof(GetTaskResultImpl));
-    private static readonly ConcurrentDictionary<(Type, string), Method> Methods = new();
+    private static readonly ConcurrentDictionary<MethodKey, Method> Methods = new();
     private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
 
     private readonly Router _router;
@@ -18,10 +18,18 @@ internal class Server
     private readonly IClient? _client;
     private readonly ConcurrentDictionary<string, PooledCancellationTokenSource> _requests = new();
 
-    public Server(Router router, ListenerSettingsBase settings, Connection connection, IClient? client = null)
+    private readonly TimeSpan _requestTimeout;
+
+    private ILogger? Logger => _connection.Logger;
+    private bool LogEnabled => Logger.Enabled();
+    public ISerializer Serializer => _connection.Serializer.OrDefault();
+    public string DebugName => _connection.DebugName;
+
+
+    public Server(Router router, TimeSpan requestTimeout, Connection connection, IClient? client = null)
     {
         _router = router;
-        Settings = settings;
+        _requestTimeout = requestTimeout;
         _connection = connection;
         _client = client;
         connection.RequestReceived += OnRequestReceived;
@@ -30,7 +38,7 @@ internal class Server
         {
             if (LogEnabled)
             {
-                Log($"Server {Name} closed.");
+                Log($"Server {DebugName} closed.");
             }
             foreach (var requestId in _requests.Keys)
             {
@@ -40,12 +48,13 @@ internal class Server
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogException(ex, $"{Name}");
+                    Logger.OrDefault().LogException(ex, $"{DebugName}");
                 }
             }
         };
     }
-    void CancelRequest(string requestId)
+
+    private void CancelRequest(string requestId)
     {
         if (_requests.TryRemove(requestId, out var cancellation))
         {
@@ -53,27 +62,28 @@ internal class Server
             cancellation.Return();
         }
     }
+
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    async ValueTask OnRequestReceived(Request request)
+    private async ValueTask OnRequestReceived(Request request)
     {
         try
         {
             if (LogEnabled)
             {
-                Log($"{Name} received request {request}");
+                Log($"{DebugName} received request {request}");
             }
             if (!_router.TryResolve(request.Endpoint, out var route))
             {
-                await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{Name} cannot find endpoint {request.Endpoint}"));
+                await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{DebugName} cannot find endpoint {request.Endpoint}"));
                 return;
             }
             var method = GetMethod(route.Service.Type, request.MethodName);
             Response? response = null;
             var requestCancellation = Rent();
             _requests[request.Id] = requestCancellation;
-            var timeout = request.GetTimeout(Settings.RequestTimeout);
+            var timeout = request.GetTimeout(_requestTimeout);
             var timeoutHelper = new TimeoutHelper(timeout, requestCancellation.Token);
             try
             {
@@ -81,7 +91,7 @@ internal class Server
                 response = await HandleRequest(method, route, request, token);
                 if (LogEnabled)
                 {
-                    Log($"{Name} sending response for {request}");
+                    Log($"{DebugName} sending response for {request}");
                 }
                 await SendResponse(response, token);
             }
@@ -96,7 +106,7 @@ internal class Server
         }
         catch (Exception ex)
         {
-            Logger.LogException(ex, $"{Name} {request}");
+            Logger.LogException(ex, $"{DebugName} {request}");
         }
         if (_requests.TryRemove(request.Id, out var cancellation))
         {
@@ -105,18 +115,19 @@ internal class Server
     }
     ValueTask OnError(Request request, Exception ex)
     {
-        Logger.LogException(ex, $"{Name} {request}");
+        Logger.LogException(ex, $"{DebugName} {request}");
         return SendResponse(Response.Fail(request, ex), default);
     }
+
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-    async ValueTask<Response> HandleRequest(Method method, Route route, Request request, CancellationToken cancellationToken)
+    private async ValueTask<Response> HandleRequest(Method method, Route route, Request request, CancellationToken cancellationToken)
     {
         var arguments = GetArguments();
 
         var callInfo = new CallInfo(newConnection: false, method.MethodInfo, arguments);
-        await route.MaybeBeforeCall(callInfo, cancellationToken);
+        await route.BeforeCall.OrDefault()(callInfo, cancellationToken);
 
         object service;
         using (route.Service.Get(out service))
@@ -166,7 +177,7 @@ internal class Server
             return allArguments;
             void Deserialize()
             {
-                object argument;
+                object? argument;
                 for (int index = 0; index < requestParametersLength; index++)
                 {
                     var parameterType = parameters[index].ParameterType;
@@ -207,36 +218,49 @@ internal class Server
             }
         }
     }
-    private void Log(string message) => _connection.Log(message);
-    private ILogger Logger => _connection.Logger;
-    private bool LogEnabled => Logger.Enabled();
-    private ListenerSettingsBase Settings { get; }
-    public ISerializer Serializer => _connection.Serializer;
-    public string Name => _connection.Name;
-    ValueTask SendResponse(Response response, CancellationToken responseCancellation) => _connection.Send(response, responseCancellation);
-    static object GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
-    static object GetTaskResult(Type taskType, Task task) =>
-        GetTaskResultByType.GetOrAdd(taskType.GenericTypeArguments[0],
-            resultType => GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>(resultType))(task);
-    static Method GetMethod(Type contract, string methodName) => Methods.GetOrAdd((contract, methodName),
-        ((Type contract, string methodName) key) => new(key.contract.GetInterfaceMethod(key.methodName)));
-    readonly struct Method
+
+    private void Log(string message) => Logger.OrDefault().LogInformation(message);
+
+    private ValueTask SendResponse(Response response, CancellationToken responseCancellation) => _connection.Send(response, responseCancellation);
+
+    private static object? GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
+
+    private static object GetTaskResult(Type taskType, Task task)
+    => GetTaskResultByType.GetOrAdd(
+        taskType.GenericTypeArguments[0],
+        GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>)(task);
+
+    private static Method GetMethod(Type contract, string methodName)
+    => Methods.GetOrAdd(new(contract, methodName), Method.FromKey);
+
+    private readonly record struct MethodKey(Type Contract, string MethodName);
+
+    private readonly struct Method
     {
-        static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
-        static readonly ParameterExpression TokenParameter = Parameter(typeof(CancellationToken), "cancellationToken");
-        static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
-        readonly MethodExecutor _executor;
+        public static Method FromKey(MethodKey key)
+        {
+            var methodInfo = key.Contract.GetInterfaceMethod(key.MethodName);
+            return new(methodInfo);
+        }
+
+        private static readonly ParameterExpression TargetParameter = Parameter(typeof(object), "target");
+        private static readonly ParameterExpression TokenParameter = Parameter(typeof(CancellationToken), "cancellationToken");
+        private static readonly ParameterExpression ParametersParameter = Parameter(typeof(object[]), "parameters");
+
+        private readonly MethodExecutor _executor;
         public readonly MethodInfo MethodInfo;
         public readonly ParameterInfo[] Parameters;
-        public readonly object[] Defaults;
+        public readonly object?[] Defaults;
+
         public Type ReturnType => MethodInfo.ReturnType;
-        public Method(MethodInfo method)
+
+        private Method(MethodInfo method)
         {
             // https://github.com/dotnet/aspnetcore/blob/3f620310883092905ed6f13d784c908b5f4a9d7e/src/Shared/ObjectMethodExecutor/ObjectMethodExecutor.cs#L156
             var parameters = method.GetParameters();
             var parametersLength = parameters.Length;
             var callParameters = new Expression[parametersLength];
-            var defaults = new object[parametersLength];
+            var defaults = new object?[parametersLength];
             for (int index = 0; index < parametersLength; index++)
             {
                 var parameter = parameters[index];
@@ -244,7 +268,7 @@ internal class Server
                 callParameters[index] = parameter.ParameterType == typeof(CancellationToken) ? TokenParameter :
                     Convert(ArrayIndex(ParametersParameter, Constant(index, typeof(int))), parameter.ParameterType);
             }
-            var instanceCast = Convert(TargetParameter, method.DeclaringType);
+            var instanceCast = Convert(TargetParameter, method.DeclaringType!);
             var methodCall = Call(instanceCast, method, callParameters);
             var lambda = Lambda<MethodExecutor>(methodCall, TargetParameter, ParametersParameter, TokenParameter);
             _executor = lambda.Compile();
@@ -252,7 +276,9 @@ internal class Server
             Parameters = parameters;
             Defaults = defaults;
         }
+
         public Task Invoke(object service, object?[] arguments, CancellationToken cancellationToken) => _executor.Invoke(service, arguments, cancellationToken);
-        public override string ToString() => MethodInfo.ToString();
+
+        public override string ToString() => MethodInfo.ToString()!;
     }
 }

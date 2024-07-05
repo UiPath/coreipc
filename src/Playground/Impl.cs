@@ -5,14 +5,25 @@ namespace Playground;
 
 internal static class Impl
 {
-    public sealed class Server : Contracts.IServerOperations
+    public sealed class ClientRegistry
     {
-        private readonly ConcurrentDictionary<Contracts.IClientOperations, object?> _clients = new();
+        private readonly ConcurrentDictionary<ClientPair, object?> _clients = new();
 
+        public bool Add(ClientPair pair) => _clients.TryAdd(pair, value: null);
+
+        public IReadOnlyList<ClientPair> All() => _clients.Keys.ToArray();
+    }
+
+    public readonly record struct ClientPair(Contracts.IClientOperations Client, Contracts.IClientOperations2 Client2);
+
+    public sealed class Server(ClientRegistry clients) : Contracts.IServerOperations
+    {
         public async Task<bool> Register(Message? m = null)
         {
-            var client = m!.GetCallback<Contracts.IClientOperations>();
-            var added = _clients.TryAdd(client, value: null);
+            var clientOps = m!.GetCallback<Contracts.IClientOperations>();
+            var clientOps2 = m.GetCallback<Contracts.IClientOperations2>();
+
+            var added = clients.Add(new(clientOps, clientOps2));
 
             if (added)
             {
@@ -28,20 +39,26 @@ internal static class Impl
 
         public async Task<bool> Broadcast(string text)
         {
-            var clients = _clients.Keys.ToArray();
+            var pairs = clients.All();
 
-            foreach (var client in clients)
+            foreach (var pair in pairs)
             {
-                _ = await client.Greet(text);
+                var time = await pair.Client2.GetTheTime();
+                _ = await pair.Client.Greet($"{text} - You said the time was: {time}");
             }
 
             return true;
         }
     }
 
-    public sealed class Client(Func<string, Task<bool>> greet) : Contracts.IClientOperations
+    public sealed class ClientOperations() : Contracts.IClientOperations
     {
-        public Task<bool> Greet(string text) => greet(text);
+        public async Task<bool> Greet(string text)
+        {
+            Console.WriteLine($"Scheduler: {TaskScheduler.Current.GetType().Name}");
+            Console.WriteLine($"Server says: {text}");
+            return true;
+        }
     }
 
     public sealed class Client2 : Contracts.IClientOperations2

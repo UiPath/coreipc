@@ -1,4 +1,5 @@
-﻿using System.IO.Pipes;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.IO.Pipes;
 
 namespace UiPath.Ipc;
 
@@ -20,18 +21,21 @@ public sealed class Connection : IDisposable
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
     public Stream Network { get; }
-    public ILogger Logger { get; internal set; }
-    public bool LogEnabled => Logger.Enabled();
-    public string Name { get; }
-    public ISerializer Serializer { get; }
+    public ILogger? Logger { get; internal set; }
 
-    public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
+    [MemberNotNullWhen(returnValue: true, nameof(Logger))]
+    public bool LogEnabled => Logger.Enabled();
+
+    public string DebugName { get; }
+    public ISerializer? Serializer { get; }
+
+    public Connection(Stream network, ISerializer? serializer, ILogger? logger, string debugName, int maxMessageSize = int.MaxValue)
     {
         Network = network;
         _nestedStream = new NestedStream(network, 0);
         Serializer = serializer;
         Logger = logger;
-        Name = $"{name} {GetHashCode()}";
+        DebugName = $"{debugName} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
         _receiveLoop = new(ReceiveLoop);
         _onResponse = response => OnResponseReceived((Response)response);
@@ -40,7 +44,7 @@ public sealed class Connection : IDisposable
         _cancelRequest = requestId => CancelRequest((string)requestId);
     }
 
-    public override string ToString() => Name;
+    public override string ToString() => DebugName;
     public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
     public Task Listen() => _receiveLoop.Value;
     internal event Func<Request, ValueTask> RequestReceived;
@@ -241,11 +245,11 @@ public sealed class Connection : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogException(ex, $"{nameof(ReceiveLoop)} {Name}");
+            Logger.LogException(ex, $"{nameof(ReceiveLoop)} {DebugName}");
         }
         if (LogEnabled)
         {
-            Log($"{nameof(ReceiveLoop)} {Name} finished.");
+            Log($"{nameof(ReceiveLoop)} {DebugName} finished.");
         }
         Dispose();
         return;
@@ -325,7 +329,7 @@ public sealed class Connection : IDisposable
         try
         {
             stream.Position = HeaderLength;
-            Serializer.Serialize(value, stream);
+            Serializer.OrDefault().Serialize(value, stream);
             return stream;
         }
         catch
@@ -334,7 +338,7 @@ public sealed class Connection : IDisposable
             throw;
         }
     }
-    private ValueTask<T> Deserialize<T>() => Serializer.DeserializeAsync<T>(_nestedStream);
+    private ValueTask<T?> Deserialize<T>() => Serializer.OrDefault().DeserializeAsync<T>(_nestedStream);
     private void OnCancellationReceived(string requestId)
     {
         try
@@ -346,7 +350,7 @@ public sealed class Connection : IDisposable
             Log(ex);
         }
     }
-    private void Log(Exception ex) => Logger.LogException(ex, Name);
+    private void Log(Exception ex) => Logger.LogException(ex, DebugName);
     private ValueTask OnRequestReceived(Request request)
     {
         try
@@ -365,7 +369,7 @@ public sealed class Connection : IDisposable
         {
             if (LogEnabled)
             {
-                Log($"Received response for request {response.RequestId} {Name}.");
+                Log($"Received response for request {response.RequestId} {DebugName}.");
             }
             if (_requests.TryRemove(response.RequestId, out var completionSource))
             {
@@ -377,5 +381,6 @@ public sealed class Connection : IDisposable
             Log(ex);
         }
     }
-    public void Log(string message) => Logger.LogInformation(message);
+
+    private void Log(string message) => Logger.LogInformation(message);
 }

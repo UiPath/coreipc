@@ -1,40 +1,39 @@
-﻿using System.Net;
-using System.Net.Sockets;
+﻿using System.Net.Sockets;
 
 namespace UiPath.Ipc.Tcp;
 
-interface ITcpKey : IConnectionKey
+class TcpClient<TInterface> : ServiceClient<TInterface> where TInterface : class
 {
-    IPEndPoint EndPoint { get; }
+    private readonly TcpConnectionKey _key;
+
+    public TcpClient(TcpConnectionKey key, ConnectionConfig config) : base(config, key)
+    => _key = key;
+
+    public override string DebugName => base.DebugName ?? _key.EndPoint.ToString();
 }
-class TcpClient<TInterface> : ServiceClient<TInterface>, ITcpKey where TInterface : class
+
+internal sealed class TcpClientConnection : ClientConnection
 {
-    public TcpClient(IPEndPoint endPoint, ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, BeforeCallHandler beforeCall) : base(serializer, requestTimeout, logger, connectionFactory, beforeCall)
+    private readonly TcpConnectionKey _key;
+    private TcpClient? _tcpClient;
+
+    public TcpClientConnection(TcpConnectionKey key) : base(key)
     {
-        EndPoint = endPoint;
-        HashCode = EndPoint.GetHashCode();
+        _key = key;
     }
-    public override string Name => base.Name ?? EndPoint.ToString();
-    public IPEndPoint EndPoint { get; }
-    public override bool Equals(IConnectionKey other) => other == this || (other is ITcpKey otherClient && EndPoint.Equals(otherClient.EndPoint) && 
-        base.Equals(other));
-    public override ClientConnection CreateClientConnection() => new TcpClientConnection(this);
-    class TcpClientConnection : ClientConnection
+
+    public override bool Connected => _tcpClient is { Client: { Connected: true } };
+
+    protected override void Dispose(bool disposing)
     {
-        private TcpClient _tcpClient;
-        public TcpClientConnection(IConnectionKey connectionKey) : base(connectionKey) {}
-        public override bool Connected => _tcpClient?.Client?.Connected is true;
-        protected override void Dispose(bool disposing)
-        {
-            _tcpClient?.Dispose();
-            base.Dispose(disposing);
-        }
-        public override async Task<Stream> Connect(CancellationToken cancellationToken)
-        {
-            _tcpClient = new();
-            var endPoint = ((ITcpKey)ConnectionKey).EndPoint;
-            await _tcpClient.ConnectAsync(endPoint.Address, endPoint.Port, cancellationToken);
-            return _tcpClient.GetStream();
-        }
+        _tcpClient?.Dispose();
+        base.Dispose(disposing);
+    }
+
+    public override async Task<Stream> Connect(CancellationToken cancellationToken)
+    {
+        _tcpClient = new();        
+        await _tcpClient.ConnectAsync(_key.EndPoint.Address, _key.EndPoint.Port, cancellationToken);
+        return _tcpClient.GetStream();
     }
 }

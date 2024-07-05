@@ -1,30 +1,21 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
-
-namespace UiPath.Ipc;
+﻿namespace UiPath.Ipc;
 
 internal readonly record struct RouterConfig(IReadOnlyDictionary<string, EndpointSettings> Endpoints);
 
 internal readonly struct Router
 {
-    public static readonly Router Callbacks = default;
-
+    private readonly RouterConfig? _config; // nullable for the case when the constructor is bypassed
     private readonly IServiceProvider? _serviceProvider;
-    private readonly RouterConfig? _config;
 
-    public Router(IServiceProvider serviceProvider, RouterConfig config)
+    public Router(RouterConfig config, IServiceProvider? serviceProvider)
     {
-        _serviceProvider = serviceProvider;
         _config = config;
+        _serviceProvider = serviceProvider;
     }
 
     public bool TryResolve(string endpoint, out Route route)
     {
-        if (_config is null)
-        {
-            return Callback.TryResolveRoute(endpoint, out route);
-        }
-
-        if (_serviceProvider is null)
+        if (_config is null) /// in case <see cref="Router"/> was allocated as default, bypassing the constructor
         {
             throw new InvalidOperationException();
         }
@@ -35,7 +26,7 @@ internal readonly struct Router
             return false;
         }
 
-        route = Route.From(_serviceProvider!, endpointSettings);
+        route = Route.From(_serviceProvider, endpointSettings);
         return true;
     }
 }
@@ -46,7 +37,7 @@ internal abstract record ServiceFactory
 
     public abstract IDisposable? Get(out object service);
 
-    public virtual ServiceFactory WithProvider(IServiceProvider serviceProvider) => this;
+    public virtual ServiceFactory WithProvider(IServiceProvider? serviceProvider) => this;
 
     public sealed record Injected : ServiceFactory
     {
@@ -59,8 +50,15 @@ internal abstract record ServiceFactory
             return scope;
         }
 
-        public override ServiceFactory WithProvider(IServiceProvider serviceProvider)
-        => this with { ServiceProvider = serviceProvider };
+        public override ServiceFactory WithProvider(IServiceProvider? serviceProvider)
+        {
+            if (serviceProvider is null)
+            {
+                throw new InvalidOperationException();
+            }
+
+            return this with { ServiceProvider = serviceProvider };
+        }
     }
 
     public sealed record Instance : ServiceFactory
@@ -81,43 +79,38 @@ internal abstract record ServiceFactory
             throw new NotSupportedException();
         }
 
-        public override ServiceFactory WithProvider(IServiceProvider serviceProvider)
-        => new Injected()
+        public override ServiceFactory WithProvider(IServiceProvider? serviceProvider)
         {
-            Type = Type,
-            ServiceProvider = serviceProvider
-        };
+            if (serviceProvider is null)
+            {
+                throw new InvalidOperationException();
+            }
+
+            return new Injected()
+            {
+                Type = Type,
+                ServiceProvider = serviceProvider
+            };
+        }
     }
 }
 
 internal readonly struct Route
 {
-    public static Route From(IServiceProvider serviceProvider, EndpointSettings endpointSettings)
+    public static Route From(IServiceProvider? serviceProvider, EndpointSettings endpointSettings)
     => new Route()
     {
         Service = endpointSettings.Service.WithProvider(serviceProvider),
         BeforeCall = endpointSettings.BeforeCall,
         Scheduler = endpointSettings.Scheduler,
-        LoggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>,
-        Serializer = serviceProvider.GetRequiredService<ISerializer>
-    };
-
-    public static Route From(Callback.CallbackRegistration callbackRegistration)
-    => new()
-    {
-        Service = callbackRegistration.Service,
-        BeforeCall = null,
-        Scheduler = callbackRegistration.Scheduler ?? TaskScheduler.Default,
-        LoggerFactory = () => callbackRegistration.Logger ?? NullLoggerFactory.Instance,
-        Serializer = () => callbackRegistration.Serializer
+        LoggerFactory = serviceProvider.MaybeGetFactory<ILoggerFactory>(),
+        Serializer = serviceProvider.MaybeGetFactory<ISerializer>()
     };
 
     public required ServiceFactory Service { get; init; }
-    public required BeforeCallHandler? BeforeCall { get; init; }
-    public required TaskScheduler Scheduler { get; init; }
-    public Func<ILoggerFactory> LoggerFactory { get; init; }
-    public Func<ISerializer?> Serializer { get; init; }
 
-    public Task MaybeBeforeCall(CallInfo callInfo, CancellationToken ct)
-    => BeforeCall?.Invoke(callInfo, ct) ?? Task.CompletedTask;
+    public TaskScheduler Scheduler { get; init; }
+    public BeforeCallHandler? BeforeCall { get; init; }
+    public Func<ILoggerFactory>? LoggerFactory { get; init; }
+    public Func<ISerializer>? Serializer { get; init; }
 }
