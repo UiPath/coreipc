@@ -57,6 +57,21 @@ public sealed record ConnectionConfig : EndpointConfig
         }
     }
 
+    internal ILogger? GetLogger(string name)
+    {
+        if (Logger is not null)
+        {
+            return Logger;
+        }
+
+        if (ServiceProvider?.GetService<ILoggerFactory>() is not { } loggerFactory)
+        {
+            return null;
+        }
+
+        return loggerFactory.CreateLogger(name);
+    }
+
     internal override RouterConfig CreateCallbackRouterConfig()
     {
         var endpoints = Callbacks?.ToDictionary(
@@ -91,11 +106,24 @@ public abstract record ConnectionKey
 {
     internal virtual ConnectionConfig DefaultConfig { get; } = ConnectionConfig.Default;
 
-    internal abstract TProxy Connect<TProxy>(ConnectionConfig config) where TProxy : class;
+    internal TProxy Connect<TProxy>(ConnectionConfig config) where TProxy : class => new ServiceClient<TProxy>(config, this).CreateProxy();
 
-    internal abstract ClientConnection CreateClientConnection();
+    internal protected virtual string GetDebugName() => ToString();
+
+    internal protected abstract ClientConnection CreateClientConnection();
 }
-public sealed record NamedPipeConnectionKey : ConnectionKey
+
+public abstract record ConnectionKey<TClientConnection> : ConnectionKey where TClientConnection : ClientConnection, new()
+{
+    protected internal override ClientConnection CreateClientConnection()
+    {
+        var result = new TClientConnection { ConnectionKey = this };
+        result.Initialize();
+        return result;
+    }
+}
+
+public sealed record NamedPipeConnectionKey : ConnectionKey<NamedPipeClientConnection>
 {
     public string PipeName { get; }
     public string ServerName { get; }
@@ -107,28 +135,17 @@ public sealed record NamedPipeConnectionKey : ConnectionKey
         ServerName = serverName ?? throw new ArgumentNullException(nameof(serverName));
         AllowImpersonation = allowImpersonation;
     }
-
-    internal override TProxy Connect<TProxy>(ConnectionConfig config) => new NamedPipeClient<TProxy>(this, config).CreateProxy();
-
-    internal override ClientConnection CreateClientConnection() => new NamedPipeClientConnection(this);
 }
-public sealed record TcpConnectionKey : ConnectionKey
+public sealed record TcpConnectionKey : ConnectionKey<TcpClientConnection>
 {
     public IPEndPoint EndPoint { get; }
 
     public TcpConnectionKey(IPEndPoint endPoint) => EndPoint = endPoint ?? throw new ArgumentNullException(nameof(endPoint));
-
-    internal override TProxy Connect<TProxy>(ConnectionConfig config) => new TcpClient<TProxy>(this, config).CreateProxy();
-
-    internal override ClientConnection CreateClientConnection() => new TcpClientConnection(this);
 }
-public sealed record WebSocketConnectionKey : ConnectionKey
+
+public sealed record WebSocketConnectionKey : ConnectionKey<WebSocketClientConnection>
 {
     public Uri Uri { get; }
 
     public WebSocketConnectionKey(Uri uri) => Uri = uri ?? throw new ArgumentNullException(nameof(uri));
-
-    internal override TProxy Connect<TProxy>(ConnectionConfig config) => new WebSocketClient<TProxy>(this, config).CreateProxy();
-
-    internal override ClientConnection CreateClientConnection() => new WebSocketClientConnection(this);
 }

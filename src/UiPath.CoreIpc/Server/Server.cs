@@ -9,7 +9,13 @@ using static CancellationTokenSourcePool;
 
 internal class Server
 {
-    private static readonly MethodInfo GetResultMethod = typeof(Server).GetStaticMethod(nameof(GetTaskResultImpl));
+    static Server()
+    {
+        var prototype = GetTaskResultImpl<object>;
+        GetResultMethod = prototype.Method.GetGenericMethodDefinition();
+    }
+
+    private static readonly MethodInfo GetResultMethod;
     private static readonly ConcurrentDictionary<MethodKey, Method> Methods = new();
     private static readonly ConcurrentDictionary<Type, GetTaskResultFunc> GetTaskResultByType = new();
 
@@ -24,7 +30,6 @@ internal class Server
     private bool LogEnabled => Logger.Enabled();
     public ISerializer Serializer => _connection.Serializer.OrDefault();
     public string DebugName => _connection.DebugName;
-
 
     public Server(Router router, TimeSpan requestTimeout, Connection connection, IClient? client = null)
     {
@@ -223,7 +228,7 @@ internal class Server
 
     private ValueTask SendResponse(Response response, CancellationToken responseCancellation) => _connection.Send(response, responseCancellation);
 
-    private static object? GetTaskResultImpl<T>(Task task) => ((Task<T>)task).Result;
+    private static object? GetTaskResultImpl<T>(Task task) => (task as Task<T>)!.Result;
 
     private static object GetTaskResult(Type taskType, Task task)
     => GetTaskResultByType.GetOrAdd(

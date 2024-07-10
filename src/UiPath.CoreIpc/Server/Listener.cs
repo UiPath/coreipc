@@ -1,34 +1,33 @@
 ﻿namespace UiPath.Ipc;
 
-internal abstract class Listener : IAsyncDisposable
+public abstract class Listener : IAsyncDisposable
 {
     private const int Megabyte = 1024 * 1024;
 
-    private readonly CancellationTokenSource _cts = new();
-    private readonly TaskCompletionSource<object?> _ready = new();
-    private readonly Task _listeningTask;
-    private readonly Lazy<Task> _disposeTask;
+    protected readonly CancellationTokenSource _cts = new();
+    private Task _listeningTask = null!;
+    private Lazy<Task> _disposeTask = null!;
 
     public string DebugName => Config.DebugName;
     public int MaxMessageSize => Config.MaxReceivedMessageSizeInMegabytes * Megabyte;
-    public ILogger Logger { get; }
+    public ILogger Logger { get; private set; } = null!;
 
-    public IpcServer Server { get; }
-    public ListenerConfig Config { get; }
+    public IpcServer Server { get; internal set; } = null!;
+    public ListenerConfig Config { get; internal set; } = null!;
 
-    protected Listener(IpcServer server, ListenerConfig listenerConfig)
+    public ValueTask DisposeAsync() => new ValueTask(_disposeTask.Value);
+
+    internal void InitializeCore()
     {
-        Server = server;
-        Config = listenerConfig;
-
         Logger = Server.Config.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
+
+        Initialize();
 
         _listeningTask = Listen(_cts.Token);
         _disposeTask = new(DisposeCore);
     }
-    public ValueTask DisposeAsync() => new ValueTask(_disposeTask.Value);
 
-    protected void EnsureListening() => _ = _ready.TrySetResult(null);
+    protected internal virtual void Initialize() { }
 
     public void Log(string message)
     {
@@ -70,7 +69,6 @@ internal abstract class Listener : IAsyncDisposable
     }
     private async Task Listen(CancellationToken ct)
     {
-        await _ready.Task.WaitAsync(ct);
         Log($"Starting listener {DebugName}...");
 
         await Task.WhenAll(Enumerable.Range(1, Config.ConcurrentAccepts).Select(async _ =>
@@ -97,5 +95,19 @@ internal abstract class Listener : IAsyncDisposable
                 Logger.LogException(ex, Config.DebugName);
             }
         }
+    }
+}
+
+public class Listener<TListenerConfig, TServerConnection> : Listener 
+    where TListenerConfig : ListenerConfig
+    where TServerConnection : ServerConnection, new()
+{
+    public new TListenerConfig Config => (TListenerConfig)base.Config;
+
+    protected sealed override ServerConnection CreateServerConnection()
+    {
+        var result = new TServerConnection() { Listener = this };
+        result.Initialize();
+        return result;
     }
 }

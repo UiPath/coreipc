@@ -13,4 +13,6 @@ public abstract record EndpointConfig
     {
         throw new NotSupportedException();
     }
+
+    internal EndpointConfig ShallowClone() => (EndpointConfig)MemberwiseClone();
 }

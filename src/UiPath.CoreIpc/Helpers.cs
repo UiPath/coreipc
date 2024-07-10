@@ -1,26 +1,19 @@
 ﻿using Microsoft.IO;
 using System.Collections.ObjectModel;
 using System.IO.Pipes;
-using System.Net;
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
+
 namespace UiPath.Ipc;
+
 using static CancellationTokenSourcePool;
+
 public static class Helpers
 {
-    public const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly;
-#if NET461
-    public static CancellationTokenRegistration UnsafeRegister(this CancellationToken token, Action<object> callback, object state) => token.Register(callback, state);
-    public static async Task ConnectAsync(this TcpClient tcpClient, IPAddress address, int port, CancellationToken cancellationToken)
-    {
-        using var token = cancellationToken.Register(state => ((TcpClient)state).Dispose(), tcpClient);
-        await tcpClient.ConnectAsync(address, port);
-    }
-#endif
-    internal static Error ToError(this Exception ex) => new(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace, GetExceptionType(ex), ex.InnerException?.ToError());
-    private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName;
+    internal const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly;
+    internal static Error ToError(this Exception ex) => new(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace!, GetExceptionType(ex), ex.InnerException?.ToError());
+    private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName!;
     internal static bool Enabled(this ILogger? logger, LogLevel logLevel = LogLevel.Information) => logger is not null && logger.IsEnabled(logLevel);
     [Conditional("DEBUG")]
     internal static void AssertDisposed(this SemaphoreSlim semaphore) => semaphore.AssertFieldNull("m_waitHandle");
@@ -40,7 +33,6 @@ public static class Helpers
         Debug.Assert(obj.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(obj) is null);
     internal static TDelegate MakeGenericDelegate<TDelegate>(this MethodInfo genericMethod, Type genericArgument) where TDelegate : Delegate =>
         (TDelegate)genericMethod.MakeGenericMethod(genericArgument).CreateDelegate(typeof(TDelegate));
-    internal static MethodInfo GetStaticMethod(this Type type, string name) => type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
     internal static MethodInfo GetInterfaceMethod(this Type type, string name)
     {
         var method = type.GetMethod(name, InstanceFlags) ??
@@ -61,7 +53,7 @@ public static class Helpers
         _ => parameter.DefaultValue
     };
     internal static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) where TKey : notnull => new(dictionary);
-    public static void LogException(this ILogger? logger, Exception ex, object tag)
+    internal static void LogException(this ILogger? logger, Exception ex, object tag)
     {
         var message = $"{tag} # {ex}";
 
@@ -73,7 +65,7 @@ public static class Helpers
 
         Trace.TraceError(message);
     }
-    public static void LogException(this Task task, ILogger? logger, object tag) => task.ContinueWith(result => logger.LogException(result.Exception!, tag), TaskContinuationOptions.NotOnRanToCompletion);
+    internal static void LogException(this Task task, ILogger? logger, object tag) => task.ContinueWith(result => logger.LogException(result.Exception!, tag), TaskContinuationOptions.NotOnRanToCompletion);
 }
 public static class IOHelpers
 {
@@ -169,17 +161,6 @@ public static class IOHelpers
 }
 internal static class Validator
 {
-    //public static void Validate(ServiceHostBuilder serviceHostBuilder)
-    //{
-    //    foreach (var endpointSettings in serviceHostBuilder.Endpoints.Values)
-    //    {
-    //        endpointSettings.Validate();
-    //    }
-    //}
-
-    public static void Validate<TDerived, TInterface>(ServiceClientBuilder<TDerived, TInterface> builder) where TInterface : class where TDerived : ServiceClientBuilder<TDerived, TInterface>
-    => Validate(typeof(TInterface));
-
     public static void Validate(params Type[] contracts)
     => Validate(contracts.AsEnumerable());
 
@@ -276,13 +257,15 @@ internal readonly struct TimeoutHelper : IDisposable
     private readonly PooledCancellationTokenSource _timeoutCancellationSource;
     private readonly CancellationToken _cancellationToken;
     private readonly CancellationTokenRegistration _linkedRegistration;
+
     public TimeoutHelper(TimeSpan timeout, CancellationToken token)
     {
         _timeoutCancellationSource = Rent();
         _timeoutCancellationSource.CancelAfter(timeout);
         _cancellationToken = token;
-        _linkedRegistration = token.UnsafeRegister(LinkedTokenCancelDelegate, _timeoutCancellationSource);
+        _linkedRegistration = token.UnsafeRegister(LinkedTokenCancelDelegate!, _timeoutCancellationSource);
     }
+
     public Exception CheckTimeout(Exception exception, string message)
     {
         if (_timeoutCancellationSource.IsCancellationRequested)

@@ -1,10 +1,12 @@
 ﻿using System.Net.WebSockets;
+
 namespace UiPath.Ipc.WebSockets;
+
 /// <summary>
 /// Exposes a <see cref="WebSocket"/> as a <see cref="Stream"/>.
 /// https://github.com/AArnott/Nerdbank.Streams/blob/main/src/Nerdbank.Streams/WebSocketStream.cs
 /// </summary>
-public class WebSocketStream : Stream
+internal class WebSocketStream : Stream
 {
     /// <summary>
     /// The socket wrapped by this stream.

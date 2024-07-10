@@ -2,17 +2,18 @@
 
 namespace UiPath.Ipc;
 
-interface IServiceClient : IDisposable
+internal interface IServiceClient : IDisposable
 {
     Task<TResult> Invoke<TResult>(MethodInfo method, object?[] args);
 
     Connection? Connection { get; }
 }
 
-class ServiceClient<TInterface> : IServiceClient where TInterface : class
+internal sealed class ServiceClient<TInterface> : IServiceClient where TInterface : class
 {
     private readonly ConnectionKey? _key;
     private readonly ConnectionConfig _config;
+    private readonly ILogger? _connectionLogger;
 
     private readonly SemaphoreSlim _connectionLock = new(initialCount: 1);
 
@@ -20,15 +21,16 @@ class ServiceClient<TInterface> : IServiceClient where TInterface : class
     private Connection? _connection;
     private ClientConnection? _clientConnection;
 
-    protected int HashCode { get; init; }
-    public virtual string DebugName => _connection?.DebugName ?? "";
+    private int HashCode { get; init; }
+    public string DebugName => _key?.GetDebugName() ?? "";
     private bool LogEnabled => _config.Logger.Enabled();
     Connection? IServiceClient.Connection => _connection;
 
-    internal ServiceClient(ConnectionConfig config, ConnectionKey? key = null)
+    public ServiceClient(ConnectionConfig config, ConnectionKey? key = null)
     {
         _config = config;
         _key = key;
+        _connectionLogger = config.GetLogger(DebugName);
     }
 
     public TInterface CreateProxy()
@@ -51,7 +53,7 @@ class ServiceClient<TInterface> : IServiceClient where TInterface : class
             return;
         }
 
-        connection.Logger ??= _config.Logger;
+        connection.Logger ??= _connectionLogger;
 
         _server = new Server(
             new Router(_config.CreateCallbackRouterConfig(), _config.ServiceProvider), 
@@ -200,13 +202,13 @@ class ServiceClient<TInterface> : IServiceClient where TInterface : class
                 clientConnection.Dispose();
                 throw;
             }
-            OnNewConnection(new Connection(network, _config.Serializer, _config.Logger, DebugName));
+            OnNewConnection(new Connection(network, _config.Serializer, _connectionLogger, DebugName));
             if (LogEnabled)
             {
                 Log($"CreateConnection {DebugName}.");
             }
 
-            _connection.Listen().LogException(_config.Logger, DebugName);
+            _connection.Listen().LogException(_connectionLogger, DebugName);
             clientConnection.Initialize(_connection, _server);
             _clientConnection = clientConnection;
         }
@@ -245,7 +247,7 @@ class ServiceClient<TInterface> : IServiceClient where TInterface : class
         GC.SuppressFinalize(this);
     }
 
-    protected virtual void Dispose(bool disposing)
+    private void Dispose(bool disposing)
     {
         _connectionLock.AssertDisposed();
         if (LogEnabled)

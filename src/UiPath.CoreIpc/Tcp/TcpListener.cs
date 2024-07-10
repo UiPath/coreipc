@@ -1,21 +1,14 @@
 ﻿namespace UiPath.Ipc.Tcp;
 
-internal class TcpListener : Listener
+public class TcpListener : Listener<TcpListenerConfig, TcpListener.TcpServerConnection>
 {
-    private readonly System.Net.Sockets.TcpListener _tcpServer;
+    private System.Net.Sockets.TcpListener _tcpServer = null!;
 
-    public new TcpListenerConfig Config { get; }
-
-    public TcpListener(IpcServer server, TcpListenerConfig config) : base(server, config)
+    protected internal override void Initialize()
     {
-        Config = config;
         _tcpServer = new(Config.EndPoint);
         _tcpServer.Start(backlog: Config.ConcurrentAccepts);
-
-        EnsureListening();
     }
-
-    protected override ServerConnection CreateServerConnection() => new TcpServerConnection(this);
 
     protected override async Task DisposeCore()
     {
@@ -25,19 +18,13 @@ internal class TcpListener : Listener
 
     private Task<System.Net.Sockets.TcpClient> AcceptClient(CancellationToken cancellationToken) => _tcpServer.AcceptTcpClientAsync();
 
-    private sealed class TcpServerConnection : ServerConnection
+    public sealed class TcpServerConnection : ServerConnection<TcpListener>
     {
-        private new readonly TcpListener _listener;
         private System.Net.Sockets.TcpClient? _tcpClient;
-
-        public TcpServerConnection(TcpListener listener) : base(listener)
-        {
-            _listener = listener;
-        }
 
         public override async Task<Stream> AcceptClient(CancellationToken cancellationToken)
         {
-            _tcpClient = await _listener.AcceptClient(cancellationToken);
+            _tcpClient = await Listener.AcceptClient(cancellationToken);
             return _tcpClient.GetStream();
         }
 

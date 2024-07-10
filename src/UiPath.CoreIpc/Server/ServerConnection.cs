@@ -7,15 +7,22 @@ public interface IClient
     void Impersonate(Action action);
 }
 
-internal abstract class ServerConnection : IClient, IDisposable
+public abstract class ServerConnection<TListener> : ServerConnection where TListener : Listener
 {
-    private readonly ConcurrentDictionary<Type, object> _callbacks = new();
-    protected readonly Listener _listener;
-    private Connection? _connection;
-    private Task<Connection>? _connectionAsTask;
-    private Server? _server;
+    public new TListener Listener => (base.Listener as TListener)!;
+}
 
-    protected ServerConnection(Listener listener) => _listener = listener;
+public abstract class ServerConnection : IClient, IDisposable
+{
+    internal Listener Listener { get; set; } = null!;
+    public ListenerConfig Config => Listener.Config;
+
+    private readonly ConcurrentDictionary<Type, object> _callbacks = new();
+    internal Connection? Connection;
+    private Task<Connection>? _connectionAsTask;
+    private Server? Server;
+
+    protected internal virtual void Initialize() { }
 
     public abstract Task<Stream> AcceptClient(CancellationToken cancellationToken);
 
@@ -27,16 +34,16 @@ internal abstract class ServerConnection : IClient, IDisposable
 
         TCallbackInterface CreateCallback(Type callbackContract)
         {
-            _listener.Log($"Create callback {callbackContract} {_listener.DebugName}");
+            Listener.Log($"Create callback {callbackContract} {Listener.DebugName}");
 
-            _connectionAsTask ??= Task.FromResult(_connection!);
+            _connectionAsTask ??= Task.FromResult(Connection!);
 
             var serviceClient = new ServiceClient<TCallbackInterface>(new ConnectionConfig()
             {
                 ConnectionFactory = (_, _) => _connectionAsTask,
-                ServiceProvider = _listener.Server.Config.ServiceProvider,
-                RequestTimeout = _listener.Config.RequestTimeout,
-                Logger = _listener.Logger,
+                ServiceProvider = Listener.Server.Config.ServiceProvider,
+                RequestTimeout = Listener.Config.RequestTimeout,
+                Logger = Listener.Logger,
             });
             return serviceClient.CreateProxy();
         }
@@ -44,22 +51,22 @@ internal abstract class ServerConnection : IClient, IDisposable
     public async Task Listen(Stream network, CancellationToken cancellationToken)
     {
         var stream = await AuthenticateAsServer();
-        var serializer = _listener.Server.Config.ServiceProvider.GetService<ISerializer>();
-        _connection = new Connection(stream, serializer, _listener.Logger, _listener.DebugName, _listener.MaxMessageSize);
-        _server = new Server(
-            new Router(_listener.Config.CreateRouterConfig(), _listener.Server.Config.ServiceProvider),
-            _listener.Config.RequestTimeout, _connection, client: this);
+        var serializer = Listener.Server.Config.ServiceProvider.GetService<ISerializer>();
+        Connection = new Connection(stream, serializer, Listener.Logger, Listener.DebugName, Listener.MaxMessageSize);
+        Server = new Server(
+            new Router(Listener.Config.CreateRouterConfig(), Listener.Server.Config.ServiceProvider),
+            Listener.Config.RequestTimeout, Connection, client: this);
 
         // close the connection when the service host closes
-        using (cancellationToken.UnsafeRegister(_ => _connection.Dispose(), null!))
+        using (cancellationToken.UnsafeRegister(_ => Connection.Dispose(), null!))
         {
-            await _connection.Listen();
+            await Connection.Listen();
         }
         return;
 
         async Task<Stream> AuthenticateAsServer()
         {
-            if (_listener.Config.Certificate is null)
+            if (Listener.Config.Certificate is null)
             {
                 return network;
             }
@@ -67,7 +74,7 @@ internal abstract class ServerConnection : IClient, IDisposable
             var sslStream = new SslStream(network);
             try
             {
-                await sslStream.AuthenticateAsServerAsync(_listener.Config.Certificate);
+                await sslStream.AuthenticateAsServerAsync(Listener.Config.Certificate);
             }
             catch
             {

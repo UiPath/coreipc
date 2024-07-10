@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using UiPath.Ipc.NamedPipe;
@@ -19,10 +18,7 @@ public readonly record struct IpcServerConfig
     internal IpcServerConfig WithServer(IpcServer server)
     => this with
     {
-        Listeners = Listeners.Select(listener => listener with
-        {
-            Server = server
-        }).ToArray()
+        Listeners = Listeners.Select(listener => listener.WithServer(server)).ToArray()
     };
 }
 
@@ -34,14 +30,14 @@ public sealed class IpcServer : IAsyncDisposable
 
     public IpcServer() => _started = new(Start);
 
-    public void EnsureStarted()
+    public async Task EnsureStarted()
     {
         if (!IsValid(out var errors))
         {
             throw new InvalidOperationException($"ValidationErrors:\r\n{string.Join("\r\n", errors)}");
         }
 
-        _ = _started.Value;
+        await _started.Value;
     }
 
     private async Task<IAsyncDisposable?> Start()
@@ -103,12 +99,24 @@ public abstract record ListenerConfig : EndpointConfig
     public byte MaxReceivedMessageSizeInMegabytes { get; init; } = 2;
     public X509Certificate? Certificate { get; init; }
 
-    internal IpcServer? Server { get; init; }
+    private IpcServer? _server;
+    internal IpcServer? Server
+    {
+        get => _server;
+        init => _server = value;
+    }
 
-    internal abstract string DebugName { get; }
+    internal ListenerConfig WithServer(IpcServer server)
+    {
+        var result = (ShallowClone() as ListenerConfig)!;
+        result._server = server;
+        return result;
+    }
+
+    internal protected virtual string DebugName => GetType().Name;
     public abstract IAsyncDisposable CreateListener(IpcServer server);
 
-    internal protected abstract IEnumerable<string> Validate();
+    internal protected virtual IEnumerable<string> Validate() => Enumerable.Empty<string>();
 
     internal override RouterConfig CreateRouterConfig()
     {
@@ -144,14 +152,119 @@ public abstract record ListenerConfig : EndpointConfig
         }
     }
 }
-public sealed record NamedPipeListenerConfig : ListenerConfig
+
+public abstract record ListenerConfig<TListener> : ListenerConfig where TListener : Listener, new()
+{
+    public sealed override IAsyncDisposable CreateListener(IpcServer server)
+    {
+        var listener = new TListener()
+        {
+            Server = server,
+            Config = this
+        };
+        listener.InitializeCore();
+        return listener;
+    }
+}
+
+public interface IAsyncStream
+{
+    ValueTask<int> Read(Memory<byte> memory, CancellationToken ct);
+    ValueTask Write(ReadOnlyMemory<byte> memory, CancellationToken ct);
+    ValueTask Flush(CancellationToken ct);
+}
+
+public abstract record ListenerConfig<TListenerState, TConnectionState> : ListenerConfig
+    where TListenerState : IAsyncDisposable
+{
+    protected internal abstract TListenerState CreateListenerState(IpcServer server);
+    protected internal abstract ValueTask<IAsyncStream> AwaitConnection(TListenerState listenerState, CancellationToken ct);
+
+    public sealed override IAsyncDisposable CreateListener(IpcServer server)
+    => new ListenerAdapter(CreateListenerState(server), this, server);
+
+    private sealed class ListenerAdapter : Listener
+    {
+        private readonly TListenerState _listenerState;
+        private readonly ListenerConfig<TListenerState, TConnectionState> _listenerConfig;
+        private readonly IpcServer _server;
+
+        public ListenerAdapter(TListenerState listenerState, ListenerConfig<TListenerState, TConnectionState> listenerConfig, IpcServer server)
+        {
+            _listenerState = listenerState;
+            _listenerConfig = listenerConfig;
+            _server = server;
+            Config = listenerConfig;
+            Server = server;
+            InitializeCore();
+        }
+
+        protected override ServerConnection CreateServerConnection()
+        {
+            return new ConnectionAdapter(_listenerState, _listenerConfig, _server, this);
+        }
+    }
+
+    private sealed class ConnectionAdapter : ServerConnection
+    {
+        private readonly TListenerState _listenerState;
+        private readonly ListenerConfig<TListenerState, TConnectionState> _listenerConfig;
+        private readonly IpcServer _server;
+        private readonly ListenerAdapter _listener;
+
+        public ConnectionAdapter(TListenerState listenerState, ListenerConfig<TListenerState, TConnectionState> listenerConfig, IpcServer server, ListenerAdapter listenerAdapter)
+        {
+            _listenerState = listenerState;
+            _listenerConfig = listenerConfig;
+            _server = server;
+            Listener = _listener = listenerAdapter;            
+        }
+
+        public override async Task<Stream> AcceptClient(CancellationToken ct)
+        {
+            var asyncStream = await _listenerConfig.AwaitConnection(_listenerState, ct);
+            return new AsyncStreamAdapter(asyncStream);
+        }
+    }
+
+    private sealed class AsyncStreamAdapter : Stream
+    {
+        private readonly IAsyncStream _target;
+
+        public AsyncStreamAdapter(IAsyncStream stream)
+        {
+            _target = stream;
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        => _target.Read(new Memory<byte>(buffer, offset, count), cancellationToken).AsTask();
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        => _target.Write(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken).AsTask();
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        => _target.Flush(cancellationToken).AsTask();
+
+        public override void Flush() => throw new NotImplementedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotImplementedException();
+        public override void SetLength(long value) => throw new NotImplementedException();
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+        public override long Length => throw new NotImplementedException();
+        public override long Position { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+    }
+}
+
+public sealed record NamedPipeListenerConfig : ListenerConfig<NamedPipeListener>
 {
     public required string PipeName { get; init; }
     public string ServerName { get; init; } = ".";
     public Action<PipeSecurity>? AccessControl { get; init; }
 
-    internal override string DebugName => ServerName is "." ? PipeName : $@"{ServerName}\{PipeName}";
-    public override IAsyncDisposable CreateListener(IpcServer server) => new NamedPipeListener(server, config: this);
+    internal protected override string DebugName => ServerName is "." ? PipeName : $@"{ServerName}\{PipeName}";
 
     internal protected override IEnumerable<string> Validate()
     {
@@ -159,24 +272,21 @@ public sealed record NamedPipeListenerConfig : ListenerConfig
         if (ServerName is null or "") { yield return $"{nameof(ServerName)} is a valid server name."; }
     }
 }
-public sealed record TcpListenerConfig : ListenerConfig
+public sealed record TcpListenerConfig : ListenerConfig<TcpListener>
 {
     public required IPEndPoint EndPoint { get; init; }
 
-    internal override string DebugName => EndPoint.ToString();
-
-    public override IAsyncDisposable CreateListener(IpcServer server) => new TcpListener(server, config: this);
+    internal protected override string DebugName => EndPoint.ToString();
 
     protected internal override IEnumerable<string> Validate()
     {
         if (EndPoint is null) { yield return $"{nameof(EndPoint)} was not set."; }
     }
 }
-public sealed record WebSocketListenerConfig : ListenerConfig
+public sealed record WebSocketListenerConfig : ListenerConfig<WebSocketListener>
 {
     public required Accept Accept { get; init; }
-    internal override string DebugName => "";
-    public override IAsyncDisposable CreateListener(IpcServer server) => new WebSocketListener(server, config: this);
+    internal protected override string DebugName => "";
 
     protected internal override IEnumerable<string> Validate()
     {
@@ -186,34 +296,4 @@ public sealed record WebSocketListenerConfig : ListenerConfig
 
 public abstract record ListenerId
 {
-}
-public abstract record ListenerId<TTransport> : ListenerId
-{
-}
-public sealed record NamedPipeListenerId : ListenerId<NamedPipeListenerId.Transport>
-{
-    public string PipeName { get; }
-
-    public NamedPipeListenerId(string pipeName) => PipeName = pipeName ?? throw new ArgumentNullException(nameof(pipeName));
-
-    public sealed record Transport
-    {
-        public Action<PipeSecurity>? PipeSecurity { get; init; }
-    }
-}
-public sealed record TCPListenerId : ListenerId
-{
-    public IPEndPoint EndPoint { get; }
-
-    public TCPListenerId(IPEndPoint endPoint) => EndPoint = endPoint ?? throw new ArgumentNullException(nameof(endPoint));
-}
-public sealed record WebSocketListenerId : ListenerId
-{
-    public int Port { get; }
-    public required Accept Accept { get; init; }
-
-    public WebSocketListenerId(int port) => Port = port;
-
-    public bool Equals(WebSocketListenerId? other) => other is not null && Port == other.Port;
-    public override int GetHashCode() => Port;
 }

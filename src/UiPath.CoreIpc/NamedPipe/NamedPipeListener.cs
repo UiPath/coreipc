@@ -3,30 +3,18 @@ using System.Security.Principal;
 
 namespace UiPath.Ipc.NamedPipe;
 
-internal sealed class NamedPipeListener : Listener
+public sealed class NamedPipeListener : Listener<NamedPipeListenerConfig, NamedPipeListener.NamedPipeServerConnection>
 {
-    public new NamedPipeListenerConfig Config { get; }
-
-    public NamedPipeListener(IpcServer server, NamedPipeListenerConfig config) : base(server, config)
+    public sealed class NamedPipeServerConnection : ServerConnection<NamedPipeListener>
     {
-        Config = config;
+        private NamedPipeServerStream _server = null!;
 
-        EnsureListening();
-    }
-
-    protected override ServerConnection CreateServerConnection() => new NamedPipeServerConnection(this);
-
-    private sealed class NamedPipeServerConnection : ServerConnection
-    {
-        private readonly NamedPipeServerStream _server;
-        private new readonly NamedPipeListener _listener;
-
-        public NamedPipeServerConnection(NamedPipeListener listener) : base(listener)
+        protected internal override void Initialize()
         {
-            _listener = listener;
-            _server = IOHelpers.NewNamedPipeServerStream(listener.Config.PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+            _server = IOHelpers.NewNamedPipeServerStream(Listener.Config.PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
                 PipeTransmissionMode.Byte, PipeOptions.Asynchronous, GetPipeSecurity);
         }
+
         public override async Task<Stream> AcceptClient(CancellationToken cancellationToken)
         {
             await _server.WaitForConnectionAsync(cancellationToken);
@@ -40,7 +28,7 @@ internal sealed class NamedPipeListener : Listener
         }
         PipeSecurity? GetPipeSecurity()
         {
-            var setAccessControl = _listener.Config.AccessControl;
+            var setAccessControl = Listener.Config.AccessControl;
             if (setAccessControl is null)
             {
                 return null;

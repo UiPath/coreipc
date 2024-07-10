@@ -4,6 +4,7 @@
     <RootNamespace>UiPath.Ipc</RootNamespace>
     <AssemblyName>UiPath.Ipc</AssemblyName>
     <GeneratePackageOnBuild Condition="$(Configuration)=='Release'">true</GeneratePackageOnBuild>
+    <GeneratePackageOnBuild Condition="$(Configuration)=='Debug'">true</GeneratePackageOnBuild>
     <Authors>UiPath</Authors>
     <Version>2.5.1</Version>
     <PackageProjectUrl>https://github.com/UiPath/CoreIpc/</PackageProjectUrl>
@@ -18,15 +19,13 @@
     <LangVersion>preview</LangVersion>
     <ImplicitUsings>true</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
   </PropertyGroup>
   <ItemGroup Condition="$(TargetFramework) == 'net461'">
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
     <PackageReference Include="System.Reflection.DispatchProxy" Version="4.7.1" />
   </ItemGroup>
   <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>UiPath.CoreIpc.Tests</_Parameter1>
-    </AssemblyAttribute>
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
@@ -38,10 +37,12 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Playground" />
+    <InternalsVisibleTo Include="UiPath.CoreIpc.Tests" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net461'">

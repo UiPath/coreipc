@@ -189,9 +189,7 @@ public class SystemService : ISystemService
         Debug.WriteLine("###################### CancelIoPipe");
         await Task.Delay(50);
 #if WINDOWS
-            var serverFieldInfo = message.Client.GetType().GetField("_server", BindingFlags.NonPublic | BindingFlags.Instance);
-            var pipeStream = serverFieldInfo.GetValue(message.Client) as PipeStream;
-
+            var pipeStream = (message.Client as ServerConnection).Connection.Network as PipeStream;
             var canceled = CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero);
             
             foreach (var msDelay in message.MsDelays ?? [])
