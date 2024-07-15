@@ -28,9 +28,9 @@ public sealed class IpcServer : IAsyncDisposable
 
     private readonly Lazy<Task<IAsyncDisposable?>> _started;
 
-    public IpcServer() => _started = new(Start);
+    public IpcServer() => _started = new(StartCore);
 
-    public async Task EnsureStarted()
+    public async Task Start()
     {
         if (!IsValid(out var errors))
         {
@@ -40,7 +40,7 @@ public sealed class IpcServer : IAsyncDisposable
         await _started.Value;
     }
 
-    private async Task<IAsyncDisposable?> Start()
+    private async Task<IAsyncDisposable?> StartCore()
     {
         if (!IsValid(out _))
         {

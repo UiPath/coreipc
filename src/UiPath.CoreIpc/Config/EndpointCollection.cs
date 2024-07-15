@@ -7,7 +7,6 @@ public class EndpointCollection : IEnumerable, IEnumerable<KeyValuePair<Type, ob
     internal readonly Dictionary<Type, object?> Endpoints = new();
 
     public void Add(Type type) => Add(type, instance: null);
-    public void Add<T>(T instance) where T : class => Add(typeof(T), instance);
     public void Add(Type type, object? instance)
     {
         if (type is null) throw new ArgumentNullException(nameof(type));
