@@ -7,12 +7,12 @@ public interface IClient
     void Impersonate(Action action);
 }
 
-public abstract class ServerConnection<TListener> : ServerConnection where TListener : Listener
+internal abstract class ServerConnection<TListener> : ServerConnection where TListener : Listener
 {
     public new TListener Listener => (base.Listener as TListener)!;
 }
 
-public abstract class ServerConnection : IClient, IDisposable
+internal abstract class ServerConnection : IClient, IDisposable
 {
     internal Listener Listener { get; set; } = null!;
     public ListenerConfig Config => Listener.Config;
@@ -54,7 +54,7 @@ public abstract class ServerConnection : IClient, IDisposable
         var serializer = Listener.Server.ServiceProvider.GetService<ISerializer>();
         Connection = new Connection(stream, serializer, Listener.Logger, Listener.DebugName, Listener.MaxMessageSize);
         Server = new Server(
-            new Router(Listener.Config.CreateRouterConfig(), Listener.Server.ServiceProvider),
+            new Router(Listener.Config.CreateRouterConfig(Listener.Server), Listener.Server.ServiceProvider),
             Listener.Config.RequestTimeout, Connection, client: this);
 
         // close the connection when the service host closes

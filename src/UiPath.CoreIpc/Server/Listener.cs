@@ -1,6 +1,6 @@
 ﻿namespace UiPath.Ipc;
 
-public abstract class Listener : IAsyncDisposable
+internal abstract class Listener : IAsyncDisposable
 {
     private const int Megabyte = 1024 * 1024;
 
@@ -98,7 +98,7 @@ public abstract class Listener : IAsyncDisposable
     }
 }
 
-public class Listener<TListenerConfig, TServerConnection> : Listener 
+internal class Listener<TListenerConfig, TServerConnection> : Listener 
     where TListenerConfig : ListenerConfig
     where TServerConnection : ServerConnection, new()
 {
