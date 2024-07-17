@@ -7,24 +7,12 @@ using UiPath.Ipc.WebSockets;
 
 namespace UiPath.Ipc;
 
-public readonly record struct IpcServerConfig
+public sealed class IpcServer : IAsyncDisposable
 {
     public required IServiceProvider ServiceProvider { get; init; }
     public required EndpointCollection Endpoints { get; init; }
-    public IReadOnlyList<Type>? Callbacks { get; init; }
     public required IReadOnlyList<ListenerConfig> Listeners { get; init; }
     public TaskScheduler? Scheduler { get; init; }
-
-    internal IpcServerConfig WithServer(IpcServer server)
-    => this with
-    {
-        Listeners = Listeners.Select(listener => listener.WithServer(server)).ToArray()
-    };
-}
-
-public sealed class IpcServer : IAsyncDisposable
-{
-    public required IpcServerConfig Config { get; init; }
 
     private readonly Lazy<Task<IAsyncDisposable?>> _started;
 
@@ -47,12 +35,10 @@ public sealed class IpcServer : IAsyncDisposable
             return null;
         }
 
-        var configWithServer = Config.WithServer(this);
-
         var disposables = new AsyncCollectionDisposable();
         try
         {
-            foreach (var listenerConfig in configWithServer.Listeners)
+            foreach (var listenerConfig in Listeners)
             {
                 disposables.Add(listenerConfig.CreateListener(server: this));
             }
@@ -67,7 +53,7 @@ public sealed class IpcServer : IAsyncDisposable
 
     private bool IsValid(out IReadOnlyList<string> errors)
     {
-        errors = Config.Listeners.SelectMany(PrefixErrors).ToArray();
+        errors = Listeners.SelectMany(PrefixErrors).ToArray();
         return errors is { Count: 0 };
 
         static IEnumerable<string> PrefixErrors(ListenerConfig config)
@@ -125,29 +111,29 @@ public abstract record ListenerConfig : EndpointConfig
             throw new InvalidOperationException();
         }
 
-        var endpoints = Server.Config.Endpoints.ToDictionary(pair => pair.Key.Name, CreateEndpointSettings);
+        var endpoints = Server.Endpoints.ToDictionary(pair => pair.Key.Name, CreateEndpointSettings);
         return new RouterConfig(endpoints);
 
         EndpointSettings CreateEndpointSettings(KeyValuePair<Type, object?> pair)
         {
             if (pair.Value is null)
             {
-                if (Server.Config.ServiceProvider is null)
+                if (Server.ServiceProvider is null)
                 {
                     throw new InvalidOperationException();
                 }
 
-                return new EndpointSettings(pair.Key, Server.Config.ServiceProvider)
+                return new EndpointSettings(pair.Key, Server.ServiceProvider)
                 {
                     BeforeCall = null,
-                    Scheduler = Server.Config.Scheduler.OrDefault(),
+                    Scheduler = Server.Scheduler.OrDefault(),
                 };
             }
 
             return new EndpointSettings(pair.Key, pair.Value)
             {
                 BeforeCall = null,
-                Scheduler = Server.Config.Scheduler.OrDefault(),
+                Scheduler = Server.Scheduler.OrDefault(),
             };
         }
     }

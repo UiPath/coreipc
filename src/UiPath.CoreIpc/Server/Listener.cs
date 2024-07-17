@@ -19,7 +19,7 @@ public abstract class Listener : IAsyncDisposable
 
     internal void InitializeCore()
     {
-        Logger = Server.Config.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
+        Logger = Server.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
 
         Initialize();
 

@@ -40,38 +40,31 @@ internal class Program
 
         await using var ipcServer = new IpcServer()
         {
-            Config = new()
+            Scheduler = serverScheduler,
+            ServiceProvider = serverSP,
+            Endpoints = new()
             {
-                Scheduler = serverScheduler,
-                ServiceProvider = serverSP,
-                Endpoints = new()
+                typeof(Contracts.IServerOperations),
+                typeof(Contracts.IClientOperations2),
+                { typeof(Contracts.IClientOperations2), new object() }
+            },
+            Listeners = [
+                new NamedPipeListenerConfig()
                 {
-                    typeof(Contracts.IServerOperations),
-                    typeof(Contracts.IClientOperations2),
-                    { typeof(Contracts.IClientOperations2), new object() }
-                },
-                Callbacks = [
-                    typeof(Contracts.IClientOperations),
-                    typeof(Contracts.IClientOperations2)
-                ],
-                Listeners = [
-                    new NamedPipeListenerConfig()
+                    PipeName = Contracts.PipeName,
+                    ServerName = ".",
+                    AccessControl = ps =>
                     {
-                        PipeName = Contracts.PipeName,
-                        ServerName = ".",
-                        AccessControl = ps =>
-                        {
-                        },
-                        MaxReceivedMessageSizeInMegabytes = 100,
-                        RequestTimeout = TimeSpan.FromHours(10)
                     },
-                    new BidirectionalHttp.ListenerConfig()
-                    {
-                        Uri = serverUri,
-                        RequestTimeout = TimeSpan.FromHours(1)
-                    }
-                ],
-            }
+                    MaxReceivedMessageSizeInMegabytes = 100,
+                    RequestTimeout = TimeSpan.FromHours(10)
+                },
+                new BidirectionalHttp.ListenerConfig()
+                {
+                    Uri = serverUri,
+                    RequestTimeout = TimeSpan.FromHours(1)
+                }
+            ]
         };
 
         try

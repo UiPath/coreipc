@@ -41,7 +41,7 @@ public abstract class ServerConnection : IClient, IDisposable
             var serviceClient = new ServiceClient<TCallbackInterface>(new ConnectionConfig()
             {
                 ConnectionFactory = (_, _) => _connectionAsTask,
-                ServiceProvider = Listener.Server.Config.ServiceProvider,
+                ServiceProvider = Listener.Server.ServiceProvider,
                 RequestTimeout = Listener.Config.RequestTimeout,
                 Logger = Listener.Logger,
             });
@@ -51,10 +51,10 @@ public abstract class ServerConnection : IClient, IDisposable
     public async Task Listen(Stream network, CancellationToken cancellationToken)
     {
         var stream = await AuthenticateAsServer();
-        var serializer = Listener.Server.Config.ServiceProvider.GetService<ISerializer>();
+        var serializer = Listener.Server.ServiceProvider.GetService<ISerializer>();
         Connection = new Connection(stream, serializer, Listener.Logger, Listener.DebugName, Listener.MaxMessageSize);
         Server = new Server(
-            new Router(Listener.Config.CreateRouterConfig(), Listener.Server.Config.ServiceProvider),
+            new Router(Listener.Config.CreateRouterConfig(), Listener.Server.ServiceProvider),
             Listener.Config.RequestTimeout, Connection, client: this);
 
         // close the connection when the service host closes
