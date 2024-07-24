@@ -66,6 +66,26 @@ public static class Helpers
         Trace.TraceError(message);
     }
     internal static void LogException(this Task task, ILogger? logger, object tag) => task.ContinueWith(result => logger.LogException(result.Exception!, tag), TaskContinuationOptions.NotOnRanToCompletion);
+
+    internal static void WaitAndUnwrapException(this Task task)
+    {
+        if (task is null)
+        {
+            throw new ArgumentNullException(nameof(task));
+        }
+
+        task.GetAwaiter().GetResult();
+    }
+
+    internal static Stream AsStream(this Network oneOf)
+    {
+        if (oneOf.Is2)
+        {
+            return oneOf.As2;
+        }
+
+        return new AsyncStreamAdapter(oneOf.As1);
+    }
 }
 public static class IOHelpers
 {

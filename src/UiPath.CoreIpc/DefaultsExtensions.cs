@@ -9,8 +9,9 @@ internal static class DefaultsExtensions
     public static ILogger OrDefault(this ILogger? logger) => logger ?? NullLogger.Instance;
     public static BeforeCallHandler OrDefault(this BeforeCallHandler? beforeCallHandler) => beforeCallHandler ?? DefaultBeforeCallHandler;
     public static TaskScheduler OrDefault(this TaskScheduler? scheduler) => scheduler ?? TaskScheduler.Default;
+    public static ContractToSettingsMap OrDefault(this ContractToSettingsMap? map) => map ?? EmptyContractToSettingsMap;
 
-    public static Func<T>? MaybeGetFactory<T>(this IServiceProvider? serviceProvider) where T : class
+    public static Func<T>? MaybeCreateServiceFactory<T>(this IServiceProvider? serviceProvider) where T : class
     {
         if (serviceProvider is null)
         {
@@ -20,5 +21,7 @@ internal static class DefaultsExtensions
         return serviceProvider.GetRequiredService<T>;
     }
 
-    private static BeforeCallHandler DefaultBeforeCallHandler = (_, _) => Task.CompletedTask;
+    private static readonly BeforeCallHandler DefaultBeforeCallHandler = (_, _) => Task.CompletedTask;
+
+    private static readonly ContractToSettingsMap EmptyContractToSettingsMap = new();
 }

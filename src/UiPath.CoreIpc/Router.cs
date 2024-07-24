@@ -103,8 +103,8 @@ internal readonly struct Route
         Service = endpointSettings.Service.WithProvider(serviceProvider),
         BeforeCall = endpointSettings.BeforeCall,
         Scheduler = endpointSettings.Scheduler,
-        LoggerFactory = serviceProvider.MaybeGetFactory<ILoggerFactory>(),
-        Serializer = serviceProvider.MaybeGetFactory<ISerializer>()
+        LoggerFactory = serviceProvider.MaybeCreateServiceFactory<ILoggerFactory>(),
+        Serializer = serviceProvider.MaybeCreateServiceFactory<ISerializer>()
     };
 
     public required ServiceFactory Service { get; init; }

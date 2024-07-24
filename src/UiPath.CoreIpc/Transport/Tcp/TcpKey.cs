@@ -9,7 +9,7 @@ public sealed record TcpKey : ITcpKey
 {
     public required IPEndPoint EndPoint { get; init; }
 
-    public required ConnectionConfig DefaultConfig { get; init; }
+    public required ClientBase DefaultConfig { get; init; }
 
     async Task<OneOf<IAsyncStream, Stream>> ITcpKey.Connect(CancellationToken ct)
     {

@@ -7,20 +7,40 @@ public interface IClient
     void Impersonate(Action action);
 }
 
-internal abstract class ServerConnection<TListener> : ServerConnection where TListener : Listener
+internal sealed class ServerConnection<TConfig, TListenerState, TConnectionState> : ServerConnection
+    where TConfig : ListenerConfig, IListenerConfig<TConfig, TListenerState, TConnectionState>
+    where TListenerState : IAsyncDisposable
 {
-    public new TListener Listener => (base.Listener as TListener)!;
+    public new readonly Listener<TConfig, TListenerState, TConnectionState> Listener;
+
+    public ServerConnection(Listener<TConfig, TListenerState, TConnectionState> listener) : base(listener)
+    {
+        Listener = listener;
+    }
+
+    public override async Task<Stream> AcceptClient(CancellationToken ct)
+    => (await Listener.Config.AwaitConnection(
+        Listener.State, 
+        Listener.Config.CreateConnectionState(
+            Listener.Server, 
+            Listener.State), 
+        ct))
+        .AsStream();
 }
 
 internal abstract class ServerConnection : IClient, IDisposable
 {
-    internal Listener Listener { get; set; } = null!;
-    public ListenerConfig Config => Listener.Config;
+    public readonly Listener Listener;
 
     private readonly ConcurrentDictionary<Type, object> _callbacks = new();
     internal Connection? Connection;
     private Task<Connection>? _connectionAsTask;
     private Server? Server;
+
+    protected ServerConnection(Listener listener)
+    {
+        Listener = listener;
+    }
 
     protected internal virtual void Initialize() { }
 
@@ -34,14 +54,17 @@ internal abstract class ServerConnection : IClient, IDisposable
 
         TCallbackInterface CreateCallback(Type callbackContract)
         {
-            Listener.Log($"Create callback {callbackContract} {Listener.DebugName}");
+            Listener.Logger.LogInformation($"Create callback {callbackContract} {Listener.Config.DebugName}");
 
             _connectionAsTask ??= Task.FromResult(Connection!);
 
-            var serviceClient = new ServiceClient<TCallbackInterface>(new ConnectionConfig()
+            var serviceClient = new CallbackServiceClient<TCallbackInterface>(Connection!, Listener);
+
+            // TODO: delete
+            var serviceClient2 = new ServiceClientBase<TCallbackInterface>(new ClientBase()
             {
                 ConnectionFactory = (_, _) => _connectionAsTask,
-                ServiceProvider = Listener.Server.ServiceProvider,
+                ServiceProvider = Listener.Server.Config.ServiceProvider,
                 RequestTimeout = Listener.Config.RequestTimeout,
                 Logger = Listener.Logger,
             });
@@ -51,11 +74,15 @@ internal abstract class ServerConnection : IClient, IDisposable
     public async Task Listen(Stream network, CancellationToken cancellationToken)
     {
         var stream = await AuthenticateAsServer();
-        var serializer = Listener.Server.ServiceProvider.GetService<ISerializer>();
-        Connection = new Connection(stream, serializer, Listener.Logger, Listener.DebugName, Listener.MaxMessageSize);
+        var serializer = Listener.Server.Config.ServiceProvider.GetService<ISerializer>();
+        Connection = new Connection(stream, serializer, Listener.Logger, Listener.Config.DebugName, Listener.Config.MaxMessageSize);
         Server = new Server(
-            new Router(Listener.Config.CreateRouterConfig(Listener.Server), Listener.Server.ServiceProvider),
-            Listener.Config.RequestTimeout, Connection, client: this);
+            new Router(
+                Listener.Config.CreateRouterConfig(Listener.Server),
+                Listener.Server.Config.ServiceProvider),
+            Listener.Config.RequestTimeout,
+            Connection,
+            client: this);
 
         // close the connection when the service host closes
         using (cancellationToken.UnsafeRegister(_ => Connection.Dispose(), null!))

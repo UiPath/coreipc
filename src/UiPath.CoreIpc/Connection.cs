@@ -49,7 +49,7 @@ public sealed class Connection : IDisposable
     public Task Listen() => _receiveLoop.Value;
     internal event Func<Request, ValueTask> RequestReceived;
     internal event Action<string> CancellationReceived;
-    public event EventHandler<EventArgs> Closed;
+    public event EventHandler<EventArgs>? Closed;
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif

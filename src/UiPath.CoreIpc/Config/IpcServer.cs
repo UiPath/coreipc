@@ -33,7 +33,7 @@ public sealed class IpcServer : IAsyncDisposable
         {
             foreach (var listenerConfig in Listeners)
             {
-                disposables.Add(listenerConfig.CreateListener(server: this));
+                disposables.Add(Listener.Create(this, listenerConfig));
             }
             return disposables;
         }
@@ -72,19 +72,9 @@ public sealed class IpcServer : IAsyncDisposable
     }
 }
 
-public interface IAsyncStream
+public interface IAsyncStream : IAsyncDisposable
 {
     ValueTask<int> Read(Memory<byte> memory, CancellationToken ct);
     ValueTask Write(ReadOnlyMemory<byte> memory, CancellationToken ct);
     ValueTask Flush(CancellationToken ct);
-}
-
-public interface IListenerConfig<TSelf, TListenerState, TConnectionState>
-    where TSelf : ListenerConfig, IListenerConfig<TSelf, TListenerState, TConnectionState>
-    where TListenerState : IAsyncDisposable
-{
-    TListenerState CreateListenerState(IpcServer server);
-    TConnectionState CreateConnectionState(IpcServer server, TListenerState listenerState);
-    ValueTask<Network> AwaitConnection(TListenerState listenerState, TConnectionState connectionState, CancellationToken ct);
-    IEnumerable<string> Validate();
 }

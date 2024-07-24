@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Playground;
 using UiPath.CoreIpc.Http;
 using UiPath.Ipc;
+using UiPath.Ipc.Transport.NamedPipe;
 
 internal class Program
 {
@@ -34,10 +35,6 @@ internal class Program
             .AddLogging(builder => builder.AddConsole())
             .BuildServiceProvider();
 
-        // IAgentOperations, IAgentEvents
-        // asdfasdf
-        // asdfasdf
-
         await using var ipcServer = new IpcServer()
         {
             Scheduler = serverScheduler,
@@ -49,7 +46,7 @@ internal class Program
                 { typeof(Contracts.IClientOperations2), new object() }
             },
             Listeners = [
-                new NamedPipeListenerConfig()
+                new NamedPipeListener()
                 {
                     PipeName = Contracts.PipeName,
                     ServerName = ".",
@@ -59,11 +56,11 @@ internal class Program
                     MaxReceivedMessageSizeInMegabytes = 100,
                     RequestTimeout = TimeSpan.FromHours(10)
                 },
-                new BidirectionalHttp.ListenerConfig()
-                {
-                    Uri = serverUri,
-                    RequestTimeout = TimeSpan.FromHours(1)
-                }
+                //new BidirectionalHttp.ListenerConfig()
+                //{
+                //    Uri = serverUri,
+                //    RequestTimeout = TimeSpan.FromHours(1)
+                //}
             ]
         };
 
@@ -78,10 +75,12 @@ internal class Program
             throw;
         }
 
-        var key1 = new NamedPipeConnectionKey(Contracts.PipeName, ".");
-
-        IpcClient.Config(key1, new()
+        var proxy1 = new NamedPipeClient()
         {
+            PipeName = Contracts.PipeName,
+            ServerName = ".",
+            AllowImpersonation = false,
+
             ServiceProvider = clientSP,
             Callbacks = new()
             {
@@ -89,29 +88,10 @@ internal class Program
                 { typeof(Contracts.IClientOperations2), new Impl.Client2() }
             },
             Scheduler = clientScheduler
-        });
+        }.GetProxy<Contracts.IServerOperations>();
 
-        var key3 = new BidirectionalHttp.ConnectionKey()
-        {
-            ServerUri = serverUri,
-            ClientUri = clientUri
-        };
-        IpcClient.Config(key3, new()
-        {
-            ServiceProvider = clientSP,
-            Callbacks = new()
-            {
-                typeof(Contracts.IClientOperations),
-                { typeof(Contracts.IClientOperations2), new Impl.Client2() }
-            },
-            Scheduler = clientScheduler
-        });
-
-        IpcClient.Connect<IOrderedQueryable>(new NamedPipeConnectionKey(Contracts.PipeName, "."));
-
-        var proxy3 = IpcClient.Connect<Contracts.IServerOperations>(key3);
-        await proxy3.Register();
-        await proxy3.Broadcast("Hello Bidirectional Http!");
+        await proxy1.Register();
+        await proxy1.Broadcast("Hello Bidirectional Http!");
 
         await Task.WhenAny(cancelled);
     }

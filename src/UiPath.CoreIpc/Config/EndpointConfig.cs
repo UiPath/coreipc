@@ -7,6 +7,4 @@ public abstract record EndpointConfig
     internal virtual RouterConfig CreateRouterConfig(IpcServer server) => throw new NotSupportedException();
 
     internal virtual RouterConfig CreateCallbackRouterConfig() => throw new NotSupportedException();
-
-    internal EndpointConfig ShallowClone() => (EndpointConfig)MemberwiseClone();
 }

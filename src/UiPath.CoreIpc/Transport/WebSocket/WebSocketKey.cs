@@ -8,7 +8,7 @@ public sealed record WebSocketKey : IWebSocketKey
 {
     public required Uri Uri { get; init; }
 
-    public required ConnectionConfig DefaultConfig { get; init; }
+    public required ClientBase DefaultConfig { get; init; }
 
     async Task<OneOf<IAsyncStream, Stream>> IWebSocketKey.Connect(CancellationToken ct)
     {

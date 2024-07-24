@@ -3,9 +3,9 @@ using System.Security.Principal;
 
 namespace UiPath.Ipc.Transport.NamedPipe;
 
-using INamedPipeListenerConfig = IListenerConfig<NamedPipeListenerConfig, NamedPipeListenerState, NamedPipeServerConnectionState>;
+using INamedPipeListenerConfig = IListenerConfig<NamedPipeListener, NamedPipeListenerState, NamedPipeServerConnectionState>;
 
-public sealed record NamedPipeListenerConfig : ListenerConfig, INamedPipeListenerConfig
+public sealed record NamedPipeListener : ListenerConfig, INamedPipeListenerConfig
 {
     public required string PipeName { get; init; }
     public string ServerName { get; init; } = ".";

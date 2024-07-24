@@ -13,7 +13,6 @@ public abstract class ClientConnection : IDisposable
     internal Connection? Connection => _connection;
 
     internal Server? Server { get; private set; }
-    public ConnectionKey ConnectionKey { get; init; } = null!;
 
     [MemberNotNull(nameof(_connection))]
     [MemberNotNull(nameof(Connection))]
