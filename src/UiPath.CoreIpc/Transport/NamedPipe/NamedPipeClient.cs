@@ -3,43 +3,28 @@ using System.Security.Principal;
 
 namespace UiPath.Ipc.Transport.NamedPipe;
 
-public sealed record NamedPipeClient : ClientBase
+public sealed class NamedPipeClientState : IClientState<NamedPipeClient, NamedPipeClientState>
+{
+    private NamedPipeClientStream? _pipe;
+
+    public Network? Network => _pipe;
+    public bool IsConnected() => _pipe?.IsConnected is true;
+
+    public async ValueTask Connect(NamedPipeClient client, CancellationToken ct)
+    {
+        _pipe = new NamedPipeClientStream(
+            client.ServerName,
+            client.PipeName,
+            PipeDirection.InOut,
+            PipeOptions.Asynchronous,
+            client.AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
+        await _pipe.ConnectAsync(ct);
+    }
+}
+
+public sealed record NamedPipeClient : ClientBase, IClient<NamedPipeClientState, NamedPipeClient>
 {
     public required string PipeName { get; init; }
     public string ServerName { get; init; } = ".";
     public bool AllowImpersonation { get; init; } = false;
-
-    protected internal override async Task<Network> Connect(CancellationToken ct)
-    {
-        var pipe = new NamedPipeClientStream(
-            ServerName,
-            PipeName,
-            PipeDirection.InOut,
-            PipeOptions.Asynchronous,
-            AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
-        await pipe.ConnectAsync(ct);
-        return pipe;
-    }
 }
-
-//public sealed record NamedPipeKey : IConnectionKey<NamedPipeKey, NamedPipeClientConnectionState>
-//{
-//    public required ClientBase DefaultConfig { get; init; }
-
-//    public async Task<Network> Connect(CancellationToken ct)
-//    {
-//        var pipe = new NamedPipeClientStream(
-//            ServerName, 
-//            PipeName, 
-//            PipeDirection.InOut, 
-//            PipeOptions.Asynchronous, 
-//            AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
-//        await pipe.ConnectAsync(ct);
-//        return pipe;
-//    }
-
-//    private sealed class NamedPipeClientConnectionState
-//    {
-//        public required NamedPipeClientStream Stream { get; init; }
-//    }
-//}

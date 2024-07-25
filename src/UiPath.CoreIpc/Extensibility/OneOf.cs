@@ -4,6 +4,9 @@ namespace UiPath.Ipc.Extensibility;
 
 public readonly struct OneOf<T1, T2> : IEquatable<OneOf<T1, T2>>
 {
+    public static implicit operator OneOf<T1, T2>?(T1? t1) => t1 is null ? null : new(t1);
+    public static implicit operator OneOf<T1, T2>?(T2? t2) => t2 is null ? null : new(t2);
+
     public static implicit operator OneOf<T1, T2>(T1 t1) => new(t1);
     public static implicit operator OneOf<T1, T2>(T2 t2) => new(t2);
 

@@ -5,18 +5,17 @@ public abstract record ClientBase : EndpointConfig
     public IServiceProvider? ServiceProvider { get; init; }
     public EndpointCollection? Callbacks { get; init; }
     public ILogger? Logger { get; init; }
+    public ConnectionFactory? ConnectionFactory { get; init; }
     public BeforeCallHandler? BeforeCall { get; init; }
     public TaskScheduler? Scheduler { get; init; }
-    public virtual void Validate() { }
 
+    internal ISerializer? Serializer { get; set; }
+
+    public virtual void Validate() { }
     public TProxy GetProxy<TProxy>() where TProxy : class
     {
         throw new NotImplementedException();
     }
-
-    protected internal abstract Task<Network> Connect(CancellationToken ct);
-
-    internal ISerializer? Serializer { get; set; }
 
     internal void ValidateInternal()
     {
@@ -70,4 +69,20 @@ public abstract record ClientBase : EndpointConfig
             };
         }
     }
+}
+
+public interface IClient<TState, TSelf>
+    where TSelf : IClient<TState, TSelf>
+    where TState : IClientState<TSelf, TState>
+{
+}
+
+public interface IClientState<TClient, TSelf>
+    where TSelf : IClientState<TClient, TSelf>
+    where TClient : IClient<TSelf, TClient>
+{
+    Network? Network { get; }
+
+    bool IsConnected();
+    ValueTask Connect(TClient client, CancellationToken ct);
 }

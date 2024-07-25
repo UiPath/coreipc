@@ -58,7 +58,7 @@ internal abstract class ServerConnection : IClient, IDisposable
 
             _connectionAsTask ??= Task.FromResult(Connection!);
 
-            var serviceClient = new CallbackServiceClient<TCallbackInterface>(Connection!, Listener);
+            var serviceClient = new ServiceClientForCallback<TCallbackInterface>(Connection!, Listener);
 
             // TODO: delete
             var serviceClient2 = new ServiceClientBase<TCallbackInterface>(new ClientBase()
