@@ -1,7 +1,7 @@
-﻿using System.Text;
+﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.Ipc.WebSockets;
-using Microsoft.Extensions.DependencyInjection;
+using System.Text;
+using UiPath.Ipc.BackCompat;
 
 namespace UiPath.Ipc.Tests;
 

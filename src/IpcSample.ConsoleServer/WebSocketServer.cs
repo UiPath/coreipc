@@ -1,8 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using System.Net;
-using System.Net.WebSockets;
-using UiPath.Ipc.WebSockets;
+using UiPath.Ipc.BackCompat;
+using UiPath.Ipc.Transport.WebSocket;
 namespace UiPath.Ipc.Tests;
 class WebSocketServer
 {
@@ -23,20 +22,20 @@ class WebSocketServer
         // build and run service host
         //var data = File.ReadAllBytes(@"../../../../localhost.pfx");
         var host = new ServiceHostBuilder(serviceProvider)
-            .UseWebSockets(new(new HttpSysWebSocketsListener("http://localhost:1212/wsDemo/").Accept)
+            .UseWebSockets(new WebSocketListener()
             {
+                Accept = new HttpSysWebSocketsListener("http://localhost:1212/wsDemo/").Accept,
                 RequestTimeout = TimeSpan.FromSeconds(2),
                 //Certificate = new X509Certificate(data, "1"),
             })
             .AddEndpoint<IComputingService>()
             .AddEndpoint<ISystemService>()
-            .AllowCallback(typeof(IComputingCallback))
             .ValidateAndBuild();
-        await await Task.WhenAny(host.RunAsync(), Task.Run(() =>
+        await await Task.WhenAny(host.RunAsync(), Task.Run(async () =>
         {
             Console.WriteLine(typeof(int).Assembly);
             Console.ReadLine();
-            host.Dispose();
+            await host.DisposeAsync();
         }));
         Console.WriteLine("Server stopped.");
         return;

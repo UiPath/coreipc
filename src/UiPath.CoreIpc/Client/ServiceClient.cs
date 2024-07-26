@@ -21,6 +21,9 @@ internal abstract class ServiceClient : IDisposable
     protected abstract ILogger? Log { get; }
     protected abstract string DebugName { get; }
     protected abstract ISerializer? Serializer { get; }
+    public abstract Stream? Network { get; }
+
+    public event EventHandler? ConnectionClosed;
 
     private readonly Type _interfaceType;
 
@@ -28,6 +31,8 @@ internal abstract class ServiceClient : IDisposable
     {
         _interfaceType = interfaceType;
     }
+
+    protected void RaiseConnectionClosed() => ConnectionClosed?.Invoke(this, EventArgs.Empty);
 
     public virtual ValueTask CloseConnection() => throw new NotSupportedException();
     public object? Invoke(MethodInfo method, object?[] args) => GetInvokeDelegate(method.ReturnType)(this, method, args);
@@ -145,6 +150,32 @@ internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
     private Connection? _latestConnection;
     private Server? _latestServer;
 
+    private Connection? LatestConnection
+    {
+        get => _latestConnection;
+        set
+        {
+            if (_latestConnection == value)
+            {
+                return;
+            }
+
+            if (_latestConnection is not null)
+            {
+                _latestConnection.Closed -= LatestConnection_Closed;
+            }
+
+            _latestConnection = value;
+
+            if (_latestConnection is not null)
+            {
+                _latestConnection.Closed += LatestConnection_Closed;
+            }
+        }
+    }
+
+    public override Stream? Network => LatestConnection?.Network;
+
     public ServiceClientProper(TClient client, Type interfaceType) : base(interfaceType)
     {
         _client = client;
@@ -158,6 +189,8 @@ internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
             _latestConnection = null;
         }
     }
+
+    private void LatestConnection_Closed(object? sender, EventArgs e) => RaiseConnectionClosed();
 
     protected override async Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct)
     {
@@ -206,6 +239,8 @@ internal sealed class ServiceClientForCallback : ServiceClient
     private readonly Connection _connection;
     private readonly Listener _listener;
 
+    public override Stream? Network => _connection.Network;
+
     public ServiceClientForCallback(Connection connection, Listener listener, Type interfaceType) : base(interfaceType)
     {
         _connection = connection;
@@ -233,4 +268,12 @@ public class IpcProxy : DispatchProxy, IDisposable
     public void Dispose() => ServiceClient?.Dispose();
 
     public ValueTask CloseConnection() => ServiceClient.CloseConnection();
+
+    public event EventHandler ConnectionClosed
+    {
+        add => ServiceClient.ConnectionClosed += value;
+        remove => ServiceClient.ConnectionClosed -= value;
+    }
+
+    public Stream? Network => ServiceClient.Network;
 }

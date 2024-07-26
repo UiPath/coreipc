@@ -8,18 +8,20 @@ public sealed class IpcServer : IAsyncDisposable
     public TaskScheduler? Scheduler { get; init; }
 
     private readonly Lazy<Task<IAsyncDisposable?>> _started;
+    private readonly TaskCompletionSource<object?> _tcsStopped = new();
 
     public IpcServer() => _started = new(StartCore);
 
-    public async Task Start()
+    public void Start()
     {
         if (!IsValid(out var errors))
         {
             throw new InvalidOperationException($"ValidationErrors:\r\n{string.Join("\r\n", errors)}");
         }
 
-        await _started.Value;
+        _ = _started.Value;
     }
+    public Task WaitForStop() => _tcsStopped.Task;
 
     private async Task<IAsyncDisposable?> StartCore()
     {
@@ -28,7 +30,7 @@ public sealed class IpcServer : IAsyncDisposable
             return null;
         }
 
-        var disposables = new AsyncCollectionDisposable();
+        var disposables = new StopAdapter(this);
         try
         {
             foreach (var listenerConfig in Listeners)
@@ -37,9 +39,10 @@ public sealed class IpcServer : IAsyncDisposable
             }
             return disposables;
         }
-        catch
+        catch (Exception ex)
         {
             await disposables.DisposeAsync();
+            _tcsStopped.TrySetException(ex);
             throw;
         }
     }
@@ -56,9 +59,12 @@ public sealed class IpcServer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     => await ((await _started.Value)?.DisposeAsync() ?? default);
 
-    private sealed class AsyncCollectionDisposable : IAsyncDisposable
+    private sealed class StopAdapter : IAsyncDisposable
     {
         private readonly List<IAsyncDisposable> _items = new();
+        private readonly IpcServer _server;
+
+        public StopAdapter(IpcServer server) => _server = server;
 
         public void Add(IAsyncDisposable item) => _items.Add(item);
 
@@ -68,6 +74,7 @@ public sealed class IpcServer : IAsyncDisposable
             {
                 await item.DisposeAsync();
             }
+            _server._tcsStopped.TrySetResult(null);
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿using System.Text;
 using System.Diagnostics;
-using UiPath.Ipc.Tcp;
+using UiPath.Ipc.BackCompat;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 

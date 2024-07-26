@@ -1,4 +1,6 @@
-﻿namespace UiPath.Ipc.Tests;
+﻿using UiPath.Ipc.BackCompat;
+
+namespace UiPath.Ipc.Tests;
 
 public class ValidationTests
 {
@@ -41,18 +43,7 @@ public class ValidationTests
     [Fact]
     public void DownloadDerivedStream() => new Action(() => new NamedPipeClientBuilder<IDerivedStreamDownload>("").ValidateAndBuild()).ShouldThrow<ArgumentException>().Message.ShouldStartWith("Stream parameters must be typed as Stream!");
     [Fact]
-    public void TheCallbackContractMustBeAnInterface()
-    {
-        var action = () =>
-        {
-            Callback.Set<ValidationTests>(IpcHelpers.ConfigureServices());
-            _ = new NamedPipeClientBuilder<ISystemService>(pipeName: "").ValidateAndBuild();
-        };
-        
-        action
-            .ShouldThrow<ArgumentOutOfRangeException>()
-            .Message.ShouldStartWith("The contract must be an interface!");
-    }
+    public void TheCallbackContractMustBeAnInterface() => new Action(() => new NamedPipeClientBuilder<ISystemService, ValidationTests>("", IpcHelpers.ConfigureServices()).ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");
 
     [Fact]
     public void TheServiceContractMustBeAnInterface() => new Action(() => new ServiceHostBuilder(IpcHelpers.ConfigureServices()).AddEndpoint<ValidationTests>().ValidateAndBuild()).ShouldThrow<ArgumentOutOfRangeException>().Message.ShouldStartWith("The contract must be an interface!");

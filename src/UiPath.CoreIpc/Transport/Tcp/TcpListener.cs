@@ -3,15 +3,15 @@ using System.Net.Sockets;
 
 namespace UiPath.Ipc.Transport.Tcp;
 
-using ITcpListenerConfig = IListenerConfig<TcpListenerConfig, TcpListenerState, TcpServerConnectionState>;
+using ITcpListenerConfig = IListenerConfig<TcpListener, TcpListenerState, TcpServerConnectionState>;
 
-public sealed record TcpListenerConfig : ListenerConfig, ITcpListenerConfig
+public sealed record TcpListener : ListenerConfig, ITcpListenerConfig
 {
     public required IPEndPoint EndPoint { get; init; }
 
     TcpListenerState ITcpListenerConfig.CreateListenerState(IpcServer server)
     {
-        var listener = new TcpListener(EndPoint);
+        var listener = new System.Net.Sockets.TcpListener(EndPoint);
         listener.Start(backlog: ConcurrentAccepts);
 
         return new() { Listener = listener };
@@ -37,7 +37,7 @@ public sealed record TcpListenerConfig : ListenerConfig, ITcpListenerConfig
 
 internal sealed class TcpListenerState : IAsyncDisposable
 {
-    public required TcpListener Listener { get; init; }
+    public required System.Net.Sockets.TcpListener Listener { get; init; }
 
     public ValueTask DisposeAsync()
     {

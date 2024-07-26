@@ -1,4 +1,6 @@
-﻿namespace UiPath.Ipc.Tests;
+﻿using UiPath.Ipc.BackCompat;
+
+namespace UiPath.Ipc.Tests;
 
 public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : ServiceClientBuilder<TBuilder, IComputingService>
 {
@@ -12,7 +14,6 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
         _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
         _computingHost = Configure(new ServiceHostBuilder(_serviceProvider))
             .AddEndpoint<IComputingService>()
-            .AllowCallback(typeof(IComputingCallback))
             .ValidateAndBuild();
         _computingHost.RunAsync(GuiScheduler);
         _computingClient = ComputingClientBuilder(GuiScheduler).ValidateAndBuild();
@@ -120,11 +121,11 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
         returnValue.ShouldBe($"{Environment.UserName}_{_computingCallback.Id}_{message.Text}");
     }
 
-    public override void Dispose()
+    public override async ValueTask DisposeAsync()
     {
         ((IDisposable)_computingClient).Dispose();
-        ((IpcProxy)_computingClient).CloseConnection();
-        _computingHost.Dispose();
-        base.Dispose();
+        await ((IpcProxy)_computingClient).CloseConnection();
+        await _computingHost.DisposeAsync();
+        await base.DisposeAsync();
     }
 }

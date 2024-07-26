@@ -1,7 +1,7 @@
-﻿using System.Text;
+﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.Ipc.NamedPipe;
-using Microsoft.Extensions.DependencyInjection;
+using System.Text;
+using UiPath.Ipc.BackCompat;
 
 namespace UiPath.Ipc.Tests;
 
@@ -31,9 +31,8 @@ class Client
     {
         var serviceProvider = ConfigureServices();
         var callback = new ComputingCallback { Id = "custom made" };
-        Callback.Set(callback, serviceProvider);
-        var computingClientBuilder = new NamedPipeClientBuilder<IComputingService>("test", serviceProvider)
-            .AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
+        var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>("test", serviceProvider)
+            .CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
         try
@@ -41,14 +40,10 @@ class Client
             var computingClient = computingClientBuilder.ValidateAndBuild();
             var systemClient =
                 new NamedPipeClientBuilder<ISystemService>("test")
-                    .RequestTimeout(TimeSpan.FromSeconds(2))
-                    .DontReconnect()
-                    .DontReconnect()
-                    .BeforeCall()
-                    .Logger(serviceProvider)
-                    .AllowImpersonation()
-                    .ValidateAndBuild();
-
+                .RequestTimeout(TimeSpan.FromSeconds(2))
+                .Logger(serviceProvider)
+                .AllowImpersonation()
+                .ValidateAndBuild();
             for (int i = 0; i < int.MaxValue; i++)
             {
                 // test 1: call IPC service method with primitive types
@@ -113,7 +108,7 @@ class Client
         {
             stopwatch.Stop();
             Console.WriteLine();
-            Console.WriteLine("Calls per second: " + count*8 / stopwatch.Elapsed.TotalSeconds);
+            Console.WriteLine("Calls per second: " + count * 8 / stopwatch.Elapsed.TotalSeconds);
             Console.WriteLine();
         }
         // test 10: call slow IPC service method

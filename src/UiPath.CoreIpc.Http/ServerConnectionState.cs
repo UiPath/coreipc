@@ -3,5 +3,5 @@ using System.IO.Pipelines;
 using System.Net;
 using UiPath.Ipc;
 
-namespace UiPath.CoreIpc.Http;
+namespace UiPath.Ipc.Http;
 

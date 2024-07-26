@@ -9,15 +9,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\UiPath.CoreIpc.BackCompat\UiPath.CoreIpc.BackCompat.csproj" />
     <ProjectReference Include="..\UiPath.CoreIpc.Tests\UiPath.CoreIpc.Tests.csproj" />
     <ProjectReference Include="..\UiPath.CoreIpc\UiPath.CoreIpc.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="6.0.0" />
   </ItemGroup>
   
 </Project>

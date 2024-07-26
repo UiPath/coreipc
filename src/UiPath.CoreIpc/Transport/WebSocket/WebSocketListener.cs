@@ -1,8 +1,8 @@
 ﻿namespace UiPath.Ipc.Transport.WebSocket;
 
-using IWebSocketListenerConfig = IListenerConfig<WebSocketListenerConfig, WebSocketListenerState, WebSocketServerConnectionState>;
+using IWebSocketListenerConfig = IListenerConfig<WebSocketListener, WebSocketListenerState, WebSocketServerConnectionState>;
 
-public sealed record WebSocketListenerConfig : ListenerConfig, IWebSocketListenerConfig
+public sealed record WebSocketListener : ListenerConfig, IWebSocketListenerConfig
 {
     public required Accept Accept { get; init; }
 

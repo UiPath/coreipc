@@ -4,10 +4,11 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipelines;
 using System.Net;
+using System.Net.Http;
 using System.Threading.Channels;
 using UiPath.Ipc;
 
-namespace UiPath.CoreIpc.Http;
+namespace UiPath.Ipc.Http;
 
 using static Constants;
 using IBidiHttpListenerConfig = IListenerConfig<BidiHttpListener, BidiHttpListenerState, BidiHttpServerConnectionState>;
@@ -194,10 +195,14 @@ internal sealed class BidiHttpServerConnectionState : IAsyncDisposable, IAsyncSt
 
     private async Task ProcessContexts(CancellationToken ct)
     {
-        var reader = _listenerState.GetConnectionChannel(_connection!.Value.connectionId);
+        var reader = _listenerState.GetConnectionChannel(_connection!.Value.connectionId);        
 
-        await foreach (var context in reader.ReadAllAsync(ct))
+        while (await reader.WaitToReadAsync(ct))
         {
+            if (!reader.TryRead(out var context))
+            {
+                continue;
+            }
             await ProcessContext(context);
         }
 
@@ -248,10 +253,14 @@ internal sealed class BidiHttpServerConnectionState : IAsyncDisposable, IAsyncSt
             throw new InvalidOperationException();
         }
 
-        await _client.PostAsync(
-            requestUri: "",
-            new ReadOnlyMemoryContent(memory),
-            ct);
+        HttpContent content =
+#if NET461
+        new ByteArrayContent(memory.ToArray());
+#else
+        new ReadOnlyMemoryContent(memory);
+#endif
+
+        await _client.PostAsync(requestUri: "", content, ct);
     }
 
     ValueTask IAsyncStream.Flush(CancellationToken ct) => default;

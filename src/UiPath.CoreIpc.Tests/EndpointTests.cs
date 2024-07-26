@@ -1,6 +1,9 @@
-﻿namespace UiPath.Ipc.Tests;
+﻿using UiPath.Ipc.BackCompat;
+using UiPath.Ipc.Transport.NamedPipe;
 
-public class EndpointTests : IDisposable
+namespace UiPath.Ipc.Tests;
+
+public class EndpointTests : IAsyncDisposable
 {
     private static TimeSpan RequestTimeout => TestBase.RequestTimeout;
     private readonly ServiceHost _host;
@@ -11,6 +14,7 @@ public class EndpointTests : IDisposable
     private readonly ComputingCallback _computingCallback;
     private readonly SystemCallback _systemCallback;
     private readonly IServiceProvider _serviceProvider;
+
     public EndpointTests()
     {
         _computingCallback = new ComputingCallback { Id = Guid.NewGuid().ToString() };
@@ -19,44 +23,43 @@ public class EndpointTests : IDisposable
         _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
         _systemService = (SystemService)_serviceProvider.GetService<ISystemService>();
         _host = new ServiceHostBuilder(_serviceProvider)
-            .UseNamedPipes(new NamedPipeSettings(PipeName) { RequestTimeout = RequestTimeout })
+            .UseNamedPipes(new NamedPipeListener()
+            {
+                PipeName = PipeName,
+                RequestTimeout = RequestTimeout
+            })
             .AddEndpoint<IComputingServiceBase>()
             .AddEndpoint<IComputingService>()
             .AddEndpoint<ISystemService>()
-            .AllowCallback(typeof(IComputingCallback))
-            .AllowCallback(typeof(ISystemCallback))
             .ValidateAndBuild();
         _host.RunAsync();
         _computingClient = ComputingClientBuilder().ValidateAndBuild();
         _systemClient = CreateSystemService();
     }
-    public string PipeName => nameof(EndpointTests)+GetHashCode();
-    private NamedPipeClientBuilder<IComputingService> ComputingClientBuilder(TaskScheduler taskScheduler = null)
-    {
-        Ipc.Callback.Set<IComputingCallback>(_computingCallback, taskScheduler);
+    public string PipeName => nameof(EndpointTests) + GetHashCode();
 
-        return new NamedPipeClientBuilder<IComputingService>(PipeName)
-            .AllowImpersonation()
-            .RequestTimeout(RequestTimeout);
-    }
+    private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null)
+    => new NamedPipeClientBuilder<IComputingService, IComputingCallback>(PipeName, _serviceProvider)
+        .AllowImpersonation()
+        .RequestTimeout(RequestTimeout)
+        .CallbackInstance(_computingCallback)
+        .TaskScheduler(taskScheduler);
 
     private ISystemService CreateSystemService() => SystemClientBuilder().ValidateAndBuild();
-    private NamedPipeClientBuilder<ISystemService> SystemClientBuilder()
-    {
-        Ipc.Callback.Set<ISystemCallback>(_systemCallback);
 
-        return new NamedPipeClientBuilder<ISystemService>(PipeName)
-            .RequestTimeout(RequestTimeout)
-            .AllowImpersonation();
-    }
+    private NamedPipeClientBuilder<ISystemService, ISystemCallback> SystemClientBuilder()
+    => new NamedPipeClientBuilder<ISystemService, ISystemCallback>(PipeName, _serviceProvider)
+        .CallbackInstance(_systemCallback)
+        .RequestTimeout(RequestTimeout)
+        .AllowImpersonation();
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         ((IDisposable)_computingClient).Dispose();
         ((IDisposable)_systemClient).Dispose();
-        ((IpcProxy)_computingClient).CloseConnection();
-        ((IpcProxy)_systemClient).CloseConnection();
-        _host.Dispose();
+        await ((IpcProxy)_computingClient).CloseConnection();
+        await ((IpcProxy)_systemClient).CloseConnection();
+        await _host.DisposeAsync();
     }
     [Fact]
     public Task CallbackConcurrently() => Task.WhenAll(Enumerable.Range(1, 50).Select(_ => CallbackCore()));
@@ -66,7 +69,7 @@ public class EndpointTests : IDisposable
         for (int index = 0; index < 50; index++)
         {
             await CallbackCore();
-            ((IpcProxy)_computingClient).CloseConnection();
+            await ((IpcProxy)_computingClient).CloseConnection();
         }
     }
 

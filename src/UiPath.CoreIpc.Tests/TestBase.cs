@@ -1,8 +1,9 @@
 ﻿using Nito.AsyncEx;
+using UiPath.Ipc.BackCompat;
 
 namespace UiPath.Ipc.Tests;
 
-public abstract class TestBase : IDisposable
+public abstract class TestBase : IAsyncDisposable
 {
     protected const int MaxReceivedMessageSizeInMegabytes = 1;
     protected static int Count = -1;
@@ -29,12 +30,17 @@ public abstract class TestBase : IDisposable
 
     protected TaskScheduler GuiScheduler => _guiThread.Scheduler;
 
-    public virtual void Dispose() => _guiThread.Dispose();
-    protected virtual TSettings Configure<TSettings>(TSettings listenerSettings) where TSettings : ListenerSettings
-    {
-        listenerSettings.RequestTimeout = RequestTimeout;
-        listenerSettings.MaxReceivedMessageSizeInMegabytes = MaxReceivedMessageSizeInMegabytes;
-        return listenerSettings;
-    }
+    public virtual async ValueTask DisposeAsync() => _guiThread.Dispose();
+
+    protected virtual TListenerConfig Configure<TListenerConfig>(TListenerConfig listenerConfig) where TListenerConfig : ListenerConfig
+    => ConfigureCore(listenerConfig, RequestTimeout, MaxReceivedMessageSizeInMegabytes);
+
     protected abstract ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder);
+
+    internal static TConfig ConfigureCore<TConfig>(TConfig listenerConfig, TimeSpan requestTimeout, byte maxReceivedMessageSizeInMegabytes) where TConfig : ListenerConfig
+    => listenerConfig with
+    {
+        RequestTimeout = requestTimeout,
+        MaxReceivedMessageSizeInMegabytes = maxReceivedMessageSizeInMegabytes
+    };
 }

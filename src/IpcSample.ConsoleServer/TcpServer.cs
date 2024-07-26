@@ -1,9 +1,12 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using System.Net;
-using UiPath.Ipc.Tcp;
+using UiPath.Ipc.BackCompat;
+using UiPath.Ipc.Transport.Tcp;
 
 namespace UiPath.Ipc.Tests;
+
+using IPEndPoint = System.Net.IPEndPoint;
+using IPAddress = System.Net.IPAddress;
 
 class TcpServer
 {
@@ -25,21 +28,21 @@ class TcpServer
         // build and run service host
         var data = File.ReadAllBytes(@"../../../../localhost.pfx");
         var host = new ServiceHostBuilder(serviceProvider)
-            .UseTcp(new TcpSettings(SystemEndPoint)
+            .UseTcp(new TcpListener()
             {
+                EndPoint = SystemEndPoint,
                 RequestTimeout = TimeSpan.FromSeconds(2),
                 //Certificate = new X509Certificate(data, "1"),
             })
             .AddEndpoint<IComputingService>()
             .AddEndpoint<ISystemService>()
-            .AllowCallback(typeof(IComputingCallback))
             .ValidateAndBuild();
 
-        await await Task.WhenAny(host.RunAsync(), Task.Run(() =>
+        await await Task.WhenAny(host.RunAsync(), Task.Run(async () =>
         {
             Console.WriteLine(typeof(int).Assembly);
             Console.ReadLine();
-            host.Dispose();
+            await host.DisposeAsync();
         }));
 
         Console.WriteLine("Server stopped.");

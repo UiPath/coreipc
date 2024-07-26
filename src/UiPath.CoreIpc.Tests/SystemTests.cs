@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using UiPath.Ipc.BackCompat;
 
 namespace UiPath.Ipc.Tests;
 
@@ -16,19 +17,20 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         _systemHost.RunAsync(GuiScheduler);
         _systemClient = CreateSystemService();
     }
-    protected override TSettings Configure<TSettings>(TSettings listenerSettings)
+    protected override TConfig Configure<TConfig>(TConfig listenerConfig)
+    => base.Configure(listenerConfig) with
     {
-        base.Configure(listenerSettings);
-        listenerSettings.ConcurrentAccepts = 10;
-        listenerSettings.RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1));
-        return listenerSettings;
-    }
-    public override void Dispose()
+        ConcurrentAccepts = 10,
+        RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1))
+    };
+
+    public override async ValueTask DisposeAsync()
     {
         ((IDisposable)_systemClient).Dispose();
-        ((IpcProxy)_systemClient).CloseConnection();
-        _systemHost.Dispose();
-        base.Dispose();
+        await ((IpcProxy)_systemClient).CloseConnection();
+
+        await _systemHost.DisposeAsync();
+        await base.DisposeAsync();
     }
     [Fact]
     public async Task ConcurrentRequests()
@@ -152,7 +154,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     [Fact]
     public async Task CancelUpload()
     {
-        var stream = new MemoryStream(Enumerable.Range(1, 50000).Select(i=>(byte)i).ToArray());
+        var stream = new MemoryStream(Enumerable.Range(1, 50000).Select(i => (byte)i).ToArray());
         await _systemClient.GetThreadName();
         using (var cancellationSource = new CancellationTokenSource(5))
         {
@@ -197,7 +199,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     protected TBuilder SystemClientBuilder() => CreateSystemClientBuilder().RequestTimeout(RequestTimeout).Logger(_serviceProvider);
     [Fact]
     public async Task BeforeCall()
-    {
+    {        
         bool newConnection = false;
         var proxy = SystemClientBuilder().BeforeCall(async (c, _) =>
         {
@@ -214,8 +216,8 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         newConnection.ShouldBeFalse();
         var ipcProxy = (IpcProxy)proxy;
         var closed = false;
-        ipcProxy.Connection.Closed += delegate { closed = true; };
-        ipcProxy.CloseConnection();
+        ipcProxy.ConnectionClosed += delegate { closed = true; };
+        await ipcProxy.CloseConnection();
         closed.ShouldBeTrue();
         newConnection.ShouldBeFalse();
         await proxy.FireAndForget();
@@ -223,7 +225,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
 
         await proxy.FireAndForget();
         newConnection.ShouldBeFalse();
-        ipcProxy.CloseConnection();
+        await ipcProxy.CloseConnection();
     }
 
     [Fact]
@@ -231,7 +233,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     {
         var proxy = SystemClientBuilder().DontReconnect().ValidateAndBuild();
         await proxy.GetGuid(System.Guid.Empty);
-        ((IpcProxy)proxy).CloseConnection();
+        await ((IpcProxy)proxy).CloseConnection();
         ObjectDisposedException exception = null;
         try
         {
@@ -270,7 +272,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         var newGuid = System.Guid.NewGuid();
         (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
         await Task.Delay(1);
-        _systemHost.Dispose();
+        await _systemHost.DisposeAsync();
         sendMessageResult.ShouldThrow<Exception>();
     }
     [Fact]
@@ -278,7 +280,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     {
         var newGuid = System.Guid.NewGuid();
         MethodInfo method = null;
-        using var protectedService = Configure(new ServiceHostBuilder(_serviceProvider))
+        await using var protectedService = Configure(new ServiceHostBuilder(_serviceProvider))
             .AddEndpoint(new EndpointSettings<ISystemService>()
             {
                 BeforeCall = async (call, ct) =>

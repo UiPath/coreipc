@@ -54,7 +54,7 @@ using System;
 
 public class EndpointSettings
 {
-    internal TaskScheduler Scheduler { get; set; }
+    internal TaskScheduler? Scheduler { get; set; }
 
     public BeforeCallHandler? BeforeCall { get; set; }
     internal ServiceFactory Service { get; }
@@ -85,10 +85,24 @@ public class EndpointSettings
     private protected EndpointSettings(ServiceFactory service) => Service = service;
 
     public void Validate() => Validator.Validate(Service.Type);
+
+    protected internal virtual EndpointSettings WithServiceProvider(IServiceProvider serviceProvider)
+    => new EndpointSettings(Service.Type, serviceProvider)
+    {
+        BeforeCall = BeforeCall,
+        Scheduler = Scheduler
+    };
 }
 
 public class EndpointSettings<TContract> : EndpointSettings where TContract : class
 {
     public EndpointSettings(TContract? serviceInstance = null) : base(typeof(TContract), serviceInstance) { }
     public EndpointSettings(IServiceProvider serviceProvider) : base(typeof(TContract), serviceProvider) { }
+
+    protected internal override EndpointSettings WithServiceProvider(IServiceProvider serviceProvider)
+    => new EndpointSettings<TContract>(serviceProvider)
+    {
+        BeforeCall = BeforeCall,
+        Scheduler = Scheduler
+    };
 }

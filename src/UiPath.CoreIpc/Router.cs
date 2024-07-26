@@ -39,6 +39,8 @@ internal abstract record ServiceFactory
 
     public virtual ServiceFactory WithProvider(IServiceProvider? serviceProvider) => this;
 
+    internal virtual object? MaybeGetInstance() => null;
+
     public sealed record Injected : ServiceFactory
     {
         public required IServiceProvider ServiceProvider { get; init; }
@@ -64,6 +66,8 @@ internal abstract record ServiceFactory
     public sealed record Instance : ServiceFactory
     {
         public required object ServiceInstance { get; init; }
+
+        internal override object? MaybeGetInstance() => ServiceInstance;
 
         public override IDisposable? Get(out object service)
         {

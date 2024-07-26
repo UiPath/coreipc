@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc.Http;
+﻿namespace UiPath.Ipc.Http;
 
 internal static class Constants
 {

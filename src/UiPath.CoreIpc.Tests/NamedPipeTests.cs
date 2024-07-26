@@ -1,13 +1,18 @@
 ﻿using System.IO;
 using System.IO.Pipes;
 using System.Security.Principal;
+using UiPath.Ipc.BackCompat;
+using UiPath.Ipc.Transport.NamedPipe;
 namespace UiPath.Ipc.Tests;
 
 public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemService>>
 {
     string _pipeName = "system";
     protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder) =>
-        serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings(_pipeName + GetHashCode())));
+        serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeListener()
+        {
+            PipeName = _pipeName + GetHashCode()
+        }));
     protected override NamedPipeClientBuilder<ISystemService> CreateSystemClientBuilder() =>
         new NamedPipeClientBuilder<ISystemService>(_pipeName + GetHashCode()).AllowImpersonation();
     [Fact]
@@ -29,9 +34,10 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
     public async Task PipeSecurityForWindows()
     {
         _pipeName = "protected";
-        using var protectedService = new ServiceHostBuilder(_serviceProvider)
-            .UseNamedPipes(Configure(new NamedPipeSettings(_pipeName+GetHashCode())
+        await using var protectedService = new ServiceHostBuilder(_serviceProvider)
+            .UseNamedPipes(Configure(new NamedPipeListener()
             {
+                PipeName = _pipeName + GetHashCode(),
                 AccessControl = pipeSecurity => pipeSecurity.Deny(WellKnownSidType.WorldSid, PipeAccessRights.FullControl)
             }))
             .AddEndpoint<ISystemService>()
@@ -66,7 +72,7 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
 
         var delayTask = _systemClient.Delay(500);
         await Task.Delay(100);
-        var pipeStream = ((IpcProxy)_systemClient).Connection.Network as PipeStream;
+        var pipeStream = ((IpcProxy)_systemClient).Network as PipeStream;
         SystemService.CancelIoEx(pipeStream.SafePipeHandle.DangerousGetHandle(), IntPtr.Zero).ShouldBeTrue();
 
         (await delayTask).ShouldBeTrue();
@@ -76,17 +82,15 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
     }
 #endif
 }
-public class ComputingNamedPipeTests : ComputingTests<NamedPipeClientBuilder<IComputingService>>
+public class ComputingNamedPipeTests : ComputingTests<NamedPipeClientBuilder<IComputingService, IComputingCallback>>
 {
     protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder) =>
-        serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeSettings("computing" + GetHashCode())));
+        serviceHostBuilder.UseNamedPipes(Configure(new NamedPipeListener { PipeName = "computing" + GetHashCode() }));
 
-    protected override NamedPipeClientBuilder<IComputingService> ComputingClientBuilder(TaskScheduler taskScheduler = null)
-    {
-        Ipc.Callback.Set<IComputingCallback>(_serviceProvider, taskScheduler);
-
-        return new NamedPipeClientBuilder<IComputingService>("computing" + GetHashCode())
-            .AllowImpersonation()
-            .RequestTimeout(RequestTimeout);
-    }
+    protected override NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
+    new NamedPipeClientBuilder<IComputingService, IComputingCallback>("computing" + GetHashCode(), _serviceProvider)
+        .AllowImpersonation()
+        .RequestTimeout(RequestTimeout)
+        .CallbackInstance(_computingCallback)
+        .TaskScheduler(taskScheduler);
 }

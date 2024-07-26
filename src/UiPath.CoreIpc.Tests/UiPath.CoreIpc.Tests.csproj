@@ -11,10 +11,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\UiPath.CoreIpc.BackCompat\UiPath.CoreIpc.BackCompat.csproj" />
+    <ProjectReference Include="..\UiPath.CoreIpc.Http\UiPath.CoreIpc.Http.csproj" />
     <ProjectReference Include="..\UiPath.CoreIpc\UiPath.CoreIpc.csproj" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.TraceSource" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="5.0.0" />
+    <PackageReference Include="AutoFixture" Version="4.18.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.TraceSource" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="6.0.0" />
     <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
     <PackageReference Include="Shouldly" Version="4.0.3" />
     <PackageReference Include="xunit" Version="2.4.1" />
@@ -27,6 +30,5 @@
     <Using Include="Microsoft.Extensions.DependencyInjection" />
     <Using Include="System.Reflection" />
     <Using Include="System.Diagnostics" />
-    <Using Include="UiPath.Ipc.NamedPipe" />
   </ItemGroup>
 </Project>
