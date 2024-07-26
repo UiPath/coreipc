@@ -173,7 +173,14 @@ public static class IOHelpers
     {
         using (recyclableStream)
         {
-            await recyclableStream.CopyToAsync(stream, 0, cancellationToken);
+            try
+            {
+                await recyclableStream.CopyToAsync(stream, 0, cancellationToken);
+            }
+            catch
+            {
+                throw;
+            }
         }
     }
     internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) =>

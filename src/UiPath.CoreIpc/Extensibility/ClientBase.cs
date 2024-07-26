@@ -1,4 +1,6 @@
-﻿namespace UiPath.Ipc;
+﻿using UiPath.Ipc.Transport.Tcp;
+
+namespace UiPath.Ipc;
 
 public abstract record ClientBase : EndpointConfig
 {
@@ -12,10 +14,6 @@ public abstract record ClientBase : EndpointConfig
     internal ISerializer? Serializer { get; set; }
 
     public virtual void Validate() { }
-    public TProxy GetProxy<TProxy>() where TProxy : class
-    {
-        throw new NotImplementedException();
-    }
 
     internal void ValidateInternal()
     {
@@ -72,14 +70,35 @@ public abstract record ClientBase : EndpointConfig
 }
 
 public interface IClient<TState, TSelf>
-    where TSelf : IClient<TState, TSelf>
-    where TState : IClientState<TSelf, TState>
+    where TSelf : ClientBase, IClient<TState, TSelf>
+    where TState : class, IClientState<TSelf, TState>, new()
 {
 }
 
-public interface IClientState<TClient, TSelf>
-    where TSelf : IClientState<TClient, TSelf>
-    where TClient : IClient<TSelf, TClient>
+public static class ClientExtensions
+{
+    public static ProxyFactory<TClient, TClientState> GetProxyFactory<TClient, TClientState>(this IClient<TClientState, TClient> client)
+        where TClient : ClientBase, IClient<TClientState, TClient>
+        where TClientState : class, IClientState<TClient, TClientState>, new()
+    => new(client as TClient ?? throw new ArgumentOutOfRangeException(nameof(client)));
+
+    public readonly struct ProxyFactory<TClient, TClientState>
+        where TClient : ClientBase, IClient<TClientState, TClient>
+        where TClientState : class, IClientState<TClient, TClientState>, new()
+    {
+        private readonly TClient _client;
+
+        internal ProxyFactory(TClient client) => _client = client;
+
+        public TProxy GetProxy<TProxy>() where TProxy : class
+        => new ServiceClientProper<TClient, TClientState>(_client, typeof(TProxy))
+            .CreateProxy<TProxy>();
+    }
+}
+
+public interface IClientState<TClient, TSelf> : IDisposable
+    where TSelf : class, IClientState<TClient, TSelf>, new()
+    where TClient : ClientBase, IClient<TSelf, TClient>
 {
     Network? Network { get; }
 

@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Playground;
-using UiPath.CoreIpc.Http;
 using UiPath.Ipc;
 using UiPath.Ipc.Transport.NamedPipe;
 
@@ -42,8 +41,7 @@ internal class Program
             Endpoints = new()
             {
                 typeof(Contracts.IServerOperations),
-                typeof(Contracts.IClientOperations2),
-                { typeof(Contracts.IClientOperations2), new object() }
+                typeof(Contracts.IClientOperations2)
             },
             Listeners = [
                 new NamedPipeListener()
@@ -88,7 +86,9 @@ internal class Program
                 { typeof(Contracts.IClientOperations2), new Impl.Client2() }
             },
             Scheduler = clientScheduler
-        }.GetProxy<Contracts.IServerOperations>();
+        }
+            .GetProxyFactory()
+            .GetProxy<Contracts.IServerOperations>();
 
         await proxy1.Register();
         await proxy1.Broadcast("Hello Bidirectional Http!");

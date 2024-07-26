@@ -3,7 +3,14 @@ using System.Security.Principal;
 
 namespace UiPath.Ipc.Transport.NamedPipe;
 
-public sealed class NamedPipeClientState : IClientState<NamedPipeClient, NamedPipeClientState>
+public sealed record NamedPipeClient : ClientBase, IClient<NamedPipeClientState, NamedPipeClient>
+{
+    public required string PipeName { get; init; }
+    public string ServerName { get; init; } = ".";
+    public bool AllowImpersonation { get; init; } = false;
+}
+
+internal sealed class NamedPipeClientState : IClientState<NamedPipeClient, NamedPipeClientState>
 {
     private NamedPipeClientStream? _pipe;
 
@@ -20,11 +27,6 @@ public sealed class NamedPipeClientState : IClientState<NamedPipeClient, NamedPi
             client.AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
         await _pipe.ConnectAsync(ct);
     }
-}
 
-public sealed record NamedPipeClient : ClientBase, IClient<NamedPipeClientState, NamedPipeClient>
-{
-    public required string PipeName { get; init; }
-    public string ServerName { get; init; } = ".";
-    public bool AllowImpersonation { get; init; } = false;
+    public void Dispose() => _pipe?.Dispose();
 }

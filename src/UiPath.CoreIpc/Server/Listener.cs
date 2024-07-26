@@ -54,7 +54,7 @@ internal abstract class Listener : IAsyncDisposable
             var listenerCtor = listenerType.GetConstructor(
                 bindingAttr: BindingFlags.Public | BindingFlags.Instance,
                 binder: Type.DefaultBinder,
-                types: [configType],
+                types: [typeof(IpcServer), configType],
                 modifiers: null)!;
 
             var paramofServer = Expression.Parameter(typeof(IpcServer));

@@ -20,10 +20,10 @@ internal sealed class ServerConnection<TConfig, TListenerState, TConnectionState
 
     public override async Task<Stream> AcceptClient(CancellationToken ct)
     => (await Listener.Config.AwaitConnection(
-        Listener.State, 
+        Listener.State,
         Listener.Config.CreateConnectionState(
-            Listener.Server, 
-            Listener.State), 
+            Listener.Server,
+            Listener.State),
         ct))
         .AsStream();
 }
@@ -58,28 +58,19 @@ internal abstract class ServerConnection : IClient, IDisposable
 
             _connectionAsTask ??= Task.FromResult(Connection!);
 
-            var serviceClient = new ServiceClientForCallback<TCallbackInterface>(Connection!, Listener);
-
-            // TODO: delete
-            var serviceClient2 = new ServiceClientBase<TCallbackInterface>(new ClientBase()
-            {
-                ConnectionFactory = (_, _) => _connectionAsTask,
-                ServiceProvider = Listener.Server.Config.ServiceProvider,
-                RequestTimeout = Listener.Config.RequestTimeout,
-                Logger = Listener.Logger,
-            });
-            return serviceClient.CreateProxy();
+            // TODO: rethink this double specification of TCallbackInterface
+            return new ServiceClientForCallback(Connection!, Listener, typeof(TCallbackInterface)).CreateProxy<TCallbackInterface>();
         }
     }
     public async Task Listen(Stream network, CancellationToken cancellationToken)
     {
         var stream = await AuthenticateAsServer();
-        var serializer = Listener.Server.Config.ServiceProvider.GetService<ISerializer>();
+        var serializer = Listener.Server.ServiceProvider.GetService<ISerializer>();
         Connection = new Connection(stream, serializer, Listener.Logger, Listener.Config.DebugName, Listener.Config.MaxMessageSize);
         Server = new Server(
             new Router(
                 Listener.Config.CreateRouterConfig(Listener.Server),
-                Listener.Server.Config.ServiceProvider),
+                Listener.Server.ServiceProvider),
             Listener.Config.RequestTimeout,
             Connection,
             client: this);

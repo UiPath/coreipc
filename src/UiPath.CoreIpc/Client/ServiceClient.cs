@@ -15,33 +15,33 @@ internal abstract class ServiceClient : IDisposable
     private static Task<TResult> Invoke<TResult>(ServiceClient serviceClient, MethodInfo method, object?[] args) => serviceClient.Invoke<TResult>(method, args);
     #endregion
 
-    public abstract void Dispose();
-    public virtual ValueTask CloseConnection() => throw new NotSupportedException();
-
-    public object? Invoke(MethodInfo method, object?[] args) => GetInvokeDelegate(method.ReturnType)(this, method, args);
-    protected abstract Task<TResult> Invoke<TResult>(MethodInfo method, object?[] args);
-}
-
-internal abstract class ServiceClient<TInterface> : ServiceClient where TInterface : class
-{
-    internal Server? _server;
-
     protected abstract TimeSpan RequestTimeout { get; }
     protected abstract ConnectionFactory? ConnectionFactory { get; }
     protected abstract BeforeCallHandler? BeforeCall { get; }
     protected abstract ILogger? Log { get; }
     protected abstract string DebugName { get; }
     protected abstract ISerializer? Serializer { get; }
+
+    private readonly Type _interfaceType;
+
+    protected ServiceClient(Type interfaceType)
+    {
+        _interfaceType = interfaceType;
+    }
+
+    public virtual ValueTask CloseConnection() => throw new NotSupportedException();
+    public object? Invoke(MethodInfo method, object?[] args) => GetInvokeDelegate(method.ReturnType)(this, method, args);
+
     protected abstract Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct);
 
-    public TInterface CreateProxy()
+    public T CreateProxy<T>() where T : class
     {
-        var proxy = DispatchProxy.Create<TInterface, IpcProxy>();
+        var proxy = DispatchProxy.Create<T, IpcProxy>();
         (proxy as IpcProxy)!.ServiceClient = this;
         return proxy;
     }
 
-    protected override Task<TResult> Invoke<TResult>(MethodInfo method, object?[] args)
+    private Task<TResult> Invoke<TResult>(MethodInfo method, object?[] args)
     {
         var syncContext = SynchronizationContext.Current;
         var defaultContext = syncContext is null || syncContext.GetType() == typeof(SynchronizationContext);
@@ -71,7 +71,7 @@ internal abstract class ServiceClient<TInterface> : ServiceClient where TInterfa
                 }
 
                 var requestId = connection.NewRequestId();
-                var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds)
+                var request = new Request(_interfaceType.Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds)
                 {
                     UploadStream = uploadStream
                 };
@@ -122,28 +122,30 @@ internal abstract class ServiceClient<TInterface> : ServiceClient where TInterfa
         }
     }
 
-    public sealed override void Dispose()
+    public void Dispose()
     {
         Dispose(true);
         GC.SuppressFinalize(this);
     }
-
     private void Dispose(bool disposing)
     {
         Log?.ServiceClientDispose(DebugName);
     }
-
     public override string ToString() => DebugName;
 }
 
-internal sealed class ServiceClientProper<TInterface> : ServiceClient<TInterface> where TInterface : class
+internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
+    where TClient : ClientBase, IClient<TClientState, TClient>
+    where TClientState : class, IClientState<TClient, TClientState>, new()
 {
     private readonly FastAsyncLock _lock = new();
-    private readonly ClientBase _client;
+    private readonly TClientState _clientState = new();
+    private readonly TClient _client;
 
     private Connection? _latestConnection;
+    private Server? _latestServer;
 
-    public ServiceClientProper(ClientBase client)
+    public ServiceClientProper(TClient client, Type interfaceType) : base(interfaceType)
     {
         _client = client;
     }
@@ -160,25 +162,35 @@ internal sealed class ServiceClientProper<TInterface> : ServiceClient<TInterface
     protected override async Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct)
     {
         using (await _lock.Lock(ct))
-        {
-            if (_latestConnection is not null && _client.IsConnected(_latestConnection.Network))
+        {            
+            if (_latestConnection is not null && _clientState.IsConnected())
             {
                 return (_latestConnection, newlyConnected: false);
             }
 
             _latestConnection = new Connection(await Connect(ct), Serializer, Log, DebugName);
+            var router = new Router(_client.CreateCallbackRouterConfig(), _client.ServiceProvider);
+            _latestServer = new Server(router, _client.RequestTimeout, _latestConnection);
+            _latestConnection.Listen().LogException(Log, DebugName);
             return (_latestConnection, newlyConnected: true);
         }
     }
     private async Task<Network> Connect(CancellationToken ct)
     {
-        if (ConnectionFactory is not null 
+        if (ConnectionFactory is not null
             && await ConnectionFactory(ct) is { } userProvidedNetwork)
         {
             return userProvidedNetwork;
         }
 
-        return await _client.Connect(ct);
+        await _clientState.Connect(_client, ct);
+
+        if (_clientState.Network is not { } network)
+        {
+            throw new InvalidOperationException();
+        }
+
+        return network;
     }
 
     protected override TimeSpan RequestTimeout => _client.RequestTimeout;
@@ -189,12 +201,12 @@ internal sealed class ServiceClientProper<TInterface> : ServiceClient<TInterface
     protected override ISerializer? Serializer => _client.Serializer;
 }
 
-internal sealed class ServiceClientForCallback<TInterface> : ServiceClient<TInterface> where TInterface : class
+internal sealed class ServiceClientForCallback : ServiceClient
 {
     private readonly Connection _connection;
     private readonly Listener _listener;
 
-    public ServiceClientForCallback(Connection connection, Listener listener)
+    public ServiceClientForCallback(Connection connection, Listener listener, Type interfaceType) : base(interfaceType)
     {
         _connection = connection;
         _listener = listener;
@@ -203,11 +215,11 @@ internal sealed class ServiceClientForCallback<TInterface> : ServiceClient<TInte
     protected override Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct)
     => Task.FromResult((_connection, newlyConnected: false));
 
-    protected override TimeSpan RequestTimeout => throw new NotImplementedException();
+    protected override TimeSpan RequestTimeout => _listener.Config.RequestTimeout;
     protected override ConnectionFactory? ConnectionFactory => null;
     protected override BeforeCallHandler? BeforeCall => null;
     protected override ILogger? Log => null;
-    protected override string DebugName => throw new NotImplementedException();
+    protected override string DebugName => "Some Callback ServiceClient"; // TODO: get the DebugName from the listener or somewhere else
     protected override ISerializer? Serializer => null;
 }
 
