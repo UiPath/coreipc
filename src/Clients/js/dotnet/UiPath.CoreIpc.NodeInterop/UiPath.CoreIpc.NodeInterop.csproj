@@ -17,6 +17,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\..\..\UiPath.CoreIpc.BackCompat\UiPath.CoreIpc.BackCompat.csproj" />
         <ProjectReference Include="..\..\..\..\UiPath.CoreIpc\UiPath.CoreIpc.csproj" />
     </ItemGroup>
 

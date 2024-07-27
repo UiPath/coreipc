@@ -7,8 +7,9 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
-using UiPath.Ipc.NamedPipe;
-using UiPath.Ipc.WebSockets;
+using UiPath.Ipc.BackCompat;
+using UiPath.Ipc.Transport.NamedPipe;
+using UiPath.Ipc.Transport.WebSocket;
 
 namespace UiPath.Ipc.NodeInterop;
 
@@ -157,16 +158,16 @@ internal static class Extensions
 
         if (pipeName is not null)
         {
-            builder = builder.UseNamedPipes(new NamedPipeSettings(pipeName));
+            builder = builder.UseNamedPipes(new NamedPipeListener() { PipeName = pipeName });
         }
 
         if (webSocketUrl is not null)
         {
             string url = CurateWebSocketUrl(webSocketUrl);
             var accept = new HttpSysWebSocketsListener(url).Accept;
-            WebSocketSettings settings = new(accept);
+            WebSocketListener listener = new() { Accept = accept };
 
-            builder = builder.UseWebSockets(settings);
+            builder = builder.UseWebSockets(listener);
         }
 
         return builder;
