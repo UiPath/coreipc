@@ -14,31 +14,7 @@ public abstract record ListenerConfig : EndpointConfig
     internal IEnumerable<string> Validate() => Enumerable.Empty<string>();
 
     internal override RouterConfig CreateRouterConfig(IpcServer server)
-    {
-        var endpoints = server.Endpoints.ToDictionary(pair => pair.Key.Name, CreateEndpointSettings);
-        return new RouterConfig(endpoints);
-
-        EndpointSettings CreateEndpointSettings(KeyValuePair<Type, object?> pair)
-        {
-            if (pair.Value is null)
-            {
-                if (server.ServiceProvider is null)
-                {
-                    throw new InvalidOperationException();
-                }
-
-                return new EndpointSettings(pair.Key, server.ServiceProvider)
-                {
-                    BeforeCall = null,
-                    Scheduler = server.Scheduler.OrDefault(),
-                };
-            }
-
-            return new EndpointSettings(pair.Key, pair.Value)
-            {
-                BeforeCall = null,
-                Scheduler = server.Scheduler.OrDefault(),
-            };
-        }
-    }
+    => new RouterConfig(server.Endpoints.ToDictionary(
+        static x => x.Service.Type.Name,
+        x => x with { Scheduler = x.Scheduler ?? server.Scheduler }));
 }

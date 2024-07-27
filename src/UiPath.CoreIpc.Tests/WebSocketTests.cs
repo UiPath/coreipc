@@ -4,17 +4,17 @@ using UiPath.Ipc.Transport.WebSocket;
 namespace UiPath.Ipc.Tests;
 public class SystemWebSocketTests : SystemTests<WebSocketClientBuilder<ISystemService>>
 {
-    int _port = 51313 + GetCount();
+    int _port = 61234 + GetCount();
     HttpSysWebSocketsListener _listener;
     protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder)
     {
         _listener = new HttpSysWebSocketsListener("http" + GetEndPoint());
         return serviceHostBuilder.UseWebSockets(Configure(new WebSocketListener() { Accept = _listener.Accept }));
     }
-    public override async ValueTask DisposeAsync()
+    public override async Task DisposeAsync()
     {
         await base.DisposeAsync();
-        _listener?.Dispose();
+        await (_listener?.DisposeAsync() ?? default);
     }
     protected override WebSocketClientBuilder<ISystemService> CreateSystemClientBuilder() => new(new("ws" + GetEndPoint()));
     [Fact]
@@ -45,9 +45,9 @@ public class ComputingWebSocketsTests : ComputingTests<WebSocketClientBuilder<IC
         _listener = new HttpSysWebSocketsListener("http" + ComputingEndPoint);
         return serviceHostBuilder.UseWebSockets(Configure(new WebSocketListener() { Accept = _listener.Accept }));
     }
-    public override async ValueTask DisposeAsync()
+    public override async Task DisposeAsync()
     {
         await base.DisposeAsync();
-        _listener?.Dispose();
+        await (_listener?.DisposeAsync() ?? default);
     }
 }

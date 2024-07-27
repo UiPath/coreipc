@@ -2,19 +2,20 @@
 
 namespace UiPath.Ipc;
 
-public class EndpointCollection : IEnumerable, IEnumerable<KeyValuePair<Type, object?>>
+public class EndpointCollection : IEnumerable, IEnumerable<EndpointSettings>
 {
-    internal readonly Dictionary<Type, object?> Endpoints = new();
+    internal readonly Dictionary<Type, EndpointSettings> Endpoints = new();
 
     public void Add(Type type) => Add(type, instance: null);
-    public void Add(Type type, object? instance)
+    public void Add(Type contractType, object? instance) => Add(new EndpointSettings(contractType, instance));
+    public void Add(EndpointSettings endpointSettings)
     {
-        if (type is null) throw new ArgumentNullException(nameof(type));
-        if (instance is not null && !instance.GetType().IsAssignableTo(type)) throw new ArgumentOutOfRangeException(nameof(instance));
-        Endpoints[type] = instance;
-    }
+        if (endpointSettings is null) throw new ArgumentNullException(nameof(endpointSettings));
+        endpointSettings.Validate();
 
-    public IEnumerator<KeyValuePair<Type, object?>> GetEnumerator() => Endpoints.GetEnumerator();
+        Endpoints[endpointSettings.Service.Type] = endpointSettings;
+    }
+    public IEnumerator<EndpointSettings> GetEnumerator() => Endpoints.Values.GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

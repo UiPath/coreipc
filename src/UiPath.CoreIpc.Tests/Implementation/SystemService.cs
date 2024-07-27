@@ -1,7 +1,7 @@
 ﻿using System.Globalization;
 using System.IO.Pipes;
-using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 using System.Text;
 
 namespace UiPath.Ipc.Tests;
@@ -14,11 +14,11 @@ public interface ISystemService
     Task<string> GetThreadName(CancellationToken cancellationToken = default);
     Task<string> ConvertText(string text, TextStyle style, CancellationToken cancellationToken = default);
     Task<string> ConvertTextWithArgs(ConvertTextArgs args, CancellationToken cancellationToken = default);
-    Task<Guid> GetGuid(Guid guid, CancellationToken cancellationToken = default);
+    Task<Guid> EchoGuid(Guid guid, CancellationToken cancellationToken = default);
     Task<byte[]> ReverseBytes(byte[] input, CancellationToken cancellationToken = default);
     Task<bool> SlowOperation(CancellationToken cancellationToken = default);
-    Task<string> MissingCallback(SystemMessage message, CancellationToken cancellationToken = default);
-    Task<bool> Infinite(CancellationToken cancellationToken = default);
+    Task<string> UnexpectedCallback(SystemMessage message, CancellationToken cancellationToken = default);
+    Task<bool> Infinite(Message? message = null, CancellationToken cancellationToken = default);
     Task<string> ImpersonateCaller(Message message = null, CancellationToken cancellationToken = default);
     Task<string> SendMessage(SystemMessage message, CancellationToken cancellationToken = default);
     Task<string> Upload(Stream stream, int delay = 0, CancellationToken cancellationToken = default);
@@ -27,6 +27,11 @@ public interface ISystemService
     Task<string> UploadNoRead(Stream memoryStream, int delay = 0, CancellationToken cancellationToken = default);
     Task<bool> CancelIoPipe(CancelIoPipeMessage message = null, CancellationToken cancellationToken = default);
     Task<bool> Delay(int delay = 0, CancellationToken cancellationToken = default);
+}
+
+public interface IUnexpectedCallback
+{
+    Task<string> Call();
 }
 
 public class SystemMessage : Message
@@ -44,7 +49,7 @@ public class SystemService : ISystemService
     {
     }
 
-    public async Task<bool> Infinite(CancellationToken cancellationToken = default)
+    public async Task<bool> Infinite(Message? message = null, CancellationToken cancellationToken = default)
     {
         await Task.Delay(Timeout.Infinite, cancellationToken);
         return true;
@@ -89,9 +94,8 @@ public class SystemService : ISystemService
         FireAndForgetDone = true;
     }
 
-    public async Task<Guid> GetGuid(Guid guid, CancellationToken cancellationToken = default)
+    public async Task<Guid> EchoGuid(Guid guid, CancellationToken cancellationToken = default)
     {
-        //throw new Exception("sssss");
         return guid;
     }
 
@@ -100,24 +104,14 @@ public class SystemService : ISystemService
         return input.Reverse().ToArray();
     }
 
-    public async Task<string> MissingCallback(SystemMessage message, CancellationToken cancellationToken = default)
+    public async Task<string> UnexpectedCallback(SystemMessage message, CancellationToken cancellationToken = default)
     {
         if (message.Delay != 0)
         {
             await Task.Delay(message.Delay, cancellationToken);
         }
-        var domainName = "";
-        var client = message.Client;
-        //client.RunAs(() => domainName = "test");
-        //try
-        //{
-            message.GetCallback<IDisposable>();
-        //}
-        //catch(Exception ex)
-        //{
-        //    Console.WriteLine(ex.ToString());
-        //}
-        return client.GetUserName() +" " + domainName;
+
+        return await message.GetCallback<IUnexpectedCallback>().Call();        
     }
 
     public async Task<bool> SlowOperation(CancellationToken cancellationToken = default)

@@ -25,7 +25,7 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
         for (int i = 0; i < 50; i++)
         {
             await _computingClient.AddFloat(1, 2);
-            ((IpcProxy)_computingClient).CloseConnection();
+            await ((IpcProxy)_computingClient).CloseConnection();
             await _computingClient.AddFloat(1, 2);
         }
     }
@@ -70,7 +70,7 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
     [Fact]
     public async Task TimeoutPerRequest()
     {
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < 100; i++)
         {
             var request = new SystemMessage { RequestTimeout = TimeSpan.FromTicks(10), Delay = 100 };
             Exception exception = null;
@@ -121,7 +121,7 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
         returnValue.ShouldBe($"{Environment.UserName}_{_computingCallback.Id}_{message.Text}");
     }
 
-    public override async ValueTask DisposeAsync()
+    public override async Task DisposeAsync()
     {
         ((IDisposable)_computingClient).Dispose();
         await ((IpcProxy)_computingClient).CloseConnection();

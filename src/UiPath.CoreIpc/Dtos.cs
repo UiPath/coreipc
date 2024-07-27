@@ -21,6 +21,7 @@ public class Message<TPayload> : Message
 }
 internal record Request(string Endpoint, string Id, string MethodName, string[] Parameters, double TimeoutInSeconds)
 {
+    [JsonIgnore]
     public Stream? UploadStream { get; set; }
 
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
@@ -31,6 +32,7 @@ record CancellationRequest(string RequestId);
 
 internal record Response(string RequestId, string? Data = null, Error? Error = null)
 {
+    [JsonIgnore]
     public Stream? DownloadStream { get; set; }
 
     public static Response Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());

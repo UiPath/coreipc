@@ -107,7 +107,7 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
         Config = config;
         State = Config.CreateListenerState(server);
 
-        _listeningTask = Listen(_cts.Token);
+        _listeningTask = Task.Run(() => Listen(_cts.Token));
     }
 
     public void Log(string message)
@@ -145,6 +145,7 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
         {
             LogError(ex, $"Stopping listener {Config.DebugName} failed.");
         }
+        await State.DisposeAsync();
         _cts.Dispose();
     }
 
@@ -160,18 +161,18 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
             }
         }));
     }
-    private async Task AcceptConnection(CancellationToken token)
+    private async Task AcceptConnection(CancellationToken ct)
     {
         var serverConnection = new ServerConnection<TConfig, TListenerState, TConnectionState>(this);
         try
         {
-            var network = await serverConnection.AcceptClient(token);
-            serverConnection.Listen(network, token).LogException(Logger, Config.DebugName);
+            var network = await serverConnection.AcceptClient(ct);
+            serverConnection.Listen(network, ct).LogException(Logger, Config.DebugName);
         }
         catch (Exception ex)
         {
             serverConnection.Dispose();
-            if (!token.IsCancellationRequested)
+            if (!ct.IsCancellationRequested)
             {
                 Logger.LogException(ex, Config.DebugName);
             }

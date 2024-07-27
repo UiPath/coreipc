@@ -36,15 +36,9 @@ public sealed class ServiceHost : IAsyncDisposable
 
     public Task RunAsync(TaskScheduler? taskScheduler = null)
     {
-        EndpointCollection endpointCollection = [];
-        foreach (var endpoint in _endpoints.Values)
-        {
-            endpointCollection.Add(endpoint.Service.Type, endpoint.Service.MaybeGetInstance());
-        }
-
         _ipcServer = new()
         {
-            Endpoints = endpointCollection,
+            Endpoints = [.. _endpoints.Values],
             Listeners = _listeners,
             Scheduler = taskScheduler,
             ServiceProvider = _serviceProvider,

@@ -12,8 +12,12 @@ public sealed record WebSocketListener : ListenerConfig, IWebSocketListenerConfi
     WebSocketServerConnectionState IWebSocketListenerConfig.CreateConnectionState(IpcServer server, WebSocketListenerState listenerState)
     => new();
 
-    async ValueTask<OneOf<IAsyncStream, Stream>> IWebSocketListenerConfig.AwaitConnection(WebSocketListenerState listenerState, WebSocketServerConnectionState connectionState, CancellationToken ct)
-    => new WebSocketStream(await Accept(ct));
+    async ValueTask<Network> IWebSocketListenerConfig.AwaitConnection(WebSocketListenerState listenerState, WebSocketServerConnectionState connectionState, CancellationToken ct)
+    {
+        var webSocket = await Accept(ct);
+
+        return new WebSocketStream(webSocket);
+    }
 
     IEnumerable<string> IWebSocketListenerConfig.Validate()
     {
@@ -23,10 +27,7 @@ public sealed record WebSocketListener : ListenerConfig, IWebSocketListenerConfi
 
 internal sealed class WebSocketListenerState : IAsyncDisposable
 {
-    public ValueTask DisposeAsync()
-    {
-        throw new NotImplementedException();
-    }
+    public ValueTask DisposeAsync() => default;
 }
 
 internal sealed class WebSocketServerConnectionState

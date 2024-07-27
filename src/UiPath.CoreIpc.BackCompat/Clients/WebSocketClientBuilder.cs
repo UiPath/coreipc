@@ -14,6 +14,10 @@ public abstract class WebSocketClientBuilderBase<TDerived, TInterface> : Service
     => new WebSocketClient()
         { 
             Uri = _uri,
+
+            Scheduler = ConfiguredTaskScheduler,
+            ServiceProvider = _serviceProvider,
+
             Serializer = Serializer,
             RequestTimeout = RequestTimeout,
             Logger = Logger,

@@ -104,7 +104,7 @@ public static class ServiceClientBuilderExtensions
 
     public static TBuilder DontReconnect<TBuilder>(this TBuilder builder)
     where TBuilder : ServiceClientBuilder
-    => builder.ConnectionFactory(_ => Task.FromResult(null as Network?));
+    => builder.ConnectionFactory((network, _) => Task.FromResult(network));
 
     public static TBuilder ConnectionFactory<TBuilder>(this TBuilder builder, ConnectionFactory connectionFactory)
     where TBuilder : ServiceClientBuilder

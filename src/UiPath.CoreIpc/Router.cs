@@ -40,10 +40,13 @@ internal abstract record ServiceFactory
     public virtual ServiceFactory WithProvider(IServiceProvider? serviceProvider) => this;
 
     internal virtual object? MaybeGetInstance() => null;
+    internal virtual bool HasServiceProvider() => false;
 
     public sealed record Injected : ServiceFactory
     {
         public required IServiceProvider ServiceProvider { get; init; }
+
+        internal override bool HasServiceProvider() => ServiceProvider is not null;
 
         public override IDisposable? Get(out object service)
         {
@@ -106,7 +109,7 @@ internal readonly struct Route
     {
         Service = endpointSettings.Service.WithProvider(serviceProvider),
         BeforeCall = endpointSettings.BeforeCall,
-        Scheduler = endpointSettings.Scheduler,
+        Scheduler = endpointSettings.Scheduler.OrDefault(),
         LoggerFactory = serviceProvider.MaybeCreateServiceFactory<ILoggerFactory>(),
         Serializer = serviceProvider.MaybeCreateServiceFactory<ISerializer>()
     };

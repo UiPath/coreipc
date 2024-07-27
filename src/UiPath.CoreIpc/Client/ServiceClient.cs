@@ -185,8 +185,8 @@ internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
     {
         using (await _lock.Lock())
         {
-            _latestConnection?.Dispose();
-            _latestConnection = null;
+            LatestConnection?.Dispose();
+            LatestConnection = null;
         }
     }
 
@@ -196,22 +196,22 @@ internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
     {
         using (await _lock.Lock(ct))
         {            
-            if (_latestConnection is not null && _clientState.IsConnected())
+            if (LatestConnection is not null && _clientState.IsConnected())
             {
-                return (_latestConnection, newlyConnected: false);
+                return (LatestConnection, newlyConnected: false);
             }
 
-            _latestConnection = new Connection(await Connect(ct), Serializer, Log, DebugName);
+            LatestConnection = new Connection(await Connect(ct), Serializer, Log, DebugName);
             var router = new Router(_client.CreateCallbackRouterConfig(), _client.ServiceProvider);
-            _latestServer = new Server(router, _client.RequestTimeout, _latestConnection);
-            _latestConnection.Listen().LogException(Log, DebugName);
-            return (_latestConnection, newlyConnected: true);
+            _latestServer = new Server(router, _client.RequestTimeout, LatestConnection);
+            LatestConnection.Listen().LogException(Log, DebugName);
+            return (LatestConnection, newlyConnected: true);
         }
     }
     private async Task<Network> Connect(CancellationToken ct)
     {
         if (ConnectionFactory is not null
-            && await ConnectionFactory(ct) is { } userProvidedNetwork)
+            && await ConnectionFactory(_clientState.Network, ct) is { } userProvidedNetwork)
         {
             return userProvidedNetwork;
         }

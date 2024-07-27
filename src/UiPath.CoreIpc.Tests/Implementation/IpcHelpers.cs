@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.WebSockets;
+using System.Threading.Channels;
 using UiPath.Ipc.BackCompat;
 using UiPath.Ipc.Tests;
 
@@ -52,19 +53,43 @@ public static class IpcHelpers
         return services.AddIpc();
     }
 }
-public class HttpSysWebSocketsListener : IDisposable
+public class HttpSysWebSocketsListener : IAsyncDisposable
 {
-    HttpListener _httpListener = new();
+    private readonly CancellationTokenSource _cts = new();
+    private readonly HttpListener _httpListener = new();
+    private readonly Channel<HttpListenerContext> _channel = Channel.CreateBounded<HttpListenerContext>(capacity: 5);
+    private readonly Task _processingContexts;
+
     public HttpSysWebSocketsListener(string uriPrefix)
     {
         _httpListener.Prefixes.Add(uriPrefix);
         _httpListener.Start();
+
+        _processingContexts = ProcessContexts(_cts.Token);
     }
-    public async Task<WebSocket> Accept(CancellationToken token)
+
+    private async Task ProcessContexts(CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                var context = await _httpListener.GetContextAsync();
+                await _channel.Writer.WriteAsync(context, ct);
+            }
+            _channel.Writer.Complete();
+        }
+        catch (Exception ex)
+        {
+            _channel.Writer.Complete(ex);
+        }
+    }
+
+    public async Task<WebSocket> Accept(CancellationToken ct)
     {
         while (true)
         {
-            var listenerContext = await _httpListener.GetContextAsync();
+            var listenerContext = await _channel.Reader.ReadAsync(ct);
             if (listenerContext.Request.IsWebSocketRequest)
             {
                 var webSocketContext = await listenerContext.AcceptWebSocketAsync(subProtocol: null);
@@ -74,5 +99,23 @@ public class HttpSysWebSocketsListener : IDisposable
             listenerContext.Response.Close();
         }
     }
-    public void Dispose() => _httpListener.Stop();
+
+    public async ValueTask DisposeAsync()
+    {
+        _cts.Cancel();
+        _httpListener.Stop();
+
+        try
+        {
+            await _processingContexts;
+        }
+        catch (ObjectDisposedException)
+        {
+            // ignore
+        }
+        catch (OperationCanceledException ex) when (ex.CancellationToken == _cts.Token)
+        {
+            // ignore
+        }
+    }
 }

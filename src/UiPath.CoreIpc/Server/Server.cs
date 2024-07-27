@@ -81,7 +81,7 @@ internal class Server
             }
             if (!_router.TryResolve(request.Endpoint, out var route))
             {
-                await OnError(request, new ArgumentOutOfRangeException(nameof(request.Endpoint), $"{DebugName} cannot find endpoint {request.Endpoint}"));
+                await OnError(request, new EndpointNotFoundException(nameof(request.Endpoint), DebugName, request.Endpoint));                    
                 return;
             }
             var method = GetMethod(route.Service.Type, request.MethodName);

@@ -24,7 +24,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         RequestTimeout = RequestTimeout.Subtract(TimeSpan.FromSeconds(1))
     };
 
-    public override async ValueTask DisposeAsync()
+    public override async Task DisposeAsync()
     {
         ((IDisposable)_systemClient).Dispose();
         await ((IpcProxy)_systemClient).CloseConnection();
@@ -105,7 +105,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     public async Task Guid()
     {
         var newGuid = System.Guid.NewGuid();
-        var guid = await _systemClient.GetGuid(newGuid);
+        var guid = await _systemClient.EchoGuid(newGuid);
         guid.ShouldBe(newGuid);
     }
 
@@ -121,19 +121,18 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
-    public async Task MissingCallback()
+    public async Task UnexpectedCallback()
     {
         RemoteException exception = null;
         try
         {
-            await _systemClient.MissingCallback(new SystemMessage());
+            await _systemClient.UnexpectedCallback(new SystemMessage());
         }
         catch (RemoteException ex)
         {
             exception = ex;
         }
-        exception.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's not configured.");
-        exception.Is<InvalidOperationException>().ShouldBeTrue();
+        exception.Is<EndpointNotFoundException>().ShouldBeTrue();
         await Guid();
     }
 
@@ -232,12 +231,12 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     public async Task DontReconnect()
     {
         var proxy = SystemClientBuilder().DontReconnect().ValidateAndBuild();
-        await proxy.GetGuid(System.Guid.Empty);
+        await proxy.EchoGuid(System.Guid.Empty);
         await ((IpcProxy)proxy).CloseConnection();
         ObjectDisposedException exception = null;
         try
         {
-            await proxy.GetGuid(System.Guid.Empty);
+            await proxy.EchoGuid(System.Guid.Empty);
         }
         catch (ObjectDisposedException ex)
         {
@@ -254,26 +253,25 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         for (int i = 0; i < counter; i++)
         {
             var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
-            var sendMessageResult = _systemClient.MissingCallback(request);
+            var sendMessageResult = _systemClient.UnexpectedCallback(request);
             var newGuid = System.Guid.NewGuid();
-            (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
+            (await _systemClient.EchoGuid(newGuid)).ShouldBe(newGuid);
             await Task.Delay(1);
             ((IpcProxy)_systemClient).CloseConnection();
             sendMessageResult.ShouldThrow<Exception>();
             newGuid = System.Guid.NewGuid();
-            (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
+            (await _systemClient.EchoGuid(newGuid)).ShouldBe(newGuid);
         }
     }
     [Fact]
     public async Task ClosingTheHostShouldCloseTheConnection()
     {
-        var request = new SystemMessage { RequestTimeout = Timeout.InfiniteTimeSpan, Delay = Timeout.Infinite };
-        var sendMessageResult = _systemClient.MissingCallback(request);
+        var call = _systemClient.Infinite(new Message { RequestTimeout = Timeout.InfiniteTimeSpan });
         var newGuid = System.Guid.NewGuid();
-        (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
+        (await _systemClient.EchoGuid(newGuid)).ShouldBe(newGuid);
         await Task.Delay(1);
         await _systemHost.DisposeAsync();
-        sendMessageResult.ShouldThrow<Exception>();
+        await call.ShouldThrowAsync<Exception>();
     }
     [Fact]
     public virtual async void BeforeCallServerSide()
@@ -291,7 +289,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
             })
             .ValidateAndBuild();
         _ = protectedService.RunAsync();
-        await CreateSystemService().GetGuid(newGuid);
-        method.ShouldBe(typeof(ISystemService).GetMethod(nameof(ISystemService.GetGuid)));
+        await CreateSystemService().EchoGuid(newGuid);
+        method.ShouldBe(typeof(ISystemService).GetMethod(nameof(ISystemService.EchoGuid)));
     }
 }

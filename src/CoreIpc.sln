@@ -21,7 +21,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "Playground\Pl
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.Http", "UiPath.CoreIpc.Http\UiPath.CoreIpc.Http.csproj", "{8776E55A-D4EB-4C3A-8FA2-29E9A1CAE469}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UiPath.CoreIpc.BackCompat", "UiPath.CoreIpc.BackCompat\UiPath.CoreIpc.BackCompat.csproj", "{DED4901A-13E1-4654-BD87-DAFD62F2AE67}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.BackCompat", "UiPath.CoreIpc.BackCompat\UiPath.CoreIpc.BackCompat.csproj", "{DED4901A-13E1-4654-BD87-DAFD62F2AE67}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -20,9 +20,15 @@ public sealed record TcpListener : ListenerConfig, ITcpListenerConfig
     TcpServerConnectionState ITcpListenerConfig.CreateConnectionState(IpcServer server, TcpListenerState listenerState)
     => new();
 
-    async ValueTask<OneOf<IAsyncStream, Stream>> ITcpListenerConfig.AwaitConnection(TcpListenerState listenerState, TcpServerConnectionState connectionState, CancellationToken ct)
+    async ValueTask<Network> ITcpListenerConfig.AwaitConnection(TcpListenerState listenerState, TcpServerConnectionState connectionState, CancellationToken ct)
     {
-        var tcpClient = await listenerState.Listener.AcceptTcpClientAsync();
+        System.Net.Sockets.TcpClient tcpClient;
+#if NET461
+        using var ctreg = ct.Register(listenerState.Listener.Stop);
+        tcpClient = await listenerState.Listener.AcceptTcpClientAsync();
+#else
+        tcpClient = await listenerState.Listener.AcceptTcpClientAsync(ct);
+#endif
         return tcpClient.GetStream();
     }
 

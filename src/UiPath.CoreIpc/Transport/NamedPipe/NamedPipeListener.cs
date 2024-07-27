@@ -9,7 +9,7 @@ public sealed record NamedPipeListener : ListenerConfig, INamedPipeListenerConfi
 {
     public required string PipeName { get; init; }
     public string ServerName { get; init; } = ".";
-    public Action<PipeSecurity>? AccessControl { get; init; }
+    public AccessControlDelegate? AccessControl { get; init; }
 
     private PipeSecurity? GetPipeSecurity()
     {

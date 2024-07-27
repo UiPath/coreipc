@@ -1,61 +1,10 @@
 ﻿namespace UiPath.Ipc;
 
 using System;
-//public class ServiceHostBuilder
-//{
-//    private readonly List<Listener> _listeners = new();
-//    internal IServiceProvider ServiceProvider { get; }
-//    internal Dictionary<string, EndpointSettings> Endpoints { get; } = new();
-//    private readonly HashSet<Type> _allowedCallbacks = new();
 
-//    public ServiceHostBuilder(IServiceProvider serviceProvider)
-//    => ServiceProvider = serviceProvider;
-
-//    public ServiceHostBuilder AddEndpoint(EndpointSettings settings)
-//    {
-//        Endpoints.Add(settings.Name, settings);
-//        return this;
-//    }
-//    public ServiceHostBuilder AllowCallback(Type callbackType)
-//    {
-//        _ = _allowedCallbacks.Add(callbackType);
-//        return this;
-//    }
-//    internal ServiceHostBuilder AddListener(Listener listener)
-//    {
-//        listener.
-//        listener.Settings.RouterConfig = new(Endpoints);
-//        _listeners.Add(listener);
-//        return this;
-//    }
-//    public ServiceHost Build() => new(ServiceProvider, _listeners, Endpoints);
-//}
-//public static class ServiceHostBuilderExtensions
-//{
-//    public static ServiceHostBuilder AddEndpoints(this ServiceHostBuilder serviceHostBuilder, IEnumerable<EndpointSettings> endpoints)
-//    {
-//        foreach (var endpoint in endpoints)
-//        {
-//            serviceHostBuilder.AddEndpoint(endpoint);
-//        }
-//        return serviceHostBuilder;
-//    }
-//    public static ServiceHostBuilder AddEndpoint<TContract>(this ServiceHostBuilder serviceHostBuilder, TContract? serviceInstance = null) where TContract : class =>
-//        serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract>(serviceInstance));
-//}
-//public static class ServiceCollectionExtensions
-//{
-//    public static IServiceCollection AddIpc(this IServiceCollection services)
-//    {
-//        services.AddSingleton<ISerializer, IpcJsonSerializer>();
-//        return services;
-//    }
-//}
-
-public class EndpointSettings
+public record EndpointSettings
 {
     internal TaskScheduler? Scheduler { get; set; }
-
     public BeforeCallHandler? BeforeCall { get; set; }
     internal ServiceFactory Service { get; }
 
@@ -84,7 +33,14 @@ public class EndpointSettings
 
     private protected EndpointSettings(ServiceFactory service) => Service = service;
 
-    public void Validate() => Validator.Validate(Service.Type);
+    public void Validate()
+    {
+        Validator.Validate(Service.Type);
+        if (Service.MaybeGetInstance() is { } instance && !instance.GetType().IsAssignableTo(Service.Type))
+        {
+            throw new ArgumentOutOfRangeException(nameof(instance));
+        }
+    }
 
     protected internal virtual EndpointSettings WithServiceProvider(IServiceProvider serviceProvider)
     => new EndpointSettings(Service.Type, serviceProvider)
@@ -94,7 +50,7 @@ public class EndpointSettings
     };
 }
 
-public class EndpointSettings<TContract> : EndpointSettings where TContract : class
+public record EndpointSettings<TContract> : EndpointSettings where TContract : class
 {
     public EndpointSettings(TContract? serviceInstance = null) : base(typeof(TContract), serviceInstance) { }
     public EndpointSettings(IServiceProvider serviceProvider) : base(typeof(TContract), serviceProvider) { }

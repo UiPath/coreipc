@@ -6,6 +6,8 @@ namespace UiPath.Ipc.Tests;
 public class EndpointTests : IAsyncDisposable
 {
     private static TimeSpan RequestTimeout => TestBase.RequestTimeout;
+    private const int ConnectionCount = 50;
+
     private readonly ServiceHost _host;
     private readonly IComputingService _computingClient;
     private readonly ISystemService _systemClient;
@@ -26,7 +28,8 @@ public class EndpointTests : IAsyncDisposable
             .UseNamedPipes(new NamedPipeListener()
             {
                 PipeName = PipeName,
-                RequestTimeout = RequestTimeout
+                RequestTimeout = RequestTimeout,
+                ConcurrentAccepts = ConnectionCount
             })
             .AddEndpoint<IComputingServiceBase>()
             .AddEndpoint<IComputingService>()
@@ -62,11 +65,11 @@ public class EndpointTests : IAsyncDisposable
         await _host.DisposeAsync();
     }
     [Fact]
-    public Task CallbackConcurrently() => Task.WhenAll(Enumerable.Range(1, 50).Select(_ => CallbackCore()));
+    public Task CallbackConcurrently() => Task.WhenAll(Enumerable.Range(1, ConnectionCount).Select(_ => CallbackCore()));
     [Fact]
     public async Task Callback()
     {
-        for (int index = 0; index < 50; index++)
+        for (int index = 0; index < ConnectionCount; index++)
         {
             await CallbackCore();
             await ((IpcProxy)_computingClient).CloseConnection();
@@ -93,14 +96,13 @@ public class EndpointTests : IAsyncDisposable
         RemoteException exception = null;
         try
         {
-            await _systemClient.MissingCallback(new SystemMessage());
+            await _systemClient.UnexpectedCallback(new SystemMessage());
         }
         catch (RemoteException ex)
         {
             exception = ex;
         }
-        exception.Message.ShouldBe("Callback contract mismatch. Requested System.IDisposable, but it's UiPath.Ipc.Tests.ISystemCallback.");
-        exception.Is<ArgumentException>().ShouldBeTrue();
+        exception.Is<EndpointNotFoundException>().ShouldBeTrue();
     }
     [Fact]
     public Task CancelServerCall() => CancelServerCallCore(10);
@@ -113,14 +115,14 @@ public class EndpointTests : IAsyncDisposable
             Task sendMessageResult;
             using (var cancellationSource = new CancellationTokenSource())
             {
-                sendMessageResult = _systemClient.MissingCallback(request, cancellationSource.Token);
+                sendMessageResult = _systemClient.UnexpectedCallback(request, cancellationSource.Token);
                 var newGuid = Guid.NewGuid();
-                (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
+                (await _systemClient.EchoGuid(newGuid)).ShouldBe(newGuid);
                 await Task.Delay(1);
                 cancellationSource.Cancel();
                 sendMessageResult.ShouldThrow<Exception>();
                 newGuid = Guid.NewGuid();
-                (await _systemClient.GetGuid(newGuid)).ShouldBe(newGuid);
+                (await _systemClient.EchoGuid(newGuid)).ShouldBe(newGuid);
             }
             ((IDisposable)_systemClient).Dispose();
         }
@@ -131,9 +133,8 @@ public class EndpointTests : IAsyncDisposable
     {
         await _systemClient.GetThreadName();
         var proxy = CreateSystemService();
-        var message = proxy.GetThreadName().ShouldThrow<InvalidOperationException>().Message;
-        message.ShouldStartWith("Duplicate callback proxy instance EndpointTests");
-        message.ShouldEndWith("<ISystemService, ISystemCallback>. Consider using a singleton callback proxy.");
+
+        await proxy.GetThreadName().ShouldNotThrowAsync();
     }
 }
 public interface ISystemCallback

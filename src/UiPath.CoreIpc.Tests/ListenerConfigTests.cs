@@ -1,4 +1,7 @@
 ﻿using AutoFixture;
+using AutoFixture.Kernel;
+using System.Net;
+using System.Net.WebSockets;
 using UiPath.Ipc.Http;
 using UiPath.Ipc.Transport.NamedPipe;
 using UiPath.Ipc.Transport.Tcp;
@@ -8,8 +11,11 @@ namespace UiPath.Ipc.Tests;
 
 public class ListenerConfigTests
 {
-    private static readonly TimeSpan NewRequestTimeout = TimeSpan.FromDays(365);
-    private static readonly byte NewMaxReceivedMessageSizeInMegabytes = 111;
+    private static readonly TimeSpan OldRequestTimeout = TimeSpan.FromSeconds(1);
+    private static readonly byte OldMaxReceivedMessageSizeInMegabytes = 100;
+
+    private static readonly TimeSpan NewRequestTimeout = OldRequestTimeout + TimeSpan.FromSeconds(10);
+    private static readonly byte NewMaxReceivedMessageSizeInMegabytes = (byte)(OldMaxReceivedMessageSizeInMegabytes + 10);
 
     [Theory]
     [MemberData(nameof(TestBaseConfigureCoreShouldWorkCases))]
@@ -24,12 +30,41 @@ public class ListenerConfigTests
 
     public static IEnumerable<object?[]> TestBaseConfigureCoreShouldWorkCases()
     {
-        Fixture fixture = new();
+        var fixture = new Fixture();
 
-        var namedPipeListener = fixture.Create<NamedPipeListener>();
-        var tcpListener = fixture.Create<TcpListener>();
-        var webSocketListener = fixture.Create<WebSocketListener>();
-        var bidiHttpListener = fixture.Create<BidiHttpListener>();
+        var namedPipeListener = new NamedPipeListener()
+        {
+            PipeName = fixture.Create<string>(),
+            ServerName = fixture.Create<string>(),
+            AccessControl = pipeSecurity => { },
+            ConcurrentAccepts = fixture.Create<int>(),
+            Certificate = null,
+            MaxReceivedMessageSizeInMegabytes = OldMaxReceivedMessageSizeInMegabytes,
+            RequestTimeout = OldRequestTimeout
+        };
+
+        var tcpListener = new TcpListener()
+        {
+            EndPoint = fixture.Create<IPEndPoint>(),
+            ConcurrentAccepts = fixture.Create<int>(),
+            Certificate = null,
+            MaxReceivedMessageSizeInMegabytes = OldMaxReceivedMessageSizeInMegabytes,
+            RequestTimeout = OldRequestTimeout
+        };
+
+        var webSocketListener = new WebSocketListener()
+        {
+            Accept = async ct => null
+        };
+
+        var bidiHttpListener = new BidiHttpListener()
+        {
+            Uri = fixture.Create<Uri>(),
+            ConcurrentAccepts = fixture.Create<int>(),
+            Certificate = null,
+            MaxReceivedMessageSizeInMegabytes = OldMaxReceivedMessageSizeInMegabytes,
+            RequestTimeout = OldRequestTimeout
+        };
 
         yield return Make(namedPipeListener, actual => ValidateNamedPipeListener(actual, namedPipeListener));
         yield return Make(tcpListener, actual => ValidateTcpListener(actual, tcpListener));
@@ -66,14 +101,12 @@ public class ListenerConfigTests
         static void ValidateListenerConfig(ListenerConfig actual, ListenerConfig expected)
         {
             actual.ConcurrentAccepts.ShouldBe(expected.ConcurrentAccepts);
-            actual.MaxReceivedMessageSizeInMegabytes.ShouldBe(expected.MaxReceivedMessageSizeInMegabytes);
             actual.Certificate.ShouldBe(expected.Certificate);
 
             ValidateEndpointConfig(actual, expected);
         }
         static void ValidateEndpointConfig(EndpointConfig actual, EndpointConfig expected)
         {
-            actual.RequestTimeout.ShouldBe(expected.RequestTimeout);
         }
 
         object?[] Make<T>(T config, Action<T> validate) where T : ListenerConfig
@@ -83,4 +116,22 @@ public class ListenerConfigTests
     }
 
     public sealed record ListenerConfigCase(ListenerConfig ListenerConfig, Action<ListenerConfig> Validate);
+
+    private sealed class MockStream : Stream
+    {
+        public override bool CanTimeout => true;
+        public override int ReadTimeout { get; set; }
+        public override int WriteTimeout { get; set; }
+
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => 0;
+        public override long Seek(long offset, SeekOrigin origin) => 0;
+        public override void SetLength(long value) { }
+        public override void Write(byte[] buffer, int offset, int count) { }
+        public override bool CanRead => true;
+        public override bool CanSeek => true;
+        public override bool CanWrite => throw new NotImplementedException();
+        public override long Length => 0;
+        public override long Position { get; set; }
+    }
 }

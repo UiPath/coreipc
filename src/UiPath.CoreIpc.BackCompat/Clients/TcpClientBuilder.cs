@@ -20,6 +20,10 @@ public abstract class TcpClientBuilderBase<TDerived, TInterface> : ServiceClient
     => new TcpClient()
         {
             EndPoint = _endPoint,
+
+            Scheduler = ConfiguredTaskScheduler,
+            ServiceProvider = _serviceProvider,
+
             Serializer = Serializer,
             RequestTimeout = RequestTimeout,
             Logger = Logger,

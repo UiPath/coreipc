@@ -56,14 +56,16 @@ public abstract class NamedPipeClientBuilderBase<TDerived, TInterface> : Service
     {
         ServerName = _serverName,
         PipeName = _pipeName,
+
+        Scheduler = ConfiguredTaskScheduler,
+        ServiceProvider = _serviceProvider,
+
         Serializer = Serializer,
         RequestTimeout = RequestTimeout,
         AllowImpersonation = _allowImpersonation,
         Logger = Logger,
         ConnectionFactory = ConfiguredConnectionFactory,
         BeforeCall = BeforeCall,
-        Scheduler = ConfiguredTaskScheduler,
-        ServiceProvider = _serviceProvider,
         Callbacks = serviceEndpoint.ToEndpointCollection()
     }
         .GetProxyFactory()

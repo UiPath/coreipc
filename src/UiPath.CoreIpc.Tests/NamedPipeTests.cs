@@ -22,7 +22,7 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
         IOHelpers.PipeExists("system" + GetHashCode(), 50).ShouldBeTrue();
     }
     [Fact]
-    public Task ServerName() => SystemClientBuilder().ValidateAndBuild().GetGuid(System.Guid.Empty);
+    public Task ServerName() => SystemClientBuilder().ValidateAndBuild().EchoGuid(System.Guid.Empty);
     [Fact]
     public override void BeforeCallServerSide()
     {

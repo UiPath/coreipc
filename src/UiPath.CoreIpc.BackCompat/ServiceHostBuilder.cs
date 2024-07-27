@@ -23,9 +23,6 @@ public class ServiceHostBuilder
         Endpoints.Add(settings.Name, settings);
         return this;
     }
-    public ServiceHostBuilder AddEndpoint<TContract>(TContract? serviceInstance = null)
-    where TContract : class
-    => AddEndpoint(new EndpointSettings<TContract>(serviceInstance));
 
     public ServiceHost Build() => new(_serviceProvider, _listeners, Endpoints);
 
@@ -38,6 +35,10 @@ public class ServiceHostBuilder
 
 public static class ServiceHostBuilderExtensions
 {
+    public static ServiceHostBuilder AddEndpoint<TContract>(this ServiceHostBuilder serviceHostBuilder, TContract? serviceInstance = null)
+    where TContract : class
+    => serviceHostBuilder.AddEndpoint(new EndpointSettings<TContract>(serviceInstance));
+
     public static ServiceHostBuilder UseNamedPipes(this ServiceHostBuilder builder, NamedPipeListener listener)
     => builder.UseListener(listener);
 

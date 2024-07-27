@@ -3,7 +3,7 @@ using UiPath.Ipc.BackCompat;
 
 namespace UiPath.Ipc.Tests;
 
-public abstract class TestBase : IAsyncDisposable
+public abstract class TestBase : IAsyncLifetime
 {
     protected const int MaxReceivedMessageSizeInMegabytes = 1;
     protected static int Count = -1;
@@ -30,7 +30,7 @@ public abstract class TestBase : IAsyncDisposable
 
     protected TaskScheduler GuiScheduler => _guiThread.Scheduler;
 
-    public virtual async ValueTask DisposeAsync() => _guiThread.Dispose();
+    public virtual async Task DisposeAsync() => _guiThread.Dispose();
 
     protected virtual TListenerConfig Configure<TListenerConfig>(TListenerConfig listenerConfig) where TListenerConfig : ListenerConfig
     => ConfigureCore(listenerConfig, RequestTimeout, MaxReceivedMessageSizeInMegabytes);
@@ -43,4 +43,8 @@ public abstract class TestBase : IAsyncDisposable
         RequestTimeout = requestTimeout,
         MaxReceivedMessageSizeInMegabytes = maxReceivedMessageSizeInMegabytes
     };
+
+    Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
+
+    Task IAsyncLifetime.DisposeAsync() => DisposeAsync();
 }

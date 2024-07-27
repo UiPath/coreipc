@@ -17,9 +17,9 @@ public abstract record ClientBase : EndpointConfig
 
     internal void ValidateInternal()
     {
-        var haveInjectedCallbacks = Callbacks?.Any(pair => pair.Value is null) ?? false;
+        var haveDeferredInjectedCallbacks = Callbacks?.Any(x => !x.Service.HasServiceProvider() && x.Service.MaybeGetInstance() is null) ?? false;
 
-        if (haveInjectedCallbacks && ServiceProvider is null)
+        if (haveDeferredInjectedCallbacks && ServiceProvider is null)
         {
             throw new InvalidOperationException("ServiceProvider is required when you register injectable callbacks. Consider registering a callback instance.");
         }
@@ -43,30 +43,14 @@ public abstract record ClientBase : EndpointConfig
     }
 
     internal override RouterConfig CreateCallbackRouterConfig()
-    {
-        var endpoints = Callbacks?.ToDictionary(pair => pair.Key.Name, CreateEndpointSettings);
-        return new RouterConfig(endpoints.OrDefault());
-
-        EndpointSettings CreateEndpointSettings(KeyValuePair<Type, object?> pair)
-        {
-            if (pair.Value is null)
+    => new RouterConfig(
+        (Callbacks?.ToDictionary(
+            x => x.Service.Type.Name,
+            x => x with
             {
-                if (ServiceProvider is null) { throw new InvalidOperationException(); }
-
-                return new EndpointSettings(pair.Key, ServiceProvider)
-                {
-                    BeforeCall = BeforeCall,
-                    Scheduler = Scheduler.OrDefault()
-                };
-            }
-
-            return new EndpointSettings(pair.Key, pair.Value)
-            {
-                BeforeCall = BeforeCall,
-                Scheduler = Scheduler.OrDefault()
-            };
-        }
-    }
+                BeforeCall = x.BeforeCall ?? BeforeCall,
+                Scheduler = x.Scheduler ?? Scheduler
+            })).OrDefault());
 }
 
 public interface IClient<TState, TSelf>

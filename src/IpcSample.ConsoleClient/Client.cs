@@ -75,7 +75,7 @@ class Client
                 Console.WriteLine($"[TEST 5] {text}");
 
                 // test 6: call IPC service method returning GUID
-                Guid generatedId = await systemClient.GetGuid(Guid.NewGuid(), cancellationToken);
+                Guid generatedId = await systemClient.EchoGuid(Guid.NewGuid(), cancellationToken);
                 Console.WriteLine($"[TEST 6] generated ID is: {generatedId}");
 
                 // test 7: call IPC service method with byte array
