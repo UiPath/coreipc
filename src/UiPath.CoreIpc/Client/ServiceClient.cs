@@ -1,5 +1,8 @@
 ﻿namespace UiPath.Ipc;
 
+using System.Linq.Expressions;
+using ServiceClientProperFactory = Func<ClientBase, Type, ServiceClient>;
+
 internal abstract class ServiceClient : IDisposable
 {
     #region " NonGeneric-Generic adapter cache "
@@ -26,6 +29,7 @@ internal abstract class ServiceClient : IDisposable
     public event EventHandler? ConnectionClosed;
 
     private readonly Type _interfaceType;
+    private readonly ContextfulLazy<IpcProxy> _proxy = new();
 
     protected ServiceClient(Type interfaceType)
     {
@@ -39,11 +43,19 @@ internal abstract class ServiceClient : IDisposable
 
     protected abstract Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct);
 
-    public T CreateProxy<T>() where T : class
+    public T GetProxy<T>() where T : class
     {
-        var proxy = DispatchProxy.Create<T, IpcProxy>();
-        (proxy as IpcProxy)!.ServiceClient = this;
-        return proxy;
+        if (!_interfaceType.IsAssignableTo(typeof(T)))
+        {
+            throw new ArgumentOutOfRangeException($"The provided generic argument T is not assignable to the proxy type. T is {typeof(T).Name}. The proxy type is {_interfaceType.Name}.");
+        }
+
+        return (_proxy.GetValue(() =>
+        {
+            var proxy = (DispatchProxy.Create<T, IpcProxy>() as IpcProxy)!;
+            proxy.ServiceClient = this;
+            return proxy;
+        }) as T)!;
     }
 
     private Task<TResult> Invoke<TResult>(MethodInfo method, object?[] args)
@@ -137,6 +149,40 @@ internal abstract class ServiceClient : IDisposable
         Log?.ServiceClientDispose(DebugName);
     }
     public override string ToString() => DebugName;
+}
+
+internal static class ServiceClientProper
+{
+    private static readonly ConcurrentDictionary<Type, ServiceClientProperFactory> CachedFactories = new();
+    private static ServiceClientProperFactory GetFactory(Type clientType) => CachedFactories.GetOrAdd(clientType, CreateFactory);
+    private static ServiceClientProperFactory CreateFactory(Type clientType)
+    {
+        if (clientType
+            .GetInterfaces()
+            .SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IClient<,>))
+            ?.GetGenericArguments()
+            is not [var clientStateType, var clientType2] || clientType2 != clientType)
+        {
+            throw new ArgumentOutOfRangeException(nameof(clientType), "The client implements 0 or more than 1 IClient<,> interfaces or the single interface's 2nd generic argument is not the client type itself.");
+        }
+
+        var ctor = typeof(ServiceClientProper<,>)
+            .MakeGenericType(clientStateType, clientType)
+            .GetConstructor([clientType, typeof(Type)])!;
+
+        var paramofClientBase = Expression.Parameter(typeof(ClientBase));
+        var paramofType = Expression.Parameter(typeof(Type));
+        return Expression.Lambda<ServiceClientProperFactory>(
+            Expression.New(
+                ctor, 
+                Expression.Convert(paramofClientBase, clientType), 
+                paramofType),
+            paramofClientBase,
+            paramofType).Compile();
+    }
+
+    public static ServiceClient Create(ClientBase client, Type proxyType)
+    => GetFactory(client.GetType())(client, proxyType);
 }
 
 internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient

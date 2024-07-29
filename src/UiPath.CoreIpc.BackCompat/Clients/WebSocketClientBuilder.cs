@@ -1,5 +1,4 @@
-﻿using UiPath.Ipc;
-using UiPath.Ipc.Transport.WebSocket;
+﻿using UiPath.Ipc.Transport.WebSocket;
 
 namespace UiPath.Ipc.BackCompat;
 
@@ -25,7 +24,6 @@ public abstract class WebSocketClientBuilderBase<TDerived, TInterface> : Service
             BeforeCall = BeforeCall,
             Callbacks = serviceEndpoint.ToEndpointCollection(),
         }
-        .GetProxyFactory()
         .GetProxy<TInterface>();
 }
 

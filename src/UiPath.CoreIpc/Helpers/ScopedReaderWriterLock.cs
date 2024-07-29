@@ -38,3 +38,37 @@ internal sealed class ScopedReaderWriterLock : IDisposable
         void IDisposable.Dispose() => action();
     }
 }
+
+public sealed class ContextfulLazy<T>
+{
+    private readonly ScopedReaderWriterLock _lock = new();
+
+    private bool _haveValue;
+    private T? _value;
+
+    public T GetValue(Func<T> factory)
+    {
+        using (_lock.EnterReadLock())
+        {
+            if (_haveValue)
+            {
+                return _value!;
+            }
+        }
+
+        using (_lock.EnterUpgradeableRead())
+        {
+            if (_haveValue)
+            {
+                return _value!;
+            }
+
+            using (_lock.EnterWriteLock())
+            {
+                _value = factory();
+                _haveValue = true;
+                return _value;
+            }
+        }
+    }
+}

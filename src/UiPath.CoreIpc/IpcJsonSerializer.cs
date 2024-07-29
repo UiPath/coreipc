@@ -30,7 +30,7 @@ internal class IpcJsonSerializer : ISerializer, IArrayPool<char>
         return StringArgsSerializer.Deserialize<T>(reader);
     }
     public void Serialize(object? obj, Stream stream) => Serialize(obj, new StreamWriter(stream), StringArgsSerializer);
-    private void Serialize(object obj, TextWriter streamWriter, JsonSerializer serializer)
+    private void Serialize(object? obj, TextWriter streamWriter, JsonSerializer serializer)
     {
         using var writer = new JsonTextWriter(streamWriter) { ArrayPool = this, CloseOutput = false };
         serializer.Serialize(writer, obj);

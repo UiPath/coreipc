@@ -59,7 +59,7 @@ internal abstract class ServerConnection : IClient, IDisposable
             _connectionAsTask ??= Task.FromResult(Connection!);
 
             // TODO: rethink this double specification of TCallbackInterface
-            return new ServiceClientForCallback(Connection!, Listener, typeof(TCallbackInterface)).CreateProxy<TCallbackInterface>();
+            return new ServiceClientForCallback(Connection!, Listener, typeof(TCallbackInterface)).GetProxy<TCallbackInterface>();
         }
     }
     public async Task Listen(Stream network, CancellationToken cancellationToken)

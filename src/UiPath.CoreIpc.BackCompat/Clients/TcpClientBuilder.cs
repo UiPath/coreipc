@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using UiPath.Ipc;
 using UiPath.Ipc.Transport.Tcp;
 
 namespace UiPath.Ipc.BackCompat;
@@ -31,7 +30,6 @@ public abstract class TcpClientBuilderBase<TDerived, TInterface> : ServiceClient
             BeforeCall = BeforeCall,
             Callbacks = serviceEndpoint.ToEndpointCollection()
         }
-        .GetProxyFactory()
         .GetProxy<TInterface>();
 }
 

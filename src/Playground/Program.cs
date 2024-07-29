@@ -87,7 +87,6 @@ internal class Program
             },
             Scheduler = clientScheduler
         }
-            .GetProxyFactory()
             .GetProxy<Contracts.IServerOperations>();
 
         await proxy1.Register();

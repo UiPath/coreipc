@@ -1,9 +1,10 @@
-﻿using UiPath.Ipc.Transport.Tcp;
-
-namespace UiPath.Ipc;
+﻿namespace UiPath.Ipc;
 
 public abstract record ClientBase : EndpointConfig
 {
+    private readonly ConcurrentDictionary<Type, ServiceClient> _clients = new();
+    private ServiceClient GetServiceClient(Type proxyType) => _clients.GetOrAdd(proxyType, ServiceClientProper.Create(this, proxyType));
+
     public IServiceProvider? ServiceProvider { get; init; }
     public EndpointCollection? Callbacks { get; init; }
     public ILogger? Logger { get; init; }
@@ -16,9 +17,7 @@ public abstract record ClientBase : EndpointConfig
     public virtual void Validate() { }
 
     public TProxy GetProxy<TProxy>() where TProxy : class
-    => new ServiceClientProper<TClient, TClientState>(_client, typeof(TProxy))
-        .CreateProxy<TProxy>();
-
+    => GetServiceClient(typeof(TProxy)).GetProxy<TProxy>();
 
     internal void ValidateInternal()
     {
@@ -61,27 +60,6 @@ public abstract record ClientBase : EndpointConfig
 public interface IClient<TState, TSelf>
     where TSelf : ClientBase, IClient<TState, TSelf>
     where TState : class, IClientState<TSelf, TState>, new() { }
-
-public static class ClientExtensions
-{
-    public static ProxyFactory<TClient, TClientState> GetProxyFactory<TClient, TClientState>(this IClient<TClientState, TClient> client)
-        where TClient : ClientBase, IClient<TClientState, TClient>
-        where TClientState : class, IClientState<TClient, TClientState>, new()
-    => new(client as TClient ?? throw new ArgumentOutOfRangeException(nameof(client)));
-
-    public readonly struct ProxyFactory<TClient, TClientState>
-        where TClient : ClientBase, IClient<TClientState, TClient>
-        where TClientState : class, IClientState<TClient, TClientState>, new()
-    {
-        private readonly TClient _client;
-
-        internal ProxyFactory(TClient client) => _client = client;
-
-        public TProxy GetProxy<TProxy>() where TProxy : class
-        => new ServiceClientProper<TClient, TClientState>(_client, typeof(TProxy))
-            .CreateProxy<TProxy>();
-    }
-}
 
 public interface IClientState<TClient, TSelf> : IDisposable
     where TSelf : class, IClientState<TClient, TSelf>, new()

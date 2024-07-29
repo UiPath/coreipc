@@ -1,5 +1,4 @@
-﻿using UiPath.Ipc;
-using UiPath.Ipc.Transport.NamedPipe;
+﻿using UiPath.Ipc.Transport.NamedPipe;
 
 namespace UiPath.Ipc.BackCompat;
 
@@ -68,6 +67,5 @@ public abstract class NamedPipeClientBuilderBase<TDerived, TInterface> : Service
         BeforeCall = BeforeCall,
         Callbacks = serviceEndpoint.ToEndpointCollection()
     }
-        .GetProxyFactory()
         .GetProxy<TInterface>();
 }
