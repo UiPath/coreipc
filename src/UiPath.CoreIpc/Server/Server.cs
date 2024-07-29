@@ -81,7 +81,7 @@ internal class Server
             }
             if (!_router.TryResolve(request.Endpoint, out var route))
             {
-                await OnError(request, new EndpointNotFoundException(nameof(request.Endpoint), DebugName, request.Endpoint));                    
+                await OnError(request, new EndpointNotFoundException(nameof(request.Endpoint), DebugName, request.Endpoint));
                 return;
             }
             var method = GetMethod(route.Service.Type, request.MethodName);
@@ -131,9 +131,6 @@ internal class Server
     {
         var arguments = GetArguments();
 
-        var callInfo = new CallInfo(newConnection: false, method.MethodInfo, arguments);
-        await route.BeforeCall.OrDefault()(callInfo, cancellationToken);
-
         object service;
         using (route.Service.Get(out service))
         {
@@ -148,24 +145,31 @@ internal class Server
             var scheduler = route.Scheduler;
             Debug.Assert(scheduler != null);
             var defaultScheduler = scheduler == TaskScheduler.Default;
+
             if (returnTaskType.IsGenericType)
             {
-                var methodResult = defaultScheduler ? MethodCall() : await RunOnScheduler();
-                await methodResult;
-                var returnValue = GetTaskResult(returnTaskType, methodResult);
-                if (returnValue is Stream downloadStream)
+                return await ScheduleMethodCall() switch
                 {
-                    return Response.Success(request, downloadStream);
-                }
-                return Response.Success(request, Serializer.Serialize(returnValue));
+                    Stream downloadStream => Response.Success(request, downloadStream),
+                    var x => Response.Success(request, Serializer.Serialize(x))
+                };
             }
-            else
+
+            ScheduleMethodCall().LogException(Logger, method.MethodInfo);
+            return Response.Success(request, "");
+
+            Task<object?> ScheduleMethodCall() => defaultScheduler ? MethodCall() : RunOnScheduler();
+            async Task<object?> MethodCall()
             {
-                (defaultScheduler ? MethodCall() : RunOnScheduler().Unwrap()).LogException(Logger, method.MethodInfo);
-                return Response.Success(request, "");
+                await (route.BeforeCall?.Invoke(
+                    new CallInfo(newConnection: false, method.MethodInfo, arguments),
+                    cancellationToken) ?? Task.CompletedTask);
+                var invocationTask = method.Invoke(service, arguments, cancellationToken);
+                await invocationTask;
+                return GetTaskResult(returnTaskType, invocationTask);
             }
-            Task MethodCall() => method.Invoke(service, arguments, cancellationToken);
-            Task<Task> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler);
+
+            Task<object?> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler).Unwrap();
         }
         object?[] GetArguments()
         {

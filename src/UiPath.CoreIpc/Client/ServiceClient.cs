@@ -167,7 +167,7 @@ internal static class ServiceClientProper
         }
 
         var ctor = typeof(ServiceClientProper<,>)
-            .MakeGenericType(clientStateType, clientType)
+            .MakeGenericType(clientType, clientStateType)
             .GetConstructor([clientType, typeof(Type)])!;
 
         var paramofClientBase = Expression.Parameter(typeof(ClientBase));
