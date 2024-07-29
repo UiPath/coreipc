@@ -4,8 +4,6 @@ using UiPath.Ipc;
 
 namespace UiPath.Ipc.BackCompat;
 
-
-
 public abstract class ServiceClientBuilder<TDerived, TInterface>
     : ServiceClientBuilder<TInterface>
     where TInterface : class

@@ -15,6 +15,11 @@ public abstract record ClientBase : EndpointConfig
 
     public virtual void Validate() { }
 
+    public TProxy GetProxy<TProxy>() where TProxy : class
+    => new ServiceClientProper<TClient, TClientState>(_client, typeof(TProxy))
+        .CreateProxy<TProxy>();
+
+
     internal void ValidateInternal()
     {
         var haveDeferredInjectedCallbacks = Callbacks?.Any(x => !x.Service.HasServiceProvider() && x.Service.MaybeGetInstance() is null) ?? false;
@@ -55,9 +60,7 @@ public abstract record ClientBase : EndpointConfig
 
 public interface IClient<TState, TSelf>
     where TSelf : ClientBase, IClient<TState, TSelf>
-    where TState : class, IClientState<TSelf, TState>, new()
-{
-}
+    where TState : class, IClientState<TSelf, TState>, new() { }
 
 public static class ClientExtensions
 {

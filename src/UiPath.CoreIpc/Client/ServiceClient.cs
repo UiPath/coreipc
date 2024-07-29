@@ -208,6 +208,7 @@ internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
             return (LatestConnection, newlyConnected: true);
         }
     }
+
     private async Task<Network> Connect(CancellationToken ct)
     {
         if (ConnectionFactory is not null
