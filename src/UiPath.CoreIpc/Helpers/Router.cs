@@ -40,13 +40,13 @@ internal abstract record ServiceFactory
     public virtual ServiceFactory WithProvider(IServiceProvider? serviceProvider) => this;
 
     internal virtual object? MaybeGetInstance() => null;
-    internal virtual bool HasServiceProvider() => false;
+    internal virtual IServiceProvider? MaybeGetServiceProvider() => null;
 
     public sealed record Injected : ServiceFactory
     {
         public required IServiceProvider ServiceProvider { get; init; }
 
-        internal override bool HasServiceProvider() => ServiceProvider is not null;
+        internal override IServiceProvider? MaybeGetServiceProvider() => ServiceProvider;
 
         public override IDisposable? Get(out object service)
         {

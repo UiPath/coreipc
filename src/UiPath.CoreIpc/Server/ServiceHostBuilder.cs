@@ -4,11 +4,12 @@ using System;
 
 public record EndpointSettings
 {
-    internal TaskScheduler? Scheduler { get; set; }
+    public TaskScheduler? Scheduler { get; set; }
     public BeforeCallHandler? BeforeCall { get; set; }
+    public Type ContractType => Service.Type;
+    public object? ServiceInstance => Service.MaybeGetInstance();
+    public IServiceProvider? ServiceProvider => Service.MaybeGetServiceProvider();
     internal ServiceFactory Service { get; }
-
-    internal string Name => Service.Type.Name;
 
     public EndpointSettings(Type contractType, object? serviceInstance) : this(
         serviceInstance is not null
@@ -42,7 +43,7 @@ public record EndpointSettings
         }
     }
 
-    protected internal virtual EndpointSettings WithServiceProvider(IServiceProvider serviceProvider)
+    public virtual EndpointSettings WithServiceProvider(IServiceProvider serviceProvider)
     => new EndpointSettings(Service.Type, serviceProvider)
     {
         BeforeCall = BeforeCall,
@@ -50,12 +51,12 @@ public record EndpointSettings
     };
 }
 
-public record EndpointSettings<TContract> : EndpointSettings where TContract : class
+public sealed record EndpointSettings<TContract> : EndpointSettings where TContract : class
 {
     public EndpointSettings(TContract? serviceInstance = null) : base(typeof(TContract), serviceInstance) { }
     public EndpointSettings(IServiceProvider serviceProvider) : base(typeof(TContract), serviceProvider) { }
 
-    protected internal override EndpointSettings WithServiceProvider(IServiceProvider serviceProvider)
+    public override EndpointSettings WithServiceProvider(IServiceProvider serviceProvider)
     => new EndpointSettings<TContract>(serviceProvider)
     {
         BeforeCall = BeforeCall,

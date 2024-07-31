@@ -20,7 +20,7 @@ public class ServiceHostBuilder
     public ServiceHostBuilder AddEndpoint(EndpointSettings settings)
     {
         settings = settings.WithServiceProvider(_serviceProvider);
-        Endpoints.Add(settings.Name, settings);
+        Endpoints.Add(settings.ContractType.Name, settings);
         return this;
     }
 

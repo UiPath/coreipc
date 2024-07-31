@@ -11,8 +11,7 @@ public abstract record ClientBase : EndpointConfig
     public ConnectionFactory? ConnectionFactory { get; init; }
     public BeforeCallHandler? BeforeCall { get; init; }
     public TaskScheduler? Scheduler { get; init; }
-
-    internal ISerializer? Serializer { get; set; }
+    public ISerializer? Serializer { get; set; }
 
     public virtual void Validate() { }
 
@@ -21,7 +20,7 @@ public abstract record ClientBase : EndpointConfig
 
     internal void ValidateInternal()
     {
-        var haveDeferredInjectedCallbacks = Callbacks?.Any(x => !x.Service.HasServiceProvider() && x.Service.MaybeGetInstance() is null) ?? false;
+        var haveDeferredInjectedCallbacks = Callbacks?.Any(x => x.Service.MaybeGetServiceProvider() is null && x.Service.MaybeGetInstance() is null) ?? false;
 
         if (haveDeferredInjectedCallbacks && ServiceProvider is null)
         {
