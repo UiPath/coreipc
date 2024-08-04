@@ -13,5 +13,5 @@ public sealed class EndpointNotFoundException : ArgumentOutOfRangeException
         EndpointName = endpointName;
     }
 
-    internal static string FormatMessage(string serverDebugName, string endpointName) => $"{serverDebugName} cannot find endpoint {endpointName}";
+    internal static string FormatMessage(string serverDebugName, string endpointName) => $"Endpoint not found. Server was \"{serverDebugName}\". Endpoint was \"{endpointName}\".";
 }

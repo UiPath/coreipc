@@ -44,6 +44,7 @@
     <InternalsVisibleTo Include="Playground" />
     <InternalsVisibleTo Include="UiPath.CoreIpc.Tests" />
     <InternalsVisibleTo Include="UiPath.CoreIpc.BackCompat" />
+    <InternalsVisibleTo Include="UiPath.Ipc.Tests" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net461'">

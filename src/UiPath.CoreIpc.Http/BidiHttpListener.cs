@@ -6,7 +6,6 @@ using System.IO.Pipelines;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Channels;
-using UiPath.Ipc;
 
 namespace UiPath.Ipc.Http;
 

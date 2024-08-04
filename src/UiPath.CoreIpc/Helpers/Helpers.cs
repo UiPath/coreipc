@@ -293,13 +293,15 @@ internal readonly struct TimeoutHelper : IDisposable
         _linkedRegistration = token.UnsafeRegister(LinkedTokenCancelDelegate!, _timeoutCancellationSource);
     }
 
+    public static string ComputeTimeoutMessage(string operation) => $"{operation} timed out.";
+
     public Exception CheckTimeout(Exception exception, string message)
     {
         if (_timeoutCancellationSource.IsCancellationRequested)
         {
             if (!_cancellationToken.IsCancellationRequested)
             {
-                return new TimeoutException(message + " timed out.", exception);
+                return new TimeoutException(ComputeTimeoutMessage(message), exception);
             }
             if (exception is not TaskCanceledException)
             {

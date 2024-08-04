@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net6.0;net461;net6.0-windows</TargetFrameworks>
+    <RootNamespace>UiPath.Ipc.Tests</RootNamespace>
+    <NoWarn>$(NoWarn);1998</NoWarn>
+    <DefineConstants>$(DefineConstants);$(DefineConstantsEx)</DefineConstants>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>true</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UiPath.CoreIpc.BackCompat\UiPath.CoreIpc.BackCompat.csproj" />
+    <ProjectReference Include="..\UiPath.CoreIpc.Http\UiPath.CoreIpc.Http.csproj" />
+    <ProjectReference Include="..\UiPath.CoreIpc\UiPath.CoreIpc.csproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="AutoFixture" Version="4.18.1" />
+    <PackageReference Include="AutoFixture.Xunit2" Version="4.18.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.TraceSource" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="6.0.0" />
+    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
+    <PackageReference Include="Shouldly" Version="4.0.3" />
+    <PackageReference Include="xunit" Version="2.4.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.0.0" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Shouldly" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="System.Reflection" />
+    <Using Include="System.Diagnostics" />
+  </ItemGroup>
+
+</Project>

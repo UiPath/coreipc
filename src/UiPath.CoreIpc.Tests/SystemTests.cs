@@ -33,6 +33,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         await base.DisposeAsync();
     }
     [Fact]
+    // DONE
     public async Task ConcurrentRequests()
     {
         var infinite = _systemClient.Infinite();
@@ -40,6 +41,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         infinite.IsCompleted.ShouldBeFalse();
     }
     [Fact]
+    // DONE
     public async Task OptionalMessage()
     {
         var returnValue = await _systemClient.ImpersonateCaller();
@@ -47,6 +49,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // DONE
     public async Task ServerTimeout()
     {
         var ex = _systemClient.Infinite().ShouldThrow<RemoteException>();
@@ -55,6 +58,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
         await Guid();
     }
     [Fact]
+    // DONE
     public async Task Void()
     {
         _systemService.FireAndForgetDone = false;
@@ -68,10 +72,11 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // WHAT?
     public async Task VoidThreadName()
     {
         await _systemClient.VoidThreadName();
-        await _systemClient.GetThreadName();
+        _ = await _systemClient.GetThreadName();
         while (_systemService.ThreadName != "GuiThread")
         {
             await Task.Delay(0);
@@ -80,6 +85,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // WHAT?
     public async Task Enum()
     {
         var text = await _systemClient.ConvertText("hEllO woRd!", TextStyle.Upper);
@@ -87,6 +93,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // WHAT?
     public async Task PropertyWithTypeDefaultValue()
     {
         var args = new ConvertTextArgs { Text = "hEllO woRd!", TextStyle = default };
@@ -95,6 +102,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // DONE
     public async Task MaxMessageSize()
     {
         _systemClient.ReverseBytes(new byte[MaxReceivedMessageSizeInMegabytes * 1024 * 1024]).ShouldThrow<Exception>();
@@ -102,6 +110,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // DONE
     public async Task Guid()
     {
         var newGuid = System.Guid.NewGuid();
@@ -110,9 +119,11 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // NOT GOING TO PORT
     public Task LargeMessage() => _systemClient.ReverseBytes(new byte[(int)(0.7 * MaxReceivedMessageSizeInMegabytes * 1024 * 1024)]);
 
     [Fact]
+    // WHAT?
     public async Task ReverseBytes()
     {
         var input = Encoding.UTF8.GetBytes("Test");
@@ -121,6 +132,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // DONE
     public async Task UnexpectedCallback()
     {
         RemoteException exception = null;
@@ -138,12 +150,15 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
 
 
     [Fact]
+    // DONE
     public async Task VoidIsAsync() => await _systemClient.VoidSyncThrow();
 
     [Fact]
+    // DONE
     public async Task GetThreadName() => (await _systemClient.GetThreadName()).ShouldBe("GuiThread");
 
     [Fact]
+    // WILL NOT PORT
     public async Task Echo()
     {
         using var stream = await _systemClient.Echo(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")));
@@ -151,6 +166,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // DONE
     public async Task CancelUpload()
     {
         var stream = new MemoryStream(Enumerable.Range(1, 50000).Select(i => (byte)i).ToArray());
@@ -162,6 +178,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // DONE
     public async Task Upload()
     {
         (await _systemClient.Upload(new MemoryStream(Encoding.UTF8.GetBytes("Hello world")))).ShouldBe("Hello world");
@@ -169,6 +186,7 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // DONE
     public virtual async Task UploadNoRead()
     {
         try
@@ -181,14 +199,17 @@ public abstract class SystemTests<TBuilder> : TestBase where TBuilder : ServiceC
     }
 
     [Fact]
+    // WHAT?
     public Task DownloadUiThread() => Task.Factory.StartNew(Download, default, TaskCreationOptions.DenyChildAttach, GuiScheduler).Unwrap();
     [Fact]
+    // DONE
     public async Task Download()
     {
         using var stream = await _systemClient.Download("Hello world");
         (await new StreamReader(stream).ReadToEndAsync()).ShouldBe("Hello world");
     }
     [Fact]
+    // DONE
     public async Task DownloadNoRead()
     {
         using (await _systemClient.Download("Hello world")) { }

@@ -244,7 +244,7 @@ public sealed class Connection : IDisposable
             }
         }
         catch (Exception ex)
-        {
+        {            
             Logger.LogException(ex, $"{nameof(ReceiveLoop)} {DebugName}");
         }
         if (LogEnabled)

@@ -148,7 +148,8 @@ internal class Server
 
             if (returnTaskType.IsGenericType)
             {
-                return await ScheduleMethodCall() switch
+                var result = await ScheduleMethodCall();
+                return result switch
                 {
                     Stream downloadStream => Response.Success(request, downloadStream),
                     var x => Response.Success(request, Serializer.Serialize(x))

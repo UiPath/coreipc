@@ -23,6 +23,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.Http", "UiPa
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.BackCompat", "UiPath.CoreIpc.BackCompat\UiPath.CoreIpc.BackCompat.csproj", "{DED4901A-13E1-4654-BD87-DAFD62F2AE67}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UiPath.Ipc.Tests", "UiPath.Ipc.Tests\UiPath.Ipc.Tests.csproj", "{E238E183-92CF-48A6-890F-C422853D6656}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,6 +59,10 @@ Global
 		{DED4901A-13E1-4654-BD87-DAFD62F2AE67}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DED4901A-13E1-4654-BD87-DAFD62F2AE67}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DED4901A-13E1-4654-BD87-DAFD62F2AE67}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E238E183-92CF-48A6-890F-C422853D6656}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E238E183-92CF-48A6-890F-C422853D6656}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E238E183-92CF-48A6-890F-C422853D6656}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E238E183-92CF-48A6-890F-C422853D6656}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
