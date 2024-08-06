@@ -49,8 +49,8 @@ public sealed class SystemService : ISystemService
 
     public async Task<string> UploadEcho(Stream stream, CancellationToken ct = default)
     {
-        using var reader = new StreamReader(stream);
-        return await reader.ReadToEndAsync(ct);
+        var bytes = await stream.ReadToEndAsync(ct);
+        return Encoding.UTF8.GetString(bytes);
     }
 
     public async Task<bool> UploadJustCountBytes(Stream stream, int serverReadByteCount, TimeSpan serverDelay, CancellationToken ct = default)

@@ -19,7 +19,7 @@ internal sealed class OverrideConfigAttribute : Attribute
         {
             throw new ArgumentException($"The type {overrideConfigType} is abstract.", nameof(overrideConfigType));
         }
-        if (!overrideConfigType.IsAssignableTo(typeof(OverrideConfig)))
+        if (!typeof(OverrideConfig).IsAssignableFrom(overrideConfigType))
         {
             throw new ArgumentException($"The type {overrideConfigType} does not inherit from {typeof(OverrideConfig)}.", nameof(overrideConfigType));
         }

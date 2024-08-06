@@ -37,7 +37,7 @@ public record EndpointSettings
     public void Validate()
     {
         Validator.Validate(Service.Type);
-        if (Service.MaybeGetInstance() is { } instance && !instance.GetType().IsAssignableTo(Service.Type))
+        if (Service.MaybeGetInstance() is { } instance && !Service.Type.IsAssignableFrom(instance.GetType()))
         {
             throw new ArgumentOutOfRangeException(nameof(instance));
         }

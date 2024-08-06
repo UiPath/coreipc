@@ -45,7 +45,7 @@ internal abstract class ServiceClient : IDisposable
 
     public T GetProxy<T>() where T : class
     {
-        if (!_interfaceType.IsAssignableTo(typeof(T)))
+        if (!typeof(T).IsAssignableFrom(_interfaceType))
         {
             throw new ArgumentOutOfRangeException($"The provided generic argument T is not assignable to the proxy type. T is {typeof(T).Name}. The proxy type is {_interfaceType.Name}.");
         }

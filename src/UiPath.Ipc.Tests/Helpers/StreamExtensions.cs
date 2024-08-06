@@ -16,4 +16,12 @@ public static class StreamExtensions
             length -= cbRead;
         }
     }
+
+    public static async Task<byte[]> ReadToEndAsync(this Stream stream, CancellationToken ct = default)
+    {
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory, bufferSize: 8192, ct);
+        return memory.ToArray();
+    }
+
 }
