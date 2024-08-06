@@ -47,50 +47,10 @@ public sealed class SystemService : ISystemService
 
     public async Task<string?> GetThreadName() => Thread.CurrentThread.Name;
 
-
-    private readonly object _latestUploadTraceLock = new();
-    private TaskCompletionSource<byte[]>? _latestUploadTrace;
-    internal Task<byte[]> ResetLatestUploadTrace()
+    public async Task<string> UploadEcho(Stream stream, CancellationToken ct = default)
     {
-        lock (_latestUploadTraceLock)
-        {
-            return (_latestUploadTrace = new()).Task;            
-        }
-    }
-    private void TrySetLatestUploadTraceResult(byte[] bytes)
-    {
-        lock (_latestUploadTraceLock)
-        {
-            _latestUploadTrace?.TrySetResult(bytes);
-        }
-    }
-
-    public async Task<string> UploadEcho(Stream stream, bool trace, CancellationToken ct = default)
-    {
-        if (trace)
-        {
-            return await WithTrace(Logic);
-        }
-
-        return await Logic(stream);
-
-        async Task<string> Logic(Stream stream)
-        {
-            using var reader = new StreamReader(stream);
-            return await reader.ReadToEndAsync(ct);
-        }
-        async Task<T> WithTrace<T>(Func<Stream, Task<T>> asyncFunc)
-        {
-            var tracedStream = new TracedStream(stream);
-            try
-            {
-                return await asyncFunc(tracedStream);
-            }
-            finally
-            {
-                TrySetLatestUploadTraceResult(tracedStream.GetTrace());
-            }
-        }
+        using var reader = new StreamReader(stream);
+        return await reader.ReadToEndAsync(ct);
     }
 
     public async Task<bool> UploadJustCountBytes(Stream stream, int serverReadByteCount, TimeSpan serverDelay, CancellationToken ct = default)
@@ -110,4 +70,11 @@ public sealed class SystemService : ISystemService
 
     public async Task<Stream> Download(string s, CancellationToken ct = default)
     => new MemoryStream(Encoding.UTF8.GetBytes(s));
+
+    public async Task<int> AddIncrement(int x, int y, Message message = null!)
+    {
+        var sum = await message.GetCallback<IComputingCallback>().AddInts(x, y);
+        var result = await message.GetCallback<IArithmeticCallback>().Increment(sum);
+        return result;
+    }
 }

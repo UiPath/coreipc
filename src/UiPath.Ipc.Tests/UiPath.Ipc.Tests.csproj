@@ -11,6 +11,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Polyfills\CallerArgumentExpressionAttribute.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Polyfills\CallerArgumentExpressionAttribute.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\UiPath.CoreIpc.BackCompat\UiPath.CoreIpc.BackCompat.csproj" />
     <ProjectReference Include="..\UiPath.CoreIpc.Http\UiPath.CoreIpc.Http.csproj" />
     <ProjectReference Include="..\UiPath.CoreIpc\UiPath.CoreIpc.csproj" />

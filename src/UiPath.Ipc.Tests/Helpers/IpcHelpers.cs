@@ -18,7 +18,6 @@ internal static class IpcHelpers
 
         .AddSingleton<ComputingService>()
         .AddSingletonAlias<IComputingService, ComputingService>()
-        .AddSingletonAlias<IComputingServiceBase, ComputingService>()
 
         .BuildServiceProvider();
 

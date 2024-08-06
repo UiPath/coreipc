@@ -31,10 +31,12 @@ public interface ISystemService
 
     Task<string?> GetThreadName();
 
-    Task<string> UploadEcho(Stream stream, bool trace, CancellationToken ct = default);
+    Task<string> UploadEcho(Stream stream, CancellationToken ct = default);
 
     Task<bool> UploadJustCountBytes(Stream stream, int serverReadByteCount, TimeSpan serverDelay, CancellationToken ct = default);
     Task<Stream> Download(string s, CancellationToken ct = default);
+
+    Task<int> AddIncrement(int x, int y, Message message = null!);
 }
 
 public interface IUnregisteredCallback

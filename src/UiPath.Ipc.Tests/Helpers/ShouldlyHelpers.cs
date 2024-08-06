@@ -18,6 +18,21 @@ internal static class ShouldlyHelpers
         }
     }
 
+    public static async Task<T> ShouldNotBeNullAsync<T>(this Task<T> task, [CallerArgumentExpression(nameof(task))] string? taskExpression = null)
+        where T : class
+    {
+        var actual = await task;
+        try
+        {
+            return actual.ShouldNotBeNull();
+        }
+        catch
+        {
+            throw new ShouldAssertException($"The provided expression `{taskExpression}`\r\n\tshouldn't have yielded null but did.");
+        }
+    }
+
+
     public static async Task<T> ShouldNotThrowAsyncAnd<T>(this Task<T> task, [CallerArgumentExpression(nameof(task))] string? taskExpression = null)
     {
         try

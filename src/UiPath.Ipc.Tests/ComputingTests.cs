@@ -40,4 +40,71 @@ public abstract class ComputingTests : TestBase
         }
     };
     #endregion
+
+    [Theory, IpcAutoData]
+    public async Task Calls_ShouldWork(float x, float y)
+    => await Proxy.AddFloats(x, y).ShouldBeAsync(x + y);
+
+    [Theory, IpcAutoData]
+    public Task ConcurrentCalls_ShouldWork(float sameX, float sameY) => Task.WhenAll(Enumerable.Range(1, 100).Select(_ => Calls_ShouldWork(sameX, sameY)));
+
+    [Theory, IpcAutoData]
+    public async Task CallsWithStructParamsAndReturns_ShouldWork(ComplexNumber a, ComplexNumber b)
+    => await Proxy.AddComplexNumbers(a, b).ShouldBeAsync(a + b);
+
+    [Fact]
+    public async Task ClientCancellations_ShouldWork()
+    {
+        using var cts = new CancellationTokenSource();
+
+        var taskWaiting = Proxy.Wait(Timeout.InfiniteTimeSpan, cts.Token);
+
+        await Task.Delay(Constants.Timeout_Short);
+
+        taskWaiting.IsCompleted.ShouldBeFalse();
+
+        cts.Cancel();
+
+        await taskWaiting.ShouldCompleteInAsync(Constants.Timeout_Short).ShouldThrowAsync<OperationCanceledException>(); // in-process scheduling fast
+
+        await Proxy.Wait(TimeSpan.Zero).ShouldCompleteInAsync(Constants.Timeout_IpcRoundtrip).ShouldBeAsync(true); // connection still alive
+    }
+
+    [Fact, OverrideConfig(typeof(ShortClientTimeout))]
+    public async Task ClientTimeouts_ShouldWork()
+    {
+        await Proxy.Wait(Timeout.InfiniteTimeSpan).ShouldThrowAsync<TimeoutException>();
+
+        await Proxy.GetCallbackThreadName(
+            duration: TimeSpan.FromMilliseconds(500),
+            message: new()
+            {
+                RequestTimeout = TimeSpan.FromSeconds(2)
+            })
+            .ShouldBeAsync(Names.GuiThreadName)
+            .ShouldNotThrowAsync();
+    }
+
+    private sealed class ShortClientTimeout : OverrideConfig
+    {
+        public override ClientBase Override(ClientBase client)
+        => client with { RequestTimeout = TimeSpan.FromMilliseconds(10) };
+    }
+
+    [Theory, IpcAutoData]
+    public async Task CallsWithArraysOfStructsAsParams_ShouldWork(ComplexNumber a, ComplexNumber b, ComplexNumber c)
+    => await Proxy.AddComplexNumberList([a, b, c]).ShouldBeAsync(a + b + c);
+
+    [Fact]
+    public async Task Callbacks_ShouldWork()
+    => await Proxy.GetCallbackThreadName(duration: TimeSpan.Zero).ShouldBeAsync(Names.GuiThreadName);
+
+    [Fact]
+    public async Task CallbacksWithParams_ShouldWork()
+    => await Proxy.MultiplyInts(7, 1).ShouldBeAsync(7);
+
+    [Fact]
+    public async Task ConcurrentCallbacksWithParams_ShouldWork()
+    => await Task.WhenAll(
+        Enumerable.Range(1, 50).Select(_ => CallbacksWithParams_ShouldWork()));
 }

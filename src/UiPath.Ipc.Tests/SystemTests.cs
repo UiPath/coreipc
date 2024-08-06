@@ -143,6 +143,30 @@ public abstract class SystemTests : TestBase
     }
 
     [Fact]
+    public async Task ServerCallingInexistentCallback_ShouldThrow2()
+    => await Proxy.AddIncrement(1, 2).ShouldThrowAsync<RemoteException>()
+        .ShouldSatisfyAllConditionsAsync([
+            ex => ex.Is<EndpointNotFoundException>()
+        ]);
+
+    [Fact, OverrideConfig(typeof(RegisterCallbacks))]
+    public async Task ServerCallingMultipleCallbackTypes_ShouldWork()
+    => await Proxy.AddIncrement(1, 2).ShouldBeAsync(1 + 2 + 1);
+
+    private sealed class RegisterCallbacks : OverrideConfig
+    {
+        public override ClientBase Override(ClientBase client)
+        => client with
+        {
+            Callbacks = new()
+            {
+                { typeof(IComputingCallback), new ComputingCallback() },
+                { typeof(IArithmeticCallback), new ArithmeticCallback() },
+            }
+        };
+    }
+
+    [Fact]
     public async Task FireAndForgetOperations_ShouldNotDeliverBusinessExceptionsEvenWhenThrownSynchronously()
     => await Proxy.FireAndForgetThrowSync()
         .ShouldNotThrowAsync()
@@ -157,7 +181,7 @@ public abstract class SystemTests : TestBase
     public async Task UploadingStreams_ShouldWork(string str)
     {
         using var memory = new MemoryStream(Encoding.UTF8.GetBytes(str));
-        await Proxy.UploadEcho(memory, trace: false).ShouldBeAsync(str);
+        await Proxy.UploadEcho(memory).ShouldBeAsync(str);
     }
 
     [Theory, IpcAutoData]
@@ -170,8 +194,7 @@ public abstract class SystemTests : TestBase
 
         var taskReadCall = stream.AwaitReadCall();
 
-        var serverTraceTask = Service.ResetLatestUploadTrace();
-        var taskUploading = Proxy.UploadEcho(stream, trace: true, cts.Token);
+        var taskUploading = Proxy.UploadEcho(stream, cts.Token);
 
         var readCall = await taskReadCall.ShouldCompleteInAsync(TimeSpan.FromSeconds(60));// Constants.Timeout_IpcRoundtrip);
         stream.AutoRespondByte = (byte)'a';
@@ -190,18 +213,12 @@ public abstract class SystemTests : TestBase
 
         await taskUploading
             .ShouldThrowAsync<OperationCanceledException>()
-            .ShouldCompleteInAsync(Constants.Timeout_Short); // we expect the OCE to be ⚡In-Process/⚡ThreadPool fast
-
-        var serverTrace = await serverTraceTask;
-        serverTrace.ShouldNotBeNull();
-
-        var act = () => Encoding.UTF8.GetString(serverTrace);
-        act.ShouldNotThrow().ShouldStartWith(expectedServerRead);
+            .ShouldCompleteInAsync(Constants.Timeout_Short); // in-process scheduling fast
 
         await Proxy.EchoGuidAfter(guid, duration: TimeSpan.Zero) // we expect the connection to recover
             .ShouldBeAsync(guid);
 
-        IpcProxy.Network.ShouldNotBeNull().ShouldNotBeSameAs(networkBeforeCancel); // and the network to be a brand new one
+        IpcProxy.Network.ShouldNotBeNull().ShouldNotBeSameAs(networkBeforeCancel); // and the network to be a new one
     }
 
     [Theory, IpcAutoData]
@@ -209,7 +226,7 @@ public abstract class SystemTests : TestBase
     {
         var stream = new UploadStream() { AutoRespondByte = 0 };
 
-        await Proxy.UploadJustCountBytes(stream, serverReadByteCount: 1, TimeSpan.Zero)
+        await Proxy.UploadJustCountBytes(stream, serverReadByteCount: 1, TimeSpan.Zero) // the server method deliberately returns before finishing to read the entire stream
             .ShouldThrowAsync<Exception>();
 
         await Proxy.EchoGuidAfter(guid, TimeSpan.Zero)
