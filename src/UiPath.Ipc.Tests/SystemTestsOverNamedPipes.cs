@@ -1,4 +1,5 @@
 ﻿using UiPath.Ipc.Transport.NamedPipe;
+using Xunit.Abstractions;
 
 namespace UiPath.Ipc.Tests;
 
@@ -6,14 +7,15 @@ public sealed class SystemTestsOverNamedPipes : SystemTests
 {
     private string PipeName => Names.GetPipeName(role: "system", TestRunId);
 
-    protected override ListenerConfig CreateListener() => CommonConfigListener(new NamedPipeListener()
+    public SystemTestsOverNamedPipes(ITestOutputHelper outputHelper) : base(outputHelper) { }
+
+    protected sealed override ListenerConfig CreateListener() => new NamedPipeListener()
     {
         PipeName = PipeName
-    });
-
-    protected override ClientBase CreateClient() => CommonConfigClient(new NamedPipeClient()
+    };
+    protected sealed override ClientBase CreateClient() => new NamedPipeClient()
     {
         PipeName = PipeName,
         AllowImpersonation = true,
-    });
+    };
 }

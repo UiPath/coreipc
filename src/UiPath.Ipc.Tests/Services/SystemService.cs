@@ -47,7 +47,23 @@ public sealed class SystemService : ISystemService
 
     public async Task<string?> GetThreadName() => Thread.CurrentThread.Name;
 
-    internal byte[]? LatestUploadTrace;
+
+    private readonly object _latestUploadTraceLock = new();
+    private TaskCompletionSource<byte[]>? _latestUploadTrace;
+    internal Task<byte[]> ResetLatestUploadTrace()
+    {
+        lock (_latestUploadTraceLock)
+        {
+            return (_latestUploadTrace = new()).Task;            
+        }
+    }
+    private void TrySetLatestUploadTraceResult(byte[] bytes)
+    {
+        lock (_latestUploadTraceLock)
+        {
+            _latestUploadTrace?.TrySetResult(bytes);
+        }
+    }
 
     public async Task<string> UploadEcho(Stream stream, bool trace, CancellationToken ct = default)
     {
@@ -72,7 +88,7 @@ public sealed class SystemService : ISystemService
             }
             finally
             {
-                LatestUploadTrace = tracedStream.GetTrace();
+                TrySetLatestUploadTraceResult(tracedStream.GetTrace());
             }
         }
     }
@@ -82,8 +98,8 @@ public sealed class SystemService : ISystemService
         var buffer = ArrayPool<byte>.Shared.Rent(serverReadByteCount);
         try
         {
-            await stream.ReadExactlyAsync(buffer, 0, serverReadByteCount, ct);
             await Task.Delay(serverDelay, ct);
+            await stream.ReadExactlyAsync(buffer, 0, serverReadByteCount, ct);
             return true;
         }
         finally
@@ -94,19 +110,4 @@ public sealed class SystemService : ISystemService
 
     public async Task<Stream> Download(string s, CancellationToken ct = default)
     => new MemoryStream(Encoding.UTF8.GetBytes(s));
-}
-
-internal sealed class TracedStream(Stream target) : StreamBase
-{
-    private readonly List<byte> _bytes = new();
-
-    public byte[] GetTrace() => _bytes.ToArray();
-
-    public override long Length => target.Length;
-    public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-    {
-        var cbRead = await target.ReadAsync(buffer, offset, count, cancellationToken);
-        _bytes.AddRange(buffer.AsSpan(offset, cbRead));
-        return cbRead;
-    }
 }

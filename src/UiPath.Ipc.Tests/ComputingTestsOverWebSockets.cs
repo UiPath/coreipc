@@ -3,11 +3,11 @@ using Xunit.Abstractions;
 
 namespace UiPath.Ipc.Tests;
 
-public sealed class SystemTestsOverWebSockets : SystemTests
+public sealed class ComputingTestsOverWebSockets : ComputingTests
 {
     private readonly WebSocketContext _webSocketContext = new();
 
-    public SystemTestsOverWebSockets(ITestOutputHelper outputHelper) : base(outputHelper) { }
+    public ComputingTestsOverWebSockets(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
     protected override async Task DisposeAsync()
     {

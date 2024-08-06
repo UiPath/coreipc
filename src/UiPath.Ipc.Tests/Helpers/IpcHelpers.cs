@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Xunit.Abstractions;
 
 namespace UiPath.Ipc.Tests;
 
@@ -6,9 +7,11 @@ using SP = ServiceProviderServiceExtensions;
 
 internal static class IpcHelpers
 {
-    public static ServiceProvider ConfigureServices()
+    public static ServiceProvider ConfigureServices(ITestOutputHelper outputHelper)
     => new ServiceCollection()
-        .AddLogging(b => b.AddTraceSource(new SourceSwitch("", "All")))
+        .AddLogging(builder => builder
+            .AddTraceSource(new SourceSwitch("", "All"))
+            .AddXUnit(outputHelper))
 
         .AddSingleton<SystemService>()
         .AddSingletonAlias<ISystemService, SystemService>()

@@ -1,21 +1,42 @@
-﻿using System.Net.Sockets;
-using System.Text;
+﻿using System.Text;
 using System.Threading.Channels;
+using Xunit.Abstractions;
 
 namespace UiPath.Ipc.Tests;
 
-public abstract class SystemTests : TestBase<ISystemService, SystemService>
+public abstract class SystemTests : TestBase
 {
-    protected TListener CommonConfigListener<TListener>(TListener listener) where TListener : ListenerConfig
+    #region " Setup "
+    private readonly Lazy<SystemService> _service;
+    private readonly Lazy<ISystemService> _proxy;
+
+    protected SystemService Service => _service.Value;
+    protected ISystemService Proxy => _proxy.Value;
+
+    protected sealed override IpcProxy IpcProxy => Proxy as IpcProxy ?? throw new InvalidOperationException($"Proxy was expected to be a {nameof(IpcProxy)} but was not.");
+    protected sealed override Type ContractType => typeof(ISystemService);
+
+    protected SystemTests(ITestOutputHelper outputHelper) : base(outputHelper)
+    {
+        ServiceProvider.InjectLazy(out _service);
+        CreateLazyProxy(out _proxy);
+    }
+
+    protected override ListenerConfig ConfigTransportAgnostic(ListenerConfig listener)
     => listener with
     {
         ConcurrentAccepts = 10,
-        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(10) : TimeSpan.FromSeconds(2),
+        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(2),
         MaxReceivedMessageSizeInMegabytes = 1,
     };
+    protected override ClientBase ConfigTransportAgnostic(ClientBase client)
+    => client with
+    {
+        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(2),
+        ServiceProvider = ServiceProvider
+    };
+    #endregion
 
-    protected TClient CommonConfigClient<TClient>(TClient client) where TClient : ClientBase => client;
-    
     [Theory, IpcAutoData]
     public async Task PassingArgsAndReturning_ShouldWork(Guid guid)
     {
@@ -46,7 +67,8 @@ public abstract class SystemTests : TestBase<ISystemService, SystemService>
         .ShouldBeAsync(true);
 
     [Fact]
-    public async Task ServerExecutingLongCall_ShouldThrowTimeout()
+    [OverrideConfig(typeof(ServerExecutingTooLongACall_ShouldThrowTimeout_Config))]
+    public async Task ServerExecutingTooLongACall_ShouldThrowTimeout()
     => await Proxy.EchoGuidAfter(Guid.Empty, Timeout.InfiniteTimeSpan) // method takes forever but we have a server side RequestTimeout configured
         .ShouldThrowAsync<RemoteException>()
         .ShouldSatisfyAllConditionsAsync(
@@ -54,6 +76,27 @@ public abstract class SystemTests : TestBase<ISystemService, SystemService>
             ex => ex.Message.ShouldBe(TimeoutHelper.ComputeTimeoutMessage(nameof(Proxy.EchoGuidAfter))),
             ex => ex.Is<TimeoutException>().ShouldBeTrue()
         ]);
+
+    [Fact]
+    [OverrideConfig(typeof(ClientWaitingForTooLongACall_ShouldThrowTimeout_Config))]
+    public async Task ClientWaitingForTooLongACall_ShouldThrowTimeout()
+    => await Proxy.EchoGuidAfter(Guid.Empty, Timeout.InfiniteTimeSpan) // method takes forever but we have a server side RequestTimeout configured
+        .ShouldThrowAsync<TimeoutException>();
+
+    private sealed class ServerExecutingTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
+    {
+        public override ListenerConfig Override(ListenerConfig listener) => listener with { RequestTimeout = Constants.Timeout_Short };
+        public override ClientBase Override(ClientBase client) => client with { RequestTimeout = Timeout.InfiniteTimeSpan };
+    }
+
+    private sealed class ClientWaitingForTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
+    {
+        public override ListenerConfig Override(ListenerConfig listener) => listener with { RequestTimeout = Timeout.InfiniteTimeSpan };
+        public override ClientBase Override(ClientBase client) => client with { RequestTimeout = Constants.Timeout_IpcRoundtrip };
+    }
+
+    private ListenerConfig ShortClientTimeout(ListenerConfig listener) => listener with { RequestTimeout = TimeSpan.FromMilliseconds(100) };
+    private ListenerConfig InfiniteServerTimeout(ListenerConfig listener) => listener with { RequestTimeout = Timeout.InfiniteTimeSpan };
 
     [Fact]
     public async Task FireAndForget_ShouldWork()
@@ -118,43 +161,55 @@ public abstract class SystemTests : TestBase<ISystemService, SystemService>
     }
 
     [Theory, IpcAutoData]
-    public async Task CancelingStreamUploads_ShouldThrow(string str)
+    public async Task CancelingStreamUploads_ShouldThrow(string str, Guid guid)
     {
-        var memory = new Memory<byte>(Encoding.UTF8.GetBytes(str));
+        var sourceMemory = new Memory<byte>(Encoding.UTF8.GetBytes(str));
 
         using var cts = new CancellationTokenSource();
         using var stream = new UploadStream();
 
         var taskReadCall = stream.AwaitReadCall();
+
+        var serverTraceTask = Service.ResetLatestUploadTrace();
         var taskUploading = Proxy.UploadEcho(stream, trace: true, cts.Token);
 
-        var readCall = await taskReadCall.ShouldCompleteInAsync(Constants.Timeout_IpcRoundtrip);
-        var cbRead = Math.Min(readCall.Memory.Length, memory.Length);
-        memory.Slice(cbRead).CopyTo(readCall.Memory);
+        var readCall = await taskReadCall.ShouldCompleteInAsync(TimeSpan.FromSeconds(60));// Constants.Timeout_IpcRoundtrip);
+        stream.AutoRespondByte = (byte)'a';
+        var cbRead = Math.Min(readCall.Memory.Length, sourceMemory.Length);
+        var sourceSlice = sourceMemory.Slice(start: 0, cbRead);
+        sourceSlice.CopyTo(readCall.Memory);
+        var expectedServerRead = Encoding.UTF8.GetString(sourceSlice.ToArray());
+
         readCall.Return(cbRead);
 
         taskUploading.IsCompleted.ShouldBeFalse();
 
+        await Task.Delay(Constants.Timeout_IpcRoundtrip); // we just replied to the read call, but canceling during stream uploads works by destroying the network
+        var networkBeforeCancel = IpcProxy.Network;
         cts.Cancel();
+
         await taskUploading
             .ShouldThrowAsync<OperationCanceledException>()
-            .ShouldCompleteInAsync(TimeSpan.FromSeconds(20));// Constants.Timeout_IpcRoundtrip + Constants.Timeout_IpcRoundtrip + Constants.Timeout_IpcRoundtrip);
+            .ShouldCompleteInAsync(Constants.Timeout_Short); // we expect the OCE to be ⚡In-Process/⚡ThreadPool fast
 
-        Service.LatestUploadTrace.ShouldNotBeNull();
-        var expectedServerRead = Encoding.UTF8.GetString(memory.Slice(cbRead).ToArray());
-        var act = () => Encoding.UTF8.GetString(Service.LatestUploadTrace);
-        act.ShouldNotThrow().ShouldBe(expectedServerRead);
+        var serverTrace = await serverTraceTask;
+        serverTrace.ShouldNotBeNull();
+
+        var act = () => Encoding.UTF8.GetString(serverTrace);
+        act.ShouldNotThrow().ShouldStartWith(expectedServerRead);
+
+        await Proxy.EchoGuidAfter(guid, duration: TimeSpan.Zero) // we expect the connection to recover
+            .ShouldBeAsync(guid);
+
+        IpcProxy.Network.ShouldNotBeNull().ShouldNotBeSameAs(networkBeforeCancel); // and the network to be a brand new one
     }
 
     [Theory, IpcAutoData]
     public async Task UnfinishedUploads_ShouldThrowOnTheClient_AndRecover(Guid guid)
     {
-        const int StreamLength = 100;
+        var stream = new UploadStream() { AutoRespondByte = 0 };
 
-        using var memory = new MemoryStream();
-        memory.SetLength(StreamLength);
-
-        await Proxy.UploadJustCountBytes(memory, serverReadByteCount: StreamLength - 1, TimeSpan.Zero)
+        await Proxy.UploadJustCountBytes(stream, serverReadByteCount: 1, TimeSpan.Zero)
             .ShouldThrowAsync<Exception>();
 
         await Proxy.EchoGuidAfter(guid, TimeSpan.Zero)
@@ -199,12 +254,24 @@ public abstract class SystemTests : TestBase<ISystemService, SystemService>
     {
         private readonly Channel<ReadCall> _readCalls = Channel.CreateUnbounded<ReadCall>();
 
+        public byte? AutoRespondByte { get; set; }
+
         public async Task<ReadCall> AwaitReadCall(CancellationToken ct = default) => await _readCalls.Reader.ReadAsync(ct);
 
         public override long Length => long.MaxValue;
         public override bool CanRead => true;
         public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
+            if (AutoRespondByte is { } @byte)
+            {
+                if (@byte > 0)
+                {
+                    buffer.AsSpan().Slice(offset, count).Fill(@byte);
+                }
+
+                return Task.FromResult(count);
+            }
+
             var memory = new Memory<byte>(buffer, offset, count);
             var call = new ReadCall(out var task)
             {

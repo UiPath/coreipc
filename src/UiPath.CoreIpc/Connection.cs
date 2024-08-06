@@ -17,7 +17,7 @@ public sealed class Connection : IDisposable
     private readonly WaitCallback _onResponse;
     private readonly WaitCallback _onRequest;
     private readonly WaitCallback _onCancellation;
-    private readonly Action<object> _cancelRequest;
+    private readonly Action<object?> _cancelRequest;
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
     public Stream Network { get; }
@@ -38,10 +38,10 @@ public sealed class Connection : IDisposable
         DebugName = $"{debugName} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
         _receiveLoop = new(ReceiveLoop);
-        _onResponse = response => OnResponseReceived((Response)response);
-        _onRequest = request => OnRequestReceived((Request)request);
-        _onCancellation = requestId => OnCancellationReceived((string)requestId);
-        _cancelRequest = requestId => CancelRequest((string)requestId);
+        _onResponse = response => OnResponseReceived((Response)response!);
+        _onRequest = request => OnRequestReceived((Request)request!);
+        _onCancellation = requestId => OnCancellationReceived((string)requestId!);
+        _cancelRequest = requestId => CancelRequest((string)requestId!);
     }
 
     public override string ToString() => DebugName;
@@ -128,7 +128,7 @@ public sealed class Connection : IDisposable
         CancellationTokenRegistration tokenRegistration = default;
         try
         {
-            tokenRegistration = cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), this);
+            tokenRegistration = cancellationToken.UnsafeRegister(state => ((Connection)state!).Dispose(), this);
             await Network.WriteMessage(messageType, data, cancellationToken);
             await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
             const int DefaultCopyBufferSize = 81920;
@@ -262,13 +262,13 @@ public sealed class Connection : IDisposable
             switch (messageType)
             {
                 case MessageType.Response:
-                    RunAsync(_onResponse, await Deserialize<Response>());
+                    RunAsync(_onResponse, (await Deserialize<Response>())!);
                     break;
                 case MessageType.Request:
-                    RunAsync(_onRequest, await Deserialize<Request>());
+                    RunAsync(_onRequest, (await Deserialize<Request>())!);
                     break;
                 case MessageType.CancellationRequest:
-                    RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
+                    RunAsync(_onCancellation, (await Deserialize<CancellationRequest>())!.RequestId);
                     break;
                 case MessageType.UploadRequest:
                     await OnUploadRequest();
@@ -288,7 +288,7 @@ public sealed class Connection : IDisposable
     static void RunAsync(WaitCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state);
     private async Task OnDownloadResponse()
     {
-        var response = await Deserialize<Response>();
+        var response = (await Deserialize<Response>())!;
         await EnterStreamMode();
         var streamDisposed = new TaskCompletionSource<bool>();
         EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
@@ -306,7 +306,7 @@ public sealed class Connection : IDisposable
     }
     private async Task OnUploadRequest()
     {
-        var request = await Deserialize<Request>();
+        var request = (await Deserialize<Request>())!;
         await EnterStreamMode();
         using (_nestedStream)
         {
@@ -382,5 +382,13 @@ public sealed class Connection : IDisposable
         }
     }
 
-    private void Log(string message) => Logger.LogInformation(message);
+    private void Log(string message)
+    {
+        if (Logger is null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        Logger.LogInformation(message);
+    }
 }

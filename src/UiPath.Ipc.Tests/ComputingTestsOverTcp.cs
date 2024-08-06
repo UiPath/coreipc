@@ -4,13 +4,13 @@ using Xunit.Abstractions;
 
 namespace UiPath.Ipc.Tests;
 
-public sealed class SystemTestsOverTcp : SystemTests
+public sealed class ComputingTestsOverTcp : ComputingTests
 {
     private readonly IPEndPoint _endPoint = NetworkHelper.FindFreeLocalPort();
 
-    public SystemTestsOverTcp(ITestOutputHelper outputHelper) : base(outputHelper) { }
+    public ComputingTestsOverTcp(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
-    protected sealed override ListenerConfig CreateListener()
+    protected override ListenerConfig CreateListener()
     => new TcpListener()
     {
         EndPoint = _endPoint,

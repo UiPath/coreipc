@@ -13,4 +13,6 @@ internal static class Constants
     /// this value represents an exagerated timeout beyond which it's clear that a bug has occurred, even when running on a CI agent under load.
     /// </summary>
     public static readonly TimeSpan Timeout_IpcRoundtrip = TimeSpan.FromMilliseconds(600);
+
+    public static readonly TimeSpan Timeout_Short = TimeSpan.FromMilliseconds(100);
 }

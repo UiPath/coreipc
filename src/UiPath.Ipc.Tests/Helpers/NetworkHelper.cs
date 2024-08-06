@@ -11,11 +11,4 @@ public static class NetworkHelper
         socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         return (IPEndPoint)socket.LocalEndPoint!;
     }
-
-    public static void FindFreeLocalPort(out Uri ws, out Uri http)
-    {
-        var port = FindFreeLocalPort().Port;
-        ws = new UriBuilder("ws", "localhost", port).Uri;
-        http = new UriBuilder("http", "localhost", port).Uri;
-    }
 }
