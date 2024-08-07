@@ -7,8 +7,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.NodeInterop"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc", "..\..\..\UiPath.CoreIpc\UiPath.CoreIpc.csproj", "{B53F7E57-886D-4E0F-A5CB-2B66746B021A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.BackCompat", "..\..\..\UiPath.CoreIpc.BackCompat\UiPath.CoreIpc.BackCompat.csproj", "{C2448296-AF4A-4608-BC6A-27BA912A0B80}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,10 +21,6 @@ Global
 		{B53F7E57-886D-4E0F-A5CB-2B66746B021A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B53F7E57-886D-4E0F-A5CB-2B66746B021A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B53F7E57-886D-4E0F-A5CB-2B66746B021A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C2448296-AF4A-4608-BC6A-27BA912A0B80}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C2448296-AF4A-4608-BC6A-27BA912A0B80}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C2448296-AF4A-4608-BC6A-27BA912A0B80}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C2448296-AF4A-4608-BC6A-27BA912A0B80}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
