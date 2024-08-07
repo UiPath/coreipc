@@ -167,6 +167,12 @@ internal class Server
                     cancellationToken) ?? Task.CompletedTask);
                 var invocationTask = method.Invoke(service, arguments, cancellationToken);
                 await invocationTask;
+
+                if (!returnTaskType.IsGenericType)
+                {
+                    return null;
+                }
+
                 return GetTaskResult(returnTaskType, invocationTask);
             }
 
