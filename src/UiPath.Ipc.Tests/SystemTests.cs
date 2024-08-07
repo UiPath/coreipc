@@ -26,13 +26,13 @@ public abstract class SystemTests : TestBase
     => listener with
     {
         ConcurrentAccepts = 10,
-        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(4),
+        RequestTimeout = Timeouts.DefaultRequest,
         MaxReceivedMessageSizeInMegabytes = 1,
     };
     protected override ClientBase ConfigTransportAgnostic(ClientBase client)
     => client with
     {
-        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(4),
+        RequestTimeout = Timeouts.DefaultRequest,
         ServiceProvider = ServiceProvider
     };
     #endregion
@@ -54,7 +54,7 @@ public abstract class SystemTests : TestBase
 
         task1.IsCompleted.ShouldBeFalse();
         cts.Cancel();
-        var act = () => task1.ShouldCompleteInAsync(Constants.Timeout_LocalProxyToThrowOCE);
+        var act = () => task1.ShouldCompleteInAsync(Timeouts.LocalProxyToThrowOCE);
         await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
@@ -62,7 +62,7 @@ public abstract class SystemTests : TestBase
     public async Task NotPassingAnOptionalMessage_ShouldWork()
     => await Proxy
         .MessageReceivedAsNotNull(message: null)
-        .ShouldCompleteInAsync(Constants.Timeout_IpcRoundtrip)
+        .ShouldCompleteInAsync(Timeouts.IpcRoundtrip)
         .ShouldNotThrowAsyncAnd()
         .ShouldBeAsync(true);
 
@@ -85,14 +85,14 @@ public abstract class SystemTests : TestBase
 
     private sealed class ServerExecutingTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
     {
-        public override ListenerConfig Override(ListenerConfig listener) => listener with { RequestTimeout = Constants.Timeout_Short };
+        public override ListenerConfig Override(ListenerConfig listener) => listener with { RequestTimeout = Timeouts.Short };
         public override ClientBase Override(ClientBase client) => client with { RequestTimeout = Timeout.InfiniteTimeSpan };
     }
 
     private sealed class ClientWaitingForTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
     {
         public override ListenerConfig Override(ListenerConfig listener) => listener with { RequestTimeout = Timeout.InfiniteTimeSpan };
-        public override ClientBase Override(ClientBase client) => client with { RequestTimeout = Constants.Timeout_IpcRoundtrip };
+        public override ClientBase Override(ClientBase client) => client with { RequestTimeout = Timeouts.IpcRoundtrip };
     }
 
     private ListenerConfig ShortClientTimeout(ListenerConfig listener) => listener with { RequestTimeout = TimeSpan.FromMilliseconds(100) };
@@ -103,10 +103,10 @@ public abstract class SystemTests : TestBase
     {
         var taskRequestHonoured = Service.ResetTripWire();
 
-        await Proxy.FireAndForget().ShouldCompleteInAsync(Constants.Timeout_IpcRoundtrip);
+        await Proxy.FireAndForget().ShouldCompleteInAsync(Timeouts.IpcRoundtrip);
         taskRequestHonoured.IsCompleted.ShouldBeFalse();
 
-        await taskRequestHonoured.ShouldCompleteInAsync(Constants.Timeout_IpcRoundtrip + TimeSpan.FromMilliseconds(SystemService.MsFireAndForgetDelay));
+        await taskRequestHonoured.ShouldCompleteInAsync(Timeouts.IpcRoundtrip + TimeSpan.FromMilliseconds(SystemService.MsFireAndForgetDelay));
     }
 
     [Fact]
@@ -170,7 +170,7 @@ public abstract class SystemTests : TestBase
     public async Task FireAndForgetOperations_ShouldNotDeliverBusinessExceptionsEvenWhenThrownSynchronously()
     => await Proxy.FireAndForgetThrowSync()
         .ShouldNotThrowAsync()
-        .ShouldCompleteInAsync(Constants.Timeout_IpcRoundtrip);
+        .ShouldCompleteInAsync(Timeouts.IpcRoundtrip);
 
     [Fact]
     public async Task ServerScheduler_ShouldBeUsed()
@@ -207,13 +207,13 @@ public abstract class SystemTests : TestBase
 
         taskUploading.IsCompleted.ShouldBeFalse();
 
-        await Task.Delay(Constants.Timeout_IpcRoundtrip); // we just replied to the read call, but canceling during stream uploads works by destroying the network
+        await Task.Delay(Timeouts.IpcRoundtrip); // we just replied to the read call, but canceling during stream uploads works by destroying the network
         var networkBeforeCancel = IpcProxy.Network;
         cts.Cancel();
 
         await taskUploading
             .ShouldThrowAsync<OperationCanceledException>()
-            .ShouldCompleteInAsync(Constants.Timeout_Short); // in-process scheduling fast
+            .ShouldCompleteInAsync(Timeouts.Short); // in-process scheduling fast
 
         await Proxy.EchoGuidAfter(guid, duration: TimeSpan.Zero) // we expect the connection to recover
             .ShouldBeAsync(guid);
@@ -251,7 +251,7 @@ public abstract class SystemTests : TestBase
 
         await Proxy.EchoGuidAfter(guid, TimeSpan.Zero)
             .ShouldBeAsync(guid)
-            .ShouldCompleteInAsync(Constants.Timeout_IpcRoundtrip);
+            .ShouldCompleteInAsync(Timeouts.IpcRoundtrip);
     }
 
     [Theory, IpcAutoData]
@@ -263,7 +263,7 @@ public abstract class SystemTests : TestBase
                 .ShouldBeAsync(str);
 
             await Proxy.EchoGuidAfter(guid, TimeSpan.Zero)
-                .ShouldStallForAtLeastAsync(Constants.Timeout_IpcRoundtrip + Constants.Timeout_IpcRoundtrip);
+                .ShouldStallForAtLeastAsync(Timeouts.IpcRoundtrip + Timeouts.IpcRoundtrip);
         }
     }
 

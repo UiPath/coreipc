@@ -26,13 +26,13 @@ public abstract class ComputingTests : TestBase
     => listener with
     {
         ConcurrentAccepts = 10,
-        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(4),
+        RequestTimeout = Timeouts.DefaultRequest,
         MaxReceivedMessageSizeInMegabytes = 1,
     };
     protected override ClientBase ConfigTransportAgnostic(ClientBase client)
     => client with
     {
-        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(4),
+        RequestTimeout = Timeouts.DefaultRequest,
         Scheduler = GuiScheduler,
         Callbacks = new()
         {
@@ -59,15 +59,15 @@ public abstract class ComputingTests : TestBase
 
         var taskWaiting = Proxy.Wait(Timeout.InfiniteTimeSpan, cts.Token);
 
-        await Task.Delay(Constants.Timeout_Short);
+        await Task.Delay(Timeouts.Short);
 
         taskWaiting.IsCompleted.ShouldBeFalse();
 
         cts.Cancel();
 
-        await taskWaiting.ShouldCompleteInAsync(Constants.Timeout_Short).ShouldThrowAsync<OperationCanceledException>(); // in-process scheduling fast
+        await taskWaiting.ShouldCompleteInAsync(Timeouts.Short).ShouldThrowAsync<OperationCanceledException>(); // in-process scheduling fast
 
-        await Proxy.Wait(TimeSpan.Zero).ShouldCompleteInAsync(Constants.Timeout_IpcRoundtrip).ShouldBeAsync(true); // connection still alive
+        await Proxy.Wait(TimeSpan.Zero).ShouldCompleteInAsync(Timeouts.IpcRoundtrip).ShouldBeAsync(true); // connection still alive
     }
 
     [Fact, OverrideConfig(typeof(ShortClientTimeout))]
@@ -76,10 +76,10 @@ public abstract class ComputingTests : TestBase
         await Proxy.Wait(Timeout.InfiniteTimeSpan).ShouldThrowAsync<TimeoutException>();
 
         await Proxy.GetCallbackThreadName(
-            duration: TimeSpan.FromMilliseconds(500),
+            duration: TimeSpan.Zero,
             message: new()
             {
-                RequestTimeout = TimeSpan.FromSeconds(2)
+                RequestTimeout = Timeouts.DefaultRequest
             })
             .ShouldBeAsync(Names.GuiThreadName)
             .ShouldNotThrowAsync();
