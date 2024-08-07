@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\UiPath.CoreIpc\UiPath.CoreIpc.csproj" />
+    <ProjectReference Include="..\..\src\UiPath.CoreIpc\UiPath.CoreIpc.csproj" />
   </ItemGroup>
 
 </Project>
