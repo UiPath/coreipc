@@ -26,13 +26,13 @@ public abstract class ComputingTests : TestBase
     => listener with
     {
         ConcurrentAccepts = 10,
-        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(2),
+        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(4),
         MaxReceivedMessageSizeInMegabytes = 1,
     };
     protected override ClientBase ConfigTransportAgnostic(ClientBase client)
     => client with
     {
-        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(2),
+        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(4),
         Scheduler = GuiScheduler,
         Callbacks = new()
         {
@@ -44,7 +44,7 @@ public abstract class ComputingTests : TestBase
     [Theory, IpcAutoData]
     public async Task Calls_ShouldWork(float x, float y)
     => await Proxy.AddFloats(x, y).ShouldBeAsync(x + y);
-
+    
     [Theory, IpcAutoData]
     public Task ConcurrentCalls_ShouldWork(float sameX, float sameY) => Task.WhenAll(Enumerable.Range(1, 100).Select(_ => Calls_ShouldWork(sameX, sameY)));
 

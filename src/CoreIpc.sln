@@ -17,6 +17,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.Http", "UiPa
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.Ipc.Tests", "UiPath.Ipc.Tests\UiPath.Ipc.Tests.csproj", "{E238E183-92CF-48A6-890F-C422853D6656}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UiPath.Ipc.Benchmarks", "UiPath.Ipc.Benchmarks\UiPath.Ipc.Benchmarks.csproj", "{E2C6BDD9-F780-4362-88A0-C3B149386CFE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{E238E183-92CF-48A6-890F-C422853D6656}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E238E183-92CF-48A6-890F-C422853D6656}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E238E183-92CF-48A6-890F-C422853D6656}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2C6BDD9-F780-4362-88A0-C3B149386CFE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2C6BDD9-F780-4362-88A0-C3B149386CFE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2C6BDD9-F780-4362-88A0-C3B149386CFE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2C6BDD9-F780-4362-88A0-C3B149386CFE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

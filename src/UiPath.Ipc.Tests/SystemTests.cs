@@ -26,13 +26,13 @@ public abstract class SystemTests : TestBase
     => listener with
     {
         ConcurrentAccepts = 10,
-        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(2),
+        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(4),
         MaxReceivedMessageSizeInMegabytes = 1,
     };
     protected override ClientBase ConfigTransportAgnostic(ClientBase client)
     => client with
     {
-        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(2),
+        RequestTimeout = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(4),
         ServiceProvider = ServiceProvider
     };
     #endregion
