@@ -3,7 +3,8 @@ using UiPath.Ipc.Benchmarks;
 
 
 // await Run(TechnologyId.New);
-BenchmarkRunner.Run<IpcBenchmark>();
+// BenchmarkRunner.Run<IpcBenchmark>();
+BenchmarkRunner.Run<SchedulerBenchmark>();
 
 static async Task Run(TechnologyId techId)
 {

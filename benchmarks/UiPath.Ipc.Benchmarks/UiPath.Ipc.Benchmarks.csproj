@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
     <PackageReference Include="UiPath.CoreIpc" Version="2.1.0-20210811-12-fix" />
   </ItemGroup>
 
