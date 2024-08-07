@@ -161,7 +161,7 @@ class Program
                             RequestTimeout = TimeSpan.FromHours(5),
                             Callbacks = new()
                             {
-                                { typeof(IAlgebra), callback }
+                                { typeof(IArithmetic), callback }
                             }
                         }
                         .GetProxy<IAlgebra>()
