@@ -62,6 +62,11 @@ class Program
 
     static async Task MainCore(string? pipeName, string? webSocketUrl, int? maybeSecondsPowerOnDelay)
     {
+        if (pipeName is null && webSocketUrl is null)
+        {
+            throw new ArgumentException($"At least one of {nameof(pipeName)} or {nameof(webSocketUrl)} must be specified.");
+        }
+
         if (maybeSecondsPowerOnDelay is { } secondsPowerOnDelay)
         {
             await Task.Delay(TimeSpan.FromSeconds(secondsPowerOnDelay));
@@ -94,35 +99,12 @@ class Program
                 typeof(IDtoService)
             },
             Listeners = [
-                EitherNamedPipesOrWebSockets(pipeName, webSocketUrl)
+                ..EnumerateListeners(pipeName, webSocketUrl)
             ],
             ServiceProvider = sp,
             Scheduler = scheduler
         };
-
-        ListenerConfig EitherNamedPipesOrWebSockets(string? pipeName, string? webSocketUrl)
-        {
-            if (pipeName is not null)
-            {
-                return new NamedPipeListener() { PipeName = pipeName };
-            }
-
-            if (webSocketUrl is not null)
-            {
-                string url = CurateWebSocketUrl(webSocketUrl);
-                var accept = new HttpSysWebSocketsListener(url).Accept;
-                return new WebSocketListener() { Accept = accept };
-            }
-
-            throw new ArgumentOutOfRangeException();
-
-            static string CurateWebSocketUrl(string raw)
-            {
-                var builder = new UriBuilder(raw);
-                builder.Scheme = "http";
-                return builder.ToString();
-            }
-        }
+        ipcServer.Start();
 
         _ = Task.Run(async () =>
         {
@@ -180,8 +162,29 @@ class Program
             }
         });
 
-        ipcServer.Start();
         await ipcServer.WaitForStop();
+
+        IEnumerable<ListenerConfig> EnumerateListeners(string? pipeName, string? webSocketUrl)
+        {
+            if (pipeName is not null)
+            {
+                yield return new NamedPipeListener() { PipeName = pipeName };
+            }
+
+            if (webSocketUrl is not null)
+            {
+                string url = CurateWebSocketUrl(webSocketUrl);
+                var accept = new HttpSysWebSocketsListener(url).Accept;
+                yield return new WebSocketListener() { Accept = accept };
+            }
+
+            static string CurateWebSocketUrl(string raw)
+            {
+                var builder = new UriBuilder(raw);
+                builder.Scheme = "http";
+                return builder.ToString();
+            }
+        }
     }
 
     private class Arithmetic : IArithmetic
