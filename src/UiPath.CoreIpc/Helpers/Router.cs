@@ -1,6 +1,23 @@
 ﻿namespace UiPath.Ipc;
 
-internal readonly record struct RouterConfig(IReadOnlyDictionary<string, EndpointSettings> Endpoints);
+internal readonly record struct RouterConfig(IReadOnlyDictionary<string, EndpointSettings> Endpoints)
+{
+    public static RouterConfig From(EndpointCollection endpoints, Func<EndpointSettings, EndpointSettings> transform)
+    {
+        ContractToSettingsMap nameToEndpoint = [];
+
+        foreach (var endpoint in endpoints)
+        {
+            var newValue = transform(endpoint);
+            foreach (var iface in endpoint.Service.Type.GetInterfaces().Prepend(endpoint.Service.Type))
+            {
+                nameToEndpoint[iface.Name] = newValue;
+            }
+        }
+
+        return new(nameToEndpoint);
+    }
+}
 
 internal readonly struct Router
 {
@@ -15,19 +32,19 @@ internal readonly struct Router
 
     public bool TryResolve(string endpoint, out Route route)
     {
-        if (_config is null) /// in case <see cref="Router"/> was allocated as default, bypassing the constructor
+        if (_config is not { } config) /// in case <see cref="Router"/> was allocated as default, bypassing the constructor
         {
             throw new InvalidOperationException();
         }
 
-        if (!_config.Value.Endpoints.TryGetValue(endpoint, out var endpointSettings))
+        if (config.Endpoints.TryGetValue(endpoint, out var endpointSettings))
         {
-            route = default;
-            return false;
+            route = Route.From(_serviceProvider, endpointSettings);
+            return true;
         }
 
-        route = Route.From(_serviceProvider, endpointSettings);
-        return true;
+        route = default;
+        return false;
     }
 }
 

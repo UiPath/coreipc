@@ -14,7 +14,10 @@ public abstract record ListenerConfig : EndpointConfig
     internal IEnumerable<string> Validate() => Enumerable.Empty<string>();
 
     internal override RouterConfig CreateRouterConfig(IpcServer server)
-    => new RouterConfig(server.Endpoints.ToDictionary(
-        static x => x.Service.Type.Name,
-        x => x with { Scheduler = x.Scheduler ?? server.Scheduler }));
+    => RouterConfig.From(
+        server.Endpoints,
+        endpoint => endpoint with
+        {
+            Scheduler = endpoint.Scheduler ?? server.Scheduler
+        });
 }

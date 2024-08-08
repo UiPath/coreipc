@@ -46,14 +46,13 @@ public abstract record ClientBase : EndpointConfig
     }
 
     internal override RouterConfig CreateCallbackRouterConfig()
-    => new RouterConfig(
-        (Callbacks?.ToDictionary(
-            x => x.Service.Type.Name,
-            x => x with
-            {
-                BeforeCall = x.BeforeCall ?? BeforeCall,
-                Scheduler = x.Scheduler ?? Scheduler
-            })).OrDefault());
+    => RouterConfig.From(
+        Callbacks.OrDefault(),
+        endpoint => endpoint with
+        {
+            BeforeCall = endpoint.BeforeCall ?? BeforeCall,
+            Scheduler = endpoint.Scheduler ?? Scheduler
+        });
 }
 
 public interface IClient<TState, TSelf>

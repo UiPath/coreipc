@@ -42,24 +42,10 @@ public record EndpointSettings
             throw new ArgumentOutOfRangeException(nameof(instance));
         }
     }
-
-    public virtual EndpointSettings WithServiceProvider(IServiceProvider serviceProvider)
-    => new EndpointSettings(Service.Type, serviceProvider)
-    {
-        BeforeCall = BeforeCall,
-        Scheduler = Scheduler
-    };
 }
 
 public sealed record EndpointSettings<TContract> : EndpointSettings where TContract : class
 {
     public EndpointSettings(TContract? serviceInstance = null) : base(typeof(TContract), serviceInstance) { }
     public EndpointSettings(IServiceProvider serviceProvider) : base(typeof(TContract), serviceProvider) { }
-
-    public override EndpointSettings WithServiceProvider(IServiceProvider serviceProvider)
-    => new EndpointSettings<TContract>(serviceProvider)
-    {
-        BeforeCall = BeforeCall,
-        Scheduler = Scheduler
-    };
 }

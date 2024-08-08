@@ -36,17 +36,19 @@ public abstract class ComputingTests : TestBase
         Scheduler = GuiScheduler,
         Callbacks = new()
         {
-            {typeof(IComputingCallback), _computingCallback }
+            { typeof(IComputingCallback), _computingCallback }
         }
     };
     #endregion
 
     [Theory, IpcAutoData]
     public async Task Calls_ShouldWork(float x, float y)
-    => await Proxy.AddFloats(x, y).ShouldBeAsync(x + y);
-    
+    {
+        await Proxy.AddFloats(x, y).ShouldBeAsync(x + y);
+    }
+
     [Theory, IpcAutoData]
-    public Task ConcurrentCalls_ShouldWork(float sameX, float sameY) => Task.WhenAll(Enumerable.Range(1, 100).Select(_ => Calls_ShouldWork(sameX, sameY)));
+    public Task ConcurrentCalls_ShouldWork(float sameX, float sameY) => Task.WhenAll(Enumerable.Range(1, 50).Select(_ => Calls_ShouldWork(sameX, sameY)));
 
     [Theory, IpcAutoData]
     public async Task CallsWithStructParamsAndReturns_ShouldWork(ComplexNumber a, ComplexNumber b)

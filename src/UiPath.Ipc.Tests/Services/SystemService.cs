@@ -73,7 +73,7 @@ public sealed class SystemService : ISystemService
 
     public async Task<int> AddIncrement(int x, int y, Message message = null!)
     {
-        var sum = await message.GetCallback<IComputingCallback>().AddInts(x, y);
+        var sum = await message.GetCallback<IComputingCallbackBase>().AddInts(x, y);
         var result = await message.GetCallback<IArithmeticCallback>().Increment(sum);
         return result;
     }

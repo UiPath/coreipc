@@ -1,9 +1,13 @@
 ﻿
 namespace UiPath.Ipc.Tests;
 
-public interface IComputingService
+public interface IComputingServiceBase
 {
     Task<float> AddFloats(float x, float y, CancellationToken ct = default);
+}
+
+public interface IComputingService : IComputingServiceBase
+{
     Task<ComplexNumber> AddComplexNumbers(ComplexNumber a, ComplexNumber b);
     Task<bool> Wait(TimeSpan duration, CancellationToken ct = default);
     Task<string> GetCallbackThreadName(TimeSpan duration, Message message = null!, CancellationToken cancellationToken = default);
@@ -11,10 +15,14 @@ public interface IComputingService
     Task<int> MultiplyInts(int x, int y, Message message = null!);
 }
 
-public interface IComputingCallback
+public interface IComputingCallbackBase
+{
+    Task<int> AddInts(int x, int y);
+}
+
+public interface IComputingCallback : IComputingCallbackBase
 {
     Task<string> GetThreadName();
-    Task<int> AddInts(int x, int y);
 }
 
 public interface IArithmeticCallback

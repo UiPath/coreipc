@@ -1,6 +1,5 @@
 ﻿using Nito.AsyncEx;
 using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
 using Xunit.Abstractions;
 
 namespace UiPath.Ipc.Tests;

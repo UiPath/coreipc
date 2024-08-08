@@ -41,7 +41,7 @@ public sealed class ComputingService(ILogger<ComputingService> logger) : IComput
 
     public async Task<int> MultiplyInts(int x, int y, Message message = null!)
     {
-        var callback = message.GetCallback<IComputingCallback>();
+        var callback = message.GetCallback<IComputingCallbackBase>();
 
         var result = 0;
         for (int i = 0; i < y; i++)
