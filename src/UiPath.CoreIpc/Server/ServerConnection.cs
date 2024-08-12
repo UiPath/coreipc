@@ -1,4 +1,5 @@
-﻿using System.Net.Security;
+﻿using System.IO.Pipes;
+using System.Net.Security;
 namespace UiPath.Ipc;
 
 public interface IClient
@@ -46,7 +47,21 @@ internal abstract class ServerConnection : IClient, IDisposable
 
     public abstract Task<Stream> AcceptClient(CancellationToken cancellationToken);
 
-    public virtual void Impersonate(Action action) => action();
+    public void Impersonate(Action action)
+    {
+        if (Connection is null)
+        {
+            throw new InvalidOperationException("The server connection is not listening yet.");
+        }
+
+        if (Connection.Network is not NamedPipeServerStream pipeStream)
+        {
+            action();
+            return;
+        }
+
+        pipeStream.RunAsClient(() => action());
+    }
 
     TCallbackInterface IClient.GetCallback<TCallbackInterface>() where TCallbackInterface : class
     {
@@ -64,7 +79,7 @@ internal abstract class ServerConnection : IClient, IDisposable
     }
     public async Task Listen(Stream network, CancellationToken cancellationToken)
     {
-        var stream = await AuthenticateAsServer();
+        var stream = await AuthenticateAsServer(); // TODO: should we decommission this?
         var serializer = Listener.Server.ServiceProvider.GetService<ISerializer>();
         Connection = new Connection(stream, serializer, Listener.Logger, Listener.Config.DebugName, Listener.Config.MaxMessageSize);
         Server = new Server(
@@ -82,6 +97,7 @@ internal abstract class ServerConnection : IClient, IDisposable
         }
         return;
 
+        // TODO: should we decommission this?
         async Task<Stream> AuthenticateAsServer()
         {
             if (Listener.Config.Certificate is null)
