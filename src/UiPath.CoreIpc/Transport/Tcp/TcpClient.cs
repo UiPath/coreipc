@@ -5,6 +5,8 @@ namespace UiPath.Ipc.Transport.Tcp;
 public sealed record TcpClient : ClientBase, IClient<TcpClientState, TcpClient>
 {
     public required IPEndPoint EndPoint { get; init; }
+
+    public override string ToString() => $"TcpClient={EndPoint}";
 }
 
 internal sealed class TcpClientState : IClientState<TcpClient, TcpClientState>

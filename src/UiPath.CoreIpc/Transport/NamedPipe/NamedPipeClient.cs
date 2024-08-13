@@ -8,6 +8,8 @@ public sealed record NamedPipeClient : ClientBase, IClient<NamedPipeClientState,
     public required string PipeName { get; init; }
     public string ServerName { get; init; } = ".";
     public bool AllowImpersonation { get; init; } = false;
+
+    public override string ToString() => $"ClientPipe={PipeName}";
 }
 
 internal sealed class NamedPipeClientState : IClientState<NamedPipeClient, NamedPipeClientState>

@@ -81,7 +81,7 @@ internal abstract class ServerConnection : IClient, IDisposable
     {
         var stream = await AuthenticateAsServer(); // TODO: should we decommission this?
         var serializer = Listener.Server.ServiceProvider.GetService<ISerializer>();
-        Connection = new Connection(stream, serializer, Listener.Logger, Listener.Config.DebugName, Listener.Config.MaxMessageSize);
+        Connection = new Connection(stream, serializer, Listener.Logger, debugName: Listener.ToString(), maxMessageSize: Listener.Config.MaxMessageSize);
         Server = new Server(
             new Router(
                 Listener.Config.CreateRouterConfig(Listener.Server),

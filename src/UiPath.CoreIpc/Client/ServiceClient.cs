@@ -277,7 +277,7 @@ internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
     protected override ConnectionFactory? ConnectionFactory => _client.ConnectionFactory;
     protected override BeforeCallHandler? BeforeCall => _client.BeforeCall;
     protected override ILogger? Log => _client.Logger;
-    protected override string DebugName => "Some ServiceClient"; // TODO: get the DebugName from the client
+    protected override string DebugName => _client.ToString();
     protected override ISerializer? Serializer => _client.Serializer;
 }
 
@@ -301,7 +301,7 @@ internal sealed class ServiceClientForCallback : ServiceClient
     protected override ConnectionFactory? ConnectionFactory => null;
     protected override BeforeCallHandler? BeforeCall => null;
     protected override ILogger? Log => null;
-    protected override string DebugName => "Some Callback ServiceClient"; // TODO: get the DebugName from the listener or somewhere else
+    protected override string DebugName => $"ReverseClient for {_listener}";
     protected override ISerializer? Serializer => null;
 }
 

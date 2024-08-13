@@ -1,4 +1,5 @@
 ﻿using Nito.AsyncEx;
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Xunit.Abstractions;
 
@@ -19,6 +20,8 @@ public abstract class TestBase : IAsyncLifetime
     protected IpcServer IpcServer => _ipcServer.Value;
     protected abstract IpcProxy IpcProxy { get; }
     protected abstract Type ContractType { get; }
+
+    protected readonly ConcurrentBag<CallInfo> _serverBeforeCalls = new();
 
     public TestBase(ITestOutputHelper outputHelper)
     {
@@ -42,7 +45,12 @@ public abstract class TestBase : IAsyncLifetime
 
         _ipcServer = new(() => new()
         {
-            Endpoints = new() { ContractType },
+            Endpoints = new() {
+                new EndpointSettings(ContractType)
+                {
+                    BeforeCall = async (callInfo, _) => _serverBeforeCalls.Add(callInfo)
+                } 
+            },
             Listeners = [CreateListenerAndConfigure()],
             ServiceProvider = _serviceProvider,
             Scheduler = GuiScheduler
@@ -71,7 +79,7 @@ public abstract class TestBase : IAsyncLifetime
         _outputHelper.WriteLine("  - Creating transport specific listener...");
         var listener = CreateListener();
         _outputHelper.WriteLine($"    Result:\r\n\t\t{listener}");
-        _outputHelper.WriteLine( "  - Applying transport agnostic configuration...");
+        _outputHelper.WriteLine("  - Applying transport agnostic configuration...");
         listener = ConfigTransportAgnostic(listener);
         _outputHelper.WriteLine($"    Result:\r\n\t\t{listener}");
         if (_overrideConfig is null)

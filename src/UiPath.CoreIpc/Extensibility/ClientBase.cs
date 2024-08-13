@@ -50,7 +50,7 @@ public abstract record ClientBase : EndpointConfig
         Callbacks.OrDefault(),
         endpoint => endpoint with
         {
-            BeforeCall = endpoint.BeforeCall ?? BeforeCall,
+            BeforeCall = null, // callbacks don't support BeforeCall
             Scheduler = endpoint.Scheduler ?? Scheduler
         });
 }

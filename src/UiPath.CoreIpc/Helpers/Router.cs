@@ -8,10 +8,10 @@ internal readonly record struct RouterConfig(IReadOnlyDictionary<string, Endpoin
 
         foreach (var endpoint in endpoints)
         {
-            var newValue = transform(endpoint);
+            var newEndpoint = transform(endpoint);
             foreach (var iface in endpoint.Service.Type.GetInterfaces().Prepend(endpoint.Service.Type))
             {
-                nameToEndpoint[iface.Name] = newValue;
+                nameToEndpoint[iface.Name] = newEndpoint;
             }
         }
 
@@ -32,7 +32,7 @@ internal readonly struct Router
 
     public bool TryResolve(string endpoint, out Route route)
     {
-        if (_config is not { } config) /// in case <see cref="Router"/> was allocated as default, bypassing the constructor
+        if (_config is not { } config) /// in case <see cref="Router"/> was allocated as <c>default(Router)</c>, bypassing the constructor
         {
             throw new InvalidOperationException();
         }

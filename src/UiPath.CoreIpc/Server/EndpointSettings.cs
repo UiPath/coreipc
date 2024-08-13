@@ -11,7 +11,7 @@ public record EndpointSettings
     public IServiceProvider? ServiceProvider => Service.MaybeGetServiceProvider();
     internal ServiceFactory Service { get; }
 
-    public EndpointSettings(Type contractType, object? serviceInstance) : this(
+    public EndpointSettings(Type contractType, object? serviceInstance = null) : this(
         serviceInstance is not null
             ? new ServiceFactory.Instance()
             {

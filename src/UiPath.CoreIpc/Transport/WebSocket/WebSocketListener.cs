@@ -23,6 +23,8 @@ public sealed record WebSocketListener : ListenerConfig, IWebSocketListenerConfi
     {
         if (Accept is null) { yield return "Accept is required"; }
     }
+
+    public override string ToString() => "WebSocketServer";
 }
 
 internal sealed class WebSocketListenerState : IAsyncDisposable

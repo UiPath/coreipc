@@ -178,4 +178,6 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
             }
         }
     }
+
+    public override string ToString() => Config.ToString();
 }

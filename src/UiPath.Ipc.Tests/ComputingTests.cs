@@ -1,4 +1,5 @@
-﻿using Xunit.Abstractions;
+﻿using System.Collections.Concurrent;
+using Xunit.Abstractions;
 
 namespace UiPath.Ipc.Tests;
 
@@ -16,6 +17,8 @@ public abstract class ComputingTests : TestBase
     protected sealed override IpcProxy IpcProxy => Proxy as IpcProxy ?? throw new InvalidOperationException($"Proxy was expected to be a {nameof(IpcProxy)} but was not.");
     protected sealed override Type ContractType => typeof(IComputingService);
 
+    protected readonly ConcurrentBag<CallInfo> _clientBeforeCalls = new();
+
     protected ComputingTests(ITestOutputHelper outputHelper) : base(outputHelper)
     {
         ServiceProvider.InjectLazy(out _service);
@@ -27,7 +30,7 @@ public abstract class ComputingTests : TestBase
     {
         ConcurrentAccepts = 10,
         RequestTimeout = Timeouts.DefaultRequest,
-        MaxReceivedMessageSizeInMegabytes = 1,
+        MaxReceivedMessageSizeInMegabytes = 1,        
     };
     protected override ClientBase ConfigTransportAgnostic(ClientBase client)
     => client with
@@ -37,7 +40,8 @@ public abstract class ComputingTests : TestBase
         Callbacks = new()
         {
             { typeof(IComputingCallback), _computingCallback }
-        }
+        },
+        BeforeCall = async (callInfo, _) => _clientBeforeCalls.Add(callInfo),
     };
     #endregion
 
@@ -109,4 +113,16 @@ public abstract class ComputingTests : TestBase
     public async Task ConcurrentCallbacksWithParams_ShouldWork()
     => await Task.WhenAll(
         Enumerable.Range(1, 50).Select(_ => CallbacksWithParams_ShouldWork()));
+
+    [Fact]
+    public async Task BeforeCall_ShouldApplyToCallsButNotToToCallbacks()
+    {
+        await Proxy.GetCallbackThreadName(TimeSpan.Zero).ShouldBeAsync(Names.GuiThreadName);
+
+        _clientBeforeCalls.ShouldContain(x => x.Method.Name == nameof(IComputingService.GetCallbackThreadName));
+        _clientBeforeCalls.ShouldNotContain(x => x.Method.Name == nameof(IComputingCallback.GetThreadName));
+
+        _serverBeforeCalls.ShouldContain(x => x.Method.Name == nameof(IComputingService.GetCallbackThreadName));
+        _serverBeforeCalls.ShouldNotContain(x => x.Method.Name == nameof(IComputingCallback.GetThreadName));
+    }
 }

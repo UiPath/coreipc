@@ -5,6 +5,7 @@ namespace UiPath.Ipc.Transport.WebSocket;
 public sealed record WebSocketClient : ClientBase, IClient<WebSocketClientState, WebSocketClient>
 {
     public required Uri Uri { get; init; }
+    public override string ToString() => $"WebSocketClient={Uri}";
 }
 
 internal sealed class WebSocketClientState : IClientState<WebSocketClient, WebSocketClientState>

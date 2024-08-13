@@ -53,6 +53,8 @@ public sealed record NamedPipeListener : ListenerConfig, INamedPipeListenerConfi
     {
         if (PipeName is null or "") { yield return "PipeName is required"; }
     }
+
+    public override string ToString() => $"ServerPipe={PipeName}";
 }
 
 internal sealed class NamedPipeServerConnectionState

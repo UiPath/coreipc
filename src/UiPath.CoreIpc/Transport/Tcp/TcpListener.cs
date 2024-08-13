@@ -39,6 +39,8 @@ public sealed record TcpListener : ListenerConfig, ITcpListenerConfig
             yield return "EndPoint is required";
         }
     }
+
+    public override string ToString() => $"TcpServer={EndPoint}";
 }
 
 internal sealed class TcpListenerState : IAsyncDisposable
