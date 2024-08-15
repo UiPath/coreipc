@@ -30,10 +30,10 @@ public abstract class ComputingTests : TestBase
     {
         ConcurrentAccepts = 10,
         RequestTimeout = Timeouts.DefaultRequest,
-        MaxReceivedMessageSizeInMegabytes = 1,        
+        MaxReceivedMessageSizeInMegabytes = 1,
     };
-    protected override ClientBase ConfigTransportAgnostic(ClientBase client)
-    => client with
+    protected override ClientConfig CreateClientConfig()
+    => new()
     {
         RequestTimeout = Timeouts.DefaultRequest,
         Scheduler = GuiScheduler,
@@ -93,8 +93,7 @@ public abstract class ComputingTests : TestBase
 
     private sealed class ShortClientTimeout : OverrideConfig
     {
-        public override ClientBase Override(ClientBase client)
-        => client with { RequestTimeout = TimeSpan.FromMilliseconds(10) };
+        public override IpcClient Override(IpcClient client) => client.WithRequestTimeout(TimeSpan.FromMilliseconds(10));
     }
 
     [Theory, IpcAutoData]
@@ -124,5 +123,22 @@ public abstract class ComputingTests : TestBase
 
         _serverBeforeCalls.ShouldContain(x => x.Method.Name == nameof(IComputingService.GetCallbackThreadName));
         _serverBeforeCalls.ShouldNotContain(x => x.Method.Name == nameof(IComputingCallback.GetThreadName));
+    }
+
+    [Fact]
+    public async Task ServerBeforeCall_WhenSync_ShouldShareAsyncLocalContextWithTheTargetMethodCall()
+    {
+        await Proxy.GetCallContext().ShouldBeAsync(null);
+
+        var id = $"{Guid.NewGuid():N}";
+        var expectedCallContext = $"{nameof(IComputingService.GetCallContext)}-{id}";
+
+        _tailBeforeCall = (callInfo, _) =>
+        {
+            ComputingService.CallContext = $"{callInfo.Method.Name}-{id}";
+            return Task.CompletedTask;
+        };
+
+        await Proxy.GetCallContext().ShouldBeAsync(expectedCallContext);
     }
 }

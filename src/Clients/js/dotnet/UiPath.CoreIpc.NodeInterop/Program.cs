@@ -120,15 +120,21 @@ class Program
                 {
                     if (webSocketUrl is not null)
                     {
-                        yield return new WebSocketClient()
+                        yield return new IpcClient
                         {
-                            Uri = new(webSocketUrl),
-                            ServiceProvider = sp,
-                            RequestTimeout = TimeSpan.FromHours(5),
-                            Callbacks = new()
+                            Config = new()
                             {
-                                { typeof(IArithmetic), callback }
+                                ServiceProvider = sp,
+                                RequestTimeout = TimeSpan.FromHours(5),
+                                Callbacks = new()
+                                {
+                                    { typeof(IArithmetic), callback }
+                                },
                             },
+                            Transport = new WebSocketTransport
+                            {
+                                Uri = new(webSocketUrl),
+                            }
                         }
                         .GetProxy<IAlgebra>()
                         .Ping();
@@ -136,14 +142,20 @@ class Program
 
                     if (pipeName is not null)
                     {
-                        yield return new NamedPipeClient()
+                        yield return new IpcClient
                         {
-                            PipeName = pipeName,
-                            ServiceProvider = sp,
-                            RequestTimeout = TimeSpan.FromHours(5),
-                            Callbacks = new()
+                            Config = new()
                             {
-                                { typeof(IArithmetic), callback }
+                                ServiceProvider = sp,
+                                RequestTimeout = TimeSpan.FromHours(5),
+                                Callbacks = new()
+                                {
+                                    { typeof(IArithmetic), callback }
+                                }
+                            },
+                            Transport = new NamedPipeTransport()
+                            {
+                                PipeName = pipeName,
                             }
                         }
                         .GetProxy<IAlgebra>()

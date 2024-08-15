@@ -34,6 +34,9 @@ public record EndpointSettings
 
     private protected EndpointSettings(ServiceFactory service) => Service = service;
 
+    public virtual EndpointSettings WithServiceProvider(IServiceProvider? serviceProvider)
+    => new(Service.WithProvider(serviceProvider));
+
     public void Validate()
     {
         Validator.Validate(Service.Type);
@@ -48,4 +51,8 @@ public sealed record EndpointSettings<TContract> : EndpointSettings where TContr
 {
     public EndpointSettings(TContract? serviceInstance = null) : base(typeof(TContract), serviceInstance) { }
     public EndpointSettings(IServiceProvider serviceProvider) : base(typeof(TContract), serviceProvider) { }
+    private EndpointSettings(ServiceFactory service) : base(service) { }
+
+    public override EndpointSettings WithServiceProvider(IServiceProvider? serviceProvider)
+    => new EndpointSettings<TContract>(Service.WithProvider(serviceProvider));
 }

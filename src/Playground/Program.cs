@@ -40,7 +40,14 @@ internal class Program
             ServiceProvider = serverSP,
             Endpoints = new()
             {
-                typeof(Contracts.IServerOperations),
+                typeof(Contracts.IServerOperations), // DEVINE
+                new EndpointSettings(typeof(Contracts.IServerOperations)) // ASTALALT
+                {
+                    BeforeCall = async (callInfo, _) =>
+                    {
+                        Console.WriteLine($"Server: {callInfo.Method.Name}");
+                    }
+                },
                 typeof(Contracts.IClientOperations2)
             },
             Listeners = [
@@ -73,21 +80,66 @@ internal class Program
             throw;
         }
 
-        var proxy1 = new NamedPipeClient()
+        var c1 = new IpcClient()
         {
-            PipeName = Contracts.PipeName,
-            ServerName = ".",
-            AllowImpersonation = false,
-
-            ServiceProvider = clientSP,
-            Callbacks = new()
+            Config = new()
             {
-                typeof(Contracts.IClientOperations),
-                { typeof(Contracts.IClientOperations2), new Impl.Client2() }
+                Callbacks = new()
+                {
+                    typeof(Contracts.IClientOperations),
+                    { typeof(Contracts.IClientOperations2), new Impl.Client2() },
+                },
+                ServiceProvider = clientSP,
+                Scheduler = clientScheduler,                
             },
-            Scheduler = clientScheduler
-        }
-            .GetProxy<Contracts.IServerOperations>();
+            Transport = new NamedPipeTransport()
+            {
+                PipeName = Contracts.PipeName,
+                ServerName = ".",
+                AllowImpersonation = false,
+            },
+        };
+
+        var c2 = new IpcClient()
+        {
+            Config = new()
+            {
+                ServiceProvider = clientSP,
+                Callbacks = new()
+                {
+                    typeof(Contracts.IClientOperations),
+                    { typeof(Contracts.IClientOperations2), new Impl.Client2() },
+                },
+                Scheduler = clientScheduler,
+            },
+            Transport = new NamedPipeTransport()
+            {
+                PipeName = Contracts.PipeName,
+                ServerName = ".",
+                AllowImpersonation = false,
+            },
+        };
+
+        var proxy1 = new IpcClient()
+        {
+            Config = new()
+            {
+                ServiceProvider = clientSP,
+                Callbacks = new()
+                {
+                    typeof(Contracts.IClientOperations),
+                    { typeof(Contracts.IClientOperations2), new Impl.Client2() },
+                },
+                Scheduler = clientScheduler,
+            },
+            Transport = new NamedPipeTransport()
+            {
+                PipeName = Contracts.PipeName,
+                ServerName = ".",
+                AllowImpersonation = false,
+            },
+        }.GetProxy<Contracts.IServerOperations>();
+
 
         await proxy1.Register();
         await proxy1.Broadcast("Hello Bidirectional Http!");

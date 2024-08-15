@@ -12,6 +12,7 @@ public abstract class TestBase : IAsyncLifetime
     private readonly ServiceProvider _serviceProvider;
     private readonly AsyncContext _guiThread = new AsyncContextThread().Context;
     private readonly Lazy<IpcServer> _ipcServer;
+    private readonly Lazy<IpcClient> _ipcClient;
     private readonly OverrideConfig? _overrideConfig;
 
     protected TestRunId TestRunId { get; } = TestRunId.New();
@@ -22,6 +23,7 @@ public abstract class TestBase : IAsyncLifetime
     protected abstract Type ContractType { get; }
 
     protected readonly ConcurrentBag<CallInfo> _serverBeforeCalls = new();
+    protected Func<CallInfo, CancellationToken, Task>? _tailBeforeCall = null;
 
     public TestBase(ITestOutputHelper outputHelper)
     {
@@ -43,18 +45,8 @@ public abstract class TestBase : IAsyncLifetime
         _guiThread.SynchronizationContext.Send(() => Thread.CurrentThread.Name = Names.GuiThreadName);
         _serviceProvider = IpcHelpers.ConfigureServices(_outputHelper);
 
-        _ipcServer = new(() => new()
-        {
-            Endpoints = new() {
-                new EndpointSettings(ContractType)
-                {
-                    BeforeCall = async (callInfo, _) => _serverBeforeCalls.Add(callInfo)
-                } 
-            },
-            Listeners = [CreateListenerAndConfigure()],
-            ServiceProvider = _serviceProvider,
-            Scheduler = GuiScheduler
-        });
+        _ipcServer = new(CreateServer);
+        _ipcClient = new(CreateClient);
 
         OverrideConfig? GetOverrideConfig()
         {
@@ -94,35 +86,47 @@ public abstract class TestBase : IAsyncLifetime
         _outputHelper.WriteLine($"    Result:\r\n\t\t{listener}\r\n");
         return listener;
     }
-    private TContract CreateClientAndConfigure<TContract>() where TContract : class
-    {
-        _outputHelper.WriteLine("Creating client...");
-        _outputHelper.WriteLine("  - Creating transport specific client...");
-        var client = CreateClient();
-        client = ConfigTransportAgnostic(client);
-        _outputHelper.WriteLine($"    Result:\r\n\t\t{client}");
-        _outputHelper.WriteLine("  - Applying transport agnostic configuration...");
-        _outputHelper.WriteLine($"    Result:\r\n\t\t{client}");
-        if (_overrideConfig is null)
-        {
-            _outputHelper.WriteLine($"  - No configuration override found for method {CustomTestFramework.Context?.Method.Name}");
-        }
-        else
-        {
-            _outputHelper.WriteLine($"  - Applying configuration override provided by \"{_overrideConfig.GetType().Name}\" ...");
-        }
-        client = _overrideConfig?.Override(client) ?? client;
-        _outputHelper.WriteLine($"    Result:\r\n\t\t{client}\r\n");
-        return client.GetProxy<TContract>();
-    }
 
-    protected void CreateLazyProxy<TContract>(out Lazy<TContract> lazy) where TContract : class => lazy = new(CreateClientAndConfigure<TContract>);
+    private IpcServer CreateServer()
+    => new()
+    {
+        Endpoints = new() {
+            new EndpointSettings(ContractType)
+            {
+                BeforeCall = (callInfo, ct) =>
+                {
+                    _serverBeforeCalls.Add(callInfo);
+                    return _tailBeforeCall?.Invoke(callInfo, ct) ?? Task.CompletedTask;
+                }
+            }
+        },
+        Listeners = [CreateListenerAndConfigure()],
+        ServiceProvider = _serviceProvider,
+        Scheduler = GuiScheduler
+    };
+    private IpcClient CreateClient()
+    {
+        var config = CreateClientConfig();
+        var transport = CreateClientTransport();
+        var client = new IpcClient
+        {
+            Config = config,
+            Transport = transport
+        };
+        client = _overrideConfig?.Override(client) ?? client;
+        return client;
+    }
+    private TContract GetProxy<TContract>() where TContract : class
+    => _ipcClient.Value.GetProxy<TContract>();
+
+    protected void CreateLazyProxy<TContract>(out Lazy<TContract> lazy) where TContract : class => lazy = new(GetProxy<TContract>);
 
     protected abstract ListenerConfig CreateListener();
-    protected abstract ClientBase CreateClient();
+
+    protected abstract ClientConfig CreateClientConfig();
+    protected abstract ClientTransport CreateClientTransport();
 
     protected abstract ListenerConfig ConfigTransportAgnostic(ListenerConfig listener);
-    protected abstract ClientBase ConfigTransportAgnostic(ClientBase client);
 
     protected virtual async Task DisposeAsync()
     {

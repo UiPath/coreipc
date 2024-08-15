@@ -29,8 +29,8 @@ public abstract class SystemTests : TestBase
         RequestTimeout = Timeouts.DefaultRequest,
         MaxReceivedMessageSizeInMegabytes = 1,
     };
-    protected override ClientBase ConfigTransportAgnostic(ClientBase client)
-    => client with
+    protected override ClientConfig CreateClientConfig()
+    => new()
     {
         RequestTimeout = Timeouts.DefaultRequest,
         ServiceProvider = ServiceProvider
@@ -86,13 +86,15 @@ public abstract class SystemTests : TestBase
     private sealed class ServerExecutingTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
     {
         public override ListenerConfig Override(ListenerConfig listener) => listener with { RequestTimeout = Timeouts.Short };
-        public override ClientBase Override(ClientBase client) => client with { RequestTimeout = Timeout.InfiniteTimeSpan };
+        public override IpcClient Override(IpcClient client)
+        => client.WithRequestTimeout(Timeout.InfiniteTimeSpan);
     }
 
     private sealed class ClientWaitingForTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
     {
         public override ListenerConfig Override(ListenerConfig listener) => listener with { RequestTimeout = Timeout.InfiniteTimeSpan };
-        public override ClientBase Override(ClientBase client) => client with { RequestTimeout = Timeouts.IpcRoundtrip };
+        public override IpcClient Override(IpcClient client)
+        => client.WithRequestTimeout(Timeouts.IpcRoundtrip);
     }
 
     private ListenerConfig ShortClientTimeout(ListenerConfig listener) => listener with { RequestTimeout = TimeSpan.FromMilliseconds(100) };
@@ -155,15 +157,12 @@ public abstract class SystemTests : TestBase
 
     private sealed class RegisterCallbacks : OverrideConfig
     {
-        public override ClientBase Override(ClientBase client)
-        => client with
+        public override IpcClient Override(IpcClient client)
+        => client.WithCallbacks(new()
         {
-            Callbacks = new()
-            {
-                { typeof(IComputingCallback), new ComputingCallback() },
-                { typeof(IArithmeticCallback), new ArithmeticCallback() },
-            }
-        };
+            { typeof(IComputingCallback), new ComputingCallback() },
+            { typeof(IArithmeticCallback), new ArithmeticCallback() },
+        });
     }
 
     [Fact]

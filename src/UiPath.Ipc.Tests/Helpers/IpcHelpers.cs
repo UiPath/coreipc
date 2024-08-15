@@ -32,3 +32,20 @@ internal static class IpcHelpers
         return serviceProvider;
     }
 }
+
+internal static class IpcClientExtensions
+{
+    public static IpcClient WithRequestTimeout(this IpcClient ipcClient, TimeSpan requestTimeout)
+    => new()
+    {
+        Config = ipcClient.Config with { RequestTimeout = requestTimeout },
+        Transport = ipcClient.Transport,
+    };
+
+    public static IpcClient WithCallbacks(this IpcClient ipcClient, EndpointCollection callbacks)
+    => new()
+    {
+        Config = ipcClient.Config with { Callbacks = callbacks },
+        Transport = ipcClient.Transport,
+    };
+}

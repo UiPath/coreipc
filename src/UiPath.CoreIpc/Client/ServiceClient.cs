@@ -1,8 +1,5 @@
 ﻿namespace UiPath.Ipc;
 
-using System.Linq.Expressions;
-using ServiceClientProperFactory = Func<ClientBase, Type, ServiceClient>;
-
 internal abstract class ServiceClient : IDisposable
 {
     #region " NonGeneric-Generic adapter cache "
@@ -19,7 +16,6 @@ internal abstract class ServiceClient : IDisposable
     #endregion
 
     protected abstract TimeSpan RequestTimeout { get; }
-    protected abstract ConnectionFactory? ConnectionFactory { get; }
     protected abstract BeforeCallHandler? BeforeCall { get; }
     protected abstract ILogger? Log { get; }
     protected abstract string DebugName { get; }
@@ -151,47 +147,11 @@ internal abstract class ServiceClient : IDisposable
     public override string ToString() => DebugName;
 }
 
-internal static class ServiceClientProper
-{
-    private static readonly ConcurrentDictionary<Type, ServiceClientProperFactory> CachedFactories = new();
-    private static ServiceClientProperFactory GetFactory(Type clientType) => CachedFactories.GetOrAdd(clientType, CreateFactory);
-    private static ServiceClientProperFactory CreateFactory(Type clientType)
-    {
-        if (clientType
-            .GetInterfaces()
-            .SingleOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IClient<,>))
-            ?.GetGenericArguments()
-            is not [var clientStateType, var clientType2] || clientType2 != clientType)
-        {
-            throw new ArgumentOutOfRangeException(nameof(clientType), "The client implements 0 or more than 1 IClient<,> interfaces or the single interface's 2nd generic argument is not the client type itself.");
-        }
-
-        var ctor = typeof(ServiceClientProper<,>)
-            .MakeGenericType(clientType, clientStateType)
-            .GetConstructor([clientType, typeof(Type)])!;
-
-        var paramofClientBase = Expression.Parameter(typeof(ClientBase));
-        var paramofType = Expression.Parameter(typeof(Type));
-        return Expression.Lambda<ServiceClientProperFactory>(
-            Expression.New(
-                ctor, 
-                Expression.Convert(paramofClientBase, clientType), 
-                paramofType),
-            paramofClientBase,
-            paramofType).Compile();
-    }
-
-    public static ServiceClient Create(ClientBase client, Type proxyType)
-    => GetFactory(client.GetType())(client, proxyType);
-}
-
-internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
-    where TClient : ClientBase, IClient<TClientState, TClient>
-    where TClientState : class, IClientState<TClient, TClientState>, new()
+internal sealed class ServiceClientProper : ServiceClient
 {
     private readonly FastAsyncLock _lock = new();
-    private readonly TClientState _clientState = new();
-    private readonly TClient _client;
+    private readonly IpcClient _client;
+    private readonly IClientState _clientState;
 
     private Connection? _latestConnection;
     private Server? _latestServer;
@@ -222,9 +182,10 @@ internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
 
     public override Stream? Network => LatestConnection?.Network;
 
-    public ServiceClientProper(TClient client, Type interfaceType) : base(interfaceType)
+    public ServiceClientProper(IpcClient client, Type interfaceType) : base(interfaceType)
     {
         _client = client;
+        _clientState = client.Transport.CreateState();
     }
 
     public override async ValueTask CloseConnection()
@@ -248,8 +209,8 @@ internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
             }
 
             LatestConnection = new Connection(await Connect(ct), Serializer, Log, DebugName);
-            var router = new Router(_client.CreateCallbackRouterConfig(), _client.ServiceProvider);
-            _latestServer = new Server(router, _client.RequestTimeout, LatestConnection);
+            var router = new Router(_client.Config.CreateCallbackRouterConfig(), _client.Config.ServiceProvider);
+            _latestServer = new Server(router, _client.Config.RequestTimeout, LatestConnection);
             LatestConnection.Listen().LogException(Log, DebugName);
             return (LatestConnection, newlyConnected: true);
         }
@@ -257,12 +218,6 @@ internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
 
     private async Task<Network> Connect(CancellationToken ct)
     {
-        if (ConnectionFactory is not null
-            && await ConnectionFactory(_clientState.Network, ct) is { } userProvidedNetwork)
-        {
-            return userProvidedNetwork;
-        }
-
         await _clientState.Connect(_client, ct);
 
         if (_clientState.Network is not { } network)
@@ -273,12 +228,11 @@ internal sealed class ServiceClientProper<TClient, TClientState> : ServiceClient
         return network;
     }
 
-    protected override TimeSpan RequestTimeout => _client.RequestTimeout;
-    protected override ConnectionFactory? ConnectionFactory => _client.ConnectionFactory;
-    protected override BeforeCallHandler? BeforeCall => _client.BeforeCall;
-    protected override ILogger? Log => _client.Logger;
-    protected override string DebugName => _client.ToString();
-    protected override ISerializer? Serializer => _client.Serializer;
+    protected override TimeSpan RequestTimeout => _client.Config.RequestTimeout;
+    protected override BeforeCallHandler? BeforeCall => _client.Config.BeforeCall;
+    protected override ILogger? Log => _client.Config.Logger;
+    protected override string DebugName => _client.Transport.ToString();
+    protected override ISerializer? Serializer => _client.Config.Serializer;
 }
 
 internal sealed class ServiceClientForCallback : ServiceClient
@@ -298,29 +252,8 @@ internal sealed class ServiceClientForCallback : ServiceClient
     => Task.FromResult((_connection, newlyConnected: false));
 
     protected override TimeSpan RequestTimeout => _listener.Config.RequestTimeout;
-    protected override ConnectionFactory? ConnectionFactory => null;
     protected override BeforeCallHandler? BeforeCall => null;
     protected override ILogger? Log => null;
     protected override string DebugName => $"ReverseClient for {_listener}";
     protected override ISerializer? Serializer => null;
-}
-
-public class IpcProxy : DispatchProxy, IDisposable
-{
-    internal ServiceClient ServiceClient { get; set; } = null!;
-
-    protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
-    => ServiceClient.Invoke(targetMethod!, args!);
-
-    public void Dispose() => ServiceClient?.Dispose();
-
-    public ValueTask CloseConnection() => ServiceClient.CloseConnection();
-
-    public event EventHandler ConnectionClosed
-    {
-        add => ServiceClient.ConnectionClosed += value;
-        remove => ServiceClient.ConnectionClosed -= value;
-    }
-
-    public Stream? Network => ServiceClient.Network;
 }

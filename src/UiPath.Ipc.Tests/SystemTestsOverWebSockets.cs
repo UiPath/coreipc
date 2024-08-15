@@ -19,8 +19,6 @@ public sealed class SystemTestsOverWebSockets : SystemTests
     {
         Accept = _webSocketContext.Accept,
     };
-    protected override ClientBase CreateClient() => new WebSocketClient()
-    {
-        Uri = _webSocketContext.ClientUri,
-    };
+    protected override ClientTransport CreateClientTransport()
+    => new WebSocketTransport() { Uri = _webSocketContext.ClientUri };
 }

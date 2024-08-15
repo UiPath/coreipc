@@ -35,5 +35,5 @@ internal sealed class OverrideConfigAttribute : Attribute
 public abstract class OverrideConfig
 {
     public virtual ListenerConfig Override(ListenerConfig listener) => listener;
-    public virtual ClientBase Override(ClientBase client) => client;
+    public virtual IpcClient Override(IpcClient client) => client;
 }

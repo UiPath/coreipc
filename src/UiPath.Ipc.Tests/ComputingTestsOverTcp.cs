@@ -16,9 +16,6 @@ public sealed class ComputingTestsOverTcp : ComputingTests
         EndPoint = _endPoint,
     };
 
-    protected override ClientBase CreateClient()
-    => new TcpClient()
-    {
-        EndPoint = _endPoint,
-    };
+    protected override ClientTransport CreateClientTransport()
+    => new TcpTransport() { EndPoint = _endPoint };
 }

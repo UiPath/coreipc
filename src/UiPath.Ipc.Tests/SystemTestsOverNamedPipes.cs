@@ -13,7 +13,7 @@ public sealed class SystemTestsOverNamedPipes : SystemTests
     {
         PipeName = PipeName
     };
-    protected sealed override ClientBase CreateClient() => new NamedPipeClient()
+    protected sealed override ClientTransport CreateClientTransport() => new NamedPipeTransport()
     {
         PipeName = PipeName,
         AllowImpersonation = true,

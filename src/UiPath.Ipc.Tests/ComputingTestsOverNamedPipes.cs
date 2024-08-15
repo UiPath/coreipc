@@ -13,9 +13,9 @@ public sealed class ComputingTestsOverNamedPipes : ComputingTests
     {
         PipeName = PipeName
     };
-    protected override ClientBase CreateClient() => new NamedPipeClient()
+    protected override ClientTransport CreateClientTransport() => new NamedPipeTransport()
     {
         PipeName = PipeName,
         AllowImpersonation = true,
-    };
+    };    
 }

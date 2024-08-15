@@ -13,6 +13,7 @@ public interface IComputingService : IComputingServiceBase
     Task<string> GetCallbackThreadName(TimeSpan duration, Message message = null!, CancellationToken cancellationToken = default);
     Task<ComplexNumber> AddComplexNumberList(IReadOnlyList<ComplexNumber> numbers);
     Task<int> MultiplyInts(int x, int y, Message message = null!);
+    Task<string?> GetCallContext();
 }
 
 public interface IComputingCallbackBase
