@@ -1,5 +1,4 @@
-﻿
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 
 namespace UiPath.Ipc.Tests;
 
@@ -30,9 +29,9 @@ public sealed class ComputingService(ILogger<ComputingService> logger) : IComput
         return true;
     }
 
-    public async Task<string> GetCallbackThreadName(TimeSpan duration, Message message = null!, CancellationToken cancellationToken = default)
+    public async Task<string> GetCallbackThreadName(TimeSpan waitOnServer, Message message = null!, CancellationToken cancellationToken = default)
     {
-        await Task.Delay(duration);
+        await Task.Delay(waitOnServer);
         return await message.GetCallback<IComputingCallback>().GetThreadName();
     }
 

@@ -15,10 +15,17 @@ public sealed class SystemTestsOverWebSockets : SystemTests
         await base.DisposeAsync();
     }
 
-    protected override ListenerConfig CreateListener() => new WebSocketListener()
+    protected override async Task<ListenerConfig> CreateListener()
     {
-        Accept = _webSocketContext.Accept,
-    };
+        var listener = new WebSocketListener
+        {
+            Accept = _webSocketContext.Accept,
+            ConcurrentAccepts = 1,
+        };
+        await Task.Delay(500); // Wait for the listener to start.
+        return listener;
+    }
+
     protected override ClientTransport CreateClientTransport()
     => new WebSocketTransport() { Uri = _webSocketContext.ClientUri };
 }

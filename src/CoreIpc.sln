@@ -8,7 +8,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{676A208A-2F08-4749-A833-F8D2BCB1B147}"
 	ProjectSection(SolutionItems) = preProject
 		Directory.Build.targets = Directory.Build.targets
-		NuGet.Config = NuGet.Config
+		..\NuGet.Config = ..\NuGet.Config
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "Playground\Playground.csproj", "{F0365E40-DA73-4583-A363-89CBEF68A4C6}"

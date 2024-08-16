@@ -15,10 +15,30 @@ public sealed class ComputingTestsOverWebSockets : ComputingTests
         await base.DisposeAsync();
     }
 
-    protected override ListenerConfig CreateListener() => new WebSocketListener()
+    protected override async Task<ListenerConfig> CreateListener()
     {
-        Accept = _webSocketContext.Accept,
-    };
+        var listener = new WebSocketListener
+        {
+            Accept = _webSocketContext.Accept,
+        };
+        await Task.Delay(200); // Wait for the listener to start.
+        return listener;
+    }
+
     protected override ClientTransport CreateClientTransport()
     => new WebSocketTransport() { Uri = _webSocketContext.ClientUri };
+
+    public override IAsyncDisposable? RandomTransportPair(out ListenerConfig listener, out ClientTransport transport)
+    {
+        var context = new WebSocketContext();
+        listener = new WebSocketListener() { Accept = context.Accept };
+        transport = new WebSocketTransport() { Uri = context.ClientUri };
+        return context;
+    }
+
+    public override ExternalServerParams RandomServerParams()
+    {
+        var endPoint = NetworkHelper.FindFreeLocalPort();
+        return new(ServerKind.WebSockets, Port: endPoint.Port);
+    }
 }

@@ -9,7 +9,7 @@ public sealed class SystemTestsOverNamedPipes : SystemTests
 
     public SystemTestsOverNamedPipes(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
-    protected sealed override ListenerConfig CreateListener() => new NamedPipeListener()
+    protected sealed override async Task<ListenerConfig> CreateListener() => new NamedPipeListener
     {
         PipeName = PipeName
     };

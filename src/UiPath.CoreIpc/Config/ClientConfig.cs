@@ -1,14 +1,20 @@
-﻿namespace UiPath.Ipc;
+﻿using System.ComponentModel;
 
-public sealed record ClientConfig : EndpointConfig
+namespace UiPath.Ipc;
+
+public sealed record ClientConfig : EndpointConfig, IServiceClientConfig
 {
     public EndpointCollection? Callbacks { get; init; }
 
     public IServiceProvider? ServiceProvider { get; init; }
     public ILogger? Logger { get; init; }
+    public BeforeConnectHandler? BeforeConnect { get; init; }
     public BeforeCallHandler? BeforeCall { get; init; }
     public TaskScheduler? Scheduler { get; init; }
     public ISerializer? Serializer { get; set; }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public string DebugName { get; set; } = null!;
 
     internal void Validate()
     {

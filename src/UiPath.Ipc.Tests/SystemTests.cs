@@ -8,10 +8,10 @@ public abstract class SystemTests : TestBase
 {
     #region " Setup "
     private readonly Lazy<SystemService> _service;
-    private readonly Lazy<ISystemService> _proxy;
+    private readonly Lazy<ISystemService?> _proxy;
 
     protected SystemService Service => _service.Value;
-    protected ISystemService Proxy => _proxy.Value;
+    protected ISystemService Proxy => _proxy.Value!;
 
     protected sealed override IpcProxy IpcProxy => Proxy as IpcProxy ?? throw new InvalidOperationException($"Proxy was expected to be a {nameof(IpcProxy)} but was not.");
     protected sealed override Type ContractType => typeof(ISystemService);
@@ -48,7 +48,7 @@ public abstract class SystemTests : TestBase
     public async Task ConcurrentOperations_ShouldWork(Guid guid1, Guid guid2)
     {
         using var cts = new CancellationTokenSource();
-        var task1 = Proxy.EchoGuidAfter(guid1, Timeout.InfiniteTimeSpan, cts.Token);
+        var task1 = Proxy.EchoGuidAfter(guid1, Timeout.InfiniteTimeSpan, message: null, cts.Token);
 
         (await Proxy.EchoGuidAfter(guid2, TimeSpan.Zero)).ShouldBe(guid2);
 
@@ -85,16 +85,16 @@ public abstract class SystemTests : TestBase
 
     private sealed class ServerExecutingTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
     {
-        public override ListenerConfig Override(ListenerConfig listener) => listener with { RequestTimeout = Timeouts.Short };
-        public override IpcClient Override(IpcClient client)
-        => client.WithRequestTimeout(Timeout.InfiniteTimeSpan);
+        public override async Task<ListenerConfig?> Override(Func<Task<ListenerConfig>> listener) => await listener() with { RequestTimeout = Timeouts.Short };
+        public override IpcClient? Override(Func<IpcClient> client)
+        => client().WithRequestTimeout(Timeout.InfiniteTimeSpan);
     }
 
     private sealed class ClientWaitingForTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
     {
-        public override ListenerConfig Override(ListenerConfig listener) => listener with { RequestTimeout = Timeout.InfiniteTimeSpan };
-        public override IpcClient Override(IpcClient client)
-        => client.WithRequestTimeout(Timeouts.IpcRoundtrip);
+        public override async Task<ListenerConfig?> Override(Func<Task<ListenerConfig>> listener) => await listener() with { RequestTimeout = Timeout.InfiniteTimeSpan };
+        public override IpcClient? Override(Func<IpcClient> client)
+        => client().WithRequestTimeout(Timeouts.IpcRoundtrip);
     }
 
     private ListenerConfig ShortClientTimeout(ListenerConfig listener) => listener with { RequestTimeout = TimeSpan.FromMilliseconds(100) };
@@ -157,8 +157,8 @@ public abstract class SystemTests : TestBase
 
     private sealed class RegisterCallbacks : OverrideConfig
     {
-        public override IpcClient Override(IpcClient client)
-        => client.WithCallbacks(new()
+        public override IpcClient? Override(Func<IpcClient> client)
+        => client().WithCallbacks(new()
         {
             { typeof(IComputingCallback), new ComputingCallback() },
             { typeof(IArithmeticCallback), new ArithmeticCallback() },
@@ -214,7 +214,7 @@ public abstract class SystemTests : TestBase
             .ShouldThrowAsync<OperationCanceledException>()
             .ShouldCompleteInAsync(Timeouts.Short); // in-process scheduling fast
 
-        await Proxy.EchoGuidAfter(guid, duration: TimeSpan.Zero) // we expect the connection to recover
+        await Proxy.EchoGuidAfter(guid, waitOnServer: TimeSpan.Zero) // we expect the connection to recover
             .ShouldBeAsync(guid);
 
         IpcProxy.Network.ShouldNotBeNull().ShouldNotBeSameAs(networkBeforeCancel); // and the network to be a new one
@@ -228,9 +228,38 @@ public abstract class SystemTests : TestBase
         await Proxy.UploadJustCountBytes(stream, serverReadByteCount: 1, TimeSpan.Zero) // the server method deliberately returns before finishing to read the entire stream
             .ShouldThrowAsync<Exception>();
 
-        await Proxy.EchoGuidAfter(guid, TimeSpan.Zero)
-            .ShouldBeAsync(guid);
+        var act = async () =>
+        {
+            while (true)
+            {
+                try
+                {
+                    var actual = await Proxy.EchoGuidAfter(guid, TimeSpan.Zero);
+                    actual.ShouldBe(guid);
+                    return;
+                }
+                catch
+                {
+                }
+                await Task.Delay(100);
+            }
+        };
+        await act().ShouldCompleteInAsync(TimeSpan.FromSeconds(5));
     }
+
+#if !CI
+    [Theory, IpcAutoData]
+    public async Task UnfinishedUploads_ShouldThrowOnTheClient_AndRecover_Repeat(Guid guid)
+    {
+        const int IterationCount = 500;
+        foreach (var i in Enumerable.Range(1, IterationCount))
+        {
+            _outputHelper.WriteLine($"Starting iteration {i}/{IterationCount}...");
+            await UnfinishedUploads_ShouldThrowOnTheClient_AndRecover(guid);
+            _outputHelper.WriteLine($"Finished iteration {i}/{IterationCount}.");
+        }
+    }
+#endif
 
     [Theory, IpcAutoData]
     public async Task DownloadingStreams_ShouldWork(string str)
@@ -261,8 +290,20 @@ public abstract class SystemTests : TestBase
             await new StreamReader(stream).ReadToEndAsync()
                 .ShouldBeAsync(str);
 
-            await Proxy.EchoGuidAfter(guid, TimeSpan.Zero)
-                .ShouldStallForAtLeastAsync(Timeouts.IpcRoundtrip + Timeouts.IpcRoundtrip);
+            await Proxy.EchoGuidAfter(guid, waitOnServer: TimeSpan.Zero, message: new() { RequestTimeout = Timeout.InfiniteTimeSpan })
+                .ShouldStallForAtLeastAsync(Timeouts.IpcRoundtrip);
+        }
+    }
+
+#if !CI
+    [Theory, IpcAutoData]
+#endif
+    public async Task StreamDownloadsLeftOpen_WillHijackTheConnection_Repeat(string str, Guid guid)
+    {
+        const int IterationCount = 20;
+        foreach (var i in Enumerable.Range(0, IterationCount))
+        {
+            await StreamDownloadsLeftOpen_WillHijackTheConnection(str, guid);
         }
     }
 

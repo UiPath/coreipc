@@ -2,26 +2,8 @@
 
 internal abstract class ServiceClient : IDisposable
 {
-    #region " NonGeneric-Generic adapter cache "
-    private static readonly MethodInfo GenericDefinition = ((Func<ServiceClient, MethodInfo, object?[], Task<int>>)Invoke<int>).Method.GetGenericMethodDefinition();
-    private static readonly ConcurrentDictionary<Type, InvokeDelegate> ReturnTypeToInvokeDelegate = new();
-    private static InvokeDelegate GetInvokeDelegate(Type returnType) => ReturnTypeToInvokeDelegate.GetOrAdd(returnType, CreateInvokeDelegate);
-    private static InvokeDelegate CreateInvokeDelegate(Type returnType)
-    => GenericDefinition.MakeGenericDelegate<InvokeDelegate>(
-        returnType.IsGenericType
-            ? returnType.GetGenericArguments()[0]
-            : typeof(object));
-
-    private static Task<TResult> Invoke<TResult>(ServiceClient serviceClient, MethodInfo method, object?[] args) => serviceClient.Invoke<TResult>(method, args);
-    #endregion
-
-    protected abstract TimeSpan RequestTimeout { get; }
-    protected abstract BeforeCallHandler? BeforeCall { get; }
-    protected abstract ILogger? Log { get; }
-    protected abstract string DebugName { get; }
-    protected abstract ISerializer? Serializer { get; }
+    protected abstract IServiceClientConfig Config { get; }
     public abstract Stream? Network { get; }
-
     public event EventHandler? ConnectionClosed;
 
     private readonly Type _interfaceType;
@@ -33,7 +15,6 @@ internal abstract class ServiceClient : IDisposable
     }
 
     protected void RaiseConnectionClosed() => ConnectionClosed?.Invoke(this, EventArgs.Empty);
-
     public virtual ValueTask CloseConnection() => throw new NotSupportedException();
     public object? Invoke(MethodInfo method, object?[] args) => GetInvokeDelegate(method.ReturnType)(this, method, args);
 
@@ -64,7 +45,7 @@ internal abstract class ServiceClient : IDisposable
         {
             CancellationToken cancellationToken = default;
             TimeSpan messageTimeout = default;
-            TimeSpan clientTimeout = RequestTimeout;
+            TimeSpan clientTimeout = Config.RequestTimeout;
             Stream? uploadStream = null;
             var methodName = method.Name;
 
@@ -77,10 +58,10 @@ internal abstract class ServiceClient : IDisposable
 
                 var (connection, newConnection) = await EnsureConnection(ct);
 
-                if (BeforeCall is not null)
+                if (Config.BeforeCall is not null)
                 {
                     var callInfo = new CallInfo(newConnection, method, args);
-                    await BeforeCall(callInfo, ct);
+                    await Config.BeforeCall(callInfo, ct);
                 }
 
                 var requestId = connection.NewRequestId();
@@ -89,11 +70,11 @@ internal abstract class ServiceClient : IDisposable
                     UploadStream = uploadStream
                 };
 
-                Log?.ServiceClientCalling(methodName, requestId, DebugName);
+                Config.Logger?.ServiceClientCalling(methodName, requestId, Config.DebugName);
                 var response = await connection.RemoteCall(request, ct); // returns user errors instead of throwing them (could throw for system bugs)
-                Log?.ServiceClientCalled(methodName, requestId, DebugName);
+                Config.Logger?.ServiceClientCalled(methodName, requestId, Config.DebugName);
 
-                return response.Deserialize<TResult>(Serializer);
+                return response.Deserialize<TResult>(Config.Serializer);
             }
             catch (Exception ex)
             {
@@ -127,7 +108,7 @@ internal abstract class ServiceClient : IDisposable
                             break;
                     }
 
-                    result[index] = Serializer.OrDefault().Serialize(args[index]);
+                    result[index] = Config.Serializer.OrDefault().Serialize(args[index]);
                 }
 
                 return result;
@@ -142,9 +123,22 @@ internal abstract class ServiceClient : IDisposable
     }
     private void Dispose(bool disposing)
     {
-        Log?.ServiceClientDispose(DebugName);
+        Config.Logger?.ServiceClientDispose(Config.DebugName);
     }
-    public override string ToString() => DebugName;
+    public override string ToString() => Config.DebugName;
+
+    #region Generic adapter cache
+    private static readonly MethodInfo GenericDefinition = ((Func<ServiceClient, MethodInfo, object?[], Task<int>>)Invoke<int>).Method.GetGenericMethodDefinition();
+    private static readonly ConcurrentDictionary<Type, InvokeDelegate> ReturnTypeToInvokeDelegate = new();
+    private static InvokeDelegate GetInvokeDelegate(Type returnType) => ReturnTypeToInvokeDelegate.GetOrAdd(returnType, CreateInvokeDelegate);
+    private static InvokeDelegate CreateInvokeDelegate(Type returnType)
+    => GenericDefinition.MakeGenericDelegate<InvokeDelegate>(
+        returnType.IsGenericType
+            ? returnType.GetGenericArguments()[0]
+            : typeof(object));
+
+    private static Task<TResult> Invoke<TResult>(ServiceClient serviceClient, MethodInfo method, object?[] args) => serviceClient.Invoke<TResult>(method, args);
+    #endregion
 }
 
 internal sealed class ServiceClientProper : ServiceClient
@@ -208,10 +202,16 @@ internal sealed class ServiceClientProper : ServiceClient
                 return (LatestConnection, newlyConnected: false);
             }
 
-            LatestConnection = new Connection(await Connect(ct), Serializer, Log, DebugName);
+            if (Config.BeforeConnect is not null)
+            {
+                await Config.BeforeConnect(ct);
+            }
+
+            var network = await Connect(ct);
+            LatestConnection = new Connection(network, Config.Serializer, Config.Logger, Config.DebugName);
             var router = new Router(_client.Config.CreateCallbackRouterConfig(), _client.Config.ServiceProvider);
             _latestServer = new Server(router, _client.Config.RequestTimeout, LatestConnection);
-            LatestConnection.Listen().LogException(Log, DebugName);
+            LatestConnection.Listen().LogException(Config.Logger, Config.DebugName);
             return (LatestConnection, newlyConnected: true);
         }
     }
@@ -228,11 +228,7 @@ internal sealed class ServiceClientProper : ServiceClient
         return network;
     }
 
-    protected override TimeSpan RequestTimeout => _client.Config.RequestTimeout;
-    protected override BeforeCallHandler? BeforeCall => _client.Config.BeforeCall;
-    protected override ILogger? Log => _client.Config.Logger;
-    protected override string DebugName => _client.Transport.ToString();
-    protected override ISerializer? Serializer => _client.Config.Serializer;
+    protected override IServiceClientConfig Config => _client.Config;
 }
 
 internal sealed class ServiceClientForCallback : ServiceClient
@@ -251,9 +247,5 @@ internal sealed class ServiceClientForCallback : ServiceClient
     protected override Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct)
     => Task.FromResult((_connection, newlyConnected: false));
 
-    protected override TimeSpan RequestTimeout => _listener.Config.RequestTimeout;
-    protected override BeforeCallHandler? BeforeCall => null;
-    protected override ILogger? Log => null;
-    protected override string DebugName => $"ReverseClient for {_listener}";
-    protected override ISerializer? Serializer => null;
+    protected override IServiceClientConfig Config => _listener.Config;
 }

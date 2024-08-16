@@ -7,13 +7,13 @@ internal sealed class WebSocketContext : IAsyncDisposable
     public Accept Accept => _httpListener.Accept;
     public Uri ClientUri { get; }
 
-    public WebSocketContext()
+    public WebSocketContext(int? port = null)
     {
-        var port = NetworkHelper.FindFreeLocalPort().Port;
+        var actualPort = port ?? NetworkHelper.FindFreeLocalPort().Port;
         ClientUri = Uri("ws");
         _httpListener = new(uriPrefix: Uri("http").ToString());
 
-        Uri Uri(string scheme) => new UriBuilder(scheme, "localhost", port).Uri;
+        Uri Uri(string scheme) => new UriBuilder(scheme, "localhost", actualPort).Uri;
     }
 
     public ValueTask DisposeAsync() => _httpListener.DisposeAsync();

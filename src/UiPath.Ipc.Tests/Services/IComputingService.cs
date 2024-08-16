@@ -10,7 +10,7 @@ public interface IComputingService : IComputingServiceBase
 {
     Task<ComplexNumber> AddComplexNumbers(ComplexNumber a, ComplexNumber b);
     Task<bool> Wait(TimeSpan duration, CancellationToken ct = default);
-    Task<string> GetCallbackThreadName(TimeSpan duration, Message message = null!, CancellationToken cancellationToken = default);
+    Task<string> GetCallbackThreadName(TimeSpan waitOnServer, Message message = null!, CancellationToken cancellationToken = default);
     Task<ComplexNumber> AddComplexNumberList(IReadOnlyList<ComplexNumber> numbers);
     Task<int> MultiplyInts(int x, int y, Message message = null!);
     Task<string?> GetCallContext();

@@ -28,5 +28,7 @@ public sealed class IpcClient
 
         Config.Validate();
         Transport.Validate();
+
+        Config.DebugName ??= Transport.ToString();
     }
 }

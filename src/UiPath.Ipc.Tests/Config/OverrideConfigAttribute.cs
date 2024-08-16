@@ -34,6 +34,6 @@ internal sealed class OverrideConfigAttribute : Attribute
 
 public abstract class OverrideConfig
 {
-    public virtual ListenerConfig Override(ListenerConfig listener) => listener;
-    public virtual IpcClient Override(IpcClient client) => client;
+    public virtual Task<ListenerConfig?> Override(Func<Task<ListenerConfig>> listener) => listener()!;
+    public virtual IpcClient? Override(Func<IpcClient> client) => client();
 }

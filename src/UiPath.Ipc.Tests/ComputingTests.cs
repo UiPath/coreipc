@@ -1,4 +1,12 @@
-﻿using System.Collections.Concurrent;
+﻿using Newtonsoft.Json;
+using Nito.Disposables;
+using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
+using System.Text;
+using UiPath.Ipc.Transport.NamedPipe;
+using UiPath.Ipc.Transport.Tcp;
+using UiPath.Ipc.Transport.WebSocket;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UiPath.Ipc.Tests;
@@ -9,12 +17,12 @@ public abstract class ComputingTests : TestBase
     protected readonly ComputingCallback _computingCallback = new();
 
     private readonly Lazy<ComputingService> _service;
-    private readonly Lazy<IComputingService> _proxy;
+    private readonly Lazy<IComputingService?> _proxy;
 
     protected ComputingService Service => _service.Value;
-    protected IComputingService Proxy => _proxy.Value;
+    protected IComputingService Proxy => _proxy.Value!;
 
-    protected sealed override IpcProxy IpcProxy => Proxy as IpcProxy ?? throw new InvalidOperationException($"Proxy was expected to be a {nameof(IpcProxy)} but was not.");
+    protected sealed override IpcProxy? IpcProxy => Proxy as IpcProxy;
     protected sealed override Type ContractType => typeof(IComputingService);
 
     protected readonly ConcurrentBag<CallInfo> _clientBeforeCalls = new();
@@ -82,7 +90,7 @@ public abstract class ComputingTests : TestBase
         await Proxy.Wait(Timeout.InfiniteTimeSpan).ShouldThrowAsync<TimeoutException>();
 
         await Proxy.GetCallbackThreadName(
-            duration: TimeSpan.Zero,
+            waitOnServer: TimeSpan.Zero,
             message: new()
             {
                 RequestTimeout = Timeouts.DefaultRequest
@@ -93,7 +101,7 @@ public abstract class ComputingTests : TestBase
 
     private sealed class ShortClientTimeout : OverrideConfig
     {
-        public override IpcClient Override(IpcClient client) => client.WithRequestTimeout(TimeSpan.FromMilliseconds(10));
+        public override IpcClient? Override(Func<IpcClient> client) => client().WithRequestTimeout(TimeSpan.FromMilliseconds(10));
     }
 
     [Theory, IpcAutoData]
@@ -102,7 +110,7 @@ public abstract class ComputingTests : TestBase
 
     [Fact]
     public async Task Callbacks_ShouldWork()
-    => await Proxy.GetCallbackThreadName(duration: TimeSpan.Zero).ShouldBeAsync(Names.GuiThreadName);
+    => await Proxy.GetCallbackThreadName(waitOnServer: TimeSpan.Zero).ShouldBeAsync(Names.GuiThreadName);
 
     [Fact]
     public async Task CallbacksWithParams_ShouldWork()
@@ -140,5 +148,140 @@ public abstract class ComputingTests : TestBase
         };
 
         await Proxy.GetCallContext().ShouldBeAsync(expectedCallContext);
+    }
+
+    [Fact]
+    [OverrideConfig(typeof(SetBeforeConnect))]
+    public async Task BeforeConnect_ShouldWork()
+    {
+        int callCount = 0;
+        SetBeforeConnect.Set(async _ => callCount++);
+
+        await Proxy.AddFloats(1, 2).ShouldBeAsync(3);
+        callCount.ShouldBe(1);
+
+        await Proxy.AddFloats(1, 2).ShouldBeAsync(3);
+        callCount.ShouldBe(1);
+
+        await IpcProxy.CloseConnection();
+        await Proxy.AddFloats(1, 2).ShouldBeAsync(3);
+        callCount.ShouldBe(2);
+    }
+
+    private sealed class SetBeforeConnect : OverrideConfig
+    {
+        private static readonly AsyncLocal<BeforeConnectHandler> ValueStorage = new();
+        public static void Set(BeforeConnectHandler value) => ValueStorage.Value = value;
+
+        public override IpcClient? Override(Func<IpcClient> client)
+        => client().WithBeforeConnect(ct => ValueStorage.Value.ShouldNotBeNull().Invoke(ct));
+    }
+
+#if !NET461 && !CI
+    [SkippableFact]
+#endif
+    [OverrideConfig(typeof(DisableInProcClientServer))]
+    public async Task BeforeConnect_ShouldStartExternalServerJIT()
+    {
+        Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows), "Test works only on Windows.");
+
+        using var whereDotNet = new Process
+        {
+            StartInfo =
+            {
+                FileName = "where.exe",
+                Arguments = "dotnet.exe",
+            }
+        };
+        var pathDotNet = await whereDotNet.RunReturnStdOut();
+
+        var externalServerParams = RandomServerParams();
+        var arg = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(externalServerParams)));
+
+        var pipeName = $"{Guid.NewGuid():N}";
+
+        using var serverProcess = new Process
+        {
+            StartInfo =
+            {
+                FileName = pathDotNet,
+                Arguments = $"\"{Assembly.GetExecutingAssembly().Location}\" {arg}",
+                UseShellExecute = false,
+            },
+        };
+        using var killProcess = new Disposable(() =>
+        {
+            try
+            {
+                serverProcess.Kill();
+            }
+            catch
+            {
+            }
+            _outputHelper.WriteLine("Killed server process");
+        });
+        var proxy = new IpcClient
+        {
+            Config = new()
+            {
+                Scheduler = GuiScheduler,
+                BeforeConnect = async (_) =>
+                {
+                    serverProcess.Start();
+                    var time = TimeSpan.FromSeconds(1);
+                    _outputHelper.WriteLine($"Server started. Waiting {time}. PID={serverProcess.Id}");
+                    await Task.Delay(time);
+                },
+            },
+            Transport = externalServerParams.CreateClientTransport()
+        }.GetProxy<IComputingService>();
+
+        await proxy.AddFloats(1, 2).ShouldBeAsync(3);
+    }
+
+    public abstract IAsyncDisposable? RandomTransportPair(out ListenerConfig listener, out ClientTransport transport);
+
+    public abstract ExternalServerParams RandomServerParams();
+    public readonly record struct ExternalServerParams(ServerKind Kind, string? PipeName = null, int Port = 0)
+    {
+        public IAsyncDisposable? CreateListenerConfig(out ListenerConfig listenerConfig)
+        {
+            switch (Kind)
+            {
+                case ServerKind.NamedPipes:
+                    {
+                        listenerConfig = new NamedPipeListener() { PipeName = PipeName! };
+                        return null;
+                    }
+                case ServerKind.Tcp:
+                    {
+                        listenerConfig = new TcpListener() { EndPoint = new(System.Net.IPAddress.Loopback, Port) };
+                        return null;
+                    }
+                case ServerKind.WebSockets:
+                    {
+                        var context = new WebSocketContext(Port);
+                        listenerConfig = new WebSocketListener { Accept = context.Accept };
+                        return context;
+                    }
+                default:
+                    throw new NotSupportedException($"Kind not supported. Kind was {Kind}");
+            }
+        }
+
+        public ClientTransport CreateClientTransport() => Kind switch
+        {
+            ServerKind.NamedPipes => new NamedPipeTransport() { PipeName = PipeName! },
+            ServerKind.Tcp => new TcpTransport() { EndPoint = new(System.Net.IPAddress.Loopback, Port) },
+            ServerKind.WebSockets => new WebSocketTransport() { Uri = new($"ws://localhost:{Port}") },
+            _ => throw new NotSupportedException($"Kind not supported. Kind was {Kind}")
+        };
+    }
+    public enum ServerKind { NamedPipes, Tcp, WebSockets }
+
+    private sealed class DisableInProcClientServer : OverrideConfig
+    {
+        public override async Task<ListenerConfig?> Override(Func<Task<ListenerConfig>> listener) => null;
+        public override IpcClient? Override(Func<IpcClient> client) => null;
     }
 }

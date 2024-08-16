@@ -48,4 +48,11 @@ internal static class IpcClientExtensions
         Config = ipcClient.Config with { Callbacks = callbacks },
         Transport = ipcClient.Transport,
     };
+
+    public static IpcClient WithBeforeConnect(this IpcClient ipcClient, BeforeConnectHandler beforeConnect)
+    => new()
+    {
+        Config = ipcClient.Config with { BeforeConnect = beforeConnect },
+        Transport = ipcClient.Transport,
+    };
 }

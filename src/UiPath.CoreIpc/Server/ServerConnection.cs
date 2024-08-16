@@ -69,7 +69,7 @@ internal abstract class ServerConnection : IClient, IDisposable
 
         TCallbackInterface CreateCallback(Type callbackContract)
         {
-            Listener.Logger.LogInformation($"Create callback {callbackContract} {Listener.Config.DebugName}");
+            Listener.Logger.LogInformation($"Create callback {callbackContract} {Listener.Config}");
 
             _connectionAsTask ??= Task.FromResult(Connection!);
 

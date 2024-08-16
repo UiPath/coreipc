@@ -10,8 +10,8 @@ public sealed class SystemTestsOverTcp : SystemTests
 
     public SystemTestsOverTcp(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
-    protected sealed override ListenerConfig CreateListener()
-    => new TcpListener()
+    protected sealed override async Task<ListenerConfig> CreateListener()
+    => new TcpListener
     {
         EndPoint = _endPoint,
     };

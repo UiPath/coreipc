@@ -82,7 +82,7 @@ internal abstract class Listener : IAsyncDisposable
     {
         Config = config;
         Server = server;
-        Logger = server.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(config.DebugName);
+        Logger = server.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(categoryName: config.ToString());
         _disposeTask = new(DisposeCore);
     }
 
@@ -131,7 +131,7 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
 
     protected override async Task DisposeCore()
     {
-        Log($"Stopping listener {Config.DebugName}...");
+        Log($"Stopping listener {Config}...");
         _cts.Cancel();
         try
         {
@@ -139,11 +139,11 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
         }
         catch (OperationCanceledException ex) when (ex.CancellationToken == _cts.Token)
         {
-            Log($"Stopping listener {Config.DebugName} threw OCE.");
+            Log($"Stopping listener {Config} threw OCE.");
         }
         catch (Exception ex)
         {
-            LogError(ex, $"Stopping listener {Config.DebugName} failed.");
+            LogError(ex, $"Stopping listener {Config} failed.");
         }
         await State.DisposeAsync();
         _cts.Dispose();
@@ -151,7 +151,7 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
 
     private async Task Listen(CancellationToken ct)
     {
-        Log($"Starting listener {Config.DebugName}...");
+        Log($"Starting listener {Config}...");
 
         await Task.WhenAll(Enumerable.Range(1, Config.ConcurrentAccepts).Select(async _ =>
         {
@@ -167,17 +167,15 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
         try
         {
             var network = await serverConnection.AcceptClient(ct);
-            serverConnection.Listen(network, ct).LogException(Logger, Config.DebugName);
+            serverConnection.Listen(network, ct).LogException(Logger, Config);
         }
         catch (Exception ex)
         {
             serverConnection.Dispose();
             if (!ct.IsCancellationRequested)
             {
-                Logger.LogException(ex, Config.DebugName);
+                Logger.LogException(ex, Config);
             }
         }
     }
-
-    public override string ToString() => Config.ToString();
 }

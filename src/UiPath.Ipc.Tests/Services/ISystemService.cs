@@ -3,12 +3,12 @@
 public interface ISystemService
 {
     /// <summary>
-    /// Returns the <paramref name="value"/> after the <paramref name="duration"/> is ellapsed.
+    /// Returns the <paramref name="value"/> after the <paramref name="waitOnServer"/> is ellapsed.
     /// </summary>
-    /// <param name="duration">The duration to wait before completing the operation.</param>
+    /// <param name="waitOnServer">The duration to wait before completing the operation.</param>
     /// <param name="ct">A <see cref="CancellationToken"/> to cancel the operation.</param>
-    /// <returns>A task that completes successfully with a <c>null</c> result, after the specified <paramref name="duration"/>, or is canceled when the passed <see cref="CancellationToken"/> is signaled.</returns>
-    Task<Guid> EchoGuidAfter(Guid value, TimeSpan duration, CancellationToken ct = default);
+    /// <returns>A task that completes successfully with a <c>null</c> result, after the specified <paramref name="waitOnServer"/>, or is canceled when the passed <see cref="CancellationToken"/> is signaled.</returns>
+    Task<Guid> EchoGuidAfter(Guid value, TimeSpan waitOnServer, Message? message = null, CancellationToken ct = default);
 
     /// <summary>
     /// Returns <c>true</c> if the received <see cref="Message"/> is not <c>null</c>.

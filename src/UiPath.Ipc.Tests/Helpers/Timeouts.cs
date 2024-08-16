@@ -8,5 +8,5 @@ internal static class Timeouts
 
     public static readonly TimeSpan Short = TimeSpan.FromMilliseconds(300);
 
-    public static readonly TimeSpan DefaultRequest = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromSeconds(5);
+    public static readonly TimeSpan DefaultRequest = Debugger.IsAttached ? TimeSpan.FromDays(1) : TimeSpan.FromMinutes(1);
 }

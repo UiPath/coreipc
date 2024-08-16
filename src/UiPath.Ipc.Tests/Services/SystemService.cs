@@ -5,9 +5,9 @@ namespace UiPath.Ipc.Tests;
 
 public sealed class SystemService : ISystemService
 {
-    public async Task<Guid> EchoGuidAfter(Guid value, TimeSpan duration, CancellationToken ct = default)
+    public async Task<Guid> EchoGuidAfter(Guid value, TimeSpan waitOnServer, Message? message = null, CancellationToken ct = default)
     {
-        await Task.Delay(duration, ct);
+        await Task.Delay(waitOnServer, ct);
         return value;
     }
 
