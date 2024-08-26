@@ -21,6 +21,7 @@ public sealed class IpcServer : IAsyncDisposable
 
         _ = _started.Value;
     }
+    public Task WaitForStart() => _started.Value;
     public Task WaitForStop() => _tcsStopped.Task;
 
     private async Task<IAsyncDisposable?> StartCore()
@@ -41,8 +42,8 @@ public sealed class IpcServer : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            disposables.SetException(ex);
             await disposables.DisposeAsync();
-            _tcsStopped.TrySetException(ex);
             throw;
         }
     }
@@ -63,10 +64,13 @@ public sealed class IpcServer : IAsyncDisposable
     {
         private readonly List<IAsyncDisposable> _items = new();
         private readonly IpcServer _server;
+        private Exception? _exception;
 
         public StopAdapter(IpcServer server) => _server = server;
 
         public void Add(IAsyncDisposable item) => _items.Add(item);
+
+        public void SetException(Exception ex) => _exception = ex;
 
         public async ValueTask DisposeAsync()
         {
@@ -74,6 +78,13 @@ public sealed class IpcServer : IAsyncDisposable
             {
                 await item.DisposeAsync();
             }
+
+            if (_exception is not null)
+            {
+                _server._tcsStopped.TrySetException(_exception);
+                return;
+            }
+
             _server._tcsStopped.TrySetResult(null);
         }
     }
@@ -84,4 +95,5 @@ public interface IAsyncStream : IAsyncDisposable
     ValueTask<int> Read(Memory<byte> memory, CancellationToken ct);
     ValueTask Write(ReadOnlyMemory<byte> memory, CancellationToken ct);
     ValueTask Flush(CancellationToken ct);
+
 }

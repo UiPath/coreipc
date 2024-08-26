@@ -76,19 +76,23 @@ internal abstract class Listener : IAsyncDisposable
     private readonly Lazy<Task> _disposeTask = null!;
     public readonly ListenerConfig Config;
     public readonly IpcServer Server;
-    public readonly ILogger Logger;
+
+    private readonly Lazy<ILogger> _lazyLogger;
+    public ILogger Logger => _lazyLogger.Value;
 
     protected Listener(IpcServer server, ListenerConfig config)
     {
         Config = config;
         Server = server;
-        Logger = server.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(categoryName: config.ToString());
+        _lazyLogger = new(() => server.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(LoggerCategory));
         _disposeTask = new(DisposeCore);
     }
 
     ValueTask IAsyncDisposable.DisposeAsync() => new(_disposeTask.Value);
 
     protected abstract Task DisposeCore();
+
+    protected abstract string LoggerCategory { get; }
 }
 
 internal sealed class Listener<TConfig, TListenerState, TConnectionState> : Listener, IAsyncDisposable
@@ -99,6 +103,7 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
     private readonly Task _listeningTask = null!;
 
     public new readonly TConfig Config;
+    private readonly Lazy<string> _lazyLoggerCategory;
 
     public TListenerState State { get; }
 
@@ -108,6 +113,7 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
         State = Config.CreateListenerState(server);
 
         _listeningTask = Task.Run(() => Listen(_cts.Token));
+        _lazyLoggerCategory = new(ComputeLoggerCategory);
     }
 
     public void Log(string message)
@@ -132,7 +138,14 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
     protected override async Task DisposeCore()
     {
         Log($"Stopping listener {Config}...");
-        _cts.Cancel();
+        try
+        {
+            _cts.Cancel();
+        }
+        catch (Exception ex)
+        {
+            LogError(ex, $"Canceling {Config} failed.");
+        }
         try
         {
             await _listeningTask;
@@ -178,4 +191,8 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
             }
         }
     }
+
+    protected override string LoggerCategory => _lazyLoggerCategory.Value;
+    private string ComputeLoggerCategory()
+    => $"{GetType().Namespace}.{nameof(Listener)}<{typeof(TConfig).Name}[{Config}],..>";
 }

@@ -151,6 +151,7 @@ public abstract class TestBase : IAsyncLifetime
     {
         IpcServer = await _ipcServer.Value;
         IpcServer?.Start();
+        await (IpcServer?.WaitForStart() ?? Task.CompletedTask);
     }
 
     Task IAsyncLifetime.DisposeAsync() => DisposeAsync();

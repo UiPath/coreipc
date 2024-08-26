@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using AutoFixture.Xunit2;
+using Microsoft.Extensions.Hosting;
+using System.Text;
 using System.Threading.Channels;
 using Xunit.Abstractions;
 
@@ -307,6 +309,27 @@ public abstract class SystemTests : TestBase
         }
     }
 
+    [Theory, IpcAutoData]
+    public async Task IpcServerDispose_ShouldBeIdempotent(Guid guid)
+    {
+        await Proxy.EchoGuidAfter(guid, waitOnServer: default).ShouldBeAsync(guid);
+        var infiniteTask = Proxy.EchoGuidAfter(guid, Timeout.InfiniteTimeSpan);
+
+        using (var host = Host.CreateDefaultBuilder()
+            .ConfigureServices(services => services.AddHostedSingleton<IHostedIpcServer, HostedIpcServer>())
+            .Build())
+        {
+            await host.StartAsync();
+            var hostedIpcServer = host.Services.GetRequiredService<IHostedIpcServer>();
+            hostedIpcServer.Set(IpcServer!);
+            await host.StopAsync();
+        }
+
+        await IpcServer!.DisposeAsync();
+        await IpcServer!.DisposeAsync();
+        await infiniteTask.ShouldThrowAsync<IOException>().ShouldCompleteInAsync(Timeouts.IpcRoundtrip);
+    }
+
     private sealed class UploadStream : StreamBase
     {
         private readonly Channel<ReadCall> _readCalls = Channel.CreateUnbounded<ReadCall>();
@@ -354,6 +377,38 @@ public abstract class SystemTests : TestBase
             public ReadCall(out Task<int> task) => task = _tcs.Task;
 
             public void Return(int cbRead) => _tcs.TrySetResult(cbRead);
+        }
+    }
+
+    private interface IHostedIpcServer
+    {
+        void Set(IpcServer ipcServer);
+    }
+
+    private sealed class HostedIpcServer : IHostedService, IHostedIpcServer, IAsyncDisposable
+    {
+        private IpcServer? _ipcServer;
+
+        public void Set(IpcServer ipcServer) => _ipcServer = ipcServer;
+
+        public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            await _ipcServer!.DisposeAsync();
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await _ipcServer!.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.ToString());
+                throw;
+            }
         }
     }
 }
