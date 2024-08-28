@@ -1,4 +1,5 @@
 ﻿using Nito.AsyncEx;
+using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
@@ -127,7 +128,7 @@ internal sealed class BidiHttpListenerState : IAsyncDisposable
     }
 }
 
-internal sealed class BidiHttpServerConnectionState : IAsyncDisposable, IAsyncStream
+internal sealed class BidiHttpServerConnectionState : Stream, IAsyncDisposable
 {
     private readonly Pipe _pipe = new();
 
@@ -148,7 +149,11 @@ internal sealed class BidiHttpServerConnectionState : IAsyncDisposable, IAsyncSt
         _disposing = new(DisposeCore);
     }
 
-    public ValueTask DisposeAsync() => new(_disposing.Value);
+    public 
+#if !NET461
+    override         
+#endif
+    ValueTask DisposeAsync() => new(_disposing.Value);
 
     private async Task DisposeCore()
     {
@@ -233,8 +238,13 @@ internal sealed class BidiHttpServerConnectionState : IAsyncDisposable, IAsyncSt
         }
     }
 
-    async ValueTask<int> IAsyncStream.Read(Memory<byte> memory, CancellationToken ct)
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => true;
+
+    public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
     {
+        var memory = new Memory<byte>(buffer, offset, count);
         var readResult = await _pipe.Reader.ReadAsync(ct);
 
         var take = (int)Math.Min(readResult.Buffer.Length, memory.Length);
@@ -245,8 +255,9 @@ internal sealed class BidiHttpServerConnectionState : IAsyncDisposable, IAsyncSt
         return take;
     }
 
-    async ValueTask IAsyncStream.Write(ReadOnlyMemory<byte> memory, CancellationToken ct)
+    public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct)
     {
+        var memory = new ReadOnlyMemory<byte>(buffer, offset, count);
         if (_client is null)
         {
             throw new InvalidOperationException();
@@ -262,5 +273,14 @@ internal sealed class BidiHttpServerConnectionState : IAsyncDisposable, IAsyncSt
         await _client.PostAsync(requestUri: "", content, ct);
     }
 
-    ValueTask IAsyncStream.Flush(CancellationToken ct) => default;
+    public override Task FlushAsync(CancellationToken cancellationToken)
+    => Task.CompletedTask;
+
+    public override void Flush() => throw new NotImplementedException();
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotImplementedException();
+    public override void SetLength(long value) => throw new NotImplementedException();
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+    public override long Length => throw new NotImplementedException();
+    public override long Position { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 }

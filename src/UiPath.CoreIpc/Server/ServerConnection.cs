@@ -19,14 +19,8 @@ internal sealed class ServerConnection<TConfig, TListenerState, TConnectionState
         Listener = listener;
     }
 
-    public override async Task<Stream> AcceptClient(CancellationToken ct)
-    => (await Listener.Config.AwaitConnection(
-        Listener.State,
-        Listener.Config.CreateConnectionState(
-            Listener.Server,
-            Listener.State),
-        ct))
-        .AsStream();
+    public override ValueTask<Stream> AcceptClient(CancellationToken ct)
+    => Listener.Config.AwaitConnection(Listener.State, Listener.Config.CreateConnectionState(Listener.Server, Listener.State), ct);
 }
 
 internal abstract class ServerConnection : IClient, IDisposable
@@ -45,7 +39,7 @@ internal abstract class ServerConnection : IClient, IDisposable
 
     protected internal virtual void Initialize() { }
 
-    public abstract Task<Stream> AcceptClient(CancellationToken cancellationToken);
+    public abstract ValueTask<Stream> AcceptClient(CancellationToken cancellationToken);
 
     public void Impersonate(Action action)
     {

@@ -89,11 +89,3 @@ public sealed class IpcServer : IAsyncDisposable
         }
     }
 }
-
-public interface IAsyncStream : IAsyncDisposable
-{
-    ValueTask<int> Read(Memory<byte> memory, CancellationToken ct);
-    ValueTask Write(ReadOnlyMemory<byte> memory, CancellationToken ct);
-    ValueTask Flush(CancellationToken ct);
-
-}

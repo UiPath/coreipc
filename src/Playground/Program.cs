@@ -72,6 +72,7 @@ internal class Program
         try
         {
             ipcServer.Start(); // ar putea fi void, ar putea fi si Run
+            // await ipcServer.WaitForStart();
         }
         catch (Exception ex)
         {

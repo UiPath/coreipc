@@ -76,16 +76,6 @@ public static class Helpers
 
         task.GetAwaiter().GetResult();
     }
-
-    internal static Stream AsStream(this Network oneOf)
-    {
-        if (oneOf.Is2)
-        {
-            return oneOf.As2;
-        }
-
-        return new AsyncStreamAdapter(oneOf.As1);
-    }
 }
 public static class IOHelpers
 {
