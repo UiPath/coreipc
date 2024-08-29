@@ -1,5 +1,8 @@
-﻿using Newtonsoft.Json;
+﻿using AutoFixture;
+using Newtonsoft.Json;
+using Nito.AsyncEx;
 using Nito.Disposables;
+using NSubstitute;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -40,12 +43,12 @@ public abstract class ComputingTests : TestBase
         RequestTimeout = Timeouts.DefaultRequest,
         MaxReceivedMessageSizeInMegabytes = 1,
     };
-    protected override ClientConfig CreateClientConfig()
+    protected override ClientConfig CreateClientConfig(EndpointCollection? callbacks = null)
     => new()
     {
         RequestTimeout = Timeouts.DefaultRequest,
         Scheduler = GuiScheduler,
-        Callbacks = new()
+        Callbacks = callbacks ?? new()
         {
             { typeof(IComputingCallback), _computingCallback }
         },
@@ -237,6 +240,35 @@ public abstract class ComputingTests : TestBase
         }.GetProxy<IComputingService>();
 
         await proxy.AddFloats(1, 2).ShouldBeAsync(3);
+    }
+
+    [SkippableFact]
+    public async Task ManyConnections_ShouldWork()
+    {
+        const int CParallelism = 10;
+        const int CTimesEach = 100;
+
+        await Enumerable.Range(1, CParallelism)
+            .Select(async index =>
+            {
+                var mockCallback = Substitute.For<IComputingCallback>();
+                mockCallback.AddInts(0, 1).Returns(1);
+
+                var proxy = CreateClient(callbacks: new()
+                {
+                    { typeof(IComputingCallback), mockCallback }
+                })!.GetProxy<IComputingService>();
+
+                foreach (var time in Enumerable.Range(1, CTimesEach))
+                {
+                    await (proxy as IpcProxy)!.CloseConnection();
+
+                    mockCallback.ClearReceivedCalls();
+                    await proxy.MultiplyInts(1, 1).ShouldBeAsync(1);
+                    await mockCallback.Received().AddInts(0, 1);
+                }
+            })
+            .WhenAll();
     }
 
     public abstract IAsyncDisposable? RandomTransportPair(out ListenerConfig listener, out ClientTransport transport);

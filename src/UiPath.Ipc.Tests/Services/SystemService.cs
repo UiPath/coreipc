@@ -43,7 +43,9 @@ public sealed class SystemService : ISystemService
         }
     }
 
-    public Task FireAndForgetThrowSync() => throw null!;
+    public Task FireAndForgetThrowSync() => throw new MarkerException();
+
+    public sealed class MarkerException : Exception { }
 
     public async Task<string?> GetThreadName() => Thread.CurrentThread.Name;
 

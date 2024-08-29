@@ -43,7 +43,7 @@ public sealed record NamedPipeListener : ListenerConfig, INamedPipeListenerConfi
             GetPipeSecurity)
     };
 
-    async ValueTask<Network> INamedPipeListenerConfig.AwaitConnection(NamedPipeListenerState listenerState, NamedPipeServerConnectionState connectionState, CancellationToken ct)
+    async ValueTask<Stream> INamedPipeListenerConfig.AwaitConnection(NamedPipeListenerState listenerState, NamedPipeServerConnectionState connectionState, CancellationToken ct)
     {
         await connectionState.Stream.WaitForConnectionAsync(ct);
         return connectionState.Stream;

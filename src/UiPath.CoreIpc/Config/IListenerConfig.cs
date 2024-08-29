@@ -6,7 +6,7 @@ public interface IListenerConfig<TSelf, TListenerState, TConnectionState>
 {
     TListenerState CreateListenerState(IpcServer server);
     TConnectionState CreateConnectionState(IpcServer server, TListenerState listenerState);
-    ValueTask<Network> AwaitConnection(TListenerState listenerState, TConnectionState connectionState, CancellationToken ct);
+    ValueTask<Stream> AwaitConnection(TListenerState listenerState, TConnectionState connectionState, CancellationToken ct);
     IEnumerable<string> Validate();
 }
 

@@ -22,7 +22,7 @@ internal sealed class WebSocketClientState : IClientState
 {
     private ClientWebSocket? _clientWebSocket;
 
-    public Network? Network { get; private set; }
+    public Stream? Network { get; private set; }
 
     public bool IsConnected() => _clientWebSocket?.State is WebSocketState.Open;
 

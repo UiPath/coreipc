@@ -1,4 +1,5 @@
-﻿using AutoFixture.Xunit2;
+﻿using AutoFixture;
+using AutoFixture.Xunit2;
 using Microsoft.Extensions.Hosting;
 using System.Text;
 using System.Threading.Channels;
@@ -31,11 +32,12 @@ public abstract class SystemTests : TestBase
         RequestTimeout = Timeouts.DefaultRequest,
         MaxReceivedMessageSizeInMegabytes = 1,
     };
-    protected override ClientConfig CreateClientConfig()
+    protected override ClientConfig CreateClientConfig(EndpointCollection? callbacks = null)
     => new()
     {
         RequestTimeout = Timeouts.DefaultRequest,
-        ServiceProvider = ServiceProvider
+        ServiceProvider = ServiceProvider,
+        Callbacks = callbacks
     };
     #endregion
 
@@ -251,6 +253,7 @@ public abstract class SystemTests : TestBase
 
 #if !CI
     [Theory, IpcAutoData]
+#endif
     public async Task UnfinishedUploads_ShouldThrowOnTheClient_AndRecover_Repeat(Guid guid)
     {
         const int IterationCount = 500;
@@ -261,7 +264,6 @@ public abstract class SystemTests : TestBase
             _outputHelper.WriteLine($"Finished iteration {i}/{IterationCount}.");
         }
     }
-#endif
 
     [Theory, IpcAutoData]
     public async Task DownloadingStreams_ShouldWork(string str)
@@ -270,6 +272,26 @@ public abstract class SystemTests : TestBase
         using var reader = new StreamReader(stream);
         var clone = await reader.ReadToEndAsync();
         clone.ShouldBe(str);
+    }
+
+#if !CI
+    [Theory, MemberData(nameof(DownloadingStreams_ShouldWork_Repeat_Cases))]
+#endif
+    public async Task DownloadingStreams_ShouldWork_Repeat(int index, string str)
+    {
+        _outputHelper.WriteLine($"Calling {nameof(DownloadingStreams_ShouldWork)}[{index}]");
+        await DownloadingStreams_ShouldWork(str);
+    }
+
+    public static IEnumerable<object[]> DownloadingStreams_ShouldWork_Repeat_Cases()
+    {
+        var fixture = IpcAutoDataAttribute.CreateFixture();
+        const int CTimes = 100;
+
+        foreach (var time in Enumerable.Range(1, CTimes))
+        {
+            yield return [time, fixture.Create<string>()];
+        }
     }
 
     [Theory, IpcAutoData]

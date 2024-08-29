@@ -216,7 +216,7 @@ internal sealed class ServiceClientProper : ServiceClient
         }
     }
 
-    private async Task<Network> Connect(CancellationToken ct)
+    private async Task<Stream> Connect(CancellationToken ct)
     {
         await _clientState.Connect(_client, ct);
 

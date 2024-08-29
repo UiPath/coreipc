@@ -9,7 +9,7 @@ internal class IpcAutoDataAttribute : AutoDataAttribute
     {
     }
 
-    private static Fixture CreateFixture()
+    public static Fixture CreateFixture()
     {
         var fixture = new Fixture();
         new SupportMutableValueTypesCustomization().Customize(fixture);

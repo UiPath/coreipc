@@ -1,6 +1,7 @@
-﻿namespace UiPath.Ipc;
+﻿using System.Linq.Expressions;
 
-using System.Linq.Expressions;
+namespace UiPath.Ipc;
+
 using ListenerFactory = Func<IpcServer, ListenerConfig, Listener>;
 
 internal abstract class Listener : IAsyncDisposable
@@ -76,12 +77,14 @@ internal abstract class Listener : IAsyncDisposable
     private readonly Lazy<Task> _disposeTask = null!;
     public readonly ListenerConfig Config;
     public readonly IpcServer Server;
+    private readonly Lazy<string> _loggerCategory;
 
     private readonly Lazy<ILogger> _lazyLogger;
     public ILogger Logger => _lazyLogger.Value;
 
     protected Listener(IpcServer server, ListenerConfig config)
     {
+        _loggerCategory = new(ComputeLoggerCategory);
         Config = config;
         Server = server;
         _lazyLogger = new(() => server.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(LoggerCategory));
@@ -92,7 +95,12 @@ internal abstract class Listener : IAsyncDisposable
 
     protected abstract Task DisposeCore();
 
-    protected abstract string LoggerCategory { get; }
+    private string LoggerCategory => _loggerCategory.Value;
+
+    private string ComputeLoggerCategory()
+    => $"{GetType().Namespace}.{nameof(Listener)}<{ConfigType.Name}[{Config}],..>";
+
+    protected abstract Type ConfigType { get; }
 }
 
 internal sealed class Listener<TConfig, TListenerState, TConnectionState> : Listener, IAsyncDisposable
@@ -103,7 +111,6 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
     private readonly Task _listeningTask = null!;
 
     public new readonly TConfig Config;
-    private readonly Lazy<string> _lazyLoggerCategory;
 
     public TListenerState State { get; }
 
@@ -113,7 +120,6 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
         State = Config.CreateListenerState(server);
 
         _listeningTask = Task.Run(() => Listen(_cts.Token));
-        _lazyLoggerCategory = new(ComputeLoggerCategory);
     }
 
     public void Log(string message)
@@ -177,9 +183,19 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
     private async Task AcceptConnection(CancellationToken ct)
     {
         var serverConnection = new ServerConnection<TConfig, TListenerState, TConnectionState>(this);
+
+        Stream network;
         try
         {
-            var network = await serverConnection.AcceptClient(ct);
+            network = await serverConnection.AcceptClient(ct);
+        }
+        catch (OperationCanceledException ex) when (ex.CancellationToken == ct)
+        {
+            return;
+        }
+
+        try
+        {
             serverConnection.Listen(network, ct).LogException(Logger, Config);
         }
         catch (Exception ex)
@@ -192,7 +208,5 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
         }
     }
 
-    protected override string LoggerCategory => _lazyLoggerCategory.Value;
-    private string ComputeLoggerCategory()
-    => $"{GetType().Namespace}.{nameof(Listener)}<{typeof(TConfig).Name}[{Config}],..>";
+    protected override Type ConfigType => typeof(TConfig);
 }

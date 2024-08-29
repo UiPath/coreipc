@@ -46,7 +46,7 @@ public abstract class TestBase : IAsyncLifetime
         _serviceProvider = IpcHelpers.ConfigureServices(_outputHelper);
 
         _ipcServer = new(CreateServer);
-        _ipcClient = new(CreateClient);
+        _ipcClient = new(() => CreateClient());
 
         OverrideConfig? GetOverrideConfig()
         {
@@ -105,11 +105,11 @@ public abstract class TestBase : IAsyncLifetime
         };
     }
 
-    private IpcClient? CreateClient()
+    protected IpcClient? CreateClient(EndpointCollection? callbacks = null)
     {
         var factory = () =>
         {
-            var config = CreateClientConfig();
+            var config = CreateClientConfig(callbacks);
             var transport = CreateClientTransport();
             var client = new IpcClient
             {
@@ -133,7 +133,7 @@ public abstract class TestBase : IAsyncLifetime
 
     protected abstract Task<ListenerConfig> CreateListener();
 
-    protected abstract ClientConfig CreateClientConfig();
+    protected abstract ClientConfig CreateClientConfig(EndpointCollection? callbacks = null);
     protected abstract ClientTransport CreateClientTransport();
 
     protected abstract ListenerConfig ConfigTransportAgnostic(ListenerConfig listener);

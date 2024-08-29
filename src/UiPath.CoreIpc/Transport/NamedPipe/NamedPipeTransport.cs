@@ -30,7 +30,7 @@ internal sealed class NamedPipeClientState : IClientState
 {
     private NamedPipeClientStream? _pipe;
 
-    public Network? Network => _pipe;
+    public Stream? Network => _pipe;
     public bool IsConnected() => _pipe?.IsConnected is true;
 
     public async ValueTask Connect(IpcClient client, CancellationToken ct)

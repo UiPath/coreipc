@@ -16,5 +16,15 @@ internal sealed class WebSocketContext : IAsyncDisposable
         Uri Uri(string scheme) => new UriBuilder(scheme, "localhost", actualPort).Uri;
     }
 
-    public ValueTask DisposeAsync() => _httpListener.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await _httpListener.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            Trace.TraceError($"Disposing the http listener threw: {ex}");
+        }
+    }
 }

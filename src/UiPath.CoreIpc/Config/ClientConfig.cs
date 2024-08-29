@@ -53,7 +53,7 @@ public sealed record ClientConfig : EndpointConfig, IServiceClientConfig
 
 public interface IClientState : IDisposable
 {
-    Network? Network { get; }
+    Stream? Network { get; }
 
     bool IsConnected();
     ValueTask Connect(IpcClient client, CancellationToken ct);

@@ -23,7 +23,7 @@ internal sealed class TcpClientState : IClientState
 {
     private System.Net.Sockets.TcpClient? _tcpClient;
 
-    public Network? Network { get; private set; }
+    public Stream? Network { get; private set; }
 
     public bool IsConnected()
     {

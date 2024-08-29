@@ -42,6 +42,7 @@ public sealed class IpcServer : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            Trace.TraceError($"Failed to start server. Ex: {ex}");
             disposables.SetException(ex);
             await disposables.DisposeAsync();
             throw;

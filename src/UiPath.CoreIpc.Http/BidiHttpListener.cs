@@ -23,7 +23,7 @@ public sealed partial record BidiHttpListener : ListenerConfig, IBidiHttpListene
     BidiHttpServerConnectionState IBidiHttpListenerConfig.CreateConnectionState(IpcServer server, BidiHttpListenerState listenerState)
     => new(server, listenerState);
 
-    async ValueTask<Network> IBidiHttpListenerConfig.AwaitConnection(BidiHttpListenerState listenerState, BidiHttpServerConnectionState connectionState, CancellationToken ct)
+    async ValueTask<Stream> IBidiHttpListenerConfig.AwaitConnection(BidiHttpListenerState listenerState, BidiHttpServerConnectionState connectionState, CancellationToken ct)
     {
         await connectionState.WaitForConnection(ct);
         return connectionState;

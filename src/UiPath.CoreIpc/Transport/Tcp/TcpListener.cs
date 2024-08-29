@@ -20,7 +20,7 @@ public sealed record TcpListener : ListenerConfig, ITcpListenerConfig
     TcpServerConnectionState ITcpListenerConfig.CreateConnectionState(IpcServer server, TcpListenerState listenerState)
     => new();
 
-    async ValueTask<Network> ITcpListenerConfig.AwaitConnection(TcpListenerState listenerState, TcpServerConnectionState connectionState, CancellationToken ct)
+    async ValueTask<Stream> ITcpListenerConfig.AwaitConnection(TcpListenerState listenerState, TcpServerConnectionState connectionState, CancellationToken ct)
     {
         System.Net.Sockets.TcpClient tcpClient;
 #if NET461

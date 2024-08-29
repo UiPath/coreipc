@@ -5,16 +5,20 @@ namespace UiPath.Ipc.Tests;
 [ShouldlyMethods]
 internal static class ShouldlyHelpers
 {
-    public static async Task ShouldBeAsync<T>(this Task<T> task, T expected, [CallerArgumentExpression(nameof(task))] string? taskExpression = null)
+    public static async Task ShouldBeAsync<T>(this Task<T> task, T expected, [CallerArgumentExpression(nameof(task))] string? taskExpression = null, bool launchDebugger = false)
     {
         var actual = await task;
         try
         {
             actual.ShouldBe(expected);
         }
-        catch
+        catch (Exception ex)
         {
-            throw new ShouldAssertException($"Awaiting the expression `{taskExpression}`\r\n\tshould yield\r\n{expected}\r\n\tbut actually yielded\r\n{actual}");
+            if (launchDebugger)
+            {
+                Debugger.Launch();
+            }
+            throw new ShouldAssertException($"Awaiting the expression `{taskExpression}`\r\n\tshould yield\r\n{expected}\r\n\tbut actually yielded\r\n{actual}", ex);
         }
     }
 

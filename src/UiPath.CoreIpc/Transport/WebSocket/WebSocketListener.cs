@@ -12,7 +12,7 @@ public sealed record WebSocketListener : ListenerConfig, IWebSocketListenerConfi
     WebSocketServerConnectionState IWebSocketListenerConfig.CreateConnectionState(IpcServer server, WebSocketListenerState listenerState)
     => new();
 
-    async ValueTask<Network> IWebSocketListenerConfig.AwaitConnection(WebSocketListenerState listenerState, WebSocketServerConnectionState connectionState, CancellationToken ct)
+    async ValueTask<Stream> IWebSocketListenerConfig.AwaitConnection(WebSocketListenerState listenerState, WebSocketServerConnectionState connectionState, CancellationToken ct)
     {
         var webSocket = await Accept(ct);
 
