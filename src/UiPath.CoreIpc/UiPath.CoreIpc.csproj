@@ -1,8 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net6.0;net461;net6.0-windows</TargetFrameworks>
-    <RootNamespace>UiPath.CoreIpc</RootNamespace>
+    <RootNamespace>UiPath.Ipc</RootNamespace>
+    <AssemblyName>UiPath.Ipc</AssemblyName>
     <GeneratePackageOnBuild Condition="$(Configuration)=='Release'">true</GeneratePackageOnBuild>
+    <GeneratePackageOnBuild Condition="$(Configuration)=='Debug'">true</GeneratePackageOnBuild>
     <Authors>UiPath</Authors>
     <Version>2.5.1</Version>
     <PackageProjectUrl>https://github.com/UiPath/CoreIpc/</PackageProjectUrl>
@@ -14,25 +16,36 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <NoWarn>CA1416</NoWarn>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>preview</LangVersion>
     <ImplicitUsings>true</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
   </PropertyGroup>
   <ItemGroup Condition="$(TargetFramework) == 'net461'">
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
     <PackageReference Include="System.Reflection.DispatchProxy" Version="4.7.1" />
   </ItemGroup>
   <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>UiPath.CoreIpc.Tests</_Parameter1>
-    </AssemblyAttribute>
-    <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="2.2.1" />
+    <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
     <PackageReference Include="System.IO.Pipes.AccessControl" Version="5.0.0" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
     <None Include="..\..\README.md" Pack="true" PackagePath="" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Playground" />
+    <InternalsVisibleTo Include="UiPath.CoreIpc.Tests" />
+    <InternalsVisibleTo Include="UiPath.CoreIpc.BackCompat" />
+    <InternalsVisibleTo Include="UiPath.Ipc.Tests" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net461'">
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="6.0.0" />
+  </ItemGroup>
+  
   <ItemGroup>
     <Using Include="System.Reflection" />
     <Using Include="System.Diagnostics" />

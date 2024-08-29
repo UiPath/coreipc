@@ -1,6 +1,11 @@
-﻿namespace UiPath.CoreIpc;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.IO.Pipes;
+
+namespace UiPath.Ipc;
+
 using static TaskCompletionPool<Response>;
 using static IOHelpers;
+
 public sealed class Connection : IDisposable
 {
     private static readonly IOException ClosedException = new("Connection closed.");
@@ -12,34 +17,39 @@ public sealed class Connection : IDisposable
     private readonly WaitCallback _onResponse;
     private readonly WaitCallback _onRequest;
     private readonly WaitCallback _onCancellation;
-    private readonly Action<object> _cancelRequest;
+    private readonly Action<object?> _cancelRequest;
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
-    public Connection(Stream network, ISerializer serializer, ILogger logger, string name, int maxMessageSize = int.MaxValue)
+    public Stream Network { get; }
+    public ILogger? Logger { get; internal set; }
+
+    [MemberNotNullWhen(returnValue: true, nameof(Logger))]
+    public bool LogEnabled => Logger.Enabled();
+
+    public string DebugName { get; }
+    public ISerializer? Serializer { get; }
+
+    public Connection(Stream network, ISerializer? serializer, ILogger? logger, string debugName, int maxMessageSize = int.MaxValue)
     {
         Network = network;
         _nestedStream = new NestedStream(network, 0);
         Serializer = serializer;
         Logger = logger;
-        Name = $"{name} {GetHashCode()}";
+        DebugName = $"{debugName} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
         _receiveLoop = new(ReceiveLoop);
-        _onResponse = response => OnResponseReceived((Response)response);
-        _onRequest = request => OnRequestReceived((Request)request);
-        _onCancellation = requestId => OnCancellationReceived((string)requestId);
-        _cancelRequest = requestId => CancelRequest((string)requestId);
+        _onResponse = response => OnResponseReceived((Response)response!);
+        _onRequest = request => OnRequestReceived((Request)request!);
+        _onCancellation = requestId => OnCancellationReceived((string)requestId!);
+        _cancelRequest = requestId => CancelRequest((string)requestId!);
     }
-    public Stream Network { get; }
-    public ILogger Logger { get; internal set; }
-    public bool LogEnabled => Logger.Enabled();
-    public string Name { get; }
-    public ISerializer Serializer { get; }
-    public override string ToString() => Name;
+
+    public override string ToString() => DebugName;
     public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
     public Task Listen() => _receiveLoop.Value;
     internal event Func<Request, ValueTask> RequestReceived;
     internal event Action<string> CancellationReceived;
-    public event EventHandler<EventArgs> Closed;
+    public event EventHandler<EventArgs>? Closed;
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
@@ -75,7 +85,6 @@ public sealed class Connection : IDisposable
     }
     internal ValueTask Send(Request request, CancellationToken token)
     {
-        Debug.Assert(request.Parameters == null || request.ObjectParameters == null);
         var uploadStream = request.UploadStream;
         var requestBytes = SerializeToStream(request);
         return uploadStream == null ?
@@ -95,7 +104,6 @@ public sealed class Connection : IDisposable
     }
     internal ValueTask Send(Response response, CancellationToken cancellationToken)
     {
-        Debug.Assert(response.Data == null || response.ObjectData == null);
         var responseBytes = SerializeToStream(response);
         return response.DownloadStream == null ?
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
@@ -120,7 +128,7 @@ public sealed class Connection : IDisposable
         CancellationTokenRegistration tokenRegistration = default;
         try
         {
-            tokenRegistration = cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), this);
+            tokenRegistration = cancellationToken.UnsafeRegister(state => ((Connection)state!).Dispose(), this);
             await Network.WriteMessage(messageType, data, cancellationToken);
             await Network.WriteBuffer(BitConverter.GetBytes(userStream.Length), cancellationToken);
             const int DefaultCopyBufferSize = 81920;
@@ -183,14 +191,32 @@ public sealed class Connection : IDisposable
     {
         int offset = 0;
         int toRead = length;
+
         do
         {
-            var read = await Network.ReadAsync(
+            int read;
+            try
+            {
+                read = await Network.ReadAsync(
 #if NET461
-                _buffer, offset, toRead);
+                    _buffer, offset, toRead);
 #else
-                _buffer.AsMemory(offset, toRead));
+                    _buffer.AsMemory(offset, toRead));
 #endif
+            }
+            catch (OperationCanceledException ex) when (Network is PipeStream)
+            {
+                // Originally we decided to throw this exception the 2nd time we caught it, but later it was discovered that the NodeJS runtime continuosly retries.
+
+                // In some Windows client environments, OperationCanceledException is sporadically thrown on named pipe ReadAsync operation (ERROR_OPERATION_ABORTED on overlapped ReadFile)
+                // The cause has not yet been discovered(os specific, antiviruses, monitoring application), and we have implemented a retry system
+                // ROBO-3083
+
+                Logger.LogException(ex, $"Retrying ReadAsync for {Network.GetType()}");
+                await Task.Delay(10); //Without this delay, on net framework can get OperationCanceledException on the second ReadAsync call
+                continue;
+            }
+
             if (read == 0)
             {
                 return false;
@@ -218,12 +244,12 @@ public sealed class Connection : IDisposable
             }
         }
         catch (Exception ex)
-        {
-            Logger.LogException(ex, $"{nameof(ReceiveLoop)} {Name}");
+        {            
+            Logger.LogException(ex, $"{nameof(ReceiveLoop)} {DebugName}");
         }
         if (LogEnabled)
         {
-            Log($"{nameof(ReceiveLoop)} {Name} finished.");
+            Log($"{nameof(ReceiveLoop)} {DebugName} finished.");
         }
         Dispose();
         return;
@@ -236,13 +262,13 @@ public sealed class Connection : IDisposable
             switch (messageType)
             {
                 case MessageType.Response:
-                    RunAsync(_onResponse, await Deserialize<Response>());
+                    RunAsync(_onResponse, (await Deserialize<Response>())!);
                     break;
                 case MessageType.Request:
-                    RunAsync(_onRequest, await Deserialize<Request>());
+                    RunAsync(_onRequest, (await Deserialize<Request>())!);
                     break;
                 case MessageType.CancellationRequest:
-                    RunAsync(_onCancellation, (await Deserialize<CancellationRequest>()).RequestId);
+                    RunAsync(_onCancellation, (await Deserialize<CancellationRequest>())!.RequestId);
                     break;
                 case MessageType.UploadRequest:
                     await OnUploadRequest();
@@ -262,7 +288,7 @@ public sealed class Connection : IDisposable
     static void RunAsync(WaitCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state);
     private async Task OnDownloadResponse()
     {
-        var response = await Deserialize<Response>();
+        var response = (await Deserialize<Response>())!;
         await EnterStreamMode();
         var streamDisposed = new TaskCompletionSource<bool>();
         EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
@@ -280,7 +306,7 @@ public sealed class Connection : IDisposable
     }
     private async Task OnUploadRequest()
     {
-        var request = await Deserialize<Request>();
+        var request = (await Deserialize<Request>())!;
         await EnterStreamMode();
         using (_nestedStream)
         {
@@ -303,7 +329,7 @@ public sealed class Connection : IDisposable
         try
         {
             stream.Position = HeaderLength;
-            Serializer.Serialize(value, stream);
+            Serializer.OrDefault().Serialize(value, stream);
             return stream;
         }
         catch
@@ -312,19 +338,19 @@ public sealed class Connection : IDisposable
             throw;
         }
     }
-    private ValueTask<T> Deserialize<T>() => Serializer.DeserializeAsync<T>(_nestedStream);
+    private ValueTask<T?> Deserialize<T>() => Serializer.OrDefault().DeserializeAsync<T>(_nestedStream);
     private void OnCancellationReceived(string requestId)
     {
         try
         {
             CancellationReceived(requestId);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             Log(ex);
         }
     }
-    private void Log(Exception ex) => Logger.LogException(ex, Name);
+    private void Log(Exception ex) => Logger.LogException(ex, DebugName);
     private ValueTask OnRequestReceived(Request request)
     {
         try
@@ -343,7 +369,7 @@ public sealed class Connection : IDisposable
         {
             if (LogEnabled)
             {
-                Log($"Received response for request {response.RequestId} {Name}.");
+                Log($"Received response for request {response.RequestId} {DebugName}.");
             }
             if (_requests.TryRemove(response.RequestId, out var completionSource))
             {
@@ -355,5 +381,14 @@ public sealed class Connection : IDisposable
             Log(ex);
         }
     }
-    public void Log(string message) => Logger.LogInformation(message);
+
+    private void Log(string message)
+    {
+        if (Logger is null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        Logger.LogInformation(message);
+    }
 }

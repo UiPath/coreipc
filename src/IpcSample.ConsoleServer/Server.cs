@@ -1,8 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.CoreIpc.NamedPipe;
+using UiPath.Ipc.BackCompat;
+using UiPath.Ipc.Transport.NamedPipe;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 class Server
 {
@@ -21,20 +22,21 @@ class Server
         var serviceProvider = ConfigureServices();
         // build and run service host
         var host = new ServiceHostBuilder(serviceProvider)
-            .UseNamedPipes(new NamedPipeSettings("test")
+            .UseNamedPipes(new NamedPipeListener()
             {
+                PipeName = "test",
                 RequestTimeout = TimeSpan.FromSeconds(2),
                 //AccessControl = security => security.AllowCurrentUser(),
             })
-            .AddEndpoint<IComputingService, IComputingCallback>()
+            .AddEndpoint<IComputingService>()
             .AddEndpoint<ISystemService>()
             .ValidateAndBuild();
 
-        await await Task.WhenAny(host.RunAsync(), Task.Run(() =>
+        await await Task.WhenAny(host.RunAsync(), Task.Run(async () =>
         {
             Console.WriteLine(typeof(int).Assembly);
             Console.ReadLine();
-            host.Dispose();
+            await host.DisposeAsync();
         }));
 
         Console.WriteLine("Server stopped.");

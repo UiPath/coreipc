@@ -1,0 +1,1 @@
+generate-public-api --target-frameworks "net6.0" --assembly UiPath.Ipc.dll --project-path "D:\Alt\coreipc\src\UiPath.CoreIpc\UiPath.CoreIpc.csproj" --output-directory "D:\Alt\coreipc\src\UiPath.CoreIpc\report"
