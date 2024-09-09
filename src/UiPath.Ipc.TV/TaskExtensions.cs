@@ -18,6 +18,13 @@ internal static class TaskExtensions
         TaskContinuationOptions.NotOnRanToCompletion,
         TaskScheduler.Current);
 
+    public static void MessageBoxError(this Task task)
+    => task.ContinueWith(
+        static task => MessageBox.Show(task.Exception!.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error),
+        CancellationToken.None,
+        TaskContinuationOptions.NotOnRanToCompletion,
+        TaskScheduler.Current);
+
     public static void TraceError(this Exception exception)
     => Trace.TraceError(exception.ToString());
 }

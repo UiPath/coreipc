@@ -14,7 +14,7 @@ partial class Telemetry
     public record ResultSucceeded : RecordBase, IOperationEnd, Is<Success>
     {
         public required Id StartId { get; init; }
-        public object? Result { get; init; }
+        public required string ResultJson { get; init; }
 
         Id? Is<Success>.Of => StartId;
     }

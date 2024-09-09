@@ -64,8 +64,8 @@
             aboutToolStripMenuItem = new ToolStripMenuItem();
             folderBrowserDialog = new FolderBrowserDialog();
             toolStrip1 = new ToolStrip();
-            buttonOpen3 = new ToolStripButton();
             itemOpenStandard2 = new ToolStripButton();
+            buttonOpen3 = new ToolStripButton();
             toolStripSeparator6 = new ToolStripSeparator();
             buttonTheWorks = new ToolStripButton();
             toolStrip3 = new ToolStrip();
@@ -82,10 +82,14 @@
             buttonStopAll = new ToolStripButton();
             toolStripProject = new ToolStrip();
             buttonCreateFilter = new ToolStripButton();
+            toolStrip4 = new ToolStrip();
+            buttonOpenContext = new ToolStripButton();
+            buttonOpenCallLog = new ToolStripButton();
             menuStrip.SuspendLayout();
             toolStrip1.SuspendLayout();
             toolStrip3.SuspendLayout();
             toolStripProject.SuspendLayout();
+            toolStrip4.SuspendLayout();
             SuspendLayout();
             // 
             // menuStrip
@@ -325,20 +329,11 @@
             toolStrip1.BackColor = Color.FromArgb(204, 213, 240);
             toolStrip1.Font = new Font("Segoe UI", 10F);
             toolStrip1.Items.AddRange(new ToolStripItem[] { itemOpenStandard2, buttonOpen3, toolStripSeparator6, buttonTheWorks });
-            toolStrip1.Location = new Point(0, 27);
+            toolStrip1.Location = new Point(0, 53);
             toolStrip1.Name = "toolStrip1";
             toolStrip1.Size = new Size(875, 26);
             toolStrip1.TabIndex = 2;
             toolStrip1.Text = "toolStrip1";
-            // 
-            // buttonOpen3
-            // 
-            buttonOpen3.ForeColor = Color.Indigo;
-            buttonOpen3.Image = (Image)resources.GetObject("buttonOpen3.Image");
-            buttonOpen3.Name = "buttonOpen3";
-            buttonOpen3.Size = new Size(75, 23);
-            buttonOpen3.Text = "O&pen 3";
-            buttonOpen3.Click += buttonOpen3_Click;
             // 
             // itemOpenStandard2
             // 
@@ -348,6 +343,15 @@
             itemOpenStandard2.Size = new Size(295, 23);
             itemOpenStandard2.Text = "O&pen %UIPATH_IPC_TELEMETRY_FOLDER%";
             itemOpenStandard2.Click += itemOpenStandard1_Click;
+            // 
+            // buttonOpen3
+            // 
+            buttonOpen3.ForeColor = Color.Indigo;
+            buttonOpen3.Image = (Image)resources.GetObject("buttonOpen3.Image");
+            buttonOpen3.Name = "buttonOpen3";
+            buttonOpen3.Size = new Size(75, 23);
+            buttonOpen3.Text = "O&pen 3";
+            buttonOpen3.Click += buttonOpen3_Click;
             // 
             // toolStripSeparator6
             // 
@@ -369,7 +373,7 @@
             toolStrip3.BackColor = Color.FromArgb(204, 213, 240);
             toolStrip3.Font = new Font("Segoe UI", 10F);
             toolStrip3.Items.AddRange(new ToolStripItem[] { toolStripLabel1, buttonStartUiRobotSvc, buttonStopUiRobotSvc, toolStripSeparator7, toolStripLabel5, buttonStartAssistant, buttonStopAssistant, toolStripSeparator8, toolStripLabel2, buttonStartAll, buttonStopAll });
-            toolStrip3.Location = new Point(0, 53);
+            toolStrip3.Location = new Point(0, 79);
             toolStrip3.Name = "toolStrip3";
             toolStrip3.Size = new Size(875, 26);
             toolStrip3.TabIndex = 6;
@@ -463,7 +467,7 @@
             toolStripProject.Enabled = false;
             toolStripProject.Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point, 0);
             toolStripProject.Items.AddRange(new ToolStripItem[] { buttonCreateFilter });
-            toolStripProject.Location = new Point(0, 79);
+            toolStripProject.Location = new Point(0, 105);
             toolStripProject.Name = "toolStripProject";
             toolStripProject.Size = new Size(875, 26);
             toolStripProject.TabIndex = 8;
@@ -478,6 +482,35 @@
             buttonCreateFilter.Text = "Create Filter";
             buttonCreateFilter.Click += buttonCreateFilter_Click;
             // 
+            // toolStrip4
+            // 
+            toolStrip4.BackColor = Color.FromArgb(204, 213, 240);
+            toolStrip4.Font = new Font("Segoe UI", 10F);
+            toolStrip4.Items.AddRange(new ToolStripItem[] { buttonOpenContext, buttonOpenCallLog });
+            toolStrip4.Location = new Point(0, 27);
+            toolStrip4.Name = "toolStrip4";
+            toolStrip4.Size = new Size(875, 26);
+            toolStrip4.TabIndex = 10;
+            toolStrip4.Text = "toolStrip4";
+            // 
+            // buttonOpenContext
+            // 
+            buttonOpenContext.ForeColor = Color.Indigo;
+            buttonOpenContext.Image = (Image)resources.GetObject("buttonOpenContext.Image");
+            buttonOpenContext.Name = "buttonOpenContext";
+            buttonOpenContext.Size = new Size(115, 23);
+            buttonOpenContext.Text = "Open Context";
+            buttonOpenContext.Click += buttonOpenContext_Click;
+            // 
+            // buttonOpenCallLog
+            // 
+            buttonOpenCallLog.ForeColor = Color.Indigo;
+            buttonOpenCallLog.Image = (Image)resources.GetObject("buttonOpenCallLog.Image");
+            buttonOpenCallLog.Name = "buttonOpenCallLog";
+            buttonOpenCallLog.Size = new Size(116, 23);
+            buttonOpenCallLog.Text = "Open Call Log";
+            buttonOpenCallLog.Click += buttonOpenCallLog_Click;
+            // 
             // FormMain
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -486,6 +519,7 @@
             Controls.Add(toolStripProject);
             Controls.Add(toolStrip3);
             Controls.Add(toolStrip1);
+            Controls.Add(toolStrip4);
             Controls.Add(menuStrip);
             IsMdiContainer = true;
             MainMenuStrip = menuStrip;
@@ -501,6 +535,8 @@
             toolStrip3.PerformLayout();
             toolStripProject.ResumeLayout(false);
             toolStripProject.PerformLayout();
+            toolStrip4.ResumeLayout(false);
+            toolStrip4.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -564,5 +600,8 @@
         private ToolStrip toolStripProject;
         private ToolStripButton buttonCreateFilter;
         private ToolStripButton buttonOpen3;
+        private ToolStrip toolStrip4;
+        private ToolStripButton buttonOpenContext;
+        private ToolStripButton buttonOpenCallLog;
     }
 }

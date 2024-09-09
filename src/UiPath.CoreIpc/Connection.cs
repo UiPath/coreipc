@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using Newtonsoft.Json;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipes;
 
 namespace UiPath.Ipc;
@@ -364,7 +365,22 @@ public sealed class Connection : IDisposable
         try
         {
             var result = (await Serializer.OrDefault().DeserializeAsync<T>(_nestedStream))!;
-            var telemSucceeded = new Telemetry.DeserializationSucceeded { StartId = telemDeserializePayload.Id, Result = result }.Log();
+
+            string json;
+            try
+            {
+                json = JsonConvert.SerializeObject(result, Telemetry.Jss);
+            }
+            catch (Exception ex)
+            {
+                json = JsonConvert.SerializeObject(new
+                {
+                    Exception = ex.ToString(),
+                    ResultType = result?.GetType().AssemblyQualifiedName,
+                }, Formatting.Indented);
+            }
+
+            var telemSucceeded = new Telemetry.DeserializationSucceeded { StartId = telemDeserializePayload.Id, ResultJson = json }.Log();
             return (result, telemSucceeded);
         }
         catch (Exception ex)

@@ -26,8 +26,8 @@ public static partial class Telemetry
 
     [MemberNotNullWhen(true, nameof(TelemetryFolder))]
     [MemberNotNullWhen(true, nameof(Writer))]
-    public static bool IsEnabled 
-    => TelemetryFolder is not null && 
+    public static bool IsEnabled
+    => TelemetryFolder is not null &&
         CurrentProcessInfo.Name is not ("UiPath.Ipc.TV" or "testhost" or "testhost.x86" or "dotnet");
 
     static Telemetry()
@@ -37,7 +37,10 @@ public static partial class Telemetry
             var fileStream = new FileStream(ComputeLogFilePath(), FileMode.Create, FileAccess.Write, FileShare.Read);
             Writer = new StreamWriter(fileStream, Encoding.UTF8, 1024, leaveOpen: false) { AutoFlush = true };
 
-            _ = Task.Run(Pump);
+            Task.Run(Pump).ContinueWith(task =>
+            {
+                Trace.TraceError(task.Exception?.ToString() ?? "Telemetry pump failed");
+            }, TaskContinuationOptions.NotOnRanToCompletion);
         }
 
         static string ComputeLogFilePath()
@@ -50,7 +53,7 @@ public static partial class Telemetry
         //{
         //    Debugger.Launch();
         //}
-            
+
         if (!IsEnabled) { return; }
         _ = Records.Writer.TryWrite(record);
     }
@@ -64,9 +67,16 @@ public static partial class Telemetry
     {
         while (await Records.Reader.WaitToReadAsync())
         {
-            var record = await Records.Reader.ReadAsync();
-            var json = JsonConvert.SerializeObject(record, Jss);
-            await Writer!.WriteLineAsync(json);
+            try
+            {
+                var record = await Records.Reader.ReadAsync();
+                var json = JsonConvert.SerializeObject(record, Jss);
+                await Writer!.WriteLineAsync(json);
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError(ex.ToString());
+            }
         }
 
         Writer!.Close();

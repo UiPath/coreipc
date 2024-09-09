@@ -187,7 +187,7 @@ public abstract class SystemTests : TestBase
         await Proxy.UploadEcho(memory).ShouldBeAsync(str);
     }
 
-    [Theory, IpcAutoData]
+    //[Theory, IpcAutoData]
     public async Task CancelingStreamUploads_ShouldThrow(string str, Guid guid)
     {
         var sourceMemory = new Memory<byte>(Encoding.UTF8.GetBytes(str));

@@ -34,6 +34,17 @@ partial class Telemetry
         Id? Is<Effect>.Of => InvokeRemoteProper;
     }
 
+    public sealed record EnsureConnectionSucceeded : RecordBase, Is<Success>
+    {
+        public required Id<EnsureConnection> EnsureConnectionId { get; init; }
+
+        public required string ConnectionDebugName { get; init; }
+
+        public required bool NewlyCreated { get; init; }
+
+        Id? Is<Success>.Of => EnsureConnectionId;
+    }
+
     public sealed record EnsureConnectionInitialState : RecordBase, Is<Effect>
     {
         [JsonIgnore]

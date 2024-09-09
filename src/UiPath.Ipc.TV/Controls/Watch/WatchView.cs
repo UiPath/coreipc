@@ -35,6 +35,9 @@ public partial class WatchView : UserControl
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public event Action<string>? SelectRecord;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public bool ExpandRootChildrenOnAttach { get; set; } = true;
+
     public WatchView()
     {
         InitializeComponent();
@@ -128,11 +131,14 @@ public partial class WatchView : UserControl
         var root = new WatchNode(_model!);
         _treeListView.SetObjects(new object[] { root });
         _treeListView.Expand(root);
-        foreach(var child in root.Children)
+        if (ExpandRootChildrenOnAttach)
         {
-            if (child.ObjectValue is not DateTime)
+            foreach (var child in root.Children)
             {
-                _treeListView.Expand(child);
+                if (child.ObjectValue is not DateTime)
+                {
+                    _treeListView.Expand(child);
+                }
             }
         }
     }

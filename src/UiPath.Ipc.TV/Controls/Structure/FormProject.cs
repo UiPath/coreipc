@@ -1,4 +1,7 @@
-﻿using System.Diagnostics;
+﻿using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
+using System.Reflection;
+using UiPath.Ipc.TV.DataAccess;
 
 namespace UiPath.Ipc.TV;
 
@@ -14,6 +17,8 @@ public partial class FormProject : Form, IAsyncDisposable
 
     private OrderedLineList _latestLineList = null!;
 
+    private readonly Func<Task<EnumerableOutgoingCallInfoFactory>> _executor;
+
     public FormProject(FormMain mdiParent, IProjectContext projectContext, SlowDisposable slowDisposable, FormProjectModel model, IServiceProvider serviceProvider)
     {
         InitializeComponent();
@@ -24,8 +29,54 @@ public partial class FormProject : Form, IAsyncDisposable
         _model.State.Subscribe(ManifestProjectModelState);
         _model.RelationalModels.Subscribe(ManifestRelationalModel);
 
+        watchView1.ExpandRootChildrenOnAttach = false;
+
         Text = _projectContext.ProjectPath;
         ServiceProvider = serviceProvider;
+
+        _executor = InitExpressionEditor();
+    }
+
+    private Func<Task<EnumerableOutgoingCallInfoFactory>> InitExpressionEditor()
+    {
+        if (DesignMode)
+        {
+            return null!;
+        }
+
+        expressionEditor.ShowLineNumbers = false;
+
+        expressionEditor.EnsureAccessible([Assembly.Load("System.Runtime")]);
+        expressionEditor.EnsureAccessible(
+        [
+            typeof(object),
+            typeof(Microsoft.CSharp.RuntimeBinder.Binder),
+            typeof(Queryable),
+            typeof(Enumerable),
+            typeof(IQueryable<>),
+            typeof(IEnumerable<>),
+            typeof(DbSet<>),
+            typeof(Telemetry),
+            typeof(RepoView),
+            typeof(Expression<>),
+            typeof(RecordEntity),
+            typeof(OutgoingCallInfo),
+        ]);
+
+        expressionEditor.Code = $$"""
+            calls => 
+            {
+                var query = from call in calls  
+                            where 1 == 1
+                            select call;
+
+                return query;
+            }
+            """;
+
+        expressionEditor.CodeChanged += (sender, e) => { buttonExecute.Enabled = true; };
+
+        return expressionEditor.ConfigureExecution<EnumerableOutgoingCallInfoFactory>();
     }
 
     private void ManifestRelationalModel(RelationalTelemetryModel model)
@@ -82,8 +133,11 @@ public partial class FormProject : Form, IAsyncDisposable
         splitContainer1.Panel2Collapsed = false;
     }
 
+    private IReadOnlyList<OutgoingCallInfo> OutgoingCalls { get; set; } = [];
+
     private void buttonScanOutgoing_Click(object sender, EventArgs e)
     {
+        buttonScanOutgoing.Enabled = false;
         var results = FormProgress.ExecuteOnThreadPool(form =>
             OutgoingCallInfoBuilder.Build(
                 telemetryExplorer.Model!,
@@ -92,11 +146,29 @@ public partial class FormProject : Form, IAsyncDisposable
                     .ScheduleOn(TaskScheduler.FromCurrentSynchronizationContext()),
                 form._cts.Token));
 
-        watchView1.Model = new ValueSource.Variable("calls", typeof(OutgoingCallInfoResults), results);
+        OutgoingCalls = results.Infos;
+
+        watchView1.Model = new ValueSource.Variable("calls", typeof(IReadOnlyList<object?>), OutgoingCalls);
+        buttonExecute.Visible = true;
+
         static (string? label, int cTotal, int cProcessed) Translate(OutgoingCallInfoBuilder.ProgressReport report)
         {
             return (null, report.CTotal, report.CProcessed);
         };
+    }
+
+    private void buttonExecute_Click(object sender, EventArgs e)
+    {
+        buttonExecute.Enabled = false;
+
+        Pal().MessageBoxError();
+
+        async Task Pal()
+        {
+            var factory = await _executor();
+            var filteredCalls = factory(OutgoingCalls).ToArray();
+            watchView1.Model = new ValueSource.Variable("calls", typeof(IReadOnlyList<object?>), filteredCalls);
+        }
     }
 
     ValueTask IAsyncDisposable.DisposeAsync() => _projectContext.DisposeAsync();

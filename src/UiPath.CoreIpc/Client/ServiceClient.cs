@@ -58,15 +58,16 @@ internal abstract class ServiceClient : IDisposable
             DefaultSynchronizationContext = defaultContext
         }.Log();
 
-        return telemInvokeRemote.Monitor(async () =>
-        {
-            if (defaultContext)
+        return telemInvokeRemote.Monitor(
+            async () =>
             {
-                return await Invoke();
-            }
+                if (defaultContext)
+                {
+                    return await Invoke();
+                }
 
-            return await Task.Run(Invoke);
-        });
+                return await Task.Run(Invoke);
+            });
 
         async Task<TResult> Invoke()
         {
@@ -89,7 +90,7 @@ internal abstract class ServiceClient : IDisposable
                     SerializedArgs = serializedArguments,
                 };
 
-                return await telemInvokeRemoteProper.Monitor(async () => 
+                return await telemInvokeRemoteProper.Monitor(async () =>
                 {
                     var ct = timeoutHelper.Token;
 
@@ -112,7 +113,7 @@ internal abstract class ServiceClient : IDisposable
                     Config.Logger?.ServiceClientCalled(methodName, requestId, Config.DebugName);
 
                     return response.Deserialize<TResult>(Config.Serializer);
-                });                
+                });
             }
             catch (Exception ex)
             {
@@ -250,62 +251,68 @@ internal sealed class ServiceClientProper : ServiceClient
             ClientTransport = _client.Transport
         };
 
-        return await telemEnsureConnection.Monitor(async () =>
-        {
-            using (await _lock.Lock(ct))
+        return await telemEnsureConnection.Monitor(
+            sanitizeSucceeded: (result, record) => new Telemetry.EnsureConnectionSucceeded {
+                EnsureConnectionId = record.Id, 
+                ConnectionDebugName = result.Item1.DebugName,
+                NewlyCreated = result.newlyConnected
+            },
+            asyncFunc: async () =>
             {
-                var haveConnectionAlready = LatestConnection is not null;
-                var isConnected = new Lazy<bool>(_clientState.IsConnected);
-                var haveBeforeConnect = Config.BeforeConnect is not null;
-
-                var telemEnsureConnectionInitialState = new Telemetry.EnsureConnectionInitialState
+                using (await _lock.Lock(ct))
                 {
-                    Cause = telemEnsureConnection.Id,
-                    HaveConnectionAlready = haveConnectionAlready,
-                    IsConnected = isConnected.Value,
-                    BeforeConnectIsNotNull = haveBeforeConnect
-                }.Log();
+                    var haveConnectionAlready = LatestConnection is not null;
+                    var isConnected = new Lazy<bool>(_clientState.IsConnected);
+                    var haveBeforeConnect = Config.BeforeConnect is not null;
 
-                if (haveConnectionAlready && isConnected.Value)
-                {
-                    return (LatestConnection!, newlyConnected: false);
-                }
-
-                if (haveBeforeConnect)
-                {
-                    await Config.BeforeConnect!(ct);
-                }
-
-                Stream network = null!;
-                var telemConnect = _latestConnectionTelemetry = new Telemetry.Connect { Cause = telemEnsureConnectionInitialState.Id };
-                await telemConnect.Monitor(
-                    async () =>
+                    var telemEnsureConnectionInitialState = new Telemetry.EnsureConnectionInitialState
                     {
-                        network = await Connect(ct);
-                    });
-                LatestConnection = new Connection(network, Config.Serializer, Config.Logger, Config.DebugName);
-                var router = new Router(_client.Config.CreateCallbackRouterConfig(), _client.Config.ServiceProvider);
-                _latestServer = new Server(router, _client.Config.RequestTimeout, LatestConnection);
+                        Cause = telemEnsureConnection.Id,
+                        HaveConnectionAlready = haveConnectionAlready,
+                        IsConnected = isConnected.Value,
+                        BeforeConnectIsNotNull = haveBeforeConnect
+                    }.Log();
 
-                var telemClientConnectionListen = new Telemetry.ClientConnectionListen { Cause = telemConnect.Id }.Log();
-
-                _ = Pal();
-                return (LatestConnection, newlyConnected: true);
-
-                async Task Pal()
-                {
-                    try
+                    if (haveConnectionAlready && isConnected.Value)
                     {
-                        var telemConnectionListenReason = new Telemetry.ConnectionListenReason { ClientConnectionListenId = telemClientConnectionListen.Id };
-                        await telemConnectionListenReason.Monitor(async () => await LatestConnection.Listen(telemConnectionListenReason));
+                        return (LatestConnection!, newlyConnected: false);
                     }
-                    catch (Exception ex)
+
+                    if (haveBeforeConnect)
                     {
-                        Config.Logger.LogException(ex, Config.DebugName);
+                        await Config.BeforeConnect!(ct);
+                    }
+
+                    Stream network = null!;
+                    var telemConnect = _latestConnectionTelemetry = new Telemetry.Connect { Cause = telemEnsureConnectionInitialState.Id };
+                    await telemConnect.Monitor(
+                        async () =>
+                        {
+                            network = await Connect(ct);
+                        });
+                    LatestConnection = new Connection(network, Config.Serializer, Config.Logger, Config.DebugName);
+                    var router = new Router(_client.Config.CreateCallbackRouterConfig(), _client.Config.ServiceProvider);
+                    _latestServer = new Server(router, _client.Config.RequestTimeout, LatestConnection);
+
+                    var telemClientConnectionListen = new Telemetry.ClientConnectionListen { Cause = telemConnect.Id }.Log();
+
+                    _ = Pal();
+                    return (LatestConnection, newlyConnected: true);
+
+                    async Task Pal()
+                    {
+                        try
+                        {
+                            var telemConnectionListenReason = new Telemetry.ConnectionListenReason { ClientConnectionListenId = telemClientConnectionListen.Id };
+                            await telemConnectionListenReason.Monitor(async () => await LatestConnection.Listen(telemConnectionListenReason));
+                        }
+                        catch (Exception ex)
+                        {
+                            Config.Logger.LogException(ex, Config.DebugName);
+                        }
                     }
                 }
-            }
-        });
+            });
     }
 
     private async Task<Stream> Connect(CancellationToken ct)

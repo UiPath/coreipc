@@ -1,10 +1,12 @@
-﻿namespace UiPath.Ipc;
+﻿using Newtonsoft.Json;
+
+namespace UiPath.Ipc;
 
 partial class Telemetry
 {
     public interface IOperationStart
     {
-        Telemetry.Id Id { get; }
+        Id Id { get; }
     }
 
     public interface IOperationEnd
@@ -26,7 +28,7 @@ partial class Telemetry
 
     public interface Is<TRole> where TRole : RoleBase
     {
-        Telemetry.Id? Of { get; }
+        Id? Of { get; }
     }
 
     public abstract class RoleBase
@@ -73,14 +75,27 @@ public static class OperationStartExtensions
             throw;
         }
     }
-    public static async Task<TResult> Monitor<TResult>(this Telemetry.RecordBase record, Func<Task<TResult>> asyncFunc)
+
+    public static Task<TResult> Monitor<TResult>(
+        this Telemetry.RecordBase record,
+        Func<Task<TResult>> asyncFunc)
+    => record.Monitor(
+        (result, record) => record.Succeed(result),
+        asyncFunc);
+
+    public static async Task<TResult> Monitor<TResult, TRecord>(
+        this TRecord record,
+        Func<TResult, TRecord, Telemetry.RecordBase>? sanitizeSucceeded,
+        Func<Task<TResult>> asyncFunc)
+        where TRecord : Telemetry.RecordBase
     {
         Telemetry.Log(record);
 
         try
         {
             var result = await asyncFunc();
-            new Telemetry.ResultSucceeded { StartId = record.Id, Result = result }.Log();
+            var succeeded = sanitizeSucceeded?.Invoke(result, record) ?? record.Succeed(result);
+            succeeded.Log();
             return result;
         }
         catch (Exception ex)
@@ -88,5 +103,23 @@ public static class OperationStartExtensions
             new Telemetry.VoidFailed { StartId = record.Id, Exception = ex }.Log();
             throw;
         }
+    }
+
+    public static Telemetry.ResultSucceeded Succeed(this Telemetry.RecordBase record, object? result)
+    {
+        string json;
+        try
+        {
+            json = JsonConvert.SerializeObject(result, Telemetry.Jss);
+        }
+        catch (Exception ex)
+        {
+            json = JsonConvert.SerializeObject(new
+            {
+                Exception = ex.ToString(),
+                ResultType = result?.GetType().AssemblyQualifiedName,
+            }, Formatting.Indented);
+        }
+        return new Telemetry.ResultSucceeded { StartId = record.Id, ResultJson = json };
     }
 }

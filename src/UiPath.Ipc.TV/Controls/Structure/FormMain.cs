@@ -114,17 +114,40 @@ public partial class FormMain : Form
     {
         if (Telemetry.TelemetryFolder is { } path)
         {
-            var scope = _scopeFactory.CreateAsyncScope();
-            var projectContext = scope.ServiceProvider.GetRequiredService<ProjectContext>();
-            projectContext.ProjectPath = path;
-            projectContext.DisposeScope = scope.DisposeAsync;
-
-            var formProject = scope.ServiceProvider.GetRequiredService<FormProject>();
-            formProject.WindowState = FormWindowState.Maximized;
-            formProject.Show();
+            OpenCallLog(path);
             return;
         }
 
         MessageBox.Show("Environment variable not set.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+
+    private void OpenCallLog(string path)
+    {
+        var scope = _scopeFactory.CreateAsyncScope();
+        var projectContext = scope.ServiceProvider.GetRequiredService<ProjectContext>();
+        projectContext.ProjectPath = path;
+        projectContext.DisposeScope = scope.DisposeAsync;
+
+        var formProject = scope.ServiceProvider.GetRequiredService<FormProject>();
+        formProject.WindowState = FormWindowState.Maximized;
+        formProject.Show();
+    }
+
+    private void buttonOpenContext_Click(object sender, EventArgs e)
+    {
+        if (folderBrowserDialog.ShowDialog() is not DialogResult.OK)
+        {
+            return;
+        }
+        OpenFolder(folderBrowserDialog.SelectedPath);
+    }
+
+    private void buttonOpenCallLog_Click(object sender, EventArgs e)
+    {
+        if (folderBrowserDialog.ShowDialog() is not DialogResult.OK)
+        {
+            return;
+        }
+        OpenCallLog(folderBrowserDialog.SelectedPath);
     }
 }
