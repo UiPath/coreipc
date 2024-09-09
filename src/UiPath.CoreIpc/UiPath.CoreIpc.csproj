@@ -24,6 +24,7 @@
   <ItemGroup Condition="$(TargetFramework) == 'net461'">
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
     <PackageReference Include="System.Reflection.DispatchProxy" Version="4.7.1" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
@@ -33,6 +34,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
     <PackageReference Include="System.IO.Pipes.AccessControl" Version="5.0.0" />
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
+    <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
     <None Include="..\..\README.md" Pack="true" PackagePath="" />
   </ItemGroup>
   <ItemGroup>
@@ -53,5 +55,16 @@
     <Using Include="System.Runtime.CompilerServices" />
     <Using Include="Microsoft.Extensions.Logging" />
     <Using Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="UiPath.Ipc.TV" />
+    <!--<InternalsVisibleTo Include="IpcRoslynCompletionService" />-->
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UiPath.Ipc.HierarchyKindGenerator\UiPath.Ipc.HierarchyKindGenerator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

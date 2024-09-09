@@ -4,12 +4,7 @@ namespace UiPath.Ipc.Tests;
 
 public sealed class ComputingService(ILogger<ComputingService> logger) : IComputingService
 {
-    private static readonly AsyncLocal<string?> CallContextStorage = new();
-    public static string? CallContext
-    {
-        get => CallContextStorage.Value;
-        set => CallContextStorage.Value = value;
-    }
+    public static string? CallContext{ get; set; }
 
     public async Task<float> AddFloats(float a, float b, CancellationToken ct = default)
     {

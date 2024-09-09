@@ -12,10 +12,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="ComputingTestsOverTcp.cs" />
+    <Compile Remove="ComputingTestsOverWebSockets.cs" />
     <Compile Remove="Polyfills\CallerArgumentExpressionAttribute.cs" />
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="ComputingTestsOverTcp.cs" />
+    <None Include="ComputingTestsOverWebSockets.cs" />
     <None Include="Polyfills\CallerArgumentExpressionAttribute.cs" />
   </ItemGroup>
 

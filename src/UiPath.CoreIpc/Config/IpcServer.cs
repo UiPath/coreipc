@@ -2,6 +2,11 @@
 
 public sealed class IpcServer : IAsyncDisposable
 {
+    static IpcServer()
+    {
+        Telemetry.ProcessStart.EnsureInitialized();
+    }
+
     public required IServiceProvider ServiceProvider { get; init; }
     public required EndpointCollection Endpoints { get; init; }
     public required IReadOnlyList<ListenerConfig> Listeners { get; init; }

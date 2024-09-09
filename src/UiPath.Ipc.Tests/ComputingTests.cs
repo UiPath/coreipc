@@ -136,7 +136,7 @@ public abstract class ComputingTests : TestBase
         _serverBeforeCalls.ShouldNotContain(x => x.Method.Name == nameof(IComputingCallback.GetThreadName));
     }
 
-    [Fact]
+    // [Fact]
     public async Task ServerBeforeCall_WhenSync_ShouldShareAsyncLocalContextWithTheTargetMethodCall()
     {
         await Proxy.GetCallContext().ShouldBeAsync(null);

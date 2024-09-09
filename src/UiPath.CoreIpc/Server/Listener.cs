@@ -171,37 +171,64 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
     private async Task Listen(CancellationToken ct)
     {
         Log($"Starting listener {Config}...");
+        var telemRunListener = new Telemetry.RunListener() { Config = Config }.Log();
 
-        await Task.WhenAll(Enumerable.Range(1, Config.ConcurrentAccepts).Select(async _ =>
+        try
         {
-            while (!ct.IsCancellationRequested)
+            await Task.WhenAll(Enumerable.Range(1, Config.ConcurrentAccepts).Select(async _ =>
             {
-                await AcceptConnection(ct);
-            }
-        }));
-    }
-    private async Task AcceptConnection(CancellationToken ct)
-    {
-        var serverConnection = new ServerConnection<TConfig, TListenerState, TConnectionState>(this);
+                while (!ct.IsCancellationRequested)
+                {
+                    await AcceptConnection(telemRunListener, ct);
+                }
+            }));
 
+            new Telemetry.VoidSucceeded() { StartId = new Telemetry.UntypedId(telemRunListener.Id) }.Log();
+        }
+        catch (Exception ex)
+        {
+            new Telemetry.VoidFailed() { StartId = new Telemetry.UntypedId(telemRunListener.Id), Exception = ex }.Log();
+            throw;
+        }
+    }
+    private async Task AcceptConnection(Telemetry.RunListener telemCause, CancellationToken ct)
+    {
+        var serverConnection = new ServerConnection<TConfig, TListenerState, TConnectionState>(this, telemCause);
+
+        var telemAcceptClient = new Telemetry.AcceptClient { ParentId = serverConnection.TelemetryRecord.Id }.Log();
         Stream network;
+        Telemetry.AcceptClientSucceeded telemSucceeded;
         try
         {
             network = await serverConnection.AcceptClient(ct);
+            telemSucceeded = new Telemetry.AcceptClientSucceeded { StartId = telemAcceptClient.Id }.Log();
         }
         catch (OperationCanceledException ex) when (ex.CancellationToken == ct)
         {
+            new Telemetry.VoidFailed { StartId = telemAcceptClient.Id, Exception = ex }.Log();
             return;
         }
 
         try
         {
-            serverConnection.Listen(network, ct).LogException(Logger, Config);
+            _ = Pal();
         }
         catch (Exception ex)
         {
             serverConnection.Dispose();
             if (!ct.IsCancellationRequested)
+            {
+                Logger.LogException(ex, Config);
+            }
+        }
+
+        async Task Pal()
+        {
+            try
+            {
+                await serverConnection.Listen(network, telemSucceeded, ct);
+            }
+            catch (Exception ex)
             {
                 Logger.LogException(ex, Config);
             }

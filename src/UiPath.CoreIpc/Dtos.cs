@@ -98,4 +98,4 @@ public class RemoteException : Exception
     }
     public bool Is<TException>() where TException : Exception => Type == typeof(TException).FullName;
 }
-internal enum MessageType : byte { Request, Response, CancellationRequest, UploadRequest, DownloadResponse }
+public enum MessageType : byte { Request, Response, CancellationRequest, UploadRequest, DownloadResponse }

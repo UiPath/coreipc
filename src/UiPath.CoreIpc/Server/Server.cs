@@ -71,43 +71,60 @@ internal class Server
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-    private async ValueTask OnRequestReceived(Request request)
+    private async ValueTask OnRequestReceived(Request request, Telemetry.HonorRequest telemCause)
     {
         try
         {
-            if (LogEnabled)
+            var telemRequestReceived = new Telemetry.OnRequestReceived { HonorRequest = telemCause.Id };
+            await telemRequestReceived.Monitor(async () =>
             {
-                Log($"{DebugName} received request {request}");
-            }
-            if (!_router.TryResolve(request.Endpoint, out var route))
-            {
-                await OnError(request, new EndpointNotFoundException(nameof(request.Endpoint), DebugName, request.Endpoint));
-                return;
-            }
-            var method = GetMethod(route.Service.Type, request.MethodName);
-            Response? response = null;
-            var requestCancellation = Rent();
-            _requests[request.Id] = requestCancellation;
-            var timeout = request.GetTimeout(_requestTimeout);
-            var timeoutHelper = new TimeoutHelper(timeout, requestCancellation.Token);
-            try
-            {
-                var token = timeoutHelper.Token;
-                response = await HandleRequest(method, route, request, token);
                 if (LogEnabled)
                 {
-                    Log($"{DebugName} sending response for {request}");
+                    Log($"{DebugName} received request {request}");
                 }
-                await SendResponse(response, token);
-            }
-            catch (Exception ex) when (response is null)
-            {
-                await OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName));
-            }
-            finally
-            {
-                timeoutHelper.Dispose();
-            }
+                if (!_router.TryResolve(request.Endpoint, out var route))
+                {
+                    new Telemetry.FailedToResolveRoute { RequestReceivedId = telemRequestReceived.Id }.Log();
+                    await OnError(request, new EndpointNotFoundException(nameof(request.Endpoint), DebugName, request.Endpoint));
+                    return;
+                }
+                var method = GetMethod(route.Service.Type, request.MethodName);
+                Response? response = null;
+                var requestCancellation = Rent();
+                _requests[request.Id] = requestCancellation;
+                var timeout = request.GetTimeout(_requestTimeout);
+                var timeoutHelper = new TimeoutHelper(timeout, requestCancellation.Token);
+                try
+                {
+                    var token = timeoutHelper.Token;
+                    var telemHandleRequest = new Telemetry.HandleRequest { OnRequestReceivedId = telemRequestReceived.Id }.Log();
+                    response = await telemHandleRequest.Monitor(
+                        async () =>
+                        {
+                            return await HandleRequest(method, route, request, telemHandleRequest, token);
+                        });
+
+                    await new Telemetry.SendResponse { OnRequestReceivedId = telemRequestReceived.Id }
+                        .Log()
+                        .Monitor(
+                            async () =>
+                            {
+                                if (LogEnabled)
+                                {
+                                    Log($"{DebugName} sending response for {request}");
+                                }
+                                await SendResponse(response, token);
+                            });
+                }
+                catch (Exception ex) when (response is null)
+                {
+                    await OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName));
+                }
+                finally
+                {
+                    timeoutHelper.Dispose();
+                }
+            });
         }
         catch (Exception ex)
         {
@@ -127,13 +144,20 @@ internal class Server
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-    private async ValueTask<Response> HandleRequest(Method method, Route route, Request request, CancellationToken cancellationToken)
+    private async ValueTask<Response> HandleRequest(Method method, Route route, Request request, Telemetry.HandleRequest telemHandleRequest, CancellationToken cancellationToken)
     {
         var arguments = GetArguments();
 
         object service;
         using (route.Service.Get(out service))
         {
+            _ = new Telemetry.ServiceInstanceRetrieved
+            {
+                HandleRequestId = telemHandleRequest.Id,
+                TypeName = service.GetType().AssemblyQualifiedName,
+                ObjectHashCode = RuntimeHelpers.GetHashCode(service)
+            }.Log();
+
             return await InvokeMethod();
         }
 #if !NET461
@@ -143,30 +167,60 @@ internal class Server
         {
             var returnTaskType = method.ReturnType;
             var scheduler = route.Scheduler;
-            Debug.Assert(scheduler != null);
             var defaultScheduler = scheduler == TaskScheduler.Default;
 
-            if (returnTaskType.IsGenericType)
+            var telemInvokeLocal = new Telemetry.InvokeLocal
             {
-                var result = await ScheduleMethodCall();
-                return result switch
-                {
-                    Stream downloadStream => Response.Success(request, downloadStream),
-                    var x => Response.Success(request, Serializer.Serialize(x))
-                };
-            }
+                HandleRequestId = telemHandleRequest.Id,
+                RouteSchedulerIsNotNull = scheduler != null,
+                RouteSchedulerIsDefault = defaultScheduler,
+                ReturnTaskTypeName = returnTaskType.AssemblyQualifiedName!,
+                ReturnTaskTypeIsGenericType = returnTaskType.IsGenericType,
+            };
+            return await telemInvokeLocal.Monitor(async () =>
+            {
+                Debug.Assert(scheduler != null);
 
-            ScheduleMethodCall().LogException(Logger, method.MethodInfo);
-            return Response.Success(request, "");
+                if (returnTaskType.IsGenericType)
+                {
+                    var result = await ScheduleMethodCall();
+                    return result switch
+                    {
+                        Stream downloadStream => Response.Success(request, downloadStream),
+                        var x => Response.Success(request, Serializer.Serialize(x))
+                    };
+                }
+
+                ScheduleMethodCall().LogException(Logger, method.MethodInfo);
+                return Response.Success(request, "");
+            });
 
             Task<object?> ScheduleMethodCall() => defaultScheduler ? MethodCall() : RunOnScheduler();
             async Task<object?> MethodCall()
             {
-                await (route.BeforeCall?.Invoke(
-                    new CallInfo(newConnection: false, method.MethodInfo, arguments),
-                    cancellationToken) ?? Task.CompletedTask);
-                var invocationTask = method.Invoke(service, arguments, cancellationToken);
-                await invocationTask;
+                await new Telemetry.MaybeRunBeforeCall
+                {
+                    InvokeMethodId = telemInvokeLocal.Id,
+                    BeforeCallIsNotNull = route.BeforeCall is not null,
+                    BeforeCallMethod = route.BeforeCall?.Method?.ToString(),
+                    BeforeCallTargetObjectHashCode = route.BeforeCall?.Target is { } target ? RuntimeHelpers.GetHashCode(target) : null,
+                }.Monitor(async () =>
+                {
+                    await (route.BeforeCall?.Invoke(
+                        new CallInfo(newConnection: false, method.MethodInfo, arguments),
+                        cancellationToken) ?? Task.CompletedTask);
+                });
+
+                Task invocationTask = null!;
+
+                await new Telemetry.InvokeLocalProper
+                {
+                    InvokeMethodId = telemInvokeLocal.Id
+                }.Monitor(async () =>
+                {
+                    invocationTask = method.Invoke(service, arguments, cancellationToken);
+                    await invocationTask;
+                });
 
                 if (!returnTaskType.IsGenericType)
                 {
@@ -176,7 +230,19 @@ internal class Server
                 return GetTaskResult(returnTaskType, invocationTask);
             }
 
-            Task<object?> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler).Unwrap();
+            async Task<object?> RunOnScheduler()
+            {
+                object? result = null;
+                await new Telemetry.RunOnScheduler
+                {
+                    InvokeMethodId = telemInvokeLocal.Id,
+                    SchedulerTypeName = scheduler!.GetType().AssemblyQualifiedName!
+                }.Monitor(async () =>
+                {
+                    result = await Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler).Unwrap();
+                });
+                return result;
+            }
         }
         object?[] GetArguments()
         {
@@ -190,6 +256,13 @@ internal class Server
             var allArguments = new object?[allParametersLength];
             Deserialize();
             SetOptionalArguments();
+
+            _ = new Telemetry.GetArgumentsSucceded
+            {
+                HandleRequestId = telemHandleRequest.Id,
+                TypeNames = allArguments.Select(arg => arg?.GetType().AssemblyQualifiedName ?? "null").ToArray()
+            }.Log();
+
             return allArguments;
             void Deserialize()
             {

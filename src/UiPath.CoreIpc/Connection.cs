@@ -12,7 +12,7 @@ public sealed class Connection : IDisposable
     private readonly ConcurrentDictionary<string, ManualResetValueTaskSource> _requests = new();
     private long _requestCounter = -1;
     private readonly int _maxMessageSize;
-    private readonly Lazy<Task> _receiveLoop;
+    private readonly DeferredLazy<Task> _receiveLoop = new();
     private readonly SemaphoreSlim _sendLock = new(1);
     private readonly WaitCallback _onResponse;
     private readonly WaitCallback _onRequest;
@@ -37,17 +37,18 @@ public sealed class Connection : IDisposable
         Logger = logger;
         DebugName = $"{debugName} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
-        _receiveLoop = new(ReceiveLoop);
-        _onResponse = response => OnResponseReceived((Response)response!);
-        _onRequest = request => OnRequestReceived((Request)request!);
-        _onCancellation = requestId => OnCancellationReceived((string)requestId!);
+        _onResponse = response => OnResponseReceived(((Response obj, Telemetry.DeserializationSucceeded telemetry))response!);
+        _onRequest = request => OnRequestReceived(((Request obj, Telemetry.DeserializationSucceeded telemetry))request!);
+        _onCancellation = requestId => OnCancellationReceived(((CancellationRequest obj, Telemetry.DeserializationSucceeded telemetry))requestId!);
         _cancelRequest = requestId => CancelRequest((string)requestId!);
     }
 
     public override string ToString() => DebugName;
     public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
-    public Task Listen() => _receiveLoop.Value;
-    internal event Func<Request, ValueTask> RequestReceived;
+    internal Task Listen(Telemetry.ConnectionListenReason telemCause)
+    => _receiveLoop.GetValue(factory: () => ReceiveLoop(telemCause));
+
+    internal event Func<Request, Telemetry.HonorRequest, ValueTask> RequestReceived;
     internal event Action<string> CancellationReceived;
     public event EventHandler<EventArgs>? Closed;
 #if !NET461
@@ -227,54 +228,72 @@ public sealed class Connection : IDisposable
         while (toRead > 0);
         return true;
     }
-    private async Task ReceiveLoop()
+    private async Task ReceiveLoop(Telemetry.ConnectionListenReason telemCause)
     {
-        try
-        {
-            while (await ReadBuffer(HeaderLength))
+        var telemReceiveLoop = new Telemetry.ReceiveLoop { ConnectionListenReasonId = telemCause.Id };
+        await telemReceiveLoop.Monitor(
+            async () =>
             {
-                Debug.Assert(SynchronizationContext.Current == null);
-                var length = BitConverter.ToInt32(_buffer, startIndex: 1);
-                if (length > _maxMessageSize)
+                try
                 {
-                    throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
+                    while (await ReadBuffer(HeaderLength))
+                    {
+                        var length = BitConverter.ToInt32(_buffer, startIndex: 1);
+
+                        var telemReceivedHeader = new Telemetry.ReceivedHeader
+                        {
+                            ReceiveLoopId = telemReceiveLoop.Id,
+                            MessageLength = length,
+                            MessageType = (MessageType)_buffer[0],
+                            MaxMessageLength = _maxMessageSize,
+                            SynchronizationContextIsNull = SynchronizationContext.Current is null
+                        };
+                        await telemReceivedHeader.Monitor(async () =>
+                        {
+                            Debug.Assert(SynchronizationContext.Current is null);
+                            if (length > _maxMessageSize)
+                            {
+                                throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
+                            }
+                            _nestedStream.Reset(length);
+                            await HandleMessage(telemReceivedHeader);
+                        });
+                    }
                 }
-                _nestedStream.Reset(length);
-                await HandleMessage();
-            }
-        }
-        catch (Exception ex)
-        {            
-            Logger.LogException(ex, $"{nameof(ReceiveLoop)} {DebugName}");
-        }
-        if (LogEnabled)
-        {
-            Log($"{nameof(ReceiveLoop)} {DebugName} finished.");
-        }
-        Dispose();
-        return;
+                catch (Exception ex)
+                {
+                    Logger.LogException(ex, $"{nameof(ReceiveLoop)} {DebugName}");
+                }
+                if (LogEnabled)
+                {
+                    Log($"{nameof(ReceiveLoop)} {DebugName} finished.");
+                }
+                Dispose();
+                return;
+            });
+
 #if !NET461
         [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
-        async ValueTask HandleMessage()
+        async ValueTask HandleMessage(Telemetry.ReceivedHeader telemCause)
         {
             var messageType = (MessageType)_buffer[0];
             switch (messageType)
             {
                 case MessageType.Response:
-                    RunAsync(_onResponse, (await Deserialize<Response>())!);
+                    RunAsync(_onResponse, (await Deserialize<Response>(telemCause))!);
                     break;
                 case MessageType.Request:
-                    RunAsync(_onRequest, (await Deserialize<Request>())!);
+                    RunAsync(_onRequest, (await Deserialize<Request>(telemCause))!);
                     break;
                 case MessageType.CancellationRequest:
-                    RunAsync(_onCancellation, (await Deserialize<CancellationRequest>())!.RequestId);
+                    RunAsync(_onCancellation, (await Deserialize<CancellationRequest>(telemCause))!);
                     break;
                 case MessageType.UploadRequest:
-                    await OnUploadRequest();
+                    await OnUploadRequest(telemCause);
                     return;
                 case MessageType.DownloadResponse:
-                    await OnDownloadResponse();
+                    await OnDownloadResponse(telemCause);
                     return;
                 default:
                     if (LogEnabled)
@@ -286,17 +305,17 @@ public sealed class Connection : IDisposable
         }
     }
     static void RunAsync(WaitCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(callback, state);
-    private async Task OnDownloadResponse()
+    private async Task OnDownloadResponse(Telemetry.ReceivedHeader telemCause)
     {
-        var response = (await Deserialize<Response>())!;
+        var data = (await Deserialize<Response>(telemCause))!;
         await EnterStreamMode();
         var streamDisposed = new TaskCompletionSource<bool>();
         EventHandler disposedHandler = delegate { streamDisposed.TrySetResult(true); };
         _nestedStream.Disposed += disposedHandler;
         try
         {
-            response.DownloadStream = _nestedStream;
-            OnResponseReceived(response);
+            data.obj.DownloadStream = _nestedStream;
+            OnResponseReceived(data);
             await streamDisposed.Task;
         }
         finally
@@ -304,14 +323,14 @@ public sealed class Connection : IDisposable
             _nestedStream.Disposed -= disposedHandler;
         }
     }
-    private async Task OnUploadRequest()
+    private async Task OnUploadRequest(Telemetry.ReceivedHeader telemCause)
     {
-        var request = (await Deserialize<Request>())!;
+        var data = (await Deserialize<Request>(telemCause))!;
         await EnterStreamMode();
         using (_nestedStream)
         {
-            request.UploadStream = _nestedStream;
-            await OnRequestReceived(request);
+            data.obj!.UploadStream = _nestedStream;
+            await OnRequestReceived(data);
         }
     }
     private async Task EnterStreamMode()
@@ -338,12 +357,31 @@ public sealed class Connection : IDisposable
             throw;
         }
     }
-    private ValueTask<T?> Deserialize<T>() => Serializer.OrDefault().DeserializeAsync<T>(_nestedStream);
-    private void OnCancellationReceived(string requestId)
+    private async ValueTask<(T obj, Telemetry.DeserializationSucceeded telemetry)> Deserialize<T>(Telemetry.ReceivedHeader telemCause)
+    {
+        var telemDeserializePayload = new Telemetry.DeserializePayload { ReceivedHeaderId = telemCause.Id }.Log();
+
+        try
+        {
+            var result = (await Serializer.OrDefault().DeserializeAsync<T>(_nestedStream))!;
+            var telemSucceeded = new Telemetry.DeserializationSucceeded { StartId = telemDeserializePayload.Id, Result = result }.Log();
+            return (result, telemSucceeded);
+        }
+        catch (Exception ex)
+        {
+            new Telemetry.VoidFailed { StartId = telemDeserializePayload.Id, Exception = ex }.Log();
+            throw;
+        }
+    }
+    private void OnCancellationReceived((CancellationRequest obj, Telemetry.DeserializationSucceeded telemetry) data)
     {
         try
         {
-            CancellationReceived(requestId);
+            var telemHonorCancellation = new Telemetry.HonorCancellation { Cause = data.telemetry.Id };
+            telemHonorCancellation.Monitor(() =>
+            {
+                CancellationReceived(data.obj.RequestId);
+            });
         }
         catch (Exception ex)
         {
@@ -351,30 +389,36 @@ public sealed class Connection : IDisposable
         }
     }
     private void Log(Exception ex) => Logger.LogException(ex, DebugName);
-    private ValueTask OnRequestReceived(Request request)
+    private async ValueTask OnRequestReceived((Request? obj, Telemetry.DeserializationSucceeded telemetry) data)
     {
         try
         {
-            return RequestReceived(request);
+            var telemHonorRequest = new Telemetry.HonorRequest { Cause = data.telemetry.Id };
+            await telemHonorRequest.Monitor(async () =>
+            {
+                await RequestReceived(data.obj!, telemHonorRequest);
+            });
         }
         catch (Exception ex)
         {
             Log(ex);
         }
-        return default;
     }
-    private void OnResponseReceived(Response response)
+    private void OnResponseReceived((Response obj, Telemetry.DeserializationSucceeded telemetry) data)
     {
         try
         {
-            if (LogEnabled)
+            new Telemetry.HonorResponse { Cause = data.telemetry.Id }.Monitor(() =>
             {
-                Log($"Received response for request {response.RequestId} {DebugName}.");
-            }
-            if (_requests.TryRemove(response.RequestId, out var completionSource))
-            {
-                completionSource.SetResult(response);
-            }
+                if (LogEnabled)
+                {
+                    Log($"Received response for request {data.obj.RequestId} {DebugName}.");
+                }
+                if (_requests.TryRemove(data.obj.RequestId, out var completionSource))
+                {
+                    completionSource.SetResult(data.obj);
+                }
+            });
         }
         catch (Exception ex)
         {

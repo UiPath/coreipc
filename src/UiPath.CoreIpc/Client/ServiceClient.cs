@@ -3,14 +3,25 @@
 internal abstract class ServiceClient : IDisposable
 {
     protected abstract IServiceClientConfig Config { get; }
+    protected abstract Telemetry.ServiceClientKind Kind { get; }
     public abstract Stream? Network { get; }
     public event EventHandler? ConnectionClosed;
 
     private readonly Type _interfaceType;
     private readonly ContextfulLazy<IpcProxy> _proxy = new();
 
-    protected ServiceClient(Type interfaceType)
+    protected readonly Telemetry.ServiceClientCreated _telemetry;
+
+    protected ServiceClient(Type interfaceType, Telemetry.Id modified, string? callbackServerConfig = null)
     {
+        _telemetry = new Telemetry.ServiceClientCreated
+        {
+            Modified = modified,
+            ServiceClientKind = Kind,
+            InterfaceTypeName = interfaceType.AssemblyQualifiedName!,
+            CallbackServerConfig = callbackServerConfig
+        }.Log();
+
         _interfaceType = interfaceType;
     }
 
@@ -18,7 +29,7 @@ internal abstract class ServiceClient : IDisposable
     public virtual ValueTask CloseConnection() => throw new NotSupportedException();
     public object? Invoke(MethodInfo method, object?[] args) => GetInvokeDelegate(method.ReturnType)(this, method, args);
 
-    protected abstract Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct);
+    protected abstract Task<(Connection connection, bool newlyConnected)> EnsureConnection(Telemetry.InvokeRemoteProper telemInvokeRemoteProper, CancellationToken ct);
 
     public T GetProxy<T>() where T : class
     {
@@ -39,7 +50,23 @@ internal abstract class ServiceClient : IDisposable
     {
         var syncContext = SynchronizationContext.Current;
         var defaultContext = syncContext is null || syncContext.GetType() == typeof(SynchronizationContext);
-        return defaultContext ? Invoke() : Task.Run(Invoke);
+
+        var telemInvokeRemote = new Telemetry.InvokeRemote
+        {
+            ServiceClientId = _telemetry.Id,
+            Method = method.Name,
+            DefaultSynchronizationContext = defaultContext
+        }.Log();
+
+        return telemInvokeRemote.Monitor(async () =>
+        {
+            if (defaultContext)
+            {
+                return await Invoke();
+            }
+
+            return await Task.Run(Invoke);
+        });
 
         async Task<TResult> Invoke()
         {
@@ -54,27 +81,38 @@ internal abstract class ServiceClient : IDisposable
             var timeoutHelper = new TimeoutHelper(clientTimeout, cancellationToken);
             try
             {
-                var ct = timeoutHelper.Token;
-
-                var (connection, newConnection) = await EnsureConnection(ct);
-
-                if (Config.BeforeCall is not null)
+                var telemInvokeRemoteProper = new Telemetry.InvokeRemoteProper
                 {
-                    var callInfo = new CallInfo(newConnection, method, args);
-                    await Config.BeforeCall(callInfo, ct);
-                }
-
-                var requestId = connection.NewRequestId();
-                var request = new Request(_interfaceType.Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds)
-                {
-                    UploadStream = uploadStream
+                    InvokeRemoteId = telemInvokeRemote.Id,
+                    ClientTimeout = clientTimeout,
+                    MessageTimeout = messageTimeout,
+                    SerializedArgs = serializedArguments,
                 };
 
-                Config.Logger?.ServiceClientCalling(methodName, requestId, Config.DebugName);
-                var response = await connection.RemoteCall(request, ct); // returns user errors instead of throwing them (could throw for system bugs)
-                Config.Logger?.ServiceClientCalled(methodName, requestId, Config.DebugName);
+                return await telemInvokeRemoteProper.Monitor(async () => 
+                {
+                    var ct = timeoutHelper.Token;
 
-                return response.Deserialize<TResult>(Config.Serializer);
+                    var (connection, newConnection) = await EnsureConnection(telemInvokeRemoteProper, ct);
+
+                    if (Config.BeforeCall is not null)
+                    {
+                        var callInfo = new CallInfo(newConnection, method, args);
+                        await Config.BeforeCall(callInfo, ct);
+                    }
+
+                    var requestId = connection.NewRequestId();
+                    var request = new Request(_interfaceType.Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds)
+                    {
+                        UploadStream = uploadStream
+                    };
+
+                    Config.Logger?.ServiceClientCalling(methodName, requestId, Config.DebugName);
+                    var response = await connection.RemoteCall(request, ct); // returns user errors instead of throwing them (could throw for system bugs)
+                    Config.Logger?.ServiceClientCalled(methodName, requestId, Config.DebugName);
+
+                    return response.Deserialize<TResult>(Config.Serializer);
+                });                
             }
             catch (Exception ex)
             {
@@ -123,6 +161,11 @@ internal abstract class ServiceClient : IDisposable
     }
     private void Dispose(bool disposing)
     {
+        new Telemetry.ServiceClientDisposed
+        {
+            StartId = _telemetry.Id,
+        }.Log();
+
         Config.Logger?.ServiceClientDispose(Config.DebugName);
     }
     public override string ToString() => Config.DebugName;
@@ -173,10 +216,13 @@ internal sealed class ServiceClientProper : ServiceClient
             }
         }
     }
+    private Telemetry.Connect? _latestConnectionTelemetry;
+
+    protected override Telemetry.ServiceClientKind Kind => Telemetry.ServiceClientKind.Proper;
 
     public override Stream? Network => LatestConnection?.Network;
 
-    public ServiceClientProper(IpcClient client, Type interfaceType) : base(interfaceType)
+    public ServiceClientProper(IpcClient client, Type interfaceType, Telemetry.IpcClientInitialized telemCause) : base(interfaceType, telemCause.Id)
     {
         _client = client;
         _clientState = client.Transport.CreateState();
@@ -188,32 +234,78 @@ internal sealed class ServiceClientProper : ServiceClient
         {
             LatestConnection?.Dispose();
             LatestConnection = null;
+            _latestConnectionTelemetry = null;
         }
     }
 
     private void LatestConnection_Closed(object? sender, EventArgs e) => RaiseConnectionClosed();
 
-    protected override async Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct)
+    protected override async Task<(Connection connection, bool newlyConnected)> EnsureConnection(Telemetry.InvokeRemoteProper telemInvokeRemoteProper, CancellationToken ct)
     {
-        using (await _lock.Lock(ct))
-        {            
-            if (LatestConnection is not null && _clientState.IsConnected())
-            {
-                return (LatestConnection, newlyConnected: false);
-            }
+        var telemEnsureConnection = new Telemetry.EnsureConnection
+        {
+            ServiceClientId = _telemetry.Id.Value,
+            InvokeRemoteProper = telemInvokeRemoteProper.Id,
+            Config = Config.ToString()!,
+            ClientTransport = _client.Transport
+        };
 
-            if (Config.BeforeConnect is not null)
+        return await telemEnsureConnection.Monitor(async () =>
+        {
+            using (await _lock.Lock(ct))
             {
-                await Config.BeforeConnect(ct);
-            }
+                var haveConnectionAlready = LatestConnection is not null;
+                var isConnected = new Lazy<bool>(_clientState.IsConnected);
+                var haveBeforeConnect = Config.BeforeConnect is not null;
 
-            var network = await Connect(ct);
-            LatestConnection = new Connection(network, Config.Serializer, Config.Logger, Config.DebugName);
-            var router = new Router(_client.Config.CreateCallbackRouterConfig(), _client.Config.ServiceProvider);
-            _latestServer = new Server(router, _client.Config.RequestTimeout, LatestConnection);
-            LatestConnection.Listen().LogException(Config.Logger, Config.DebugName);
-            return (LatestConnection, newlyConnected: true);
-        }
+                var telemEnsureConnectionInitialState = new Telemetry.EnsureConnectionInitialState
+                {
+                    Cause = telemEnsureConnection.Id,
+                    HaveConnectionAlready = haveConnectionAlready,
+                    IsConnected = isConnected.Value,
+                    BeforeConnectIsNotNull = haveBeforeConnect
+                }.Log();
+
+                if (haveConnectionAlready && isConnected.Value)
+                {
+                    return (LatestConnection!, newlyConnected: false);
+                }
+
+                if (haveBeforeConnect)
+                {
+                    await Config.BeforeConnect!(ct);
+                }
+
+                Stream network = null!;
+                var telemConnect = _latestConnectionTelemetry = new Telemetry.Connect { Cause = telemEnsureConnectionInitialState.Id };
+                await telemConnect.Monitor(
+                    async () =>
+                    {
+                        network = await Connect(ct);
+                    });
+                LatestConnection = new Connection(network, Config.Serializer, Config.Logger, Config.DebugName);
+                var router = new Router(_client.Config.CreateCallbackRouterConfig(), _client.Config.ServiceProvider);
+                _latestServer = new Server(router, _client.Config.RequestTimeout, LatestConnection);
+
+                var telemClientConnectionListen = new Telemetry.ClientConnectionListen { Cause = telemConnect.Id }.Log();
+
+                _ = Pal();
+                return (LatestConnection, newlyConnected: true);
+
+                async Task Pal()
+                {
+                    try
+                    {
+                        var telemConnectionListenReason = new Telemetry.ConnectionListenReason { ClientConnectionListenId = telemClientConnectionListen.Id };
+                        await telemConnectionListenReason.Monitor(async () => await LatestConnection.Listen(telemConnectionListenReason));
+                    }
+                    catch (Exception ex)
+                    {
+                        Config.Logger.LogException(ex, Config.DebugName);
+                    }
+                }
+            }
+        });
     }
 
     private async Task<Stream> Connect(CancellationToken ct)
@@ -236,15 +328,17 @@ internal sealed class ServiceClientForCallback : ServiceClient
     private readonly Connection _connection;
     private readonly Listener _listener;
 
+    protected override Telemetry.ServiceClientKind Kind => Telemetry.ServiceClientKind.Callback;
+
     public override Stream? Network => _connection.Network;
 
-    public ServiceClientForCallback(Connection connection, Listener listener, Type interfaceType) : base(interfaceType)
+    public ServiceClientForCallback(Connection connection, Listener listener, Type interfaceType, Telemetry.ServerConnectionCreated telemCause) : base(interfaceType, telemCause.Id, listener.Config.ToString())
     {
         _connection = connection;
         _listener = listener;
     }
 
-    protected override Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct)
+    protected override Task<(Connection connection, bool newlyConnected)> EnsureConnection(Telemetry.InvokeRemoteProper telemInvokeRemoteProper, CancellationToken ct)
     => Task.FromResult((_connection, newlyConnected: false));
 
     protected override IServiceClientConfig Config => _listener.Config;

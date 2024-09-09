@@ -14,7 +14,7 @@ internal sealed class ServerConnection<TConfig, TListenerState, TConnectionState
 {
     public new readonly Listener<TConfig, TListenerState, TConnectionState> Listener;
 
-    public ServerConnection(Listener<TConfig, TListenerState, TConnectionState> listener) : base(listener)
+    public ServerConnection(Listener<TConfig, TListenerState, TConnectionState> listener, Telemetry.RunListener telemCause) : base(listener, telemCause)
     {
         Listener = listener;
     }
@@ -32,8 +32,12 @@ internal abstract class ServerConnection : IClient, IDisposable
     private Task<Connection>? _connectionAsTask;
     private Server? Server;
 
-    protected ServerConnection(Listener listener)
+    public Telemetry.ServerConnectionCreated TelemetryRecord { get; }
+
+    protected ServerConnection(Listener listener, Telemetry.RunListener telemCause)
     {
+        TelemetryRecord = new Telemetry.ServerConnectionCreated() { ParentId = telemCause.Id }.Log();
+
         Listener = listener;
     }
 
@@ -68,28 +72,39 @@ internal abstract class ServerConnection : IClient, IDisposable
             _connectionAsTask ??= Task.FromResult(Connection!);
 
             // TODO: rethink this double specification of TCallbackInterface
-            return new ServiceClientForCallback(Connection!, Listener, typeof(TCallbackInterface)).GetProxy<TCallbackInterface>();
+            return new ServiceClientForCallback(Connection!, Listener, typeof(TCallbackInterface), TelemetryRecord).GetProxy<TCallbackInterface>();
         }
     }
-    public async Task Listen(Stream network, CancellationToken cancellationToken)
+    public async Task Listen(Stream network, Telemetry.AcceptClientSucceeded telemCause, CancellationToken cancellationToken)
     {
-        var stream = await AuthenticateAsServer(); // TODO: should we decommission this?
-        var serializer = Listener.Server.ServiceProvider.GetService<ISerializer>();
-        Connection = new Connection(stream, serializer, Listener.Logger, debugName: Listener.ToString(), maxMessageSize: Listener.Config.MaxMessageSize);
-        Server = new Server(
-            new Router(
-                Listener.Config.CreateRouterConfig(Listener.Server),
-                Listener.Server.ServiceProvider),
-            Listener.Config.RequestTimeout,
-            Connection,
-            client: this);
-
-        // close the connection when the service host closes
-        using (cancellationToken.UnsafeRegister(_ => Connection.Dispose(), null!))
+        var telemetry = new Telemetry.ServerConnectionListen { AcceptClientSucceededId = telemCause.Id };
+        await telemetry.Monitor(async () =>
         {
-            await Connection.Listen();
-        }
-        return;
+            var stream = await AuthenticateAsServer(); // TODO: should we decommission this?
+            var serializer = Listener.Server.ServiceProvider.GetService<ISerializer>();
+
+            new Telemetry.InstantiateConnection { ServerConnectionListenId = telemetry.Id }.Log();
+            Connection = new Connection(stream, serializer, Listener.Logger, debugName: Listener.ToString(), maxMessageSize: Listener.Config.MaxMessageSize);
+
+            Server = new Server(
+                new Router(
+                    Listener.Config.CreateRouterConfig(Listener.Server),
+                    Listener.Server.ServiceProvider),
+                Listener.Config.RequestTimeout,
+                Connection,
+                client: this);
+
+            // close the connection when the service host closes
+            using (cancellationToken.UnsafeRegister(
+                _ => new Telemetry.ServerConnectionListenCancel { ServerConnectionListenId = telemetry.Id }
+                    .Monitor(Connection.Dispose),
+                state: null!))
+            {
+                var telemConnectionListenReason = new Telemetry.ConnectionListenReason { ServerConnectionListenId = telemetry.Id };
+                await telemConnectionListenReason.Monitor(() => Connection.Listen(telemConnectionListenReason));
+            }
+            return;
+        });
 
         // TODO: should we decommission this?
         async Task<Stream> AuthenticateAsServer()
@@ -114,10 +129,6 @@ internal abstract class ServerConnection : IClient, IDisposable
             return sslStream;
         }
     }
-    protected virtual void Dispose(bool disposing) { }
     public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
+    => new Telemetry.ServerConnectionDisposed { StartId = TelemetryRecord.Id }.Log();
 }

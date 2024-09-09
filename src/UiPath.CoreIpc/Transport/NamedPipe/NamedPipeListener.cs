@@ -1,4 +1,5 @@
-﻿using System.IO.Pipes;
+﻿using Newtonsoft.Json;
+using System.IO.Pipes;
 using System.Security.Principal;
 
 namespace UiPath.Ipc.Transport.NamedPipe;
@@ -9,6 +10,7 @@ public sealed record NamedPipeListener : ListenerConfig, INamedPipeListenerConfi
 {
     public required string PipeName { get; init; }
     public string ServerName { get; init; } = ".";
+    [JsonIgnore]
     public AccessControlDelegate? AccessControl { get; init; }
 
     private PipeSecurity? GetPipeSecurity()
