@@ -2,7 +2,7 @@
 
 partial class Telemetry
 {
-    public sealed record ProcessStart : RecordBase
+    public sealed partial record ProcessStart : RecordBase
     {
         private static readonly object Lock = new();
         private static bool Initialized = false;

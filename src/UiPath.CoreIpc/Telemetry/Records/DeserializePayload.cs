@@ -4,7 +4,7 @@ namespace UiPath.Ipc;
 
 partial class Telemetry
 {
-    public sealed record DeserializePayload : RecordBase, IOperationStart, Is<Effect>
+    public sealed partial record DeserializePayload : RecordBase, IOperationStart, Is<Effect>
     {
         [JsonIgnore]
         public new Id<DeserializePayload> Id => base.Id.Value;

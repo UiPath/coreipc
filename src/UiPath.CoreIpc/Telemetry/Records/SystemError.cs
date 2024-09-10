@@ -2,7 +2,7 @@
 
 partial class Telemetry
 {
-    public sealed record SystemError : RecordBase, IOperationFailed
+    public sealed partial record SystemError : RecordBase, IOperationFailed
     {
         public required ExceptionInfo Exception { get; init; }
 

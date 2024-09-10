@@ -2,7 +2,7 @@
 
 partial class Telemetry
 {
-    public sealed record SendResponse : RecordBase, IOperationStart, Is<SubOperation>
+    public sealed partial record SendResponse : RecordBase, IOperationStart, Is<SubOperation>
     {
         public required Id<OnRequestReceived> OnRequestReceivedId { get; init; }
 

@@ -2,7 +2,7 @@
 
 partial class Telemetry
 {
-    public sealed record ServiceInstanceRetrieved : RecordBase, Is<Effect>
+    public sealed partial record ServiceInstanceRetrieved : RecordBase, Is<Effect>
     {
         public required Id<HandleRequest> HandleRequestId { get; init; }
 

@@ -1,5 +1,6 @@
 ﻿namespace UiPath.Ipc.TV;
 
+using Newtonsoft.Json;
 using static Telemetry;
 
 public sealed class RelationalRecord
@@ -50,7 +51,11 @@ public sealed class RelationalRecord
 
 }
 
-public readonly record struct Origin(FileInfo File, int LineNumber);
+public readonly record struct Origin(FileInfo File, int LineNumber)
+{
+    [JsonIgnore]
+    public string FilePath => File.FullName;
+}
 
 public readonly record struct RecordId(string Value)
 {

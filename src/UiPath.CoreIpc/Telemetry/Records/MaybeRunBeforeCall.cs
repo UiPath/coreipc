@@ -2,7 +2,7 @@
 
 partial class Telemetry
 {
-    public sealed record MaybeRunBeforeCall : RecordBase, IOperationStart, Is<Effect>
+    public sealed partial record MaybeRunBeforeCall : RecordBase, IOperationStart, Is<Effect>
     {
         public required Id<InvokeLocal> InvokeMethodId { get; init; }
 

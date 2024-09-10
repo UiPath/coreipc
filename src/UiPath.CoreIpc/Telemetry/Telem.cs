@@ -1,7 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
-using System.Threading.Channels;
 
 namespace UiPath.Ipc;
 
@@ -22,7 +21,7 @@ public static partial class Telemetry
         Environment.GetEnvironmentVariable(EnvironmentVariableName, EnvironmentVariableTarget.Machine);
 
     private static readonly StreamWriter? Writer;
-    private static readonly Channel<RecordBase> Records = Channel.CreateUnbounded<RecordBase>();
+    private static readonly object Lock = new();
 
     [MemberNotNullWhen(true, nameof(TelemetryFolder))]
     [MemberNotNullWhen(true, nameof(Writer))]
@@ -36,11 +35,6 @@ public static partial class Telemetry
         {
             var fileStream = new FileStream(ComputeLogFilePath(), FileMode.Create, FileAccess.Write, FileShare.Read);
             Writer = new StreamWriter(fileStream, Encoding.UTF8, 1024, leaveOpen: false) { AutoFlush = true };
-
-            Task.Run(Pump).ContinueWith(task =>
-            {
-                Trace.TraceError(task.Exception?.ToString() ?? "Telemetry pump failed");
-            }, TaskContinuationOptions.NotOnRanToCompletion);
         }
 
         static string ComputeLogFilePath()
@@ -55,30 +49,39 @@ public static partial class Telemetry
         //}
 
         if (!IsEnabled) { return; }
-        _ = Records.Writer.TryWrite(record);
+
+        try
+        {
+            var json = JsonConvert.SerializeObject(record, Jss);
+            lock (Lock)
+            {
+                Writer!.WriteLine(json);
+            }
+        }
+        catch (Exception ex)
+        {
+            _ = new RecordSerializationException
+            {
+                RecordId = record.Id,
+                RecordTypeName = record.GetType().AssemblyQualifiedName!,
+                RecordToString = record.ToString(),
+                ExceptionInfo = ex!,
+            }.Log();
+        }
     }
 
     public static void Close()
     {
-        _ = Records.Writer.TryComplete();
-    }
-
-    private static async Task Pump()
-    {
-        while (await Records.Reader.WaitToReadAsync())
+        lock (Lock)
         {
             try
             {
-                var record = await Records.Reader.ReadAsync();
-                var json = JsonConvert.SerializeObject(record, Jss);
-                await Writer!.WriteLineAsync(json);
+                Writer?.Close();
             }
-            catch (Exception ex)
+            catch
             {
-                Trace.TraceError(ex.ToString());
+                // ignore
             }
         }
-
-        Writer!.Close();
     }
 }

@@ -2,7 +2,7 @@
 
 partial class Telemetry
 {
-    public sealed record InstantiateConnection : RecordBase, Is<Effect>
+    public sealed partial record InstantiateConnection : RecordBase, Is<Effect>
     {
         public required Id<ServerConnectionListen> ServerConnectionListenId { get; init; }
 

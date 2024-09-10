@@ -2,7 +2,7 @@
 
 partial class Telemetry
 {
-    public record VoidFailed : RecordBase, IOperationEnd, IOperationFailed, Is<Failure>
+    public partial record VoidFailed : RecordBase, IOperationEnd, IOperationFailed, Is<Failure>
     {
         public required Id StartId { get; init; }
         public ExceptionInfo? Exception { get; init; }

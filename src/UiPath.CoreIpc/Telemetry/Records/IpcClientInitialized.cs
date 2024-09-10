@@ -2,7 +2,7 @@
 
 partial class Telemetry
 {
-    public sealed record IpcClientInitialized : RecordBase, IExternallyTriggered
+    public sealed partial record IpcClientInitialized : RecordBase, IExternallyTriggered
     {
         public required string Transport { get; init; }
     }

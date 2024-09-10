@@ -3,7 +3,7 @@ namespace UiPath.Ipc;
 
 partial class Telemetry
 {
-    public sealed record OnRequestReceived : RecordBase, IOperationStart, Is<Effect>
+    public sealed partial record OnRequestReceived : RecordBase, IOperationStart, Is<Effect>
     {
         [JsonIgnore]
         public new Id<OnRequestReceived> Id => base.Id.Value;

@@ -2,7 +2,7 @@
 
 partial class Telemetry
 {
-    public sealed record GetArgumentsSucceded : RecordBase, Is<Effect>
+    public sealed partial record GetArgumentsSucceded : RecordBase, Is<Effect>
     {
         public required Id<HandleRequest> HandleRequestId { get; init; }
 

@@ -2,7 +2,7 @@
 
 partial class Telemetry
 {
-    public sealed record ProcessExit : RecordBase
+    public sealed partial record ProcessExit : RecordBase
     {
         static ProcessExit()
         {

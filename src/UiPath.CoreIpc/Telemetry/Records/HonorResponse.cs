@@ -2,5 +2,5 @@
 
 partial class Telemetry
 {
-    public sealed record HonorResponse : HonorDeserialization;
+    public sealed partial record HonorResponse : HonorDeserialization;
 }

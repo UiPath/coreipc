@@ -1,9 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -39,12 +36,31 @@ public class HelloWorldGenerator : ISourceGenerator
                     partial record RecordBase
                     {
                         public RecordKind Kind => (RecordKind)Enum.Parse(typeof(RecordKind), GetType().Name);
+
                     }
+
+            {{string.Join("\r\n", leaves.Select(WriteJsonConstructor))}}
                 }
             }
             """;
 
         context.AddSource("RecordKind.cs", SourceText.From(source, Encoding.UTF8));
+
+        static string WriteJsonConstructor(INamedTypeSymbol type)
+        {
+            return $$"""
+                        partial record {{type.Name}}
+                        {
+                            [Newtonsoft.Json.JsonConstructor]
+                            public {{type.Name}}(
+                                [CallerMemberName] string memberName = default!,
+                                [CallerFilePath] string filePath = default!,
+                                [CallerLineNumber] int line = default,
+                                string stackTrace = default!) : base(memberName, filePath, line, stackTrace)
+                            { }
+                        }
+                """;
+        }
     }
 }
 
