@@ -4,7 +4,7 @@ public class OutgoingCallInfo
 {
     public required OutgoingCallDetails Details { get; init; }
 
-    public string Caller => $"{Details.ProcessStart.Record.Name} [Pid={Details.ProcessStart.Record.Id}]";
+    public string Caller => $"{Details.ProcessStart.Record.Name} [Pid={Details.ProcessStart.Record.ProcessId}]";
     public string Callee => Details.EnsureConnection?.Record.ClientTransport.ToString() ?? $"Callback over {Details.ServiceClient.Record.CallbackServerConfig}";
 
     public string Method => Details.InvokeRemote.Record.Method;
