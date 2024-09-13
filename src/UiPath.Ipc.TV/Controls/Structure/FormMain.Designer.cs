@@ -85,6 +85,7 @@
             toolStrip4 = new ToolStrip();
             buttonOpenContext = new ToolStripButton();
             buttonOpenCallLog = new ToolStripButton();
+            toolStripButton1 = new ToolStripButton();
             menuStrip.SuspendLayout();
             toolStrip1.SuspendLayout();
             toolStrip3.SuspendLayout();
@@ -328,7 +329,7 @@
             // 
             toolStrip1.BackColor = Color.FromArgb(204, 213, 240);
             toolStrip1.Font = new Font("Segoe UI", 10F);
-            toolStrip1.Items.AddRange(new ToolStripItem[] { itemOpenStandard2, buttonOpen3, toolStripSeparator6, buttonTheWorks });
+            toolStrip1.Items.AddRange(new ToolStripItem[] { itemOpenStandard2, buttonOpen3, toolStripSeparator6, buttonTheWorks, toolStripButton1 });
             toolStrip1.Location = new Point(0, 53);
             toolStrip1.Name = "toolStrip1";
             toolStrip1.Size = new Size(875, 26);
@@ -511,6 +512,16 @@
             buttonOpenCallLog.Text = "Open Call Log";
             buttonOpenCallLog.Click += buttonOpenCallLog_Click;
             // 
+            // toolStripButton1
+            // 
+            toolStripButton1.ForeColor = Color.DarkRed;
+            toolStripButton1.Image = (Image)resources.GetObject("toolStripButton1.Image");
+            toolStripButton1.ImageTransparentColor = Color.Magenta;
+            toolStripButton1.Name = "toolStripButton1";
+            toolStripButton1.Size = new Size(185, 23);
+            toolStripButton1.Text = "Stop, Clean, Build, Deploy";
+            toolStripButton1.Click += toolStripButton1_Click;
+            // 
             // FormMain
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -603,5 +614,6 @@
         private ToolStrip toolStrip4;
         private ToolStripButton buttonOpenContext;
         private ToolStripButton buttonOpenCallLog;
+        private ToolStripButton toolStripButton1;
     }
 }

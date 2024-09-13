@@ -11,7 +11,7 @@ public class EndpointCollection : IEnumerable, IEnumerable<EndpointSettings>
     public void Add(EndpointSettings endpointSettings)
     {
         if (endpointSettings is null) throw new ArgumentNullException(nameof(endpointSettings));
-        endpointSettings.Validate();
+        // endpointSettings.Validate();
 
         Endpoints[endpointSettings.Service.Type] = endpointSettings;
     }

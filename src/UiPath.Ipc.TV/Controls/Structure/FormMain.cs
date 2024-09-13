@@ -150,4 +150,7 @@ public partial class FormMain : Form
         }
         OpenCallLog(folderBrowserDialog.SelectedPath);
     }
+
+    private void toolStripButton1_Click(object sender, EventArgs e)
+    => Build(BuildTargets.Build | BuildTargets.PurgeTelemetry);
 }
