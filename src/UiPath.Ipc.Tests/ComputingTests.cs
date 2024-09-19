@@ -36,6 +36,14 @@ public abstract class ComputingTests : TestBase
         CreateLazyProxy(out _proxy);
     }
 
+    protected override void ConfigureSpecificServices(IServiceCollection services)
+    => services
+        .AddSingleton<SystemService>()
+        .AddSingletonAlias<ISystemService, SystemService>()
+        .AddSingleton<ComputingService>()
+        .AddSingletonAlias<IComputingService, ComputingService>()
+        ;
+
     protected override ListenerConfig ConfigTransportAgnostic(ListenerConfig listener)
     => listener with
     {

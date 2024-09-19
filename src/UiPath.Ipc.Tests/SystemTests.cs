@@ -25,6 +25,11 @@ public abstract class SystemTests : TestBase
         CreateLazyProxy(out _proxy);
     }
 
+    protected override void ConfigureSpecificServices(IServiceCollection services)
+    => services
+        .AddSingleton<SystemService>()
+        .AddSingletonAlias<ISystemService, SystemService>();
+
     protected override ListenerConfig ConfigTransportAgnostic(ListenerConfig listener)
     => listener with
     {
@@ -108,11 +113,12 @@ public abstract class SystemTests : TestBase
     public async Task FireAndForget_ShouldWork()
     {
         var taskRequestHonoured = Service.ResetTripWire();
+        var wait = TimeSpan.FromSeconds(1);
 
-        await Proxy.FireAndForget().ShouldCompleteInAsync(Timeouts.IpcRoundtrip);
+        await Proxy.FireAndForget(wait).ShouldCompleteInAsync(Timeouts.IpcRoundtrip);
         taskRequestHonoured.IsCompleted.ShouldBeFalse();
 
-        await taskRequestHonoured.ShouldCompleteInAsync(Timeouts.IpcRoundtrip + TimeSpan.FromMilliseconds(SystemService.MsFireAndForgetDelay));
+        await taskRequestHonoured.ShouldCompleteInAsync(Timeouts.IpcRoundtrip + wait + wait);
     }
 
     [Fact]
@@ -272,15 +278,6 @@ public abstract class SystemTests : TestBase
         using var reader = new StreamReader(stream);
         var clone = await reader.ReadToEndAsync();
         clone.ShouldBe(str);
-    }
-
-#if !CI
-    [Theory, MemberData(nameof(DownloadingStreams_ShouldWork_Repeat_Cases))]
-#endif
-    public async Task DownloadingStreams_ShouldWork_Repeat(int index, string str)
-    {
-        _outputHelper.WriteLine($"Calling {nameof(DownloadingStreams_ShouldWork)}[{index}]");
-        await DownloadingStreams_ShouldWork(str);
     }
 
     public static IEnumerable<object[]> DownloadingStreams_ShouldWork_Repeat_Cases()

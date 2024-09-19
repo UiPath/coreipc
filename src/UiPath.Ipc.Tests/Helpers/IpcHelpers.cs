@@ -7,21 +7,20 @@ using SP = ServiceProviderServiceExtensions;
 
 internal static class IpcHelpers
 {
-    public static ServiceProvider ConfigureServices(ITestOutputHelper outputHelper)
-    => new ServiceCollection()
-        .AddLogging(builder => builder
-            .AddTraceSource(new SourceSwitch("", "All"))
-            .AddXUnit(outputHelper))
+    public static ServiceProvider ConfigureServices(ITestOutputHelper outputHelper, Action<IServiceCollection>? configureSpecificServices = null)
+    {
+        var services = new ServiceCollection()
+            .AddLogging(builder => builder
+                .AddTraceSource(new SourceSwitch("", "All"))
+                .AddXUnit(outputHelper));
 
-        .AddSingleton<SystemService>()
-        .AddSingletonAlias<ISystemService, SystemService>()
+        configureSpecificServices?.Invoke(services);
 
-        .AddSingleton<ComputingService>()
-        .AddSingletonAlias<IComputingService, ComputingService>()
+        return services
+            .BuildServiceProvider();
+    }
 
-        .BuildServiceProvider();
-
-    private static IServiceCollection AddSingletonAlias<TNew, TExisting>(this IServiceCollection services)
+    public static IServiceCollection AddSingletonAlias<TNew, TExisting>(this IServiceCollection services)
         where TNew : class
         where TExisting : class, TNew
     => services.AddSingleton<TNew>(SP.GetRequiredService<TExisting>);

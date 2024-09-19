@@ -43,7 +43,7 @@ public abstract class TestBase : IAsyncLifetime
         _overrideConfig = GetOverrideConfig();
 
         _guiThread.SynchronizationContext.Send(() => Thread.CurrentThread.Name = Names.GuiThreadName);
-        _serviceProvider = IpcHelpers.ConfigureServices(_outputHelper);
+        _serviceProvider = IpcHelpers.ConfigureServices(_outputHelper, ConfigureSpecificServices);
 
         _ipcServer = new(CreateServer);
         _ipcClient = new(() => CreateClient());
@@ -64,6 +64,8 @@ public abstract class TestBase : IAsyncLifetime
             return Activator.CreateInstance(overrideConfigType) as OverrideConfig;
         }
     }
+
+    protected abstract void ConfigureSpecificServices(IServiceCollection services);
 
     private Task<ListenerConfig?> CreateListenerAndConfigure()
     {
@@ -126,7 +128,7 @@ public abstract class TestBase : IAsyncLifetime
 
         return _overrideConfig.Override(factory);
     }
-    private TContract? GetProxy<TContract>() where TContract : class
+    protected TContract? GetProxy<TContract>() where TContract : class
     => _ipcClient.Value?.GetProxy<TContract>();
 
     protected void CreateLazyProxy<TContract>(out Lazy<TContract?> lazy) where TContract : class => lazy = new(GetProxy<TContract>);

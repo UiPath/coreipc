@@ -22,9 +22,9 @@ public sealed class SystemService : ISystemService
 #else
             40;
 #endif
-    public async Task FireAndForget()
+    public async Task FireAndForget(TimeSpan wait)
     {
-        await Task.Delay(MsFireAndForgetDelay);
+        await Task.Delay(wait);
         _tripWire?.TrySetResult(null);
     }
 

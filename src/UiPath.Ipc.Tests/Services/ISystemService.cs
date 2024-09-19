@@ -21,7 +21,7 @@ public interface ISystemService
     /// A method that does not return a result and whose algorithm will not be awaited by the remote client.
     /// </summary>
     /// <returns>A task that completes when the Ipc infrastructure confirms that the operation has begun but way before it has ended.</returns>
-    Task FireAndForget();
+    Task FireAndForget(TimeSpan wait);
 
     Task<string> EchoString(string value);
 
