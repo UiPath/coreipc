@@ -63,10 +63,13 @@ public sealed class Connection : IDisposable
         var tokenRegistration = token.UnsafeRegister(_cancelRequest, requestId);
         try
         {
+            Logger?.LogInformation("Sending the request");
             await Send(request, token);
+            Logger?.LogInformation("Sent the request");
         }
-        catch
+        catch (Exception ex)
         {
+            Logger?.LogError($"Caught exception while sending the request. Ex: {ex}");
             tokenRegistration.Dispose();
             if (_requests.TryRemove(requestId, out _))
             {
@@ -76,7 +79,18 @@ public sealed class Connection : IDisposable
         }
         try
         {
-            return await requestCompletion.ValueTask();
+            Logger?.LogInformation("Waiting for the completion source to complete.");
+            Response response;
+            try
+            {
+                response = await requestCompletion.ValueTask();
+                Logger?.LogInformation("The completion source completed successfully.");
+            } catch (Exception ex)
+            {
+                Logger?.LogInformation($"The completion source failed. Ex: {ex}");
+                throw;
+            }
+            return response;
         }
         finally
         {
@@ -87,6 +101,7 @@ public sealed class Connection : IDisposable
     }
     internal ValueTask Send(Request request, CancellationToken token)
     {
+        Logger?.LogInformation("Connection.Send...");
         var uploadStream = request.UploadStream;
         var requestBytes = SerializeToStream(request);
         return uploadStream == null ?
@@ -147,13 +162,17 @@ public sealed class Connection : IDisposable
 #endif
     private async ValueTask SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken)
     {
+        Logger?.LogInformation("Connection.SendMessage: Awaiting the acquiring of the sendLock");
         await _sendLock.WaitAsync(cancellationToken);
         try
         {
+            Logger?.LogInformation($"Connection.SendMessage: sendLock was successfully aquired. Pushing the bytes onto the network. ByteCount: {data.Length}");
             await Network.WriteMessage(messageType, data, CancellationToken.None);
+            Logger?.LogInformation("Connection.SendMessage: Successfully pushed the bytes.");
         }
         finally
         {
+            Logger?.LogInformation("Connection.SendMessage: Releasing the sendLock.");
             _sendLock.Release();
         }
     }
@@ -360,11 +379,11 @@ public sealed class Connection : IDisposable
     }
     private async ValueTask<(T obj, Telemetry.DeserializationSucceeded telemetry)> Deserialize<T>(Telemetry.ReceivedHeader telemCause)
     {
-        var telemDeserializePayload = new Telemetry.DeserializePayload { ReceivedHeaderId = telemCause.Id }.Log();
+        var telemDeserializePayload = new Telemetry.DeserializePayload { ReceivedHeaderId = telemCause.Id, Logger = Logger }.Log();
 
         try
         {
-            var result = (await Serializer.OrDefault().DeserializeAsync<T>(_nestedStream))!;
+            var result = (await Serializer.OrDefault().DeserializeAsync<T>(_nestedStream, Logger))!;
 
             string json;
             try
@@ -380,7 +399,7 @@ public sealed class Connection : IDisposable
                 }, Formatting.Indented);
             }
 
-            var telemSucceeded = new Telemetry.DeserializationSucceeded { StartId = telemDeserializePayload.Id, ResultJson = json }.Log();
+            var telemSucceeded = new Telemetry.DeserializationSucceeded { StartId = telemDeserializePayload.Id, ResultJson = json, Logger = Logger }.Log();
             return (result, telemSucceeded);
         }
         catch (Exception ex)
@@ -409,7 +428,7 @@ public sealed class Connection : IDisposable
     {
         try
         {
-            var telemHonorRequest = new Telemetry.HonorRequest { Cause = data.telemetry.Id };
+            var telemHonorRequest = new Telemetry.HonorRequest { Cause = data.telemetry.Id, Method = data.obj!.MethodName };
             await telemHonorRequest.Monitor(async () =>
             {
                 await RequestReceived(data.obj!, telemHonorRequest);

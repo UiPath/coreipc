@@ -7,7 +7,7 @@ namespace UiPath.Ipc;
 
 public interface ISerializer
 {
-    ValueTask<T?> DeserializeAsync<T>(Stream json);
+    ValueTask<T?> DeserializeAsync<T>(Stream json, ILogger? logger);
     void Serialize(object? obj, Stream stream);
     string Serialize(object? obj);
     object? Deserialize(string json, Type type);
@@ -15,7 +15,7 @@ public interface ISerializer
 
 internal interface ISerializerExtended : ISerializer
 {
-    ValueTask<T?> DeserializeAsync<T>(Stream json, Telemetry.ReceivedHeader telemCause);
+    ValueTask<T?> DeserializeAsync<T>(Stream json, Telemetry.ReceivedHeader telemCause, ILogger? logger);
 }
 
 internal class IpcJsonSerializer : ISerializerExtended, IArrayPool<char>
@@ -27,22 +27,29 @@ internal class IpcJsonSerializer : ISerializerExtended, IArrayPool<char>
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-    public ValueTask<T?> DeserializeAsync<T>(Stream json) => DeserializeAsync<T>(json, telemCause: null!);
+    public ValueTask<T?> DeserializeAsync<T>(Stream json, ILogger? logger) => DeserializeAsync<T>(json, telemCause: null!, logger);
 
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-    public async ValueTask<T?> DeserializeAsync<T>(Stream json, Telemetry.ReceivedHeader telemCause)
-    {
+    public async ValueTask<T?> DeserializeAsync<T>(Stream json, Telemetry.ReceivedHeader telemCause, ILogger? logger)
+    {        
         var telemDeserializePayload = new Telemetry.DeserializePayload { ReceivedHeaderId = telemCause?.Id }.Log();
-        return await telemDeserializePayload.Monitor(async () =>
-        {
-            using var stream = IOHelpers.GetStream((int)json.Length);
-            await json.CopyToAsync(stream);
-            stream.Position = 0;
-            using var reader = CreateReader(new StreamReader(stream));
-            return StringArgsSerializer.Deserialize<T>(reader);
-        });
+        return await telemDeserializePayload.Monitor(
+            sanitizeSucceeded: (result, start) => new Telemetry.DeserializationSucceeded
+            {
+                Logger = logger,
+                StartId = start.Id,
+                ResultJson = JsonConvert.SerializeObject(result, Formatting.Indented)
+            },
+            async () =>
+            {
+                using var stream = IOHelpers.GetStream((int)json.Length);
+                await json.CopyToAsync(stream);
+                stream.Position = 0;
+                using var reader = CreateReader(new StreamReader(stream));
+                return StringArgsSerializer.Deserialize<T>(reader);
+            });
     }
     public void Serialize(object? obj, Stream stream) => Serialize(obj, new StreamWriter(stream), StringArgsSerializer);
     private void Serialize(object? obj, TextWriter streamWriter, JsonSerializer serializer)

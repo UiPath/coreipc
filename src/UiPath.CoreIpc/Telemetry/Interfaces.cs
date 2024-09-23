@@ -9,6 +9,13 @@ partial class Telemetry
         Id Id { get; }
     }
 
+    public interface ILoggable
+    {
+        ILogger? Logger { get; }
+        string LogMessage { get; }
+        LogLevel LogLevel { get; }
+    }
+
     public interface IOperationEnd
     {
         Telemetry.Id StartId { get; }

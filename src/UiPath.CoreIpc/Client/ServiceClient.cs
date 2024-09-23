@@ -109,7 +109,18 @@ internal abstract class ServiceClient : IDisposable
                     };
 
                     Config.Logger?.ServiceClientCalling(methodName, requestId, Config.DebugName);
-                    var response = await connection.RemoteCall(request, ct); // returns user errors instead of throwing them (could throw for system bugs)
+
+                    Response response;
+                    try
+                    {
+                        response = await connection.RemoteCall(request, ct); // returns user errors instead of throwing them (could throw for system bugs)
+                        Config.Logger?.LogInformation($"RemoteCall succeeded. Called method was {request.MethodName}. Response.Error?.Type is {response.Error?.Type ?? "null"}. Response.Data is {response.Data}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Config.Logger?.LogError($"RemoteCall failed. Called method was {request.MethodName}. Caught exception is: {ex}");
+                        throw;
+                    }
                     Config.Logger?.ServiceClientCalled(methodName, requestId, Config.DebugName);
 
                     return response.Deserialize<TResult>(Config.Serializer);
@@ -252,8 +263,9 @@ internal sealed class ServiceClientProper : ServiceClient
         };
 
         return await telemEnsureConnection.Monitor(
-            sanitizeSucceeded: (result, record) => new Telemetry.EnsureConnectionSucceeded {
-                EnsureConnectionId = record.Id, 
+            sanitizeSucceeded: (result, record) => new Telemetry.EnsureConnectionSucceeded
+            {
+                EnsureConnectionId = record.Id,
                 ConnectionDebugName = result.Item1.DebugName,
                 NewlyCreated = result.newlyConnected
             },

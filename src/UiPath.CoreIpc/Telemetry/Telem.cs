@@ -43,6 +43,11 @@ public static partial class Telemetry
 
     public static void Log(RecordBase record)
     {
+        if (record is ILoggable loggable)
+        {
+            loggable.Logger?.Log(loggable.LogLevel, loggable.LogMessage);
+        }
+
         //if (record is ProcessStart { Name: "UiPath.Service.UserHost" })
         //{
         //    Debugger.Launch();
