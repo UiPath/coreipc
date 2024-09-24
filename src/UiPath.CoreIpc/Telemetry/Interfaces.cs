@@ -9,6 +9,18 @@ partial class Telemetry
         Id Id { get; }
     }
 
+    public interface IVoidOperation
+    {
+        VoidSucceeded CreateSucceeded();
+        VoidFailed CreateFailed(Exception? ex);
+    }
+
+    public interface INonVoidOperation
+    {
+        ResultSucceeded CreateSucceeded(object? result);
+        VoidFailed CreateFailed(Exception? ex);
+    }
+
     public interface ILoggable
     {
         ILogger? Logger { get; }
@@ -59,11 +71,11 @@ public static class OperationStartExtensions
         try
         {
             action();
-            new Telemetry.VoidSucceeded { StartId = record.Id }.Log();
+            record.CreateSucceeded().Log();
         }
         catch (Exception ex)
         {
-            new Telemetry.VoidFailed { StartId = record.Id, Exception = ex }.Log();
+            record.CreateFailed(ex).Log();
             throw;
         }
     }
@@ -74,11 +86,11 @@ public static class OperationStartExtensions
         try
         {
             await asyncAction();
-            new Telemetry.VoidSucceeded { StartId = record.Id }.Log();
+            record.CreateSucceeded().Log();
         }
         catch (Exception ex)
         {
-            new Telemetry.VoidFailed { StartId = record.Id, Exception = ex }.Log();
+            record.CreateFailed(ex).Log();
             throw;
         }
     }
@@ -107,13 +119,24 @@ public static class OperationStartExtensions
         }
         catch (Exception ex)
         {
-            new Telemetry.VoidFailed { StartId = record.Id, Exception = ex }.Log();
+            var recordFailed = record switch
+            {
+                Telemetry.INonVoidOperation nvo => nvo.CreateFailed(ex),
+                _ => new Telemetry.VoidFailed { StartId = record.Id, Exception = ex }
+            };
+            recordFailed.Log();
+            
             throw;
         }
     }
 
     public static Telemetry.ResultSucceeded Succeed(this Telemetry.RecordBase record, object? result)
     {
+        if (record is Telemetry.INonVoidOperation nvo)
+        {
+            return nvo.CreateSucceeded(result);
+        }
+
         string json;
         try
         {

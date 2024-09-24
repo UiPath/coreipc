@@ -3,7 +3,7 @@ namespace UiPath.Ipc;
 
 partial class Telemetry
 {
-    public sealed partial record ReceivedHeader : RecordBase, IOperationStart, Is<Effect>
+    public sealed partial record ReceivedHeader : RecordBase, IOperationStart, Is<Effect>, ILoggable
     {
         [JsonIgnore]
         public new Id<ReceivedHeader> Id => base.Id.Value;
@@ -15,5 +15,14 @@ partial class Telemetry
         public required bool SynchronizationContextIsNull { get; init; }
 
         Id? Is<Effect>.Of => ReceiveLoopId;
+
+        [JsonIgnore]
+        public ILogger? Logger { get; set; }
+
+        [JsonIgnore]
+        public string LogMessage => $"ReceiveHeader: {nameof(MessageType)}={MessageType}, {nameof(MessageLength)}={MessageLength}";
+
+        [JsonIgnore]
+        public LogLevel LogLevel => LogLevel.Information;
     }
 }

@@ -96,7 +96,7 @@ internal abstract class ServerConnection : IClient, IDisposable
 
             // close the connection when the service host closes
             using (cancellationToken.UnsafeRegister(
-                _ => new Telemetry.ServerConnectionListenCancel { ServerConnectionListenId = telemetry.Id }
+                _ => new Telemetry.ServerConnectionListenCancel { ServerConnectionListenId = telemetry.Id, Logger = Listener.Logger }
                     .Monitor(Connection.Dispose),
                 state: null!))
             {

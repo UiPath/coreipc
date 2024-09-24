@@ -21,6 +21,14 @@ internal static class RecordBaseExtensions
         IsExternallyTriggered: record is IExternallyTriggered,
         Links: record.EnumerateLinks().ToArray());
 
+    public static VoidSucceeded CreateSucceeded(this RecordBase record)
+    => (record as IVoidOperation)?.CreateSucceeded()
+    ?? new VoidSucceeded { StartId = record.Id };
+
+    public static VoidFailed CreateFailed(this RecordBase record, Exception? ex)
+    => (record as IVoidOperation)?.CreateFailed(ex)
+    ?? new VoidFailed { StartId = record.Id, Exception = ex };
+
     private static IEnumerable<RecordLink> EnumerateLinks(this RecordBase record)
     {
         if (record is Is<Effect> { Of: { } cause })

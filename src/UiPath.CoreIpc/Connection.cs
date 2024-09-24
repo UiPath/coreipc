@@ -250,7 +250,7 @@ public sealed class Connection : IDisposable
     }
     private async Task ReceiveLoop(Telemetry.ConnectionListenReason telemCause)
     {
-        var telemReceiveLoop = new Telemetry.ReceiveLoop { ConnectionListenReasonId = telemCause.Id };
+        var telemReceiveLoop = new Telemetry.ReceiveLoop { ConnectionListenReasonId = telemCause.Id, Logger = Logger };
         await telemReceiveLoop.Monitor(
             async () =>
             {
@@ -266,7 +266,8 @@ public sealed class Connection : IDisposable
                             MessageLength = length,
                             MessageType = (MessageType)_buffer[0],
                             MaxMessageLength = _maxMessageSize,
-                            SynchronizationContextIsNull = SynchronizationContext.Current is null
+                            SynchronizationContextIsNull = SynchronizationContext.Current is null,
+                            Logger = Logger
                         };
                         await telemReceivedHeader.Monitor(async () =>
                         {

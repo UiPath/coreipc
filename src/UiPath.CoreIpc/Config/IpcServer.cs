@@ -64,7 +64,13 @@ public sealed class IpcServer : IAsyncDisposable
     }
 
     public async ValueTask DisposeAsync()
-    => await ((await _started.Value)?.DisposeAsync() ?? default);
+    {
+        await new Telemetry.IpcServerDispose().Monitor(
+            async () =>
+            {
+                await ((await _started.Value)?.DisposeAsync() ?? default);
+            });
+    }
 
     private sealed class StopAdapter : IAsyncDisposable
     {

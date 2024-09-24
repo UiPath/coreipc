@@ -201,17 +201,23 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
         try
         {
             network = await serverConnection.AcceptClient(ct);
-            telemSucceeded = new Telemetry.AcceptClientSucceeded { StartId = telemAcceptClient.Id }.Log();
+            telemSucceeded = new Telemetry.AcceptClientSucceeded { StartId = telemAcceptClient.Id, Logger = Logger }.Log();
         }
-        catch (OperationCanceledException ex) when (ex.CancellationToken == ct)
+        catch (Exception ex)
         {
-            new Telemetry.VoidFailed { StartId = telemAcceptClient.Id, Exception = ex }.Log();
+            new Telemetry.AcceptClientFailed
+            {
+                StartId = telemAcceptClient.Id,
+                Exception = ex,
+                Logger = Logger,
+                ExceptionToString = ex.ToString()
+            }.Log();
             return;
         }
 
         try
         {
-            _ = Pal();
+            _ = Task.Run(TryToListen);
         }
         catch (Exception ex)
         {
@@ -222,7 +228,7 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
             }
         }
 
-        async Task Pal()
+        async Task TryToListen()
         {
             try
             {
@@ -230,7 +236,7 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
             }
             catch (Exception ex)
             {
-                Logger.LogException(ex, Config);
+                Logger.LogException(ex, $"Listen loop failed for {Config}");
             }
         }
     }
