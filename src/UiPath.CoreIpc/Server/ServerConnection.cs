@@ -11,8 +11,14 @@ public interface IClient
 internal sealed class ServerConnection<TConfig, TListenerState, TConnectionState> : ServerConnection
     where TConfig : ListenerConfig, IListenerConfig<TConfig, TListenerState, TConnectionState>
     where TListenerState : IAsyncDisposable
+    where TConnectionState : IDisposable
 {
     public new readonly Listener<TConfig, TListenerState, TConnectionState> Listener;
+
+    private readonly object _lock = new();
+    private bool _acceptClientCalled = false;
+    private bool _disposed = false;
+    private TConnectionState? _connectionState;
 
     public ServerConnection(Listener<TConfig, TListenerState, TConnectionState> listener, Telemetry.RunListener telemCause) : base(listener, telemCause)
     {
@@ -20,7 +26,41 @@ internal sealed class ServerConnection<TConfig, TListenerState, TConnectionState
     }
 
     public override ValueTask<Stream> AcceptClient(CancellationToken ct)
-    => Listener.Config.AwaitConnection(Listener.State, Listener.Config.CreateConnectionState(Listener.Server, Listener.State), ct);
+    {
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(ServerConnection));
+            }
+            if (_acceptClientCalled)
+            {
+                throw new InvalidOperationException("AcceptClient can only be called once.");
+            }
+            _acceptClientCalled = true;
+            _connectionState = Listener.Config.CreateConnectionState(Listener.Server, Listener.State);
+        }
+
+        return Listener.Config.AwaitConnection(Listener.State, _connectionState, ct);
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+
+            if (_connectionState is not null)
+            {
+                _connectionState.Dispose();
+            }
+        }
+    }
 }
 
 internal abstract class ServerConnection : IClient, IDisposable
@@ -129,6 +169,6 @@ internal abstract class ServerConnection : IClient, IDisposable
             return sslStream;
         }
     }
-    public void Dispose()
+    public virtual void Dispose()
     => new Telemetry.ServerConnectionDisposed { StartId = TelemetryRecord.Id }.Log();
 }

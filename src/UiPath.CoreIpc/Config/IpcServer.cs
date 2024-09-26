@@ -65,7 +65,9 @@ public sealed class IpcServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await new Telemetry.IpcServerDispose().Monitor(
+        var maybeLogger = ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger(typeof(IpcServer));
+
+        await new Telemetry.IpcServerDispose { Logger = maybeLogger }.Monitor(
             async () =>
             {
                 await ((await _started.Value)?.DisposeAsync() ?? default);

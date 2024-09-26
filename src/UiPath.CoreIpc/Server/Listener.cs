@@ -106,6 +106,7 @@ internal abstract class Listener : IAsyncDisposable
 internal sealed class Listener<TConfig, TListenerState, TConnectionState> : Listener, IAsyncDisposable
     where TConfig : ListenerConfig, IListenerConfig<TConfig, TListenerState, TConnectionState>
     where TListenerState : IAsyncDisposable
+    where TConnectionState : IDisposable
 {
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _listeningTask = null!;
@@ -196,7 +197,7 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
         var serverConnection = new ServerConnection<TConfig, TListenerState, TConnectionState>(this, telemCause);
 
         var telemAcceptClient = new Telemetry.AcceptClient { ParentId = serverConnection.TelemetryRecord.Id }.Log();
-        Stream network;
+        Stream? network = null;
         Telemetry.AcceptClientSucceeded telemSucceeded;
         try
         {
@@ -205,6 +206,7 @@ internal sealed class Listener<TConfig, TListenerState, TConnectionState> : List
         }
         catch (Exception ex)
         {
+            serverConnection.Dispose();
             new Telemetry.AcceptClientFailed
             {
                 StartId = telemAcceptClient.Id,

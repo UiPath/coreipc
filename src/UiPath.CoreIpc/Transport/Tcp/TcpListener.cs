@@ -54,7 +54,8 @@ internal sealed class TcpListenerState : IAsyncDisposable
     }
 }
 
-internal sealed class TcpServerConnectionState
+internal sealed class TcpServerConnectionState : IDisposable
 {
+    public void Dispose() { }
 }
 

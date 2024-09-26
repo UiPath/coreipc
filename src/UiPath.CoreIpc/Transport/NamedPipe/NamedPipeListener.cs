@@ -59,9 +59,11 @@ public sealed record NamedPipeListener : ListenerConfig, INamedPipeListenerConfi
     public override string ToString() => $"ServerPipe={PipeName}";
 }
 
-internal sealed class NamedPipeServerConnectionState
+internal sealed class NamedPipeServerConnectionState : IDisposable
 {
     public required NamedPipeServerStream Stream { get; init; }
+
+    public void Dispose() => Stream.Dispose();
 }
 
 internal sealed class NamedPipeListenerState : IAsyncDisposable

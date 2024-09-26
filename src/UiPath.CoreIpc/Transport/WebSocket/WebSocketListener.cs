@@ -32,6 +32,7 @@ internal sealed class WebSocketListenerState : IAsyncDisposable
     public ValueTask DisposeAsync() => default;
 }
 
-internal sealed class WebSocketServerConnectionState
+internal sealed class WebSocketServerConnectionState : IDisposable
 {
+    public void Dispose() { }
 }
