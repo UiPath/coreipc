@@ -87,7 +87,7 @@ internal abstract class Listener : IAsyncDisposable
         _loggerCategory = new(ComputeLoggerCategory);
         Config = config;
         Server = server;
-        _lazyLogger = new(() => server.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(LoggerCategory));
+        _lazyLogger = new(() => server.ServiceProvider.GetService<ILoggerFactory>().OrDefault().CreateLogger(LoggerCategory));
         _disposeTask = new(DisposeCore);
     }
 

@@ -112,7 +112,7 @@ public static class OperationStartExtensions
 
         try
         {
-            var result = await asyncFunc();
+            var result = await asyncFunc().ConfigureAwait(false);
             var succeeded = sanitizeSucceeded?.Invoke(result, record) ?? record.Succeed(result);
             succeeded.Log();
             return result;

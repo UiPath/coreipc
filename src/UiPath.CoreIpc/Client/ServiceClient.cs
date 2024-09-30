@@ -48,26 +48,12 @@ internal abstract class ServiceClient : IDisposable
 
     private Task<TResult> Invoke<TResult>(MethodInfo method, object?[] args)
     {
-        var syncContext = SynchronizationContext.Current;
-        var defaultContext = syncContext is null || syncContext.GetType() == typeof(SynchronizationContext);
+        var sc = SynchronizationContext.Current;
+        var defaultContext = 
+            (sc is null || sc.GetType() == typeof(SynchronizationContext)) && 
+            TaskScheduler.Current == TaskScheduler.Default;
 
-        var telemInvokeRemote = new Telemetry.InvokeRemote
-        {
-            ServiceClientId = _telemetry.Id,
-            Method = method.Name,
-            DefaultSynchronizationContext = defaultContext
-        }.Log();
-
-        return telemInvokeRemote.Monitor(
-            async () =>
-            {
-                if (defaultContext)
-                {
-                    return await Invoke();
-                }
-
-                return await Task.Run(Invoke);
-            });
+        return defaultContext ? Invoke() : Task.Run(Invoke);
 
         async Task<TResult> Invoke()
         {
@@ -84,7 +70,7 @@ internal abstract class ServiceClient : IDisposable
             {
                 var telemInvokeRemoteProper = new Telemetry.InvokeRemoteProper
                 {
-                    InvokeRemoteId = telemInvokeRemote.Id,
+                    InvokeRemoteId = default!,
                     ClientTimeout = clientTimeout,
                     MessageTimeout = messageTimeout,
                     SerializedArgs = serializedArguments,
