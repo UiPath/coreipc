@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace UiPath.CoreIpc.NodeInterop;
+namespace UiPath.Ipc.NodeInterop;
 
 internal static class Contracts
 {
