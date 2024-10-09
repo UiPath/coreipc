@@ -1,0 +1,5 @@
+<Project>
+    <ItemGroup>
+        <PackageReference Update="Microsoft.IO.RecyclableMemoryStream" Version="2.2.0" />
+    </ItemGroup>
+</Project>

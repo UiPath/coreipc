@@ -2,7 +2,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System;
 
-namespace UiPath.CoreIpc.NodeInterop;
+namespace UiPath.Ipc.NodeInterop;
 
 internal static class Signalling
 {

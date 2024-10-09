@@ -1,9 +1,9 @@
-﻿using System.Text;
+﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.CoreIpc.NamedPipe;
-using Microsoft.Extensions.DependencyInjection;
+using System.Text;
+using UiPath.Ipc.BackCompat;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 class Client
 {
@@ -32,7 +32,7 @@ class Client
         var serviceProvider = ConfigureServices();
         var callback = new ComputingCallback { Id = "custom made" };
         var computingClientBuilder = new NamedPipeClientBuilder<IComputingService, IComputingCallback>("test", serviceProvider)
-            .SerializeParametersAsObjects().CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
+            .CallbackInstance(callback).AllowImpersonation().RequestTimeout(TimeSpan.FromSeconds(2));
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
         try
@@ -40,7 +40,6 @@ class Client
             var computingClient = computingClientBuilder.ValidateAndBuild();
             var systemClient =
                 new NamedPipeClientBuilder<ISystemService>("test")
-                .SerializeParametersAsObjects()
                 .RequestTimeout(TimeSpan.FromSeconds(2))
                 .Logger(serviceProvider)
                 .AllowImpersonation()
@@ -67,7 +66,7 @@ class Client
                 Console.WriteLine($"[TEST 3] sum of 3 complexe number is: {result3.A}+{result3.B}i", cancellationToken);
 
                 // test 4: call IPC service method without parameter or return
-                await systemClient.DoNothing(cancellationToken);
+                await systemClient.FireAndForget(cancellationToken);
                 Console.WriteLine($"[TEST 4] invoked DoNothing()");
                 //((IDisposable)systemClient).Dispose();
 
@@ -76,7 +75,7 @@ class Client
                 Console.WriteLine($"[TEST 5] {text}");
 
                 // test 6: call IPC service method returning GUID
-                Guid generatedId = await systemClient.GetGuid(Guid.NewGuid(), cancellationToken);
+                Guid generatedId = await systemClient.EchoGuid(Guid.NewGuid(), cancellationToken);
                 Console.WriteLine($"[TEST 6] generated ID is: {generatedId}");
 
                 // test 7: call IPC service method with byte array
@@ -109,7 +108,7 @@ class Client
         {
             stopwatch.Stop();
             Console.WriteLine();
-            Console.WriteLine("Calls per second: " + count*8 / stopwatch.Elapsed.TotalSeconds);
+            Console.WriteLine("Calls per second: " + count * 8 / stopwatch.Elapsed.TotalSeconds);
             Console.WriteLine();
         }
         // test 10: call slow IPC service method

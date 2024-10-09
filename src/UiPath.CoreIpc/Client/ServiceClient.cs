@@ -1,138 +1,110 @@
-﻿using System.Net.Security;
-namespace UiPath.CoreIpc;
+﻿namespace UiPath.Ipc;
 
-using ConnectionFactory = Func<Connection, CancellationToken, Task<Connection>>;
-using BeforeCallHandler = Func<CallInfo, CancellationToken, Task>;
-using InvokeDelegate = Func<IServiceClient, MethodInfo, object[], object>;
-
-interface IServiceClient : IDisposable
+internal abstract class ServiceClient : IDisposable
 {
-    Task<TResult> Invoke<TResult>(MethodInfo method, object[] args);
-    Connection Connection { get; }
-}
+    private static readonly MethodInfo GenericDefOf_CreateProxy = ((Func<ServiceClient, IpcProxy>)CreateProxy<object>).Method.GetGenericMethodDefinition();
 
-class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterface : class
-{
-    private readonly ISerializer _serializer;
-    private readonly TimeSpan _requestTimeout;
-    private readonly ILogger _logger;
-    private readonly ConnectionFactory _connectionFactory;
-    private readonly BeforeCallHandler _beforeCall;
-    private readonly EndpointSettings _serviceEndpoint;
-    private readonly SemaphoreSlim _connectionLock = new(1);
-    private Connection _connection;
-    private Server _server;
-    private ClientConnection _clientConnection;
-
-    internal ServiceClient(ISerializer serializer, TimeSpan requestTimeout, ILogger logger, ConnectionFactory connectionFactory, string sslServer = null, BeforeCallHandler beforeCall = null, bool objectParameters = false, EndpointSettings serviceEndpoint = null)
+    private static IpcProxy CreateProxy<T>(ServiceClient serviceClient) where T : class
     {
-        ObjectParameters = objectParameters;
-        _serializer = serializer;
-        _requestTimeout = requestTimeout;
-        _logger = logger;
-        _connectionFactory = connectionFactory;
-        SslServer = sslServer;
-        _beforeCall = beforeCall;
-        _serviceEndpoint = serviceEndpoint;
-    }
-    protected int HashCode { get; init; }
-    public string SslServer { get; init; }
-    public virtual string Name => _connection?.Name;
-    private bool LogEnabled => _logger.Enabled();
-    Connection IServiceClient.Connection => _connection;
-    public bool ObjectParameters { get; init; }
-
-    public TInterface CreateProxy()
-    {
-        var proxy = DispatchProxy.Create<TInterface, IpcProxy>();
-        (proxy as IpcProxy).ServiceClient = this;
+        var proxy = (DispatchProxy.Create<T, IpcProxy>() as IpcProxy)!;
+        proxy.ServiceClient = serviceClient;
         return proxy;
     }
-    
-    public override int GetHashCode() => HashCode;
 
-    private void OnNewConnection(Connection connection, bool alreadyHasServer = false)
+    protected abstract IServiceClientConfig Config { get; }
+    public abstract Stream? Network { get; }
+    public event EventHandler? ConnectionClosed;
+
+    private readonly Type _interfaceType;
+    private readonly Lazy<IpcProxy> _proxy;
+
+    protected ServiceClient(Type interfaceType)
     {
-        _connection?.Dispose();
-        _connection = connection;
-        if (alreadyHasServer || _serviceEndpoint == null)
-        {
-            return;
-        }
-        connection.Logger ??= _logger;
-        var endpoints = new ConcurrentDictionary<string, EndpointSettings> { [_serviceEndpoint.Name] = _serviceEndpoint };
-        var listenerSettings = new ListenerSettings(Name) { RequestTimeout = _requestTimeout, ServiceProvider = _serviceEndpoint.ServiceProvider, Endpoints = endpoints };
-        _server = new(listenerSettings, connection);
+        _interfaceType = interfaceType;
+        _proxy = new(() => (GenericDefOf_CreateProxy.MakeGenericMethod(interfaceType).Invoke(null, [this]) as IpcProxy)!);
     }
 
-    public Task<TResult> Invoke<TResult>(MethodInfo method, object[] args)
+    protected void RaiseConnectionClosed() => ConnectionClosed?.Invoke(this, EventArgs.Empty);
+    public virtual ValueTask CloseConnection() => throw new NotSupportedException();
+    public object? Invoke(MethodInfo method, object?[] args) => GetInvokeDelegate(method.ReturnType)(this, method, args);
+
+    protected abstract Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct);
+
+    public T GetProxy<T>() where T : class
     {
-        var syncContext = SynchronizationContext.Current;
-        var defaultContext = syncContext == null || syncContext.GetType() == typeof(SynchronizationContext);
+        if (!typeof(T).IsAssignableFrom(_interfaceType))
+        {
+            throw new ArgumentOutOfRangeException($"The provided generic argument T is not assignable to the proxy type. T is {typeof(T).Name}. The proxy type is {_interfaceType.Name}.");
+        }
+
+        return (_proxy.Value as T)!;
+    }
+
+    private Task<TResult> Invoke<TResult>(MethodInfo method, object?[] args)
+    {
+        var sc = SynchronizationContext.Current;
+        var defaultContext =
+            (sc is null || sc.GetType() == typeof(SynchronizationContext)) &&
+            TaskScheduler.Current == TaskScheduler.Default;
+
         return defaultContext ? Invoke() : Task.Run(Invoke);
+
         async Task<TResult> Invoke()
         {
             CancellationToken cancellationToken = default;
             TimeSpan messageTimeout = default;
-            TimeSpan clientTimeout = _requestTimeout;
-            Stream uploadStream = null;
-            string[] serializedArguments = null;
+            TimeSpan clientTimeout = Config.RequestTimeout;
+            Stream? uploadStream = null;
             var methodName = method.Name;
-            SerializeArguments();
-            var timeoutHelper = new TimeoutHelper(clientTimeout, cancellationToken);
+
+            var serializedArguments = SerializeArguments();
+
+            using var timeoutHelper = new TimeoutHelper(clientTimeout, cancellationToken);
             try
             {
-                var token = timeoutHelper.Token;
-                bool newConnection;
-                await _connectionLock.WaitAsync(token);
-                try
+                var ct = timeoutHelper.Token;
+
+                var (connection, newConnection) = await EnsureConnection(ct);
+
+                if (Config.BeforeCall is not null)
                 {
-                    newConnection = await EnsureConnection(token);
+                    var callInfo = new CallInfo(newConnection, method, args);
+                    await Config.BeforeCall(callInfo, ct);
                 }
-                finally
-                {
-                    _connectionLock.Release();
-                }
-                if (_beforeCall != null)
-                {
-                    await _beforeCall(new(newConnection, method, args), token);
-                }
-                var requestId = _connection.NewRequestId();
-                var request = new Request(typeof(TInterface).Name, requestId, methodName, serializedArguments, ObjectParameters ? args : null, messageTimeout.TotalSeconds)
+
+                var requestId = connection.NewRequestId();
+                var request = new Request(_interfaceType.Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds)
                 {
                     UploadStream = uploadStream
                 };
-                if (LogEnabled)
+
+                Config.Logger?.ServiceClient_Calling(methodName, requestId, Config.DebugName);
+
+                Response response;
+                try
                 {
-                    Log($"IpcClient calling {methodName} {requestId} {Name}.");
+                    response = await connection.RemoteCall(request, ct); // returns user errors instead of throwing them (could throw for system bugs)
+
+                    Config.Logger?.ServiceClient_CalledSuccessfully(request.MethodName, requestId, Config.DebugName);
                 }
-                if (ObjectParameters && !method.ReturnType.IsGenericType)
+                catch (Exception ex)
                 {
-                    await _connection.Send(request, token);
-                    return default;
+                    Config.Logger?.ServiceClient_FailedToCall(request.MethodName, requestId, Config.DebugName, ex);
+                    throw;
                 }
-                var response = await _connection.RemoteCall(request, token);
-                if (LogEnabled)
-                {
-                    Log($"IpcClient called {methodName} {requestId} {Name}.");
-                }
-                return response.Deserialize<TResult>(_serializer, ObjectParameters);
+
+                return response.Deserialize<TResult>(Config.Serializer);
             }
             catch (Exception ex)
             {
                 timeoutHelper.ThrowTimeout(ex, methodName);
                 throw;
             }
-            finally
+
+            string[] SerializeArguments()
             {
-                timeoutHelper.Dispose();
-            }
-            void SerializeArguments()
-            {
-                if (!ObjectParameters)
-                {
-                    serializedArguments = new string[args.Length];
-                }
+                var result = new string[args.Length];
+
                 for (int index = 0; index < args.Length; index++)
                 {
                     switch (args[index])
@@ -150,168 +122,167 @@ class ServiceClient<TInterface> : IServiceClient, IConnectionKey where TInterfac
                             args[index] = "";
                             break;
                     }
-                    if (!ObjectParameters)
-                    {
-                        serializedArguments[index] = _serializer.Serialize(args[index]);
-                    }
+
+                    result[index] = Config.Serializer.OrDefault().Serialize(args[index]);
                 }
+
+                return result;
             }
         }
     }
 
-    private async Task<bool> EnsureConnection(CancellationToken cancellationToken)
-    {
-        if (_connectionFactory != null)
-        {
-            var externalConnection = await _connectionFactory(_connection, cancellationToken);
-            if (externalConnection != null)
-            {
-                if (_connection == null)
-                {
-                    OnNewConnection(externalConnection);
-                    return true;
-                }
-                return false;
-            }
-        }
-        if (_clientConnection?.Connected is true)
-        {
-            return false;
-        }
-        return await Connect(cancellationToken);
-    }
+    public abstract void Dispose();
 
-    private async Task<bool> Connect(CancellationToken cancellationToken)
-    {
-        var clientConnection = await ClientConnectionsRegistry.GetOrCreate(this, cancellationToken);
-        try
-        {
-            if (clientConnection.Connected)
-            {
-                ReuseClientConnection(clientConnection);
-                return false;
-            }
-            clientConnection.Dispose();
-            Stream network;
-            try
-            {
-                network = await clientConnection.Connect(cancellationToken);
-            }
-            catch
-            {
-                clientConnection.Dispose();
-                throw;
-            }
-            var stream = SslServer == null ? network : await AuthenticateAsClient(network);
-            OnNewConnection(new(stream, _serializer, _logger, Name));
-            if (LogEnabled)
-            {
-                Log($"CreateConnection {Name}.");
-            }
-            InitializeClientConnection(clientConnection);
-        }
-        finally
-        {
-            clientConnection.Release();
-        }
-        return true;
-        async Task<Stream> AuthenticateAsClient(Stream network)
-        {
-            var sslStream = new SslStream(network);
-            try
-            {
-                await sslStream.AuthenticateAsClientAsync(SslServer);
-            }
-            catch
-            {
-                sslStream.Dispose();
-                throw;
-            }
-            Debug.Assert(sslStream.IsEncrypted && sslStream.IsSigned);
-            return sslStream;
-        }
-    }
+    public override string ToString() => Config.DebugName;
 
-    private void ReuseClientConnection(ClientConnection clientConnection)
-    {
-        _clientConnection = clientConnection;
-        var alreadyHasServer = clientConnection.Server != null;
-        if (LogEnabled)
-        {
-            Log(nameof(ReuseClientConnection) + " " + clientConnection);
-        }
-        OnNewConnection(clientConnection.Connection, alreadyHasServer);
-        if (!alreadyHasServer)
-        {
-            clientConnection.Server = _server;
-        }
-        else if (_serviceEndpoint != null)
-        {
-            _server = clientConnection.Server;
-            if (_server.Endpoints.ContainsKey(_serviceEndpoint.Name))
-            {
-                throw new InvalidOperationException($"Duplicate callback proxy instance {Name} <{typeof(TInterface).Name}, {_serviceEndpoint.Contract.Name}>. Consider using a singleton callback proxy.");
-            }
-            _server.Endpoints.Add(_serviceEndpoint.Name, _serviceEndpoint);
-        }
-    }
+    #region Generic adapter cache
+    private static readonly MethodInfo GenericDefOf_Invoke = ((Func<ServiceClient, MethodInfo, object?[], Task<int>>)Invoke<int>).Method.GetGenericMethodDefinition();
+    private static readonly ConcurrentDictionary<Type, InvokeDelegate> ReturnTypeToInvokeDelegate = new();
+    private static InvokeDelegate GetInvokeDelegate(Type returnType) => ReturnTypeToInvokeDelegate.GetOrAdd(returnType, CreateInvokeDelegate);
+    private static InvokeDelegate CreateInvokeDelegate(Type returnType)
+    => GenericDefOf_Invoke.MakeGenericDelegate<InvokeDelegate>(
+        returnType.IsGenericType
+            ? returnType.GetGenericArguments()[0]
+            : typeof(object));
 
-    public void Log(string message) => _logger.LogInformation(message);
-
-    private void InitializeClientConnection(ClientConnection clientConnection)
-    {
-        _connection.Listen().LogException(_logger, Name);
-        clientConnection.Connection = _connection;
-        clientConnection.Server = _server;
-        _clientConnection = clientConnection;
-    }
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        _connectionLock.AssertDisposed();
-        if (LogEnabled)
-        {
-            Log($"Dispose {Name}");
-        }
-        if (disposing)
-        {
-            _server?.Endpoints.Remove(_serviceEndpoint.Name);
-        }
-    }
-
-    public override string ToString() => Name;
-
-    public virtual bool Equals(IConnectionKey other) => SslServer == other.SslServer;
-
-    public virtual ClientConnection CreateClientConnection() => throw new NotImplementedException();
+    private static Task<TResult> Invoke<TResult>(ServiceClient serviceClient, MethodInfo method, object?[] args) => serviceClient.Invoke<TResult>(method, args);
+    #endregion
 }
 
-public class IpcProxy : DispatchProxy, IDisposable
+internal sealed class ServiceClientProper : ServiceClient
 {
-    private static readonly MethodInfo InvokeMethod = typeof(IpcProxy).GetStaticMethod(nameof(GenericInvoke));
-    private static readonly ConcurrentDictionary<Type, InvokeDelegate> InvokeByType = new();
+    private readonly FastAsyncLock _lock = new();
+    private readonly IpcClient _client;
+    private readonly IClientState _clientState;
 
-    internal IServiceClient ServiceClient { get; set; }
+    private Connection? _latestConnection;
+    private Server? _latestServer;
 
-    public Connection Connection => ServiceClient.Connection;
-
-    protected override object Invoke(MethodInfo targetMethod, object[] args) => GetInvoke(targetMethod)(ServiceClient, targetMethod, args);
-
-    public void Dispose() => ServiceClient.Dispose();
-
-    public void CloseConnection() => Connection?.Dispose();
-
-    private static InvokeDelegate GetInvoke(MethodInfo targetMethod) => InvokeByType.GetOrAdd(targetMethod.ReturnType, taskType =>
+    private Connection? LatestConnection
     {
-        var resultType = taskType.IsGenericType ? taskType.GenericTypeArguments[0] : typeof(object);
-        return InvokeMethod.MakeGenericDelegate<InvokeDelegate>(resultType);
-    });
+        get => _latestConnection;
+        set
+        {
+            if (_latestConnection == value)
+            {
+                return;
+            }
 
-    private static object GenericInvoke<T>(IServiceClient serviceClient, MethodInfo method, object[] args) => serviceClient.Invoke<T>(method, args);
+            if (_latestConnection is not null)
+            {
+                _latestConnection.Closed -= LatestConnection_Closed;
+            }
+
+            _latestConnection = value;
+
+            if (_latestConnection is not null)
+            {
+                _latestConnection.Closed += LatestConnection_Closed;
+            }
+        }
+    }
+
+    public override Stream? Network => LatestConnection?.Network;
+
+    public ServiceClientProper(IpcClient client, Type interfaceType) : base(interfaceType)
+    {
+        _client = client;
+        _clientState = client.Transport.CreateState();
+    }
+
+    public override void Dispose()
+    {
+        CloseConnection().AsTask().TraceError();
+    }
+
+    public override async ValueTask CloseConnection()
+    {
+        using (await _lock.Lock())
+        {
+            LatestConnection?.Dispose();
+            LatestConnection = null;
+        }
+    }
+
+    private void LatestConnection_Closed(object? sender, EventArgs e) => RaiseConnectionClosed();
+
+    protected override async Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct)
+    {
+
+        using (await _lock.Lock(ct))
+        {
+            var haveConnectionAlready = LatestConnection is not null;
+            var isConnected = new Lazy<bool>(_clientState.IsConnected);
+            var haveBeforeConnect = Config.BeforeConnect is not null;
+
+            if (haveConnectionAlready && isConnected.Value)
+            {
+                return (LatestConnection!, newlyConnected: false);
+            }
+
+            if (haveBeforeConnect)
+            {
+                await Config.BeforeConnect!(ct);
+            }
+
+            var network = await Connect(ct);
+
+            LatestConnection = new Connection(network, Config.Serializer, Config.Logger, Config.DebugName);
+            var router = new Router(_client.Config.CreateCallbackRouterConfig(), _client.Config.ServiceProvider);
+            _latestServer = new Server(router, _client.Config.RequestTimeout, LatestConnection);
+
+            _ = Pal();
+            return (LatestConnection, newlyConnected: true);
+
+            async Task Pal()
+            {
+                try
+                {
+                    await LatestConnection.Listen();
+                }
+                catch (Exception ex)
+                {
+                    Config.Logger.LogException(ex, Config.DebugName);
+                }
+            }
+        }
+    }
+
+    private async Task<Stream> Connect(CancellationToken ct)
+    {
+        await _clientState.Connect(_client, ct);
+
+        if (_clientState.Network is not { } network)
+        {
+            throw new InvalidOperationException();
+        }
+
+        return network;
+    }
+
+    protected override IServiceClientConfig Config => _client.Config;
+}
+
+internal sealed class ServiceClientForCallback : ServiceClient
+{
+    private readonly Connection _connection;
+    private readonly Listener _listener;
+
+    public override Stream? Network => _connection.Network;
+
+    public ServiceClientForCallback(Connection connection, Listener listener, Type interfaceType) : base(interfaceType)
+    {
+        _connection = connection;
+        _listener = listener;
+    }
+
+    public override void Dispose()
+    {
+        // do nothing
+    }
+
+    protected override Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct)
+    => Task.FromResult((_connection, newlyConnected: false));
+
+    protected override IServiceClientConfig Config => _listener.Config;
 }

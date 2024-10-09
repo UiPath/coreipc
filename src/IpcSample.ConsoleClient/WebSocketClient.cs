@@ -1,8 +1,10 @@
-﻿using System.Text;
+﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.CoreIpc.WebSockets;
-using Microsoft.Extensions.DependencyInjection;
-namespace UiPath.CoreIpc.Tests;
+using System.Text;
+using UiPath.Ipc.BackCompat;
+
+namespace UiPath.Ipc.Tests;
+
 class WebSocketClient
 {
     static async Task _Main(string[] args)
@@ -32,7 +34,7 @@ class WebSocketClient
         Uri uri = new("ws://localhost:1212/wsDemo/");
         var serviceProvider = ConfigureServices();
         var callback = new ComputingCallback { Id = "custom made" };
-        var computingClientBuilder = new WebSocketClientBuilder<IComputingService, IComputingCallback>(uri, serviceProvider).SerializeParametersAsObjects()
+        var computingClientBuilder = new WebSocketClientBuilder<IComputingService, IComputingCallback>(uri, serviceProvider)
             .CallbackInstance(callback)/*.EncryptAndSign("localhost")*/.RequestTimeout(TimeSpan.FromSeconds(2));
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
@@ -40,7 +42,7 @@ class WebSocketClient
         {
             var computingClient = computingClientBuilder.ValidateAndBuild();
             var systemClient =
-                new WebSocketClientBuilder<ISystemService>(uri).SerializeParametersAsObjects()
+                new WebSocketClientBuilder<ISystemService>(uri)
                 //.EncryptAndSign("localhost")
                 .RequestTimeout(TimeSpan.FromSeconds(2))
                 .Logger(serviceProvider)
@@ -81,7 +83,7 @@ class WebSocketClient
                 Console.WriteLine($"[TEST 5] {text}");
 
                 // test 6: call IPC service method returning GUID
-                Guid generatedId = await systemClient.GetGuid(Guid.NewGuid(), cancellationToken);
+                Guid generatedId = await systemClient.EchoGuid(Guid.NewGuid(), cancellationToken);
                 Console.WriteLine($"[TEST 6] generated ID is: {generatedId}");
 
                 // test 7: call IPC service method with byte array

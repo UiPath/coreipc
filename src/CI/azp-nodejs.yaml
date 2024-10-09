@@ -48,7 +48,7 @@
     inputs:
         workingDirectory: $(NodeJS_ProjectPath)
         script: 'npm test'
-
+    
   - task: PublishTestResults@2
     displayName: 'Publish Web Test Results'
     condition: succeededOrFailed()

@@ -1,80 +1,226 @@
-﻿using System.Security.Cryptography.X509Certificates;
+﻿using System.Linq.Expressions;
 
-namespace UiPath.CoreIpc;
+namespace UiPath.Ipc;
 
-public class ListenerSettings
+using ListenerFactory = Func<IpcServer, ListenerConfig, Listener>;
+
+internal abstract class Listener : IAsyncDisposable
 {
-    public ListenerSettings(string name) => Name = name;
-    public byte ConcurrentAccepts { get; set; } = 5;
-    public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
-    public X509Certificate Certificate { get; set; }
-    public string Name { get; }
-    public TimeSpan RequestTimeout { get; set; } = Timeout.InfiniteTimeSpan;
-    internal IServiceProvider ServiceProvider { get; set; }
-    internal IDictionary<string, EndpointSettings> Endpoints { get; set; }
-}
-abstract class Listener : IDisposable
-{
-    protected Listener(ListenerSettings settings)
+    public static Listener Create(IpcServer server, ListenerConfig config)
+    => GetFactory(config.GetType())(
+        server ?? throw new ArgumentNullException(nameof(server)),
+        config ?? throw new ArgumentNullException(nameof(config)));
+
+    private readonly struct Result<T>
     {
-        Settings = settings;
-        MaxMessageSize = settings.MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
-    }
-    public string Name => Settings.Name;
-    public ILogger Logger { get; private set; }
-    public IServiceProvider ServiceProvider => Settings.ServiceProvider;
-    public ListenerSettings Settings { get; }
-    public int MaxMessageSize { get; }
-    public Task Listen(CancellationToken token)
-    {
-        Logger = ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(GetType());
-        if (LogEnabled)
+        private readonly T _value;
+        private readonly Exception? _exception;
+
+        public T Value => _exception is null ? _value : throw _exception;
+
+        public Result(T value)
         {
-            Log($"Starting listener {Name}...");
+            _value = value;
+            _exception = null;
         }
-        return Task.WhenAll(Enumerable.Range(1, Settings.ConcurrentAccepts).Select(async _ =>
+
+        public Result(Exception exception)
         {
-            while (!token.IsCancellationRequested)
+            _value = default!;
+            _exception = exception;
+        }
+    }
+    private static readonly ConcurrentDictionary<Type, Result<ListenerFactory>> Factories = new();
+    private static ListenerFactory GetFactory(Type configType) => Factories.GetOrAdd(configType, CreateFactory).Value;
+    private static Result<ListenerFactory> CreateFactory(Type configType)
+    {
+        try
+        {
+            return new(Pal(configType));
+        }
+        catch (Exception ex)
+        {
+            return new(ex);
+        }
+
+        static ListenerFactory Pal(Type configType)
+        {
+            if (configType.GetInterfaces().SingleOrDefault(IsIListenerConfig) is not { } iface
+                || iface.GetGenericArguments() is not [_, var listenerStateType, var connectionStateType])
             {
-                await AcceptConnection(token);
+                throw new ArgumentOutOfRangeException(nameof(iface), $"The ListenerConfig type must implement IListenerConfig<,>. ListenerConfig type was: {configType.FullName}");
+            }
+
+            var listenerType = typeof(Listener<,,>).MakeGenericType(configType, listenerStateType, connectionStateType);
+            var listenerCtor = listenerType.GetConstructor(
+                bindingAttr: BindingFlags.Public | BindingFlags.Instance,
+                binder: Type.DefaultBinder,
+                types: [typeof(IpcServer), configType],
+                modifiers: null)!;
+
+            var paramofServer = Expression.Parameter(typeof(IpcServer));
+            var paramofConfig = Expression.Parameter(typeof(ListenerConfig));
+            var lambda = Expression.Lambda(
+                delegateType: typeof(ListenerFactory),
+                body: Expression.New(listenerCtor, paramofServer, Expression.Convert(paramofConfig, configType)),
+                paramofServer,
+                paramofConfig);
+
+            var @delegate = (lambda.Compile() as ListenerFactory)!;
+            return @delegate;
+        }
+
+        static bool IsIListenerConfig(Type candidateIface)
+        => candidateIface.IsGenericType && candidateIface.GetGenericTypeDefinition() == typeof(IListenerConfig<,,>);
+    }
+
+    private readonly Lazy<Task> _disposeTask = null!;
+    public readonly ListenerConfig Config;
+    public readonly IpcServer Server;
+    private readonly Lazy<string> _loggerCategory;
+
+    private readonly Lazy<ILogger> _lazyLogger;
+    public ILogger Logger => _lazyLogger.Value;
+
+    protected Listener(IpcServer server, ListenerConfig config)
+    {
+        _loggerCategory = new(ComputeLoggerCategory);
+        Config = config;
+        Server = server;
+        _lazyLogger = new(() => server.ServiceProvider.GetService<ILoggerFactory>().OrDefault().CreateLogger(LoggerCategory));
+        _disposeTask = new(DisposeCore);
+    }
+
+    ValueTask IAsyncDisposable.DisposeAsync() => new(_disposeTask.Value);
+
+    protected abstract Task DisposeCore();
+
+    private string LoggerCategory => _loggerCategory.Value;
+
+    private string ComputeLoggerCategory()
+    => $"{GetType().Namespace}.{nameof(Listener)}<{ConfigType.Name}[{Config}],..>";
+
+    protected abstract Type ConfigType { get; }
+}
+
+internal sealed class Listener<TConfig, TListenerState, TConnectionState> : Listener, IAsyncDisposable
+    where TConfig : ListenerConfig, IListenerConfig<TConfig, TListenerState, TConnectionState>
+    where TListenerState : IAsyncDisposable
+    where TConnectionState : IDisposable
+{
+    private readonly CancellationTokenSource _cts = new();
+    private readonly Task _listeningTask = null!;
+
+    public new readonly TConfig Config;
+
+    public TListenerState State { get; }
+
+    public Listener(IpcServer server, TConfig config) : base(server, config)
+    {
+        Config = config;
+        State = Config.CreateListenerState(server);
+
+        _listeningTask = Task.Run(() => Listen(_cts.Token));
+    }
+
+    public void Log(string message)
+    {
+        if (!Logger.Enabled())
+        {
+            return;
+        }
+
+        Logger.LogInformation(message);
+    }
+    public void LogError(Exception exception, string message)
+    {
+        if (!Logger.Enabled(LogLevel.Error))
+        {
+            return;
+        }
+
+        Logger.LogError(exception, message);
+    }
+
+    protected override async Task DisposeCore()
+    {
+        Log($"Stopping listener {Config}...");
+        try
+        {
+            _cts.Cancel();
+        }
+        catch (Exception ex)
+        {
+            LogError(ex, $"Canceling {Config} failed.");
+        }
+        try
+        {
+            await _listeningTask;
+        }
+        catch (OperationCanceledException ex) when (ex.CancellationToken == _cts.Token)
+        {
+            Log($"Stopping listener {Config} threw OCE.");
+        }
+        catch (Exception ex)
+        {
+            LogError(ex, $"Stopping listener {Config} failed.");
+        }
+        await State.DisposeAsync();
+        _cts.Dispose();
+    }
+
+    private async Task Listen(CancellationToken ct)
+    {
+        Log($"Starting listener {Config}...");
+
+        await Task.WhenAll(Enumerable.Range(1, Config.ConcurrentAccepts).Select(async _ =>
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await AcceptConnection(ct);
             }
         }));
     }
-    protected abstract ServerConnection CreateServerConnection();
-    async Task AcceptConnection(CancellationToken token)
+    private async Task AcceptConnection(CancellationToken ct)
     {
-        var serverConnection = CreateServerConnection();
+        var serverConnection = new ServerConnection<TConfig, TListenerState, TConnectionState>(this);
+
+        Stream? network = null;
         try
         {
-            var network = await serverConnection.AcceptClient(token);
-            serverConnection.Listen(network, token).LogException(Logger, Name);
+            network = await serverConnection.AcceptClient(ct);
+        }
+        catch
+        {
+            serverConnection.Dispose();
+            return;
+        }
+
+        try
+        {
+            _ = Task.Run(TryToListen);
         }
         catch (Exception ex)
         {
             serverConnection.Dispose();
-            if (!token.IsCancellationRequested)
+            if (!ct.IsCancellationRequested)
             {
-                Logger.LogException(ex, Settings.Name);
+                Logger.LogException(ex, Config);
+            }
+        }
+
+        async Task TryToListen()
+        {
+            try
+            {
+                await serverConnection.Listen(network, ct);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogException(ex, $"Listen loop failed for {Config}");
             }
         }
     }
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!disposing)
-        {
-            return;
-        }
-        Settings.Certificate?.Dispose();
-    }
-    public void Dispose()
-    {
-        if (LogEnabled)
-        {
-            Log($"Stopping listener {Name}...");
-        }
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
-    public void Log(string message) => Logger.LogInformation(message);
-    public bool LogEnabled => Logger.Enabled();
+
+    protected override Type ConfigType => typeof(TConfig);
 }

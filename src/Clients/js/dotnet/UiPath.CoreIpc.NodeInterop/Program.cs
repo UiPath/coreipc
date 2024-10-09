@@ -7,14 +7,15 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
-using UiPath.CoreIpc.NamedPipe;
-using UiPath.CoreIpc.WebSockets;
+using UiPath.Ipc.Transport.NamedPipe;
+using UiPath.Ipc.Transport.WebSocket;
 
-namespace UiPath.CoreIpc.NodeInterop;
+namespace UiPath.Ipc.NodeInterop;
 
 using static Contracts;
 using static ServiceImpls;
 using static Signalling;
+using static UiPath.Ipc.NodeInterop.Extensions;
 
 class Program
 {
@@ -61,6 +62,11 @@ class Program
 
     static async Task MainCore(string? pipeName, string? webSocketUrl, int? maybeSecondsPowerOnDelay)
     {
+        if (pipeName is null && webSocketUrl is null)
+        {
+            throw new ArgumentException($"At least one of {nameof(pipeName)} or {nameof(webSocketUrl)} must be specified.");
+        }
+
         if (maybeSecondsPowerOnDelay is { } secondsPowerOnDelay)
         {
             await Task.Delay(TimeSpan.FromSeconds(secondsPowerOnDelay));
@@ -71,7 +77,6 @@ class Program
 
         var sp = services
             .AddLogging()
-            .AddIpc()
             .AddSingleton<IAlgebra, Algebra>()
             .AddSingleton<ICalculus, Calculus>()
             .AddSingleton<IBrittleService, BrittleService>()
@@ -79,18 +84,27 @@ class Program
             .AddSingleton<IDtoService, DtoService>()
             .BuildServiceProvider();
 
-        var serviceHost = new ServiceHostBuilder(sp)
-            .UseNamedPipesAndOrWebSockets(pipeName, webSocketUrl)
-            .AddEndpoint<IAlgebra, IArithmetic>()
-            .AddEndpoint<ICalculus>()
-            .AddEndpoint<IBrittleService>()
-            .AddEndpoint<IEnvironmentVariableGetter>()
-            .AddEndpoint<IDtoService>()
-            .Build();
-
         var thread = new AsyncContextThread();
         thread.Context.SynchronizationContext.Send(_ => Thread.CurrentThread.Name = "GuiThread", null);
-        var sched = thread.Context.Scheduler;
+        var scheduler = thread.Context.Scheduler;
+
+        var ipcServer = new IpcServer()
+        {
+            Endpoints = new()
+            {
+                typeof(IAlgebra),
+                typeof(ICalculus),
+                typeof(IBrittleService),
+                typeof(IEnvironmentVariableGetter),
+                typeof(IDtoService)
+            },
+            Listeners = [
+                ..EnumerateListeners(pipeName, webSocketUrl)
+            ],
+            ServiceProvider = sp,
+            Scheduler = scheduler
+        };
+        ipcServer.Start();
 
         _ = Task.Run(async () =>
         {
@@ -98,7 +112,6 @@ class Program
             {
                 await using var sp = new ServiceCollection()
                     .AddLogging()
-                    .AddIpc()
                     .BuildServiceProvider();
 
                 var callback = new Arithmetic();
@@ -107,25 +120,51 @@ class Program
                 {
                     if (webSocketUrl is not null)
                     {
-                        yield return new WebSocketClientBuilder<IAlgebra, IArithmetic>(uri: new(webSocketUrl), sp)
-                            .RequestTimeout(TimeSpan.FromHours(5))
-                            .CallbackInstance(callback)
-                            .Build()
-                            .Ping();
+                        yield return new IpcClient
+                        {
+                            Config = new()
+                            {
+                                ServiceProvider = sp,
+                                RequestTimeout = TimeSpan.FromHours(5),
+                                Callbacks = new()
+                                {
+                                    { typeof(IArithmetic), callback }
+                                },
+                            },
+                            Transport = new WebSocketTransport
+                            {
+                                Uri = new(webSocketUrl),
+                            }
+                        }
+                        .GetProxy<IAlgebra>()
+                        .Ping();
                     }
 
                     if (pipeName is not null)
                     {
-                        yield return new NamedPipeClientBuilder<IAlgebra, IArithmetic>(pipeName, sp)
-                            .RequestTimeout(TimeSpan.FromHours(5))
-                            .CallbackInstance(callback)
-                            .Build()
-                            .Ping();
+                        yield return new IpcClient
+                        {
+                            Config = new()
+                            {
+                                ServiceProvider = sp,
+                                RequestTimeout = TimeSpan.FromHours(5),
+                                Callbacks = new()
+                                {
+                                    { typeof(IArithmetic), callback }
+                                }
+                            },
+                            Transport = new NamedPipeTransport()
+                            {
+                                PipeName = pipeName,
+                            }
+                        }
+                        .GetProxy<IAlgebra>()
+                        .Ping();
                     }
                 }
 
                 await Task.WhenAll(EnumeratePings());
-                
+
                 Send(SignalKind.ReadyToConnect);
             }
             catch (Exception ex)
@@ -135,7 +174,29 @@ class Program
             }
         });
 
-        await serviceHost.RunAsync(sched);
+        await ipcServer.WaitForStop();
+
+        IEnumerable<ListenerConfig> EnumerateListeners(string? pipeName, string? webSocketUrl)
+        {
+            if (pipeName is not null)
+            {
+                yield return new NamedPipeListener() { PipeName = pipeName };
+            }
+
+            if (webSocketUrl is not null)
+            {
+                string url = CurateWebSocketUrl(webSocketUrl);
+                var accept = new HttpSysWebSocketsListener(url).Accept;
+                yield return new WebSocketListener() { Accept = accept };
+            }
+
+            static string CurateWebSocketUrl(string raw)
+            {
+                var builder = new UriBuilder(raw);
+                builder.Scheme = "http";
+                return builder.ToString();
+            }
+        }
     }
 
     private class Arithmetic : IArithmetic
@@ -148,37 +209,6 @@ class Program
 
 internal static class Extensions
 {
-    public static ServiceHostBuilder UseNamedPipesAndOrWebSockets(this ServiceHostBuilder builder, string? pipeName, string? webSocketUrl)
-    {
-        if (pipeName is null && webSocketUrl is null)
-        {
-            throw new ArgumentOutOfRangeException();
-        }                
-
-        if (pipeName is not null)
-        {
-            builder = builder.UseNamedPipes(new NamedPipeSettings(pipeName));
-        }
-
-        if (webSocketUrl is not null)
-        {
-            string url = CurateWebSocketUrl(webSocketUrl);
-            var accept = new HttpSysWebSocketsListener(url).Accept;
-            WebSocketSettings settings = new(accept);
-
-            builder = builder.UseWebSockets(settings);
-        }
-
-        return builder;
-    }
-
-    private static string CurateWebSocketUrl(string raw)
-    {
-        var builder = new UriBuilder(raw);
-        builder.Scheme = "http";
-        return builder.ToString();
-    }
-
     public class HttpSysWebSocketsListener : IDisposable
     {
         HttpListener _httpListener = new();

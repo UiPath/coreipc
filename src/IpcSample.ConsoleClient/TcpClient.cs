@@ -1,10 +1,10 @@
 ﻿using System.Text;
 using System.Diagnostics;
-using UiPath.CoreIpc.Tcp;
+using UiPath.Ipc.BackCompat;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 class TcpClient
 {
@@ -35,7 +35,7 @@ class TcpClient
         var serviceProvider = ConfigureServices();
         var callback = new ComputingCallback { Id = "custom made" };
         var computingClientBuilder = new TcpClientBuilder<IComputingService, IComputingCallback>(SystemEndPoint, serviceProvider)
-            .SerializeParametersAsObjects().CallbackInstance(callback)/*.EncryptAndSign("localhost")*/.RequestTimeout(TimeSpan.FromSeconds(2));
+            .CallbackInstance(callback)/*.EncryptAndSign("localhost")*/.RequestTimeout(TimeSpan.FromSeconds(2));
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
         try
@@ -43,7 +43,6 @@ class TcpClient
             var computingClient = computingClientBuilder.ValidateAndBuild();
             var systemClient =
                 new TcpClientBuilder<ISystemService>(SystemEndPoint)
-                .SerializeParametersAsObjects()
                 //.EncryptAndSign("localhost")
                 .RequestTimeout(TimeSpan.FromSeconds(2))
                 .Logger(serviceProvider)
@@ -84,7 +83,7 @@ class TcpClient
                 Console.WriteLine($"[TEST 5] {text}");
 
                 // test 6: call IPC service method returning GUID
-                Guid generatedId = await systemClient.GetGuid(Guid.NewGuid(), cancellationToken);
+                Guid generatedId = await systemClient.EchoGuid(Guid.NewGuid(), cancellationToken);
                 Console.WriteLine($"[TEST 6] generated ID is: {generatedId}");
 
                 // test 7: call IPC service method with byte array
