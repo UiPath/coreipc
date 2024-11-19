@@ -67,7 +67,7 @@ public abstract class TestBase : IAsyncLifetime
 
     protected abstract void ConfigureSpecificServices(IServiceCollection services);
 
-    private Task<ListenerConfig?> CreateListenerAndConfigure()
+    private Task<ServerTransport?> CreateListenerAndConfigure()
     {
         var factory = async () =>
         {
@@ -101,7 +101,7 @@ public abstract class TestBase : IAsyncLifetime
                     }
                 }
             },
-            Listeners = [listener],
+            Transport = [listener],
             ServiceProvider = _serviceProvider,
             Scheduler = GuiScheduler
         };
@@ -133,12 +133,12 @@ public abstract class TestBase : IAsyncLifetime
 
     protected void CreateLazyProxy<TContract>(out Lazy<TContract?> lazy) where TContract : class => lazy = new(GetProxy<TContract>);
 
-    protected abstract Task<ListenerConfig> CreateListener();
+    protected abstract Task<ServerTransport> CreateListener();
 
     protected abstract ClientConfig CreateClientConfig(EndpointCollection? callbacks = null);
     protected abstract ClientTransport CreateClientTransport();
 
-    protected abstract ListenerConfig ConfigTransportAgnostic(ListenerConfig listener);
+    protected abstract ServerTransport ConfigTransportAgnostic(ServerTransport listener);
 
     protected virtual async Task DisposeAsync()
     {

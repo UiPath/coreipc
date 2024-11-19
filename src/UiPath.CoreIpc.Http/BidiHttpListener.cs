@@ -12,7 +12,7 @@ namespace UiPath.Ipc.Http;
 using static Constants;
 using IBidiHttpListenerConfig = IListenerConfig<BidiHttpListener, BidiHttpListenerState, BidiHttpServerConnectionState>;
 
-public sealed partial record BidiHttpListener : ListenerConfig, IBidiHttpListenerConfig
+public sealed partial record BidiHttpListener : ServerTransport, IBidiHttpListenerConfig
 {
     public required Uri Uri { get; init; }
 

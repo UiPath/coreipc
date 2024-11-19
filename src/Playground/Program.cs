@@ -50,7 +50,7 @@ internal class Program
                 },
                 typeof(Contracts.IClientOperations2)
             },
-            Listeners = [
+            Transport = [
                 new NamedPipeListener()
                 {
                     PipeName = Contracts.PipeName,

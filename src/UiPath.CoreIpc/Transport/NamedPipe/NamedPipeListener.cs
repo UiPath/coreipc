@@ -6,7 +6,7 @@ namespace UiPath.Ipc.Transport.NamedPipe;
 
 using INamedPipeListenerConfig = IListenerConfig<NamedPipeListener, NamedPipeListenerState, NamedPipeServerConnectionState>;
 
-public sealed record NamedPipeListener : ListenerConfig, INamedPipeListenerConfig
+public sealed record NamedPipeListener : ServerTransport, INamedPipeListenerConfig
 {
     public required string PipeName { get; init; }
     public string ServerName { get; init; } = ".";

@@ -1,9 +1,7 @@
 ﻿namespace UiPath.Ipc;
 
-public sealed class IpcClient
+public sealed class IpcClient : Peer
 {
-    private ClientTransport _transport = null!;
-
     public required ClientConfig Config { get; init; }
     public required ClientTransport Transport { get; init; }
 

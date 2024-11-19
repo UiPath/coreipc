@@ -30,7 +30,7 @@ public abstract class SystemTests : TestBase
         .AddSingleton<SystemService>()
         .AddSingletonAlias<ISystemService, SystemService>();
 
-    protected override ListenerConfig ConfigTransportAgnostic(ListenerConfig listener)
+    protected override ServerTransport ConfigTransportAgnostic(ServerTransport listener)
     => listener with
     {
         ConcurrentAccepts = 10,
@@ -94,20 +94,20 @@ public abstract class SystemTests : TestBase
 
     private sealed class ServerExecutingTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
     {
-        public override async Task<ListenerConfig?> Override(Func<Task<ListenerConfig>> listener) => await listener() with { RequestTimeout = Timeouts.Short };
+        public override async Task<ServerTransport?> Override(Func<Task<ServerTransport>> listener) => await listener() with { RequestTimeout = Timeouts.Short };
         public override IpcClient? Override(Func<IpcClient> client)
         => client().WithRequestTimeout(Timeout.InfiniteTimeSpan);
     }
 
     private sealed class ClientWaitingForTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
     {
-        public override async Task<ListenerConfig?> Override(Func<Task<ListenerConfig>> listener) => await listener() with { RequestTimeout = Timeout.InfiniteTimeSpan };
+        public override async Task<ServerTransport?> Override(Func<Task<ServerTransport>> listener) => await listener() with { RequestTimeout = Timeout.InfiniteTimeSpan };
         public override IpcClient? Override(Func<IpcClient> client)
         => client().WithRequestTimeout(Timeouts.IpcRoundtrip);
     }
 
-    private ListenerConfig ShortClientTimeout(ListenerConfig listener) => listener with { RequestTimeout = TimeSpan.FromMilliseconds(100) };
-    private ListenerConfig InfiniteServerTimeout(ListenerConfig listener) => listener with { RequestTimeout = Timeout.InfiniteTimeSpan };
+    private ServerTransport ShortClientTimeout(ServerTransport listener) => listener with { RequestTimeout = TimeSpan.FromMilliseconds(100) };
+    private ServerTransport InfiniteServerTimeout(ServerTransport listener) => listener with { RequestTimeout = Timeout.InfiniteTimeSpan };
 
     [Fact]
     public async Task FireAndForget_ShouldWork()

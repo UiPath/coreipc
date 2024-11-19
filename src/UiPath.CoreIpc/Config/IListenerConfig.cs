@@ -1,7 +1,7 @@
 ﻿namespace UiPath.Ipc.Extensibility;
 
-public interface IListenerConfig<TSelf, TListenerState, TConnectionState>
-    where TSelf : ListenerConfig, IListenerConfig<TSelf, TListenerState, TConnectionState>
+internal interface IListenerConfig<TSelf, TListenerState, TConnectionState>
+    where TSelf : ServerTransport, IListenerConfig<TSelf, TListenerState, TConnectionState>
     where TListenerState : IAsyncDisposable
 {
     TListenerState CreateListenerState(IpcServer server);

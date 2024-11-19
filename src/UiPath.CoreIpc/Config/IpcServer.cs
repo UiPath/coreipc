@@ -1,16 +1,17 @@
 ﻿namespace UiPath.Ipc;
 
-public sealed class IpcServer : IAsyncDisposable
+public sealed class IpcServer : Peer, IAsyncDisposable
 {
-    public required IServiceProvider ServiceProvider { get; init; }
     public required EndpointCollection Endpoints { get; init; }
-    public required IReadOnlyList<ListenerConfig> Listeners { get; init; }
-    public TaskScheduler? Scheduler { get; init; }
+    public required ServerTransport Transport { get; init; }
 
-    private readonly Lazy<Task<IAsyncDisposable?>> _started;
+    private readonly Lazy<Listener> _listener;
     private readonly TaskCompletionSource<object?> _tcsStopped = new();
 
-    public IpcServer() => _started = new(StartCore);
+    public IpcServer()
+    {
+        _listener = new(() => Listener.Create(server: this));
+    }
 
     public void Start()
     {
@@ -24,25 +25,21 @@ public sealed class IpcServer : IAsyncDisposable
     public Task WaitForStart() => _started.Value;
     public Task WaitForStop() => _tcsStopped.Task;
 
-    private async Task<IAsyncDisposable?> StartCore()
+    private Listener? StartCore()
     {
         if (!IsValid(out _))
         {
             return null;
         }
 
-        var disposables = new StopAdapter(this);
         try
         {
-            foreach (var listenerConfig in Listeners)
-            {
-                disposables.Add(Listener.Create(this, listenerConfig));
-            }
-            return disposables;
+            return Listener.Create(this, Transport);
         }
         catch (Exception ex)
         {
             Trace.TraceError($"Failed to start server. Ex: {ex}");
+            _tcsStopped.TrySetException(ex);
             disposables.SetException(ex);
             await disposables.DisposeAsync();
             throw;
@@ -51,11 +48,11 @@ public sealed class IpcServer : IAsyncDisposable
 
     private bool IsValid(out IReadOnlyList<string> errors)
     {
-        errors = Listeners.SelectMany(PrefixErrors).ToArray();
+        errors = PrefixErrors(Transport).ToArray();
         return errors is { Count: 0 };
 
-        static IEnumerable<string> PrefixErrors(ListenerConfig config)
-        => config.Validate().Select(error => $"{config.GetType().Name}: {error}");
+        static IEnumerable<string> PrefixErrors(ServerTransport transport)
+        => transport.Validate().Select(error => $"{transport.GetType().Name}: {error}");
     }
 
     public async ValueTask DisposeAsync()
@@ -63,34 +60,5 @@ public sealed class IpcServer : IAsyncDisposable
         var maybeLogger = ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger(typeof(IpcServer));
 
         await ((await _started.Value)?.DisposeAsync() ?? default);
-    }
-
-    private sealed class StopAdapter : IAsyncDisposable
-    {
-        private readonly List<IAsyncDisposable> _items = new();
-        private readonly IpcServer _server;
-        private Exception? _exception;
-
-        public StopAdapter(IpcServer server) => _server = server;
-
-        public void Add(IAsyncDisposable item) => _items.Add(item);
-
-        public void SetException(Exception ex) => _exception = ex;
-
-        public async ValueTask DisposeAsync()
-        {
-            foreach (var item in _items)
-            {
-                await item.DisposeAsync();
-            }
-
-            if (_exception is not null)
-            {
-                _server._tcsStopped.TrySetException(_exception);
-                return;
-            }
-
-            _server._tcsStopped.TrySetResult(null);
-        }
     }
 }

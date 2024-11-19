@@ -2,7 +2,7 @@
 
 namespace UiPath.Ipc;
 
-public sealed record ClientConfig : EndpointConfig, IServiceClientConfig
+public sealed record ClientConfig : Peer, IServiceClientConfig
 {
     public EndpointCollection? Callbacks { get; init; }
 

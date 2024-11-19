@@ -2,7 +2,7 @@
 
 namespace UiPath.Ipc;
 
-public abstract record ListenerConfig : EndpointConfig, IServiceClientConfig
+public abstract class ServerTransport : Peer, IServiceClientConfig
 {
     public int ConcurrentAccepts { get; init; } = 5;
     public byte MaxReceivedMessageSizeInMegabytes { get; init; } = 2;
@@ -20,7 +20,7 @@ public abstract record ListenerConfig : EndpointConfig, IServiceClientConfig
         });
 
     #region IServiceClientConfig
-    /// Do not implement <see cref="IServiceClientConfig.RequestTimeout"/> explicitly, as it must be implicitly implemented by <see cref="EndpointConfig.RequestTimeout"/>.
+    /// Do not implement <see cref="IServiceClientConfig.RequestTimeout"/> explicitly, as it must be implicitly implemented by <see cref="Peer.RequestTimeout"/>.
 
     BeforeConnectHandler? IServiceClientConfig.BeforeConnect => null;
     BeforeCallHandler? IServiceClientConfig.BeforeCall => null;

@@ -44,7 +44,7 @@ public abstract class ComputingTests : TestBase
         .AddSingletonAlias<IComputingService, ComputingService>()
         ;
 
-    protected override ListenerConfig ConfigTransportAgnostic(ListenerConfig listener)
+    protected override ServerTransport ConfigTransportAgnostic(ServerTransport listener)
     => listener with
     {
         ConcurrentAccepts = 10,
@@ -279,12 +279,12 @@ public abstract class ComputingTests : TestBase
             .WhenAll();
     }
 
-    public abstract IAsyncDisposable? RandomTransportPair(out ListenerConfig listener, out ClientTransport transport);
+    public abstract IAsyncDisposable? RandomTransportPair(out ServerTransport listener, out ClientTransport transport);
 
     public abstract ExternalServerParams RandomServerParams();
     public readonly record struct ExternalServerParams(ServerKind Kind, string? PipeName = null, int Port = 0)
     {
-        public IAsyncDisposable? CreateListenerConfig(out ListenerConfig listenerConfig)
+        public IAsyncDisposable? CreateListenerConfig(out ServerTransport listenerConfig)
         {
             switch (Kind)
             {
@@ -321,7 +321,7 @@ public abstract class ComputingTests : TestBase
 
     private sealed class DisableInProcClientServer : OverrideConfig
     {
-        public override async Task<ListenerConfig?> Override(Func<Task<ListenerConfig>> listener) => null;
+        public override async Task<ServerTransport?> Override(Func<Task<ServerTransport>> listener) => null;
         public override IpcClient? Override(Func<IpcClient> client) => null;
     }
 }

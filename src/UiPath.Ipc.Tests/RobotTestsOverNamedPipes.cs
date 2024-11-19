@@ -12,7 +12,7 @@ public sealed class RobotTestsOverNamedPipes : RobotTests
 
     public RobotTestsOverNamedPipes(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
-    protected override async Task<ListenerConfig> CreateListener() => new NamedPipeListener
+    protected override async Task<ServerTransport> CreateListener() => new NamedPipeListener
     {
         PipeName = PipeName
     };
