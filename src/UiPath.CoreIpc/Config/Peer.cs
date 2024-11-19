@@ -1,8 +1,12 @@
 ﻿namespace UiPath.Ipc;
 
-public abstract record EndpointConfig
+public abstract class Peer
 {
     public TimeSpan RequestTimeout { get; init; } = Timeout.InfiniteTimeSpan;
+    public IServiceProvider? ServiceProvider { get; init; }
+    public TaskScheduler? Scheduler { get; init; }
+
+    internal ISerializer? Serializer => IpcJsonSerializer.Instance;
 
     internal virtual RouterConfig CreateRouterConfig(IpcServer server) => throw new NotSupportedException();
 

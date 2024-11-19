@@ -15,7 +15,7 @@ public sealed class SystemTestsOverWebSockets : SystemTests
         await base.DisposeAsync();
     }
 
-    protected override async Task<ListenerConfig> CreateListener()
+    protected override async Task<ServerTransport> CreateListener()
     {
         var listener = new WebSocketListener
         {

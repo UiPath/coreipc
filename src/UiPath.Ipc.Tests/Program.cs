@@ -25,7 +25,7 @@ await using var ipcServer = new IpcServer()
     {
         { typeof(IComputingService) },
     },
-    Listeners = [listener],
+    Transport = [listener],
 };
 ipcServer.Start();
 await ipcServer.WaitForStop();

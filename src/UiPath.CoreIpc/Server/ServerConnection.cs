@@ -9,7 +9,7 @@ public interface IClient
 }
 
 internal sealed class ServerConnection<TConfig, TListenerState, TConnectionState> : ServerConnection
-    where TConfig : ListenerConfig, IListenerConfig<TConfig, TListenerState, TConnectionState>
+    where TConfig : ServerTransport, IListenerConfig<TConfig, TListenerState, TConnectionState>
     where TListenerState : IAsyncDisposable
     where TConnectionState : IDisposable
 {

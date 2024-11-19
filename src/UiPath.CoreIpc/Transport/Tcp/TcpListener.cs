@@ -5,7 +5,7 @@ namespace UiPath.Ipc.Transport.Tcp;
 
 using ITcpListenerConfig = IListenerConfig<TcpListener, TcpListenerState, TcpServerConnectionState>;
 
-public sealed record TcpListener : ListenerConfig, ITcpListenerConfig
+public sealed record TcpListener : ServerTransport, ITcpListenerConfig
 {
     public required IPEndPoint EndPoint { get; init; }
 

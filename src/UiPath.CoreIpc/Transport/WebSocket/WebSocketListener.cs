@@ -2,7 +2,7 @@
 
 using IWebSocketListenerConfig = IListenerConfig<WebSocketListener, WebSocketListenerState, WebSocketServerConnectionState>;
 
-public sealed record WebSocketListener : ListenerConfig, IWebSocketListenerConfig
+public sealed record WebSocketListener : ServerTransport, IWebSocketListenerConfig
 {
     public required Accept Accept { get; init; }
 

@@ -31,7 +31,7 @@ public abstract class RobotTests : TestBase
         .AddSingleton<StudioOperations>()
         .AddSingletonAlias<IStudioOperations, StudioOperations>();
 
-    protected override ListenerConfig ConfigTransportAgnostic(ListenerConfig listener)
+    protected override ServerTransport ConfigTransportAgnostic(ServerTransport listener)
     => listener with
     {
         ConcurrentAccepts = 10,

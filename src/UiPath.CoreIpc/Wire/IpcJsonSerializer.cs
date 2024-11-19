@@ -5,7 +5,7 @@ using System.Text;
 
 namespace UiPath.Ipc;
 
-public interface ISerializer
+internal interface ISerializer
 {
     ValueTask<T?> DeserializeAsync<T>(Stream json, ILogger? logger);
     void Serialize(object? obj, Stream stream);
