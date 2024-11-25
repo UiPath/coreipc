@@ -48,7 +48,7 @@ public class SyncOverAsyncTests
     => new IpcServer
     {
         Transport = [
-            new NamedPipeListener
+            new NamedPipeServerTransport
                 {
                     PipeName = pipeName,
                 }
@@ -66,7 +66,7 @@ public class SyncOverAsyncTests
     private static IpcClient CreateClient(string pipeName)
     => new()
     {
-        Transport = new NamedPipeTransport { PipeName = pipeName },
+        Transport = new NamedPipeClientTransport { PipeName = pipeName },
         Config = new()
     };
 

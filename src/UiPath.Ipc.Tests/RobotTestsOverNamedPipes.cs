@@ -12,11 +12,11 @@ public sealed class RobotTestsOverNamedPipes : RobotTests
 
     public RobotTestsOverNamedPipes(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
-    protected override async Task<ServerTransport> CreateListener() => new NamedPipeListener
+    protected override async Task<ServerTransport> CreateListener() => new NamedPipeServerTransport
     {
         PipeName = PipeName
     };
-    protected override ClientTransport CreateClientTransport() => new NamedPipeTransport
+    protected override ClientTransport CreateClientTransport() => new NamedPipeClientTransport
     {
         PipeName = PipeName,
         AllowImpersonation = true,
@@ -62,7 +62,7 @@ public sealed class RobotTestsOverNamedPipes : RobotTests
         public TContract CreateUserServiceProxy<TContract>(string pipeName)
             where TContract : class
         => RobotIpcHelpers.CreateProxy<TContract>(
-            listener: new NamedPipeListener()
+            listener: new NamedPipeServerTransport()
             {
                 PipeName = pipeName,
                 AccessControl = security => security.AllowCurrentUser(),
@@ -82,7 +82,7 @@ internal static partial class RobotIpcHelpers
     private static readonly ConcurrentDictionary<CreateProxyRequest, ClientAndParams> PipeClients = new();
 
     public static TContract CreateProxy<TContract>(
-        NamedPipeListener listener,
+        NamedPipeServerTransport listener,
         EndpointCollection? callbacks = null,
         IServiceProvider? provider = null,
         Action? beforeConnect = null,
@@ -153,7 +153,7 @@ internal static partial class RobotIpcHelpers
                 BeforeCall = request.Params.BeforeCall,
                 Scheduler = request.Params.Scheduler,
             },
-            Transport = new NamedPipeTransport
+            Transport = new NamedPipeClientTransport
             {
                 PipeName = request.ActualKey.Name,
                 AllowImpersonation = request.ActualKey.AllowImpersonation,

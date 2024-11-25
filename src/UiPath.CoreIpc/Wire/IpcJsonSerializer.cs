@@ -5,15 +5,7 @@ using System.Text;
 
 namespace UiPath.Ipc;
 
-internal interface ISerializer
-{
-    ValueTask<T?> DeserializeAsync<T>(Stream json, ILogger? logger);
-    void Serialize(object? obj, Stream stream);
-    string Serialize(object? obj);
-    object? Deserialize(string json, Type type);
-}
-
-internal class IpcJsonSerializer : ISerializer, IArrayPool<char>
+internal class IpcJsonSerializer : IArrayPool<char>
 {
     public static readonly IpcJsonSerializer Instance = new();
 

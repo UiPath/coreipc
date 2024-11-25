@@ -1,5 +1,4 @@
-﻿using AutoFixture;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Nito.AsyncEx;
 using Nito.Disposables;
 using NSubstitute;
@@ -9,7 +8,6 @@ using System.Text;
 using UiPath.Ipc.Transport.NamedPipe;
 using UiPath.Ipc.Transport.Tcp;
 using UiPath.Ipc.Transport.WebSocket;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace UiPath.Ipc.Tests;
@@ -290,18 +288,18 @@ public abstract class ComputingTests : TestBase
             {
                 case ServerKind.NamedPipes:
                     {
-                        listenerConfig = new NamedPipeListener() { PipeName = PipeName! };
+                        listenerConfig = new NamedPipeServerTransport() { PipeName = PipeName! };
                         return null;
                     }
                 case ServerKind.Tcp:
                     {
-                        listenerConfig = new TcpListener() { EndPoint = new(System.Net.IPAddress.Loopback, Port) };
+                        listenerConfig = new TcpServerTransport() { EndPoint = new(System.Net.IPAddress.Loopback, Port) };
                         return null;
                     }
                 case ServerKind.WebSockets:
                     {
                         var context = new WebSocketContext(Port);
-                        listenerConfig = new WebSocketListener { Accept = context.Accept };
+                        listenerConfig = new WebSocketServerTransport { Accept = context.Accept };
                         return context;
                     }
                 default:
@@ -311,7 +309,7 @@ public abstract class ComputingTests : TestBase
 
         public ClientTransport CreateClientTransport() => Kind switch
         {
-            ServerKind.NamedPipes => new NamedPipeTransport() { PipeName = PipeName! },
+            ServerKind.NamedPipes => new NamedPipeClientTransport() { PipeName = PipeName! },
             ServerKind.Tcp => new TcpTransport() { EndPoint = new(System.Net.IPAddress.Loopback, Port) },
             ServerKind.WebSockets => new WebSocketTransport() { Uri = new($"ws://localhost:{Port}") },
             _ => throw new NotSupportedException($"Kind not supported. Kind was {Kind}")

@@ -28,7 +28,6 @@ internal class Server
 
     private ILogger? Logger => _connection.Logger;
     private bool LogEnabled => Logger.Enabled();
-    public ISerializer Serializer => _connection.Serializer.OrDefault();
     public string DebugName => _connection.DebugName;
 
     public Server(Router router, TimeSpan requestTimeout, Connection connection, IClient? client = null)
@@ -154,7 +153,7 @@ internal class Server
                 return result switch
                 {
                     Stream downloadStream => Response.Success(request, downloadStream),
-                    var x => Response.Success(request, Serializer.Serialize(x))
+                    var x => Response.Success(request, IpcJsonSerializer.Instance.Serialize(x))
                 };
             }
 
@@ -213,7 +212,7 @@ internal class Server
                     }
                     else
                     {
-                        argument = Serializer.Deserialize(request.Parameters[index], parameterType);
+                        argument = IpcJsonSerializer.Instance.Deserialize(request.Parameters[index], parameterType);
                         argument = CheckMessage(argument, parameterType);
                     }
                     allArguments[index] = argument;

@@ -38,6 +38,7 @@ internal class Program
         {
             Scheduler = serverScheduler,
             ServiceProvider = serverSP,
+            RequestTimeout = TimeSpan.FromHours(10),
             Endpoints = new()
             {
                 typeof(Contracts.IServerOperations), // DEVINE
@@ -50,23 +51,15 @@ internal class Program
                 },
                 typeof(Contracts.IClientOperations2)
             },
-            Transport = [
-                new NamedPipeListener()
+            Transport = new NamedPipeServerTransport()
+            {
+                PipeName = Contracts.PipeName,
+                ServerName = ".",
+                AccessControl = ps =>
                 {
-                    PipeName = Contracts.PipeName,
-                    ServerName = ".",
-                    AccessControl = ps =>
-                    {
-                    },
-                    MaxReceivedMessageSizeInMegabytes = 100,
-                    RequestTimeout = TimeSpan.FromHours(10)
                 },
-                //new BidirectionalHttp.ListenerConfig()
-                //{
-                //    Uri = serverUri,
-                //    RequestTimeout = TimeSpan.FromHours(1)
-                //}
-            ]
+                MaxReceivedMessageSizeInMegabytes = 100,
+            }
         };
 
         try
@@ -91,9 +84,9 @@ internal class Program
                     { typeof(Contracts.IClientOperations2), new Impl.Client2() },
                 },
                 ServiceProvider = clientSP,
-                Scheduler = clientScheduler,                
+                Scheduler = clientScheduler,
             },
-            Transport = new NamedPipeTransport()
+            Transport = new NamedPipeClientTransport()
             {
                 PipeName = Contracts.PipeName,
                 ServerName = ".",
@@ -113,7 +106,7 @@ internal class Program
                 },
                 Scheduler = clientScheduler,
             },
-            Transport = new NamedPipeTransport()
+            Transport = new NamedPipeClientTransport()
             {
                 PipeName = Contracts.PipeName,
                 ServerName = ".",
@@ -133,7 +126,7 @@ internal class Program
                 },
                 Scheduler = clientScheduler,
             },
-            Transport = new NamedPipeTransport()
+            Transport = new NamedPipeClientTransport()
             {
                 PipeName = Contracts.PipeName,
                 ServerName = ".",

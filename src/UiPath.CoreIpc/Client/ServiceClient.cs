@@ -93,7 +93,7 @@ internal abstract class ServiceClient : IDisposable
                     throw;
                 }
 
-                return response.Deserialize<TResult>(Config.Serializer);
+                return response.Deserialize<TResult>();
             }
             catch (Exception ex)
             {
@@ -123,7 +123,7 @@ internal abstract class ServiceClient : IDisposable
                             break;
                     }
 
-                    result[index] = Config.Serializer.OrDefault().Serialize(args[index]);
+                    result[index] = IpcJsonSerializer.Instance.Serialize(args[index]);
                 }
 
                 return result;
@@ -227,7 +227,7 @@ internal sealed class ServiceClientProper : ServiceClient
 
             var network = await Connect(ct);
 
-            LatestConnection = new Connection(network, Config.Serializer, Config.Logger, Config.DebugName);
+            LatestConnection = new Connection(network, Config.DebugName, Config.Logger);
             var router = new Router(_client.Config.CreateCallbackRouterConfig(), _client.Config.ServiceProvider);
             _latestServer = new Server(router, _client.Config.RequestTimeout, LatestConnection);
 
@@ -263,18 +263,20 @@ internal sealed class ServiceClientProper : ServiceClient
     protected override IServiceClientConfig Config => _client.Config;
 }
 
-internal sealed class ServiceClientForCallback : ServiceClient
+internal sealed class ServiceClientForCallback<TInterface> : ServiceClient where TInterface : class
 {
     private readonly Connection _connection;
-    private readonly Listener _listener;
+    private readonly IServiceClientConfig _config;
 
     public override Stream? Network => _connection.Network;
 
-    public ServiceClientForCallback(Connection connection, Listener listener, Type interfaceType) : base(interfaceType)
+    public ServiceClientForCallback(Connection connection, IServiceClientConfig config) : base(typeof(TInterface))
     {
         _connection = connection;
-        _listener = listener;
+        _config = config;
     }
+
+    public TInterface GetProxy() => GetProxy<TInterface>();
 
     public override void Dispose()
     {
@@ -284,5 +286,5 @@ internal sealed class ServiceClientForCallback : ServiceClient
     protected override Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct)
     => Task.FromResult((_connection, newlyConnected: false));
 
-    protected override IServiceClientConfig Config => _listener.Config;
+    protected override IServiceClientConfig Config => _config;
 }

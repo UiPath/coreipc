@@ -11,7 +11,7 @@ public sealed class SystemTestsOverTcp : SystemTests
     public SystemTestsOverTcp(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
     protected sealed override async Task<ServerTransport> CreateListener()
-    => new TcpListener
+    => new TcpServerTransport
     {
         EndPoint = _endPoint,
     };

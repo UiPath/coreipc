@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipes;
 
 namespace UiPath.Ipc;
@@ -21,22 +20,21 @@ internal sealed class Connection : IDisposable
     private readonly Action<object?> _cancelRequest;
     private readonly byte[] _buffer = new byte[sizeof(long)];
     private readonly NestedStream _nestedStream;
+
+    public string DebugName { get; }
+    public ILogger? Logger { get; }
+
     public Stream Network { get; }
-    public ILogger? Logger { get; internal set; }
 
     [MemberNotNullWhen(returnValue: true, nameof(Logger))]
     public bool LogEnabled => Logger.Enabled();
 
-    public string DebugName { get; }
-    public ISerializer? Serializer { get; }
-
-    public Connection(Stream network, ISerializer? serializer, ILogger? logger, string debugName, int maxMessageSize = int.MaxValue)
+    public Connection(Stream network, string debugName, ILogger? logger, int maxMessageSize = int.MaxValue)
     {
         Network = network;
         _nestedStream = new NestedStream(network, 0);
-        Serializer = serializer;
+        DebugName = debugName;
         Logger = logger;
-        DebugName = $"{debugName} {GetHashCode()}";
         _maxMessageSize = maxMessageSize;
         _onResponse = response => OnResponseReceived((Response)response!);
         _onRequest = request => OnRequestReceived((Request)request!);
@@ -49,8 +47,8 @@ internal sealed class Connection : IDisposable
     public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
     internal Task Listen() => _receiveLoop.Value;
 
-    internal event Func<Request, ValueTask> RequestReceived;
-    internal event Action<string> CancellationReceived;
+    internal event Func<Request, ValueTask>? RequestReceived;
+    internal event Action<string>? CancellationReceived;
     public event EventHandler<EventArgs>? Closed;
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
@@ -351,7 +349,7 @@ internal sealed class Connection : IDisposable
         try
         {
             stream.Position = HeaderLength;
-            Serializer.OrDefault().Serialize(value, stream);
+            IpcJsonSerializer.Instance.Serialize(value, stream);
             return stream;
         }
         catch
@@ -360,7 +358,7 @@ internal sealed class Connection : IDisposable
             throw;
         }
     }
-    private ValueTask<T?> Deserialize<T>() => Serializer.OrDefault().DeserializeAsync<T>(_nestedStream, Logger);
+    private ValueTask<T?> Deserialize<T>() => IpcJsonSerializer.Instance.DeserializeAsync<T>(_nestedStream, Logger);
 
     private void OnCancellationReceived(CancellationRequest cancellationRequest)
     {

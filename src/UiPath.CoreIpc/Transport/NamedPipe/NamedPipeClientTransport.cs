@@ -3,7 +3,7 @@ using System.Security.Principal;
 
 namespace UiPath.Ipc.Transport.NamedPipe;
 
-public sealed record NamedPipeTransport : ClientTransport
+public sealed record NamedPipeClientTransport : ClientTransport
 {
     public required string PipeName { get; init; }
     public string ServerName { get; init; } = ".";
@@ -35,7 +35,7 @@ internal sealed class NamedPipeClientState : IClientState
 
     public async ValueTask Connect(IpcClient client, CancellationToken ct)
     {
-        var transport = client.Transport as NamedPipeTransport ?? throw new InvalidOperationException();
+        var transport = client.Transport as NamedPipeClientTransport ?? throw new InvalidOperationException();
 
         _pipe = new NamedPipeClientStream(
             transport.ServerName,

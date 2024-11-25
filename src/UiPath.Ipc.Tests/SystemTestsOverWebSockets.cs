@@ -17,7 +17,7 @@ public sealed class SystemTestsOverWebSockets : SystemTests
 
     protected override async Task<ServerTransport> CreateListener()
     {
-        var listener = new WebSocketListener
+        var listener = new WebSocketServerTransport
         {
             Accept = _webSocketContext.Accept,
             ConcurrentAccepts = 1,

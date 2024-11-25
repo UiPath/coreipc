@@ -1,31 +1,58 @@
-﻿using System.Security.Cryptography.X509Certificates;
+﻿using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 
 namespace UiPath.Ipc;
 
-public abstract class ServerTransport : Peer, IServiceClientConfig
+public abstract class ServerTransport
 {
     public int ConcurrentAccepts { get; init; } = 5;
     public byte MaxReceivedMessageSizeInMegabytes { get; init; } = 2;
     public X509Certificate? Certificate { get; init; }
     internal int MaxMessageSize => MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
 
-    internal IEnumerable<string> Validate() => Enumerable.Empty<string>();
-
-    internal override RouterConfig CreateRouterConfig(IpcServer server)
-    => RouterConfig.From(
-        server.Endpoints,
-        endpoint => endpoint with
+    // TODO: Maybe decommission.
+    internal async Task<Stream> MaybeAuthenticate(Stream network)
+    {
+        if (Certificate is null)
         {
-            Scheduler = endpoint.Scheduler ?? server.Scheduler
-        });
+            return network;
+        }
 
-    #region IServiceClientConfig
-    /// Do not implement <see cref="IServiceClientConfig.RequestTimeout"/> explicitly, as it must be implicitly implemented by <see cref="Peer.RequestTimeout"/>.
+        var sslStream = new SslStream(network, leaveInnerStreamOpen: false);
+        try
+        {
+            await sslStream.AuthenticateAsServerAsync(Certificate);
+        }
+        catch
+        {
+            sslStream.Dispose();
+            throw;
+        }
 
-    BeforeConnectHandler? IServiceClientConfig.BeforeConnect => null;
-    BeforeCallHandler? IServiceClientConfig.BeforeCall => null;
-    ILogger? IServiceClientConfig.Logger => null;
-    ISerializer? IServiceClientConfig.Serializer => null!;
-    string IServiceClientConfig.DebugName => $"CallbackClient for {this}";
-    #endregion
+        Debug.Assert(sslStream.IsEncrypted && sslStream.IsSigned);
+        return sslStream;
+    }
+
+    protected internal abstract IServerState CreateServerState();
+
+    internal IEnumerable<string> Validate()
+    => ValidateCore().Where(x => x is not null).Select(x => $"{GetType().Name}.{x}");
+    protected abstract IEnumerable<string?> ValidateCore();
+    protected static string? IsNotNull<T>(T? propertyValue, [CallerArgumentExpression(nameof(propertyValue))] string? propertyName = null)
+    {
+        if (propertyValue is null)
+        {
+            return $"{propertyName} is required.";
+        }
+        return null;
+    }
+
+    protected internal interface IServerState : IAsyncDisposable
+    {
+        IServerConnectionSlot CreateConnectionSlot();
+    }
+    protected internal interface IServerConnectionSlot : IDisposable
+    {
+        ValueTask<Stream> AwaitConnection(CancellationToken ct);
+    }
 }
