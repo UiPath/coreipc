@@ -2,7 +2,7 @@
 
 namespace UiPath.Ipc.Transport.WebSocket;
 
-public sealed record WebSocketTransport : ClientTransport
+public sealed record WebSocketClientTransport : ClientTransport
 {
     public required Uri Uri { get; init; }
     public override string ToString() => $"WebSocketClient={Uri}";
@@ -28,7 +28,7 @@ internal sealed class WebSocketClientState : IClientState
 
     public async ValueTask Connect(IpcClient client, CancellationToken ct)
     {
-        var transport = client.Transport as WebSocketTransport ?? throw new InvalidOperationException();
+        var transport = client.Transport as WebSocketClientTransport ?? throw new InvalidOperationException();
 
         _clientWebSocket = new();
         await _clientWebSocket.ConnectAsync(transport.Uri, ct);

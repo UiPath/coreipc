@@ -1,9 +1,21 @@
-﻿namespace UiPath.Ipc;
+﻿using System.ComponentModel;
 
-public sealed class IpcClient : Peer
+namespace UiPath.Ipc;
+
+public sealed class IpcClient : Peer, IClientConfig
 {
-    public required ClientConfig Config { get; init; }
+    public EndpointCollection? Callbacks { get; set; }
+
+    public ILogger? Logger { get; init; }
+    public BeforeConnectHandler? BeforeConnect { get; set; }
+    public BeforeCallHandler? BeforeOutgoingCall { get; set; }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public string DebugName { get; set; } = null!;
+
     public required ClientTransport Transport { get; init; }
+
+    string IClientConfig.GetComputedDebugName() => DebugName ?? Transport.ToString();
 
     private readonly ConcurrentDictionary<Type, ServiceClient> _clients = new();
     private ServiceClient GetServiceClient(Type proxyType)
@@ -16,18 +28,42 @@ public sealed class IpcClient : Peer
 
     internal void Validate()
     {
-        if (Config is null)
+        var haveDeferredInjectedCallbacks = Callbacks?.Any(x => x.Service.MaybeGetServiceProvider() is null && x.Service.MaybeGetInstance() is null) ?? false;
+
+        if (haveDeferredInjectedCallbacks && ServiceProvider is null)
         {
-            throw new InvalidOperationException($"{Config} is required.");
+            throw new InvalidOperationException("ServiceProvider is required when you register injectable callbacks. Consider registering a callback instance.");
         }
+
         if (Transport is null)
         {
             throw new InvalidOperationException($"{Transport} is required.");
         }
 
-        Config.Validate();
         Transport.Validate();
-
-        Config.DebugName ??= Transport.ToString();
     }
+
+    internal ILogger? GetLogger(string name)
+    {
+        if (Logger is not null)
+        {
+            return Logger;
+        }
+
+        if (ServiceProvider?.GetService<ILoggerFactory>() is not { } loggerFactory)
+        {
+            return null;
+        }
+
+        return loggerFactory.CreateLogger(name);
+    }
+
+    internal RouterConfig CreateCallbackRouterConfig()
+    => RouterConfig.From(
+        Callbacks.OrDefault(),
+        endpoint => endpoint with
+        {
+            BeforeIncommingCall = null, // callbacks don't support BeforeCall
+            Scheduler = endpoint.Scheduler ?? Scheduler
+        });
 }

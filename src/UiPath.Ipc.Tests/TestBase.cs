@@ -45,8 +45,8 @@ public abstract class TestBase : IAsyncLifetime
         _guiThread.SynchronizationContext.Send(() => Thread.CurrentThread.Name = Names.GuiThreadName);
         _serviceProvider = IpcHelpers.ConfigureServices(_outputHelper, ConfigureSpecificServices);
 
-        _ipcServer = new(CreateServer);
-        _ipcClient = new(() => CreateClient());
+        _ipcServer = new(CreateIpcServer);
+        _ipcClient = new(() => CreateIpcClient());
 
         OverrideConfig? GetOverrideConfig()
         {
@@ -67,78 +67,84 @@ public abstract class TestBase : IAsyncLifetime
 
     protected abstract void ConfigureSpecificServices(IServiceCollection services);
 
-    private Task<ServerTransport?> CreateListenerAndConfigure()
-    {
-        var factory = async () =>
-        {
-            _outputHelper.WriteLine("Creating listener...");
-            var listener = await CreateListener();
-            listener = ConfigTransportAgnostic(listener);
-            return listener;
-        };
+    protected virtual EndpointCollection? Callbacks => [];
 
-        if (_overrideConfig is null)
+    private Task<IpcServer?> CreateIpcServer()
+    {
+        if (_overrideConfig is not null)
         {
-            return factory();
+            return _overrideConfig.Override(Core);
         }
 
-        return _overrideConfig.Override(factory);
-    }
+        return Core()!;
 
-    protected async Task<IpcServer?> CreateServer()
-    {
-        if (await CreateListenerAndConfigure() is not { } listener) return null;
-
-        return new()
+        async Task<IpcServer> Core()
         {
-            Endpoints = new() {
-                new EndpointSettings(ContractType)
+            _outputHelper.WriteLine($"Creating {nameof(ServerTransport)}...");
+
+            var serverTransport = await CreateServerTransport();
+            ConfigTransportBase(serverTransport);
+
+            var endpointSettings = new EndpointSettings(ContractType)
+            {
+                BeforeIncommingCall = (callInfo, ct) =>
                 {
-                    BeforeCall = (callInfo, ct) =>
-                    {
-                        _serverBeforeCalls.Add(callInfo);
-                        return _tailBeforeCall?.Invoke(callInfo, ct) ?? Task.CompletedTask;
-                    }
+                    _serverBeforeCalls.Add(callInfo);
+                    return _tailBeforeCall?.Invoke(callInfo, ct) ?? Task.CompletedTask;
                 }
-            },
-            Transport = [listener],
-            ServiceProvider = _serviceProvider,
-            Scheduler = GuiScheduler
-        };
-    }
+            };
 
-    protected IpcClient? CreateClient(EndpointCollection? callbacks = null)
+            return new()
+            {
+                Endpoints = new() { endpointSettings },
+                Transport = serverTransport,
+                ServiceProvider = _serviceProvider,
+                Scheduler = GuiScheduler,
+                RequestTimeout = ServerRequestTimeout
+            };
+        }
+    }
+    protected IpcClient? CreateIpcClient(EndpointCollection? callbacks = null) 
     {
-        var factory = () =>
+        if (_overrideConfig is null)
         {
-            var config = CreateClientConfig(callbacks);
-            var transport = CreateClientTransport();
+            return CreateDefaultClient();
+        }
+
+        return _overrideConfig.Override(CreateDefaultClient);
+
+        IpcClient CreateDefaultClient()
+        {
             var client = new IpcClient
             {
-                Config = config,
-                Transport = transport
+                Callbacks = callbacks ?? Callbacks,
+                Transport = CreateClientTransport()
             };
+            ConfigureClient(client);
             return client;
-        };
-
-        if (_overrideConfig is null)
-        {
-            return factory();
         }
-
-        return _overrideConfig.Override(factory);
     }
+
     protected TContract? GetProxy<TContract>() where TContract : class
     => _ipcClient.Value?.GetProxy<TContract>();
 
     protected void CreateLazyProxy<TContract>(out Lazy<TContract?> lazy) where TContract : class => lazy = new(GetProxy<TContract>);
 
-    protected abstract Task<ServerTransport> CreateListener();
+    protected abstract Task<ServerTransport> CreateServerTransport();
+    protected abstract TimeSpan ServerRequestTimeout { get; }
 
-    protected abstract ClientConfig CreateClientConfig(EndpointCollection? callbacks = null);
+    protected virtual void ConfigureClient(IpcClient ipcClient)
+    {
+        ipcClient.RequestTimeout = Timeouts.DefaultRequest;
+        ipcClient.Scheduler = GuiScheduler;
+    }
     protected abstract ClientTransport CreateClientTransport();
 
-    protected abstract ServerTransport ConfigTransportAgnostic(ServerTransport listener);
+    protected virtual void ConfigTransportBase(ServerTransport serverTransport)
+    {
+        serverTransport.ConcurrentAccepts = 10;
+        serverTransport.MaxReceivedMessageSizeInMegabytes = 1;
+    }
 
     protected virtual async Task DisposeAsync()
     {

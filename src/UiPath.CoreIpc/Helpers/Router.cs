@@ -131,7 +131,7 @@ internal readonly struct Route
     => new Route()
     {
         Service = endpointSettings.Service.WithProvider(serviceProvider),
-        BeforeCall = endpointSettings.BeforeCall,
+        BeforeCall = endpointSettings.BeforeIncommingCall,
         Scheduler = endpointSettings.Scheduler.OrDefault(),
         LoggerFactory = serviceProvider.MaybeCreateServiceFactory<ILoggerFactory>(),
     };

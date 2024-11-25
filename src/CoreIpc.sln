@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# 17
+# Visual Studio Version 17
 VisualStudioVersion = 17.0.31919.166
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc", "UiPath.CoreIpc\UiPath.CoreIpc.csproj", "{58200319-1F71-4E22-894D-7E69E0CD0B57}"
@@ -16,6 +16,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.Http", "UiPath.CoreIpc.Http\UiPath.CoreIpc.Http.csproj", "{8776E55A-D4EB-4C3A-8FA2-29E9A1CAE469}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.Ipc.Tests", "UiPath.Ipc.Tests\UiPath.Ipc.Tests.csproj", "{E238E183-92CF-48A6-890F-C422853D6656}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UiPath.CoreIpc.Extensions.Abstractions", "UiPath.CoreIpc.Extensions.Abstractions\UiPath.CoreIpc.Extensions.Abstractions.csproj", "{F519AE2B-88A6-482E-A6E2-B525F71F566D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +41,10 @@ Global
 		{E238E183-92CF-48A6-890F-C422853D6656}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E238E183-92CF-48A6-890F-C422853D6656}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E238E183-92CF-48A6-890F-C422853D6656}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F519AE2B-88A6-482E-A6E2-B525F71F566D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F519AE2B-88A6-482E-A6E2-B525F71F566D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F519AE2B-88A6-482E-A6E2-B525F71F566D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F519AE2B-88A6-482E-A6E2-B525F71F566D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

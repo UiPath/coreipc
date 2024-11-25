@@ -10,7 +10,7 @@ if (args is not [var base64])
     return 1;
 }
 var externalServerParams = JsonConvert.DeserializeObject<ComputingTests.ExternalServerParams>(Encoding.UTF8.GetString(Convert.FromBase64String(base64)));
-await using var asyncDisposable = externalServerParams.CreateListenerConfig(out var listener);
+await using var asyncDisposable = externalServerParams.CreateListenerConfig(out var serverTransport);
 
 await using var serviceProvider = new ServiceCollection()
     .AddLogging(builder => builder.AddConsole())
@@ -25,7 +25,7 @@ await using var ipcServer = new IpcServer()
     {
         { typeof(IComputingService) },
     },
-    Transport = [listener],
+    Transport = serverTransport,
 };
 ipcServer.Start();
 await ipcServer.WaitForStop();

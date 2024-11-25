@@ -44,7 +44,7 @@ internal class Program
                 typeof(Contracts.IServerOperations), // DEVINE
                 new EndpointSettings(typeof(Contracts.IServerOperations)) // ASTALALT
                 {
-                    BeforeCall = async (callInfo, _) =>
+                    BeforeIncommingCall = async (callInfo, _) =>
                     {
                         Console.WriteLine($"Server: {callInfo.Method.Name}");
                     }
@@ -76,36 +76,30 @@ internal class Program
 
         var c1 = new IpcClient()
         {
-            Config = new()
+            Callbacks = new()
             {
-                Callbacks = new()
-                {
-                    typeof(Contracts.IClientOperations),
-                    { typeof(Contracts.IClientOperations2), new Impl.Client2() },
-                },
-                ServiceProvider = clientSP,
-                Scheduler = clientScheduler,
+                typeof(Contracts.IClientOperations),
+                { typeof(Contracts.IClientOperations2), new Impl.Client2() },
             },
+            ServiceProvider = clientSP,
+            Scheduler = clientScheduler,
             Transport = new NamedPipeClientTransport()
             {
                 PipeName = Contracts.PipeName,
                 ServerName = ".",
                 AllowImpersonation = false,
-            },
+            }
         };
 
         var c2 = new IpcClient()
         {
-            Config = new()
+            ServiceProvider = clientSP,
+            Callbacks = new()
             {
-                ServiceProvider = clientSP,
-                Callbacks = new()
-                {
-                    typeof(Contracts.IClientOperations),
-                    { typeof(Contracts.IClientOperations2), new Impl.Client2() },
-                },
-                Scheduler = clientScheduler,
+                typeof(Contracts.IClientOperations),
+                { typeof(Contracts.IClientOperations2), new Impl.Client2() },
             },
+            Scheduler = clientScheduler,
             Transport = new NamedPipeClientTransport()
             {
                 PipeName = Contracts.PipeName,
@@ -116,16 +110,13 @@ internal class Program
 
         var proxy1 = new IpcClient()
         {
-            Config = new()
+            ServiceProvider = clientSP,
+            Callbacks = new()
             {
-                ServiceProvider = clientSP,
-                Callbacks = new()
-                {
-                    typeof(Contracts.IClientOperations),
-                    { typeof(Contracts.IClientOperations2), new Impl.Client2() },
-                },
-                Scheduler = clientScheduler,
+                typeof(Contracts.IClientOperations),
+                { typeof(Contracts.IClientOperations2), new Impl.Client2() },
             },
+            Scheduler = clientScheduler,
             Transport = new NamedPipeClientTransport()
             {
                 PipeName = Contracts.PipeName,

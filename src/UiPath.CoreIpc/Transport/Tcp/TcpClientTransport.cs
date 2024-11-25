@@ -2,7 +2,7 @@
 
 namespace UiPath.Ipc.Transport.Tcp;
 
-public sealed record TcpTransport : ClientTransport
+public sealed record TcpClientTransport : ClientTransport
 {
     public required IPEndPoint EndPoint { get; init; }
 
@@ -32,7 +32,7 @@ internal sealed class TcpClientState : IClientState
 
     public async ValueTask Connect(IpcClient client, CancellationToken ct)
     {
-        var transport = client.Transport as TcpTransport ?? throw new InvalidOperationException();
+        var transport = client.Transport as TcpClientTransport ?? throw new InvalidOperationException();
 
         _tcpClient = new System.Net.Sockets.TcpClient();
 #if NET461

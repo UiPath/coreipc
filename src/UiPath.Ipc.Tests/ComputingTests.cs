@@ -2,7 +2,6 @@
 using Nito.AsyncEx;
 using Nito.Disposables;
 using NSubstitute;
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
 using UiPath.Ipc.Transport.NamedPipe;
@@ -12,7 +11,7 @@ using Xunit.Abstractions;
 
 namespace UiPath.Ipc.Tests;
 
-public abstract class ComputingTests : TestBase
+public abstract class ComputingTests : SpyTestBase
 {
     #region " Setup "
     protected readonly ComputingCallback _computingCallback = new();
@@ -25,8 +24,10 @@ public abstract class ComputingTests : TestBase
 
     protected sealed override IpcProxy? IpcProxy => Proxy as IpcProxy;
     protected sealed override Type ContractType => typeof(IComputingService);
-
-    protected readonly ConcurrentBag<CallInfo> _clientBeforeCalls = new();
+    protected override EndpointCollection? Callbacks => new()
+    {
+        { typeof(IComputingCallback), _computingCallback }
+    };
 
     protected ComputingTests(ITestOutputHelper outputHelper) : base(outputHelper)
     {
@@ -42,24 +43,7 @@ public abstract class ComputingTests : TestBase
         .AddSingletonAlias<IComputingService, ComputingService>()
         ;
 
-    protected override ServerTransport ConfigTransportAgnostic(ServerTransport listener)
-    => listener with
-    {
-        ConcurrentAccepts = 10,
-        RequestTimeout = Timeouts.DefaultRequest,
-        MaxReceivedMessageSizeInMegabytes = 1,
-    };
-    protected override ClientConfig CreateClientConfig(EndpointCollection? callbacks = null)
-    => new()
-    {
-        RequestTimeout = Timeouts.DefaultRequest,
-        Scheduler = GuiScheduler,
-        Callbacks = callbacks ?? new()
-        {
-            { typeof(IComputingCallback), _computingCallback }
-        },
-        BeforeCall = async (callInfo, _) => _clientBeforeCalls.Add(callInfo),
-    };
+    protected override TimeSpan ServerRequestTimeout => Timeouts.DefaultRequest;
     #endregion
 
     [Theory, IpcAutoData]
@@ -231,16 +215,13 @@ public abstract class ComputingTests : TestBase
         });
         var proxy = new IpcClient
         {
-            Config = new()
+            Scheduler = GuiScheduler,
+            BeforeConnect = async (_) =>
             {
-                Scheduler = GuiScheduler,
-                BeforeConnect = async (_) =>
-                {
-                    serverProcess.Start();
-                    var time = TimeSpan.FromSeconds(1);
-                    _outputHelper.WriteLine($"Server started. Waiting {time}. PID={serverProcess.Id}");
-                    await Task.Delay(time);
-                },
+                serverProcess.Start();
+                var time = TimeSpan.FromSeconds(1);
+                _outputHelper.WriteLine($"Server started. Waiting {time}. PID={serverProcess.Id}");
+                await Task.Delay(time);
             },
             Transport = externalServerParams.CreateClientTransport()
         }.GetProxy<IComputingService>();
@@ -260,7 +241,7 @@ public abstract class ComputingTests : TestBase
                 var mockCallback = Substitute.For<IComputingCallback>();
                 mockCallback.AddInts(0, 1).Returns(1);
 
-                var proxy = CreateClient(callbacks: new()
+                var proxy = CreateIpcClient(callbacks: new()
                 {
                     { typeof(IComputingCallback), mockCallback }
                 })!.GetProxy<IComputingService>();
@@ -310,8 +291,8 @@ public abstract class ComputingTests : TestBase
         public ClientTransport CreateClientTransport() => Kind switch
         {
             ServerKind.NamedPipes => new NamedPipeClientTransport() { PipeName = PipeName! },
-            ServerKind.Tcp => new TcpTransport() { EndPoint = new(System.Net.IPAddress.Loopback, Port) },
-            ServerKind.WebSockets => new WebSocketTransport() { Uri = new($"ws://localhost:{Port}") },
+            ServerKind.Tcp => new TcpClientTransport() { EndPoint = new(System.Net.IPAddress.Loopback, Port) },
+            ServerKind.WebSockets => new WebSocketClientTransport() { Uri = new($"ws://localhost:{Port}") },
             _ => throw new NotSupportedException($"Kind not supported. Kind was {Kind}")
         };
     }
@@ -319,7 +300,7 @@ public abstract class ComputingTests : TestBase
 
     private sealed class DisableInProcClientServer : OverrideConfig
     {
-        public override async Task<ServerTransport?> Override(Func<Task<ServerTransport>> listener) => null;
+        public override async Task<IpcServer?> Override(Func<Task<IpcServer>> ipcServerFactory) => null;
         public override IpcClient? Override(Func<IpcClient> client) => null;
     }
 }
