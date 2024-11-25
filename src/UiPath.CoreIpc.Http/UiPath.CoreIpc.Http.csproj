@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\UiPath.CoreIpc\UiPath.CoreIpc.csproj" />
+    <ProjectReference Include="..\UiPath.CoreIpc.Extensions.Abstractions\UiPath.CoreIpc.Extensions.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

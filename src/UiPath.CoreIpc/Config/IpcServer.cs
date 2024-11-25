@@ -14,8 +14,16 @@ public sealed class IpcServer : Peer, IAsyncDisposable
 
     private bool _disposeStarted;
     private Accepter? _accepter;
+    private Lazy<Task> _dispose;
 
-    public async ValueTask DisposeAsync()
+    public IpcServer()
+    {
+        _dispose = new(DisposeCore);
+    }
+
+    public ValueTask DisposeAsync() => new(_dispose.Value);
+
+    private async Task DisposeCore()
     {
         Accepter? accepter = null;
         lock (_lock)
@@ -77,6 +85,13 @@ public sealed class IpcServer : Peer, IAsyncDisposable
         _stopped.TrySetException(ex);
     }
 
+    internal RouterConfig CreateRouterConfig(IpcServer server) => RouterConfig.From(
+        server.Endpoints,
+        endpoint => endpoint with
+        {
+            Scheduler = endpoint.Scheduler ?? server.Scheduler
+        });
+
     private sealed class ObserverAdapter<T> : IObserver<T>
     {
         public required Action<T> OnNext { get; init; }
@@ -95,6 +110,7 @@ public sealed class IpcServer : Peer, IAsyncDisposable
         private readonly Task _running;
         private readonly IObserver<Stream> _newConnection;
         private readonly TaskCompletionSource<object?> _tcsStartedAccepting = new();
+        private readonly Lazy<Task> _dispose;
 
         public Task StartedAccepting => _tcsStartedAccepting.Task;
 
@@ -103,14 +119,18 @@ public sealed class IpcServer : Peer, IAsyncDisposable
             _serverState = transport.CreateServerState();
             _newConnection = connected;
             _running = RunOnThreadPool(LoopAccept, parallelCount: transport.ConcurrentAccepts, _cts.Token);
+            _dispose = new(DisposeCore);
         }
 
-        public async ValueTask DisposeAsync()
-        {
+        public ValueTask DisposeAsync() => new(_dispose.Value);
+
+        private async Task DisposeCore()
+        { 
             _cts.Cancel();
             await _running;
             _cts.Dispose();
         }
+
 
         private async Task LoopAccept(CancellationToken ct)
         {

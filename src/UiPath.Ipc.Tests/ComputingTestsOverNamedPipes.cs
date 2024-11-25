@@ -9,7 +9,7 @@ public sealed class ComputingTestsOverNamedPipes : ComputingTests
 
     public ComputingTestsOverNamedPipes(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
-    protected override async Task<ServerTransport> CreateListener() => new NamedPipeServerTransport
+    protected override async Task<ServerTransport> CreateServerTransport() => new NamedPipeServerTransport
     {
         PipeName = PipeName
     };

@@ -12,7 +12,7 @@ public sealed class RobotTestsOverNamedPipes : RobotTests
 
     public RobotTestsOverNamedPipes(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
-    protected override async Task<ServerTransport> CreateListener() => new NamedPipeServerTransport
+    protected override async Task<ServerTransport> CreateServerTransport() => new NamedPipeServerTransport
     {
         PipeName = PipeName
     };
@@ -62,13 +62,8 @@ public sealed class RobotTestsOverNamedPipes : RobotTests
         public TContract CreateUserServiceProxy<TContract>(string pipeName)
             where TContract : class
         => RobotIpcHelpers.CreateProxy<TContract>(
-            listener: new NamedPipeServerTransport()
-            {
-                PipeName = pipeName,
-                AccessControl = security => security.AllowCurrentUser(),
-                MaxReceivedMessageSizeInMegabytes = 10,
-                RequestTimeout = TimeSpan.FromSeconds(40),
-            },
+            pipeName,
+            requestTimeout: TimeSpan.FromSeconds(40),
             callbacks: new EndpointCollection()
             {
                 { typeof(TCallback), Instance }
@@ -82,16 +77,6 @@ internal static partial class RobotIpcHelpers
     private static readonly ConcurrentDictionary<CreateProxyRequest, ClientAndParams> PipeClients = new();
 
     public static TContract CreateProxy<TContract>(
-        NamedPipeServerTransport listener,
-        EndpointCollection? callbacks = null,
-        IServiceProvider? provider = null,
-        Action? beforeConnect = null,
-        BeforeCallHandler? beforeCall = null,
-        bool allowImpersonation = false,
-        TaskScheduler? scheduler = null) where TContract : class
-    => CreateProxy<TContract>(listener.PipeName, listener.RequestTimeout, callbacks, provider, beforeConnect, beforeCall, allowImpersonation, scheduler);
-
-    public static TContract CreateProxy<TContract>(
         string pipeName,
         TimeSpan? requestTimeout = null,
         EndpointCollection? callbacks = null,
@@ -101,6 +86,7 @@ internal static partial class RobotIpcHelpers
         bool allowImpersonation = false,
         TaskScheduler? scheduler = null) where TContract : class
     {
+        // TODO: Fix this
         // Dirty hack (temporary): different callback sets will result in different connections
         // Hopefully, the different sets are also disjunctive.
 
@@ -139,20 +125,17 @@ internal static partial class RobotIpcHelpers
     => new(
         Client: new()
         {
-            Config = new()
+            RequestTimeout = request.Params.RequestTimeout ?? Timeout.InfiniteTimeSpan,
+            ServiceProvider = request.Params.Provider,
+            Logger = request.Params.Provider?.GetService<ILogger<IpcProxy>>(),
+            Callbacks = request.Callbacks,
+            BeforeConnect = request.Params.BeforeConnect is null ? null : _ =>
             {
-                RequestTimeout = request.Params.RequestTimeout ?? Timeout.InfiniteTimeSpan,
-                ServiceProvider = request.Params.Provider,
-                Logger = request.Params.Provider?.GetService<ILogger<IpcProxy>>(),
-                Callbacks = request.Callbacks,
-                BeforeConnect = request.Params.BeforeConnect is null ? null : _ =>
-                {
-                    request.Params.BeforeConnect();
-                    return Task.CompletedTask;
-                },
-                BeforeCall = request.Params.BeforeCall,
-                Scheduler = request.Params.Scheduler,
+                request.Params.BeforeConnect();
+                return Task.CompletedTask;
             },
+            BeforeOutgoingCall = request.Params.BeforeCall,
+            Scheduler = request.Params.Scheduler,
             Transport = new NamedPipeClientTransport
             {
                 PipeName = request.ActualKey.Name,

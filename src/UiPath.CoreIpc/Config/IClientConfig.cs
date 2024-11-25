@@ -1,11 +1,11 @@
 ﻿namespace UiPath.Ipc;
 
 // Maybe decommission
-internal interface IServiceClientConfig
+internal interface IClientConfig
 {
     TimeSpan RequestTimeout { get; }
     BeforeConnectHandler? BeforeConnect { get; }
-    BeforeCallHandler? BeforeCall { get; }
+    BeforeCallHandler? BeforeOutgoingCall { get; }
     ILogger? Logger { get; }
-    string DebugName { get; }
+    string GetComputedDebugName();
 }

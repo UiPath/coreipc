@@ -5,7 +5,7 @@ using System;
 public record EndpointSettings
 {
     public TaskScheduler? Scheduler { get; set; }
-    public BeforeCallHandler? BeforeCall { get; set; }
+    public BeforeCallHandler? BeforeIncommingCall { get; set; }
     public Type ContractType => Service.Type;
     public object? ServiceInstance => Service.MaybeGetInstance();
     public IServiceProvider? ServiceProvider => Service.MaybeGetServiceProvider();

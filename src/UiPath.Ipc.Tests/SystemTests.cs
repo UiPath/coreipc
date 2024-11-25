@@ -30,20 +30,7 @@ public abstract class SystemTests : TestBase
         .AddSingleton<SystemService>()
         .AddSingletonAlias<ISystemService, SystemService>();
 
-    protected override ServerTransport ConfigTransportAgnostic(ServerTransport listener)
-    => listener with
-    {
-        ConcurrentAccepts = 10,
-        RequestTimeout = Timeouts.DefaultRequest,
-        MaxReceivedMessageSizeInMegabytes = 1,
-    };
-    protected override ClientConfig CreateClientConfig(EndpointCollection? callbacks = null)
-    => new()
-    {
-        RequestTimeout = Timeouts.DefaultRequest,
-        ServiceProvider = ServiceProvider,
-        Callbacks = callbacks
-    };
+    protected override TimeSpan ServerRequestTimeout => Timeouts.DefaultRequest;
     #endregion
 
     [Theory, IpcAutoData]
@@ -76,7 +63,7 @@ public abstract class SystemTests : TestBase
         .ShouldBeAsync(true);
 
     [Fact]
-    [OverrideConfig(typeof(ServerExecutingTooLongACall_ShouldThrowTimeout_Config))]
+    [OverrideConfig(typeof(ShortServerLongClientTimeout))]
     public async Task ServerExecutingTooLongACall_ShouldThrowTimeout()
     => await Proxy.EchoGuidAfter(Guid.Empty, Timeout.InfiniteTimeSpan) // method takes forever but we have a server side RequestTimeout configured
         .ShouldThrowAsync<RemoteException>()
@@ -92,22 +79,23 @@ public abstract class SystemTests : TestBase
     => await Proxy.EchoGuidAfter(Guid.Empty, Timeout.InfiniteTimeSpan) // method takes forever but we have a server side RequestTimeout configured
         .ShouldThrowAsync<TimeoutException>();
 
-    private sealed class ServerExecutingTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
+    private sealed class ShortServerLongClientTimeout : OverrideConfig
     {
-        public override async Task<ServerTransport?> Override(Func<Task<ServerTransport>> listener) => await listener() with { RequestTimeout = Timeouts.Short };
-        public override IpcClient? Override(Func<IpcClient> client)
-        => client().WithRequestTimeout(Timeout.InfiniteTimeSpan);
+        public override async Task<IpcServer?> Override(Func<Task<IpcServer>> ipcServerFactory)
+        {
+            var ipcServer = await ipcServerFactory();
+            ipcServer.RequestTimeout = Timeouts.Short;
+            return ipcServer;
+        }
+
+        public override IpcClient? Override(Func<IpcClient> client) => client().WithRequestTimeout(Timeout.InfiniteTimeSpan);
     }
 
     private sealed class ClientWaitingForTooLongACall_ShouldThrowTimeout_Config : OverrideConfig
     {
-        public override async Task<ServerTransport?> Override(Func<Task<ServerTransport>> listener) => await listener() with { RequestTimeout = Timeout.InfiniteTimeSpan };
-        public override IpcClient? Override(Func<IpcClient> client)
-        => client().WithRequestTimeout(Timeouts.IpcRoundtrip);
+        public override Task<IpcServer?> Override(Func<Task<IpcServer>> ipcServerFactory) => ipcServerFactory().WithRequestTimeout(Timeout.InfiniteTimeSpan)!;
+        public override IpcClient? Override(Func<IpcClient> client) => client().WithRequestTimeout(Timeouts.IpcRoundtrip);
     }
-
-    private ServerTransport ShortClientTimeout(ServerTransport listener) => listener with { RequestTimeout = TimeSpan.FromMilliseconds(100) };
-    private ServerTransport InfiniteServerTimeout(ServerTransport listener) => listener with { RequestTimeout = Timeout.InfiniteTimeSpan };
 
     [Fact]
     public async Task FireAndForget_ShouldWork()

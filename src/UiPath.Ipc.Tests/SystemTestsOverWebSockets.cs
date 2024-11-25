@@ -15,7 +15,7 @@ public sealed class SystemTestsOverWebSockets : SystemTests
         await base.DisposeAsync();
     }
 
-    protected override async Task<ServerTransport> CreateListener()
+    protected override async Task<ServerTransport> CreateServerTransport()
     {
         var listener = new WebSocketServerTransport
         {
@@ -27,5 +27,5 @@ public sealed class SystemTestsOverWebSockets : SystemTests
     }
 
     protected override ClientTransport CreateClientTransport()
-    => new WebSocketTransport() { Uri = _webSocketContext.ClientUri };
+    => new WebSocketClientTransport() { Uri = _webSocketContext.ClientUri };
 }

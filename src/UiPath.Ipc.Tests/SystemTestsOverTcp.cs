@@ -10,12 +10,12 @@ public sealed class SystemTestsOverTcp : SystemTests
 
     public SystemTestsOverTcp(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
-    protected sealed override async Task<ServerTransport> CreateListener()
+    protected sealed override async Task<ServerTransport> CreateServerTransport()
     => new TcpServerTransport
     {
         EndPoint = _endPoint,
     };
 
     protected override ClientTransport CreateClientTransport()
-    => new TcpTransport() { EndPoint = _endPoint };
+    => new TcpClientTransport() { EndPoint = _endPoint };
 }

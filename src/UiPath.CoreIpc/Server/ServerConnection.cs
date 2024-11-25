@@ -2,7 +2,7 @@
 
 namespace UiPath.Ipc;
 
-internal sealed class ServerConnection : IClient, IDisposable, IServiceClientConfig
+internal sealed class ServerConnection : IClient, IDisposable, IClientConfig
 {
     public static void CreateAndListen(IpcServer server, Stream network, CancellationToken ct)
     {
@@ -71,10 +71,10 @@ internal sealed class ServerConnection : IClient, IDisposable, IServiceClientCon
     }
 
     #region IServiceClientConfig 
-    TimeSpan IServiceClientConfig.RequestTimeout => _ipcServer.RequestTimeout;
-    BeforeConnectHandler? IServiceClientConfig.BeforeConnect => null;
-    BeforeCallHandler? IServiceClientConfig.BeforeCall => null;
-    ILogger? IServiceClientConfig.Logger => _logger;
-    string IServiceClientConfig.DebugName => _debugName;
+    TimeSpan IClientConfig.RequestTimeout => _ipcServer.RequestTimeout;
+    BeforeConnectHandler? IClientConfig.BeforeConnect => null;
+    BeforeCallHandler? IClientConfig.BeforeOutgoingCall => null;
+    ILogger? IClientConfig.Logger => _logger;
+    string IClientConfig.GetComputedDebugName() => _debugName;
     #endregion
 }

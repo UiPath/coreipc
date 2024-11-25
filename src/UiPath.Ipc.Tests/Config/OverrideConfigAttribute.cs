@@ -34,6 +34,6 @@ internal sealed class OverrideConfigAttribute : Attribute
 
 public abstract class OverrideConfig
 {
-    public virtual Task<ServerTransport?> Override(Func<Task<ServerTransport>> listener) => listener()!;
-    public virtual IpcClient? Override(Func<IpcClient> client) => client();
+    public virtual Task<IpcServer?> Override(Func<Task<IpcServer>> ipcServer) => ipcServer()!;
+    public virtual IpcClient? Override(Func<IpcClient> ipcClientFactory) => ipcClientFactory();
 }

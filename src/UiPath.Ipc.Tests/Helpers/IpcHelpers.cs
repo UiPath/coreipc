@@ -35,23 +35,27 @@ internal static class IpcHelpers
 internal static class IpcClientExtensions
 {
     public static IpcClient WithRequestTimeout(this IpcClient ipcClient, TimeSpan requestTimeout)
-    => new()
     {
-        Config = ipcClient.Config with { RequestTimeout = requestTimeout },
-        Transport = ipcClient.Transport,
-    };
+        ipcClient.RequestTimeout = requestTimeout;
+        return ipcClient;
+    }
+    public static IpcServer WithRequestTimeout(this IpcServer ipcServer, TimeSpan requestTimeout)
+    {
+        ipcServer.RequestTimeout = requestTimeout;
+        return ipcServer;
+    }
+    public static async Task<IpcServer> WithRequestTimeout(this Task<IpcServer> ipcServerTask, TimeSpan requestTimeout)
+    => (await ipcServerTask).WithRequestTimeout(requestTimeout);
 
     public static IpcClient WithCallbacks(this IpcClient ipcClient, EndpointCollection callbacks)
-    => new()
     {
-        Config = ipcClient.Config with { Callbacks = callbacks },
-        Transport = ipcClient.Transport,
-    };
+        ipcClient.Callbacks = callbacks;
+        return ipcClient;
+    }
 
     public static IpcClient WithBeforeConnect(this IpcClient ipcClient, BeforeConnectHandler beforeConnect)
-    => new()
     {
-        Config = ipcClient.Config with { BeforeConnect = beforeConnect },
-        Transport = ipcClient.Transport,
-    };
+        ipcClient.BeforeConnect = beforeConnect;
+        return ipcClient;
+    }
 }

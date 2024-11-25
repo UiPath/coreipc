@@ -5,8 +5,9 @@ namespace UiPath.Ipc;
 
 public abstract class ServerTransport
 {
-    public int ConcurrentAccepts { get; init; } = 5;
-    public byte MaxReceivedMessageSizeInMegabytes { get; init; } = 2;
+    public int ConcurrentAccepts { get; set; } = 5;
+    public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
+
     public X509Certificate? Certificate { get; init; }
     internal int MaxMessageSize => MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
 

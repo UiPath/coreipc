@@ -17,6 +17,10 @@ public abstract class RobotTests : TestBase
 
     protected sealed override IpcProxy? IpcProxy => Proxy as IpcProxy;
     protected sealed override Type ContractType => typeof(IStudioOperations);
+    protected override EndpointCollection? Callbacks => new()
+    {
+        { typeof(IStudioEvents), _studioEvents }
+    };
 
     protected readonly ConcurrentBag<CallInfo> _clientBeforeCalls = new();
 
@@ -31,24 +35,7 @@ public abstract class RobotTests : TestBase
         .AddSingleton<StudioOperations>()
         .AddSingletonAlias<IStudioOperations, StudioOperations>();
 
-    protected override ServerTransport ConfigTransportAgnostic(ServerTransport listener)
-    => listener with
-    {
-        ConcurrentAccepts = 10,
-        RequestTimeout = Timeouts.DefaultRequest,
-        MaxReceivedMessageSizeInMegabytes = 1,
-    };
-    protected override ClientConfig CreateClientConfig(EndpointCollection? callbacks = null)
-    => new()
-    {
-        RequestTimeout = Timeouts.DefaultRequest,
-        Scheduler = GuiScheduler,
-        Callbacks = callbacks ?? new()
-        {
-            { typeof(IStudioEvents), _studioEvents }
-        },
-        BeforeCall = async (callInfo, _) => _clientBeforeCalls.Add(callInfo),
-    };
+    protected override TimeSpan ServerRequestTimeout => Timeouts.DefaultRequest;
     #endregion
 
     [Fact]

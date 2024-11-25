@@ -11,7 +11,7 @@ internal abstract class ServiceClient : IDisposable
         return proxy;
     }
 
-    protected abstract IServiceClientConfig Config { get; }
+    protected abstract IClientConfig Config { get; }
     public abstract Stream? Network { get; }
     public event EventHandler? ConnectionClosed;
 
@@ -66,11 +66,7 @@ internal abstract class ServiceClient : IDisposable
 
                 var (connection, newConnection) = await EnsureConnection(ct);
 
-                if (Config.BeforeCall is not null)
-                {
-                    var callInfo = new CallInfo(newConnection, method, args);
-                    await Config.BeforeCall(callInfo, ct);
-                }
+                await (Config.BeforeOutgoingCall?.Invoke(new CallInfo(newConnection, method, args), ct) ?? Task.CompletedTask);
 
                 var requestId = connection.NewRequestId();
                 var request = new Request(_interfaceType.Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds)
@@ -78,18 +74,18 @@ internal abstract class ServiceClient : IDisposable
                     UploadStream = uploadStream
                 };
 
-                Config.Logger?.ServiceClient_Calling(methodName, requestId, Config.DebugName);
+                Config.Logger?.ServiceClient_Calling(methodName, requestId, Config.GetComputedDebugName());
 
                 Response response;
                 try
                 {
                     response = await connection.RemoteCall(request, ct); // returns user errors instead of throwing them (could throw for system bugs)
 
-                    Config.Logger?.ServiceClient_CalledSuccessfully(request.MethodName, requestId, Config.DebugName);
+                    Config.Logger?.ServiceClient_CalledSuccessfully(request.MethodName, requestId, Config.GetComputedDebugName());
                 }
                 catch (Exception ex)
                 {
-                    Config.Logger?.ServiceClient_FailedToCall(request.MethodName, requestId, Config.DebugName, ex);
+                    Config.Logger?.ServiceClient_FailedToCall(request.MethodName, requestId, Config.GetComputedDebugName(), ex);
                     throw;
                 }
 
@@ -133,7 +129,7 @@ internal abstract class ServiceClient : IDisposable
 
     public abstract void Dispose();
 
-    public override string ToString() => Config.DebugName;
+    public override string ToString() => Config.GetComputedDebugName();
 
     #region Generic adapter cache
     private static readonly MethodInfo GenericDefOf_Invoke = ((Func<ServiceClient, MethodInfo, object?[], Task<int>>)Invoke<int>).Method.GetGenericMethodDefinition();
@@ -227,9 +223,9 @@ internal sealed class ServiceClientProper : ServiceClient
 
             var network = await Connect(ct);
 
-            LatestConnection = new Connection(network, Config.DebugName, Config.Logger);
-            var router = new Router(_client.Config.CreateCallbackRouterConfig(), _client.Config.ServiceProvider);
-            _latestServer = new Server(router, _client.Config.RequestTimeout, LatestConnection);
+            LatestConnection = new Connection(network, Config.GetComputedDebugName(), Config.Logger);
+            var router = new Router(_client.CreateCallbackRouterConfig(), _client.ServiceProvider);
+            _latestServer = new Server(router, _client.RequestTimeout, LatestConnection);
 
             _ = Pal();
             return (LatestConnection, newlyConnected: true);
@@ -242,7 +238,7 @@ internal sealed class ServiceClientProper : ServiceClient
                 }
                 catch (Exception ex)
                 {
-                    Config.Logger.LogException(ex, Config.DebugName);
+                    Config.Logger.LogException(ex, Config.GetComputedDebugName());
                 }
             }
         }
@@ -260,17 +256,17 @@ internal sealed class ServiceClientProper : ServiceClient
         return network;
     }
 
-    protected override IServiceClientConfig Config => _client.Config;
+    protected override IClientConfig Config => _client;
 }
 
 internal sealed class ServiceClientForCallback<TInterface> : ServiceClient where TInterface : class
 {
     private readonly Connection _connection;
-    private readonly IServiceClientConfig _config;
+    private readonly IClientConfig _config;
 
     public override Stream? Network => _connection.Network;
 
-    public ServiceClientForCallback(Connection connection, IServiceClientConfig config) : base(typeof(TInterface))
+    public ServiceClientForCallback(Connection connection, IClientConfig config) : base(typeof(TInterface))
     {
         _connection = connection;
         _config = config;
@@ -286,5 +282,5 @@ internal sealed class ServiceClientForCallback<TInterface> : ServiceClient where
     protected override Task<(Connection connection, bool newlyConnected)> EnsureConnection(CancellationToken ct)
     => Task.FromResult((_connection, newlyConnected: false));
 
-    protected override IServiceClientConfig Config => _config;
+    protected override IClientConfig Config => _config;
 }

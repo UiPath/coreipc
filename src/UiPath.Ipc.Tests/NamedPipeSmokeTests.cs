@@ -26,12 +26,10 @@ public sealed class NamedPipeSmokeTests
     private static IpcServer CreateServer(string pipeName)
     => new IpcServer
     {
-        Transport = [
-            new NamedPipeServerTransport
-            {
-                PipeName = pipeName,
-            }
-        ],
+        Transport = new NamedPipeServerTransport
+        {
+            PipeName = pipeName,
+        },
         Endpoints = new()
         {
             typeof(IComputingService)
@@ -45,8 +43,7 @@ public sealed class NamedPipeSmokeTests
     private static IpcClient CreateClient(string pipeName)
     => new()
     {
-        Transport = new NamedPipeClientTransport { PipeName = pipeName },
-        Config = new()
+        Transport = new NamedPipeClientTransport { PipeName = pipeName }
     };
 
     private static Task<string> ListPipes(string pattern)
