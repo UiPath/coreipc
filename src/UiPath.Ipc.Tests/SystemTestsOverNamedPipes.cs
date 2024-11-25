@@ -9,11 +9,11 @@ public sealed class SystemTestsOverNamedPipes : SystemTests
 
     public SystemTestsOverNamedPipes(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
-    protected sealed override async Task<ServerTransport> CreateListener() => new NamedPipeListener
+    protected sealed override async Task<ServerTransport> CreateListener() => new NamedPipeServerTransport
     {
         PipeName = PipeName
     };
-    protected sealed override ClientTransport CreateClientTransport() => new NamedPipeTransport()
+    protected sealed override ClientTransport CreateClientTransport() => new NamedPipeClientTransport()
     {
         PipeName = PipeName,
         AllowImpersonation = true,

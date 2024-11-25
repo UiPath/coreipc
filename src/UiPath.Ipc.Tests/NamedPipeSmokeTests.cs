@@ -27,7 +27,7 @@ public sealed class NamedPipeSmokeTests
     => new IpcServer
     {
         Transport = [
-            new NamedPipeListener
+            new NamedPipeServerTransport
             {
                 PipeName = pipeName,
             }
@@ -45,7 +45,7 @@ public sealed class NamedPipeSmokeTests
     private static IpcClient CreateClient(string pipeName)
     => new()
     {
-        Transport = new NamedPipeTransport { PipeName = pipeName },
+        Transport = new NamedPipeClientTransport { PipeName = pipeName },
         Config = new()
     };
 

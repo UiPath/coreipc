@@ -38,14 +38,14 @@ internal record Response(string RequestId, string? Data = null, Error? Error = n
     public static Response Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());
     public static Response Success(Request request, string data) => new(request.Id, data);
     public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
-    public TResult Deserialize<TResult>(ISerializer? serializer)
+    public TResult Deserialize<TResult>()
     {        
         if (Error != null)
         {
             throw new RemoteException(Error);
         }
 
-        return (TResult)(DownloadStream ?? serializer.OrDefault().Deserialize(Data ?? "", typeof(TResult)))!;
+        return (TResult)(DownloadStream ?? IpcJsonSerializer.Instance.Deserialize(Data ?? "", typeof(TResult)))!;
     }
 }
 [Serializable]

@@ -24,6 +24,12 @@ internal readonly struct Router
     private readonly RouterConfig? _config; // nullable for the case when the constructor is bypassed
     private readonly IServiceProvider? _serviceProvider;
 
+    public Router(IpcServer ipcServer)
+    {
+        _config = ipcServer.CreateRouterConfig(ipcServer);
+        _serviceProvider = ipcServer.ServiceProvider;
+    }
+
     public Router(RouterConfig config, IServiceProvider? serviceProvider)
     {
         _config = config;
@@ -128,7 +134,6 @@ internal readonly struct Route
         BeforeCall = endpointSettings.BeforeCall,
         Scheduler = endpointSettings.Scheduler.OrDefault(),
         LoggerFactory = serviceProvider.MaybeCreateServiceFactory<ILoggerFactory>(),
-        Serializer = serviceProvider.MaybeCreateServiceFactory<ISerializer>()
     };
 
     public required ServiceFactory Service { get; init; }
@@ -136,5 +141,4 @@ internal readonly struct Route
     public TaskScheduler Scheduler { get; init; }
     public BeforeCallHandler? BeforeCall { get; init; }
     public Func<ILoggerFactory>? LoggerFactory { get; init; }
-    public Func<ISerializer>? Serializer { get; init; }
 }

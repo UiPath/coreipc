@@ -9,11 +9,11 @@ public sealed class ComputingTestsOverNamedPipes : ComputingTests
 
     public ComputingTestsOverNamedPipes(ITestOutputHelper outputHelper) : base(outputHelper) { }
 
-    protected override async Task<ServerTransport> CreateListener() => new NamedPipeListener
+    protected override async Task<ServerTransport> CreateListener() => new NamedPipeServerTransport
     {
         PipeName = PipeName
     };
-    protected override ClientTransport CreateClientTransport() => new NamedPipeTransport
+    protected override ClientTransport CreateClientTransport() => new NamedPipeClientTransport
     {
         PipeName = PipeName,
         AllowImpersonation = true,
@@ -22,8 +22,8 @@ public sealed class ComputingTestsOverNamedPipes : ComputingTests
     public override IAsyncDisposable? RandomTransportPair(out ServerTransport listener, out ClientTransport transport)
     {
         var pipeName = $"{Guid.NewGuid():N}";
-        listener = new NamedPipeListener { PipeName = pipeName };
-        transport = new NamedPipeTransport { PipeName = pipeName };
+        listener = new NamedPipeServerTransport { PipeName = pipeName };
+        transport = new NamedPipeClientTransport { PipeName = pipeName };
         return null;
     }
 

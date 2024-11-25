@@ -6,8 +6,6 @@ public abstract class Peer
     public IServiceProvider? ServiceProvider { get; init; }
     public TaskScheduler? Scheduler { get; init; }
 
-    internal ISerializer? Serializer => IpcJsonSerializer.Instance;
-
     internal virtual RouterConfig CreateRouterConfig(IpcServer server) => throw new NotSupportedException();
 
     internal virtual RouterConfig CreateCallbackRouterConfig() => throw new NotSupportedException();

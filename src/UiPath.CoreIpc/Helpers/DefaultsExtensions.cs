@@ -4,8 +4,8 @@ namespace UiPath.Ipc;
 
 internal static class DefaultsExtensions
 {
-    public static ISerializer OrDefault(this ISerializer? serializer) => serializer ?? IpcJsonSerializer.Instance;
-    public static ILoggerFactory OrDefault(this ILoggerFactory? loggerFactory) => loggerFactory ?? NullLoggerFactory.Instance;
+    public static ILogger? MaybeCreateLogger(this IServiceProvider? serviceProvider, string category) => serviceProvider?.GetService<ILoggerFactory>()?.CreateLogger(category);
+
     public static ILogger OrDefault(this ILogger? logger) => logger ?? NullLogger.Instance;
     public static BeforeCallHandler OrDefault(this BeforeCallHandler? beforeCallHandler) => beforeCallHandler ?? DefaultBeforeCallHandler;
     public static TaskScheduler OrDefault(this TaskScheduler? scheduler) => scheduler ?? TaskScheduler.Default;

@@ -9,4 +9,3 @@ internal interface IListenerConfig<TSelf, TListenerState, TConnectionState>
     ValueTask<Stream> AwaitConnection(TListenerState listenerState, TConnectionState connectionState, CancellationToken ct);
     IEnumerable<string> Validate();
 }
-
