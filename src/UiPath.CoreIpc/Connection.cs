@@ -364,7 +364,7 @@ internal sealed class Connection : IDisposable
     {
         try
         {
-            CancellationReceived(cancellationRequest.RequestId);
+            CancellationReceived?.Invoke(cancellationRequest.RequestId);
         }
         catch (Exception ex)
         {
@@ -380,7 +380,7 @@ internal sealed class Connection : IDisposable
     {
         try
         {
-            await RequestReceived(request);
+            await (RequestReceived?.Invoke(request) ?? default);
         }
         catch (Exception ex)
         {

@@ -1,0 +1,177 @@
+﻿#nullable enable
+abstract UiPath.Ipc.ClientTransport.CreateState() -> UiPath.Ipc.IClientState!
+abstract UiPath.Ipc.ClientTransport.Validate() -> void
+abstract UiPath.Ipc.ServerTransport.CreateServerState() -> UiPath.Ipc.ServerTransport.IServerState!
+abstract UiPath.Ipc.ServerTransport.ValidateCore() -> System.Collections.Generic.IEnumerable<string?>!
+override UiPath.Ipc.EndpointSettings<TContract>.WithServiceProvider(System.IServiceProvider? serviceProvider) -> UiPath.Ipc.EndpointSettings!
+override UiPath.Ipc.Error.ToString() -> string!
+override UiPath.Ipc.IpcProxy.Invoke(System.Reflection.MethodInfo? targetMethod, object?[]? args) -> object?
+override UiPath.Ipc.RemoteException.StackTrace.get -> string!
+override UiPath.Ipc.RemoteException.ToString() -> string!
+override UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport.CreateState() -> UiPath.Ipc.IClientState!
+override UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport.ToString() -> string!
+override UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport.Validate() -> void
+override UiPath.Ipc.Transport.NamedPipe.NamedPipeServerTransport.ToString() -> string!
+override UiPath.Ipc.Transport.Tcp.TcpClientTransport.CreateState() -> UiPath.Ipc.IClientState!
+override UiPath.Ipc.Transport.Tcp.TcpClientTransport.ToString() -> string!
+override UiPath.Ipc.Transport.Tcp.TcpClientTransport.Validate() -> void
+override UiPath.Ipc.Transport.Tcp.TcpServerTransport.ToString() -> string!
+override UiPath.Ipc.Transport.WebSocket.WebSocketClientTransport.CreateState() -> UiPath.Ipc.IClientState!
+override UiPath.Ipc.Transport.WebSocket.WebSocketClientTransport.ToString() -> string!
+override UiPath.Ipc.Transport.WebSocket.WebSocketClientTransport.Validate() -> void
+override UiPath.Ipc.Transport.WebSocket.WebSocketServerTransport.ToString() -> string!
+static UiPath.Ipc.Error.FromException(System.Exception? exception) -> UiPath.Ipc.Error?
+static UiPath.Ipc.IOHelpers.Allow(this System.IO.Pipes.PipeSecurity! pipeSecurity, System.Security.Principal.IdentityReference! sid, System.IO.Pipes.PipeAccessRights pipeAccessRights) -> System.IO.Pipes.PipeSecurity!
+static UiPath.Ipc.IOHelpers.Allow(this System.IO.Pipes.PipeSecurity! pipeSecurity, System.Security.Principal.WellKnownSidType sid, System.IO.Pipes.PipeAccessRights pipeAccessRights) -> System.IO.Pipes.PipeSecurity!
+static UiPath.Ipc.IOHelpers.AllowCurrentUser(this System.IO.Pipes.PipeSecurity! pipeSecurity, bool onlyNonAdmin = false) -> System.IO.Pipes.PipeSecurity!
+static UiPath.Ipc.IOHelpers.Deny(this System.IO.Pipes.PipeSecurity! pipeSecurity, System.Security.Principal.IdentityReference! sid, System.IO.Pipes.PipeAccessRights pipeAccessRights) -> System.IO.Pipes.PipeSecurity!
+static UiPath.Ipc.IOHelpers.Deny(this System.IO.Pipes.PipeSecurity! pipeSecurity, System.Security.Principal.WellKnownSidType sid, System.IO.Pipes.PipeAccessRights pipeAccessRights) -> System.IO.Pipes.PipeSecurity!
+static UiPath.Ipc.IOHelpers.LocalOnly(this System.IO.Pipes.PipeSecurity! pipeSecurity) -> System.IO.Pipes.PipeSecurity!
+static UiPath.Ipc.IOHelpers.PipeExists(string! pipeName, int timeout = 1) -> bool
+static UiPath.Ipc.ServerTransport.IsNotNull<T>(T? propertyValue, string? propertyName = null) -> string?
+UiPath.Ipc.CallInfo
+UiPath.Ipc.CallInfo.Arguments.get -> object?[]!
+UiPath.Ipc.CallInfo.CallInfo() -> void
+UiPath.Ipc.CallInfo.CallInfo(bool newConnection, System.Reflection.MethodInfo! method, object?[]! arguments) -> void
+UiPath.Ipc.CallInfo.Method.get -> System.Reflection.MethodInfo!
+UiPath.Ipc.CallInfo.NewConnection.get -> bool
+UiPath.Ipc.ClientTransport
+UiPath.Ipc.EndpointCollection
+UiPath.Ipc.EndpointCollection.Add(System.Type! contractType, object? instance) -> void
+UiPath.Ipc.EndpointCollection.Add(System.Type! type) -> void
+UiPath.Ipc.EndpointCollection.Add(UiPath.Ipc.EndpointSettings! endpointSettings) -> void
+UiPath.Ipc.EndpointCollection.EndpointCollection() -> void
+UiPath.Ipc.EndpointCollection.GetEnumerator() -> System.Collections.Generic.IEnumerator<UiPath.Ipc.EndpointSettings!>!
+UiPath.Ipc.EndpointNotFoundException
+UiPath.Ipc.EndpointNotFoundException.EndpointName.get -> string!
+UiPath.Ipc.EndpointNotFoundException.EndpointNotFoundException(string! paramName, string! serverDebugName, string! endpointName) -> void
+UiPath.Ipc.EndpointNotFoundException.ServerDebugName.get -> string!
+UiPath.Ipc.EndpointSettings
+UiPath.Ipc.EndpointSettings.BeforeIncommingCall.get -> System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task!>?
+UiPath.Ipc.EndpointSettings.BeforeIncommingCall.set -> void
+UiPath.Ipc.EndpointSettings.ContractType.get -> System.Type!
+UiPath.Ipc.EndpointSettings.EndpointSettings(System.Type! contractType, object? serviceInstance = null) -> void
+UiPath.Ipc.EndpointSettings.EndpointSettings(System.Type! contractType, System.IServiceProvider! serviceProvider) -> void
+UiPath.Ipc.EndpointSettings.Scheduler.get -> System.Threading.Tasks.TaskScheduler?
+UiPath.Ipc.EndpointSettings.Scheduler.set -> void
+UiPath.Ipc.EndpointSettings.ServiceInstance.get -> object?
+UiPath.Ipc.EndpointSettings.ServiceProvider.get -> System.IServiceProvider?
+UiPath.Ipc.EndpointSettings.Validate() -> void
+UiPath.Ipc.EndpointSettings<TContract>
+UiPath.Ipc.EndpointSettings<TContract>.EndpointSettings(System.IServiceProvider! serviceProvider) -> void
+UiPath.Ipc.EndpointSettings<TContract>.EndpointSettings(TContract? serviceInstance = null) -> void
+UiPath.Ipc.Error
+UiPath.Ipc.Error.Error(string! Message, string! StackTrace, string! Type, UiPath.Ipc.Error? InnerError) -> void
+UiPath.Ipc.Error.InnerError.get -> UiPath.Ipc.Error?
+UiPath.Ipc.Error.InnerError.init -> void
+UiPath.Ipc.Error.Message.get -> string!
+UiPath.Ipc.Error.Message.init -> void
+UiPath.Ipc.Error.StackTrace.get -> string!
+UiPath.Ipc.Error.StackTrace.init -> void
+UiPath.Ipc.Error.Type.get -> string!
+UiPath.Ipc.Error.Type.init -> void
+UiPath.Ipc.IClient
+UiPath.Ipc.IClient.GetCallback<TCallbackInterface>() -> TCallbackInterface!
+UiPath.Ipc.IClient.Impersonate(System.Action! action) -> void
+UiPath.Ipc.IClientState
+UiPath.Ipc.IClientState.Connect(UiPath.Ipc.IpcClient! client, System.Threading.CancellationToken ct) -> System.Threading.Tasks.ValueTask
+UiPath.Ipc.IClientState.IsConnected() -> bool
+UiPath.Ipc.IClientState.Network.get -> System.IO.Stream?
+UiPath.Ipc.IOHelpers
+UiPath.Ipc.IpcClient
+UiPath.Ipc.IpcClient.BeforeConnect.get -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>?
+UiPath.Ipc.IpcClient.BeforeConnect.set -> void
+UiPath.Ipc.IpcClient.BeforeOutgoingCall.get -> System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task!>?
+UiPath.Ipc.IpcClient.BeforeOutgoingCall.set -> void
+UiPath.Ipc.IpcClient.Callbacks.get -> UiPath.Ipc.EndpointCollection?
+UiPath.Ipc.IpcClient.Callbacks.set -> void
+UiPath.Ipc.IpcClient.DebugName.get -> string!
+UiPath.Ipc.IpcClient.DebugName.set -> void
+UiPath.Ipc.IpcClient.GetProxy<TProxy>() -> TProxy!
+UiPath.Ipc.IpcClient.IpcClient() -> void
+UiPath.Ipc.IpcClient.Logger.get -> Microsoft.Extensions.Logging.ILogger?
+UiPath.Ipc.IpcClient.Logger.init -> void
+UiPath.Ipc.IpcClient.Transport.get -> UiPath.Ipc.ClientTransport!
+UiPath.Ipc.IpcClient.Transport.init -> void
+UiPath.Ipc.IpcProxy
+UiPath.Ipc.IpcProxy.CloseConnection() -> System.Threading.Tasks.ValueTask
+UiPath.Ipc.IpcProxy.ConnectionClosed -> System.EventHandler!
+UiPath.Ipc.IpcProxy.Dispose() -> void
+UiPath.Ipc.IpcProxy.IpcProxy() -> void
+UiPath.Ipc.IpcProxy.Network.get -> System.IO.Stream?
+UiPath.Ipc.IpcServer
+UiPath.Ipc.IpcServer.DisposeAsync() -> System.Threading.Tasks.ValueTask
+UiPath.Ipc.IpcServer.Endpoints.get -> UiPath.Ipc.EndpointCollection!
+UiPath.Ipc.IpcServer.Endpoints.init -> void
+UiPath.Ipc.IpcServer.IpcServer() -> void
+UiPath.Ipc.IpcServer.Start() -> void
+UiPath.Ipc.IpcServer.Transport.get -> UiPath.Ipc.ServerTransport!
+UiPath.Ipc.IpcServer.Transport.init -> void
+UiPath.Ipc.IpcServer.WaitForStart() -> System.Threading.Tasks.Task!
+UiPath.Ipc.IpcServer.WaitForStop() -> System.Threading.Tasks.Task!
+UiPath.Ipc.Message
+UiPath.Ipc.Message.Client.get -> UiPath.Ipc.IClient!
+UiPath.Ipc.Message.Client.set -> void
+UiPath.Ipc.Message.GetCallback<TCallbackInterface>() -> TCallbackInterface!
+UiPath.Ipc.Message.ImpersonateClient(System.Action! action) -> void
+UiPath.Ipc.Message.Message() -> void
+UiPath.Ipc.Message.RequestTimeout.get -> System.TimeSpan
+UiPath.Ipc.Message.RequestTimeout.set -> void
+UiPath.Ipc.Message<TPayload>
+UiPath.Ipc.Message<TPayload>.Message(TPayload payload) -> void
+UiPath.Ipc.Message<TPayload>.Payload.get -> TPayload
+UiPath.Ipc.Peer
+UiPath.Ipc.Peer.Peer() -> void
+UiPath.Ipc.Peer.RequestTimeout.get -> System.TimeSpan
+UiPath.Ipc.Peer.RequestTimeout.set -> void
+UiPath.Ipc.Peer.Scheduler.get -> System.Threading.Tasks.TaskScheduler?
+UiPath.Ipc.Peer.Scheduler.set -> void
+UiPath.Ipc.Peer.ServiceProvider.get -> System.IServiceProvider?
+UiPath.Ipc.Peer.ServiceProvider.set -> void
+UiPath.Ipc.RemoteException
+UiPath.Ipc.RemoteException.InnerException.get -> UiPath.Ipc.RemoteException?
+UiPath.Ipc.RemoteException.Is<TException>() -> bool
+UiPath.Ipc.RemoteException.RemoteException(UiPath.Ipc.Error! error) -> void
+UiPath.Ipc.RemoteException.Type.get -> string!
+UiPath.Ipc.ServerTransport
+UiPath.Ipc.ServerTransport.Certificate.get -> System.Security.Cryptography.X509Certificates.X509Certificate?
+UiPath.Ipc.ServerTransport.Certificate.init -> void
+UiPath.Ipc.ServerTransport.ConcurrentAccepts.get -> int
+UiPath.Ipc.ServerTransport.ConcurrentAccepts.set -> void
+UiPath.Ipc.ServerTransport.IServerConnectionSlot
+UiPath.Ipc.ServerTransport.IServerConnectionSlot.AwaitConnection(System.Threading.CancellationToken ct) -> System.Threading.Tasks.ValueTask<System.IO.Stream!>
+UiPath.Ipc.ServerTransport.IServerState
+UiPath.Ipc.ServerTransport.IServerState.CreateConnectionSlot() -> UiPath.Ipc.ServerTransport.IServerConnectionSlot!
+UiPath.Ipc.ServerTransport.MaxReceivedMessageSizeInMegabytes.get -> byte
+UiPath.Ipc.ServerTransport.MaxReceivedMessageSizeInMegabytes.set -> void
+UiPath.Ipc.ServerTransport.ServerTransport() -> void
+UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport
+UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport.AllowImpersonation.get -> bool
+UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport.AllowImpersonation.init -> void
+UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport.PipeName.get -> string!
+UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport.PipeName.init -> void
+UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport.ServerName.get -> string!
+UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport.ServerName.init -> void
+UiPath.Ipc.Transport.NamedPipe.NamedPipeServerTransport
+UiPath.Ipc.Transport.NamedPipe.NamedPipeServerTransport.AccessControl.get -> System.Action<System.IO.Pipes.PipeSecurity!>?
+UiPath.Ipc.Transport.NamedPipe.NamedPipeServerTransport.AccessControl.init -> void
+UiPath.Ipc.Transport.NamedPipe.NamedPipeServerTransport.NamedPipeServerTransport() -> void
+UiPath.Ipc.Transport.NamedPipe.NamedPipeServerTransport.PipeName.get -> string!
+UiPath.Ipc.Transport.NamedPipe.NamedPipeServerTransport.PipeName.init -> void
+UiPath.Ipc.Transport.NamedPipe.NamedPipeServerTransport.ServerName.get -> string!
+UiPath.Ipc.Transport.NamedPipe.NamedPipeServerTransport.ServerName.init -> void
+UiPath.Ipc.Transport.Tcp.TcpClientTransport
+UiPath.Ipc.Transport.Tcp.TcpClientTransport.EndPoint.get -> System.Net.IPEndPoint!
+UiPath.Ipc.Transport.Tcp.TcpClientTransport.EndPoint.init -> void
+UiPath.Ipc.Transport.Tcp.TcpServerTransport
+UiPath.Ipc.Transport.Tcp.TcpServerTransport.EndPoint.get -> System.Net.IPEndPoint!
+UiPath.Ipc.Transport.Tcp.TcpServerTransport.EndPoint.init -> void
+UiPath.Ipc.Transport.Tcp.TcpServerTransport.TcpServerTransport() -> void
+UiPath.Ipc.Transport.WebSocket.WebSocketClientTransport
+UiPath.Ipc.Transport.WebSocket.WebSocketClientTransport.Uri.get -> System.Uri!
+UiPath.Ipc.Transport.WebSocket.WebSocketClientTransport.Uri.init -> void
+UiPath.Ipc.Transport.WebSocket.WebSocketServerTransport
+UiPath.Ipc.Transport.WebSocket.WebSocketServerTransport.Accept.get -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Net.WebSockets.WebSocket!>!>!
+UiPath.Ipc.Transport.WebSocket.WebSocketServerTransport.Accept.init -> void
+UiPath.Ipc.Transport.WebSocket.WebSocketServerTransport.WebSocketServerTransport() -> void
+virtual UiPath.Ipc.EndpointSettings.WithServiceProvider(System.IServiceProvider? serviceProvider) -> UiPath.Ipc.EndpointSettings!

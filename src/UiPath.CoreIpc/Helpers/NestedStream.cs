@@ -35,7 +35,7 @@ internal class NestedStream : Stream
         _length = length;
     }
 
-    public event EventHandler Disposed;
+    public event EventHandler? Disposed;
     /// <inheritdoc />
     public bool IsDisposed => _underlyingStream == null;
     /// <inheritdoc />
@@ -148,7 +148,7 @@ internal class NestedStream : Stream
         if (_remainingBytes != 0)
         {
             _underlyingStream?.Dispose();
-            _underlyingStream = null;
+            _underlyingStream = null!;
         }
         Disposed?.Invoke(this, EventArgs.Empty);
         base.Dispose(disposing);
