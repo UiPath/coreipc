@@ -1,5 +1,6 @@
 ﻿using Microsoft.IO;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
@@ -136,6 +137,8 @@ public static class IOHelpers
         return pipeSecurity;
     }
 
+    [Browsable(false)]
+    [EditorBrowsable( EditorBrowsableState.Never)]
     public static bool PipeExists(string pipeName, int timeout = 1)
     {
         try
