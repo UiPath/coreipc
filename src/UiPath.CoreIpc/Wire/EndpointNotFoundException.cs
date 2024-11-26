@@ -1,11 +1,11 @@
 ﻿namespace UiPath.Ipc;
 
-public sealed class EndpointNotFoundException : ArgumentOutOfRangeException
+public sealed class EndpointNotFoundException : ArgumentException
 {
     public string ServerDebugName { get; }
     public string EndpointName { get; }
 
-    public EndpointNotFoundException(string paramName, string serverDebugName, string endpointName)
+    internal EndpointNotFoundException(string paramName, string serverDebugName, string endpointName)
     : base(paramName, FormatMessage(serverDebugName, endpointName))
     {
         ServerDebugName = serverDebugName;
