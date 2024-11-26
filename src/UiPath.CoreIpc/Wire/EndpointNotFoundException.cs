@@ -1,6 +1,5 @@
 ﻿namespace UiPath.Ipc;
 
-[Serializable]
 public sealed class EndpointNotFoundException : ArgumentOutOfRangeException
 {
     public string ServerDebugName { get; }

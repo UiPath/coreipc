@@ -1,6 +1,4 @@
-﻿using System.ComponentModel;
-
-namespace UiPath.Ipc;
+﻿namespace UiPath.Ipc;
 
 public sealed class IpcClient : IpcBase, IClientConfig
 {
@@ -10,8 +8,7 @@ public sealed class IpcClient : IpcBase, IClientConfig
     public BeforeConnectHandler? BeforeConnect { get; set; }
     public BeforeCallHandler? BeforeOutgoingCall { get; set; }
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public string DebugName { get; set; } = null!;
+    internal string DebugName { get; set; } = null!;
 
     public required ClientTransport Transport { get; init; }
 
@@ -26,6 +23,7 @@ public sealed class IpcClient : IpcBase, IClientConfig
     }
     public TProxy GetProxy<TProxy>() where TProxy : class => GetServiceClient(typeof(TProxy)).GetProxy<TProxy>();
 
+    // TODO: should decommission?
     internal void Validate()
     {
         var haveDeferredInjectedCallbacks = Callbacks?.Any(x => x.Service.MaybeGetServiceProvider() is null && x.Service.MaybeGetInstance() is null) ?? false;

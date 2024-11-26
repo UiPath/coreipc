@@ -88,7 +88,8 @@ internal class Program
                 PipeName = Contracts.PipeName,
                 ServerName = ".",
                 AllowImpersonation = false,
-            }
+            },
+            DebugName = "Client1",
         };
 
         var c2 = new IpcClient()
