@@ -28,10 +28,8 @@ namespace UiPath.Ipc
         public void Add(System.Type contractType, object? instance) { }
         public System.Collections.Generic.IEnumerator<UiPath.Ipc.EndpointSettings> GetEnumerator() { }
     }
-    [System.Serializable]
-    public sealed class EndpointNotFoundException : System.ArgumentOutOfRangeException
+    public sealed class EndpointNotFoundException : System.ArgumentException
     {
-        public EndpointNotFoundException(string paramName, string serverDebugName, string endpointName) { }
         public string EndpointName { get; }
         public string ServerDebugName { get; }
     }
@@ -54,7 +52,6 @@ namespace UiPath.Ipc
         public EndpointSettings(TContract? serviceInstance = null) { }
         public override UiPath.Ipc.EndpointSettings WithServiceProvider(System.IServiceProvider? serviceProvider) { }
     }
-    [System.Serializable]
     public class Error : System.IEquatable<UiPath.Ipc.Error>
     {
         public Error(string Message, string StackTrace, string Type, UiPath.Ipc.Error? InnerError) { }
@@ -80,6 +77,7 @@ namespace UiPath.Ipc
         public static System.IO.Pipes.PipeSecurity Deny(this System.IO.Pipes.PipeSecurity pipeSecurity, System.Security.Principal.IdentityReference sid, System.IO.Pipes.PipeAccessRights pipeAccessRights) { }
         public static System.IO.Pipes.PipeSecurity Deny(this System.IO.Pipes.PipeSecurity pipeSecurity, System.Security.Principal.WellKnownSidType sid, System.IO.Pipes.PipeAccessRights pipeAccessRights) { }
         public static System.IO.Pipes.PipeSecurity LocalOnly(this System.IO.Pipes.PipeSecurity pipeSecurity) { }
+        [System.ComponentModel.Browsable(false)]
         public static bool PipeExists(string pipeName, int timeout = 1) { }
     }
     public abstract class IpcBase
@@ -97,7 +95,6 @@ namespace UiPath.Ipc
         public System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeConnect { get; set; }
         public System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeOutgoingCall { get; set; }
         public UiPath.Ipc.EndpointCollection? Callbacks { get; set; }
-        public string DebugName { get; set; }
         public Microsoft.Extensions.Logging.ILogger? Logger { get; init; }
         public UiPath.Ipc.ClientTransport Transport { get; init; }
         public TProxy GetProxy<TProxy>()
@@ -143,7 +140,6 @@ namespace UiPath.Ipc
         public Message(TPayload payload) { }
         public TPayload Payload { get; }
     }
-    [System.Serializable]
     public class RemoteException : System.Exception
     {
         public RemoteException(UiPath.Ipc.Error error) { }
