@@ -48,7 +48,7 @@ internal record Response(string RequestId, string? Data = null, Error? Error = n
         return (TResult)(DownloadStream ?? IpcJsonSerializer.Instance.Deserialize(Data ?? "", typeof(TResult)))!;
     }
 }
-[Serializable]
+
 public record Error(string Message, string StackTrace, string Type, Error? InnerError)
 {
     [return: NotNullIfNotNull("exception")]
@@ -64,7 +64,7 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
 
     private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName!;
 }
-[Serializable]
+
 public class RemoteException : Exception
 {
     public RemoteException(Error error) : base(error.Message, error.InnerError == null ? null : new RemoteException(error.InnerError))
