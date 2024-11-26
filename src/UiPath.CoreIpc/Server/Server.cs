@@ -226,7 +226,7 @@ internal class Server
                 }
                 if (argument is Message message)
                 {
-                    message.Client = _client;
+                    message.Client = _client!;
                 }
                 return argument;
             }

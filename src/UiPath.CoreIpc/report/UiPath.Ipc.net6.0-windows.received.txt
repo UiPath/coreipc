@@ -16,18 +16,6 @@ namespace UiPath.Ipc
         public System.Reflection.MethodInfo Method { get; }
         public bool NewConnection { get; }
     }
-    public sealed class ClientConfig : UiPath.Ipc.EndpointConfig, System.IEquatable<UiPath.Ipc.ClientConfig>
-    {
-        public ClientConfig() { }
-        public string DebugName { get; set; }
-        public UiPath.Ipc.ISerializer? Serializer { get; set; }
-        public System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeCall { get; init; }
-        public System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeConnect { get; init; }
-        public UiPath.Ipc.EndpointCollection? Callbacks { get; init; }
-        public Microsoft.Extensions.Logging.ILogger? Logger { get; init; }
-        public System.Threading.Tasks.TaskScheduler? Scheduler { get; init; }
-        public System.IServiceProvider? ServiceProvider { get; init; }
-    }
     public abstract class ClientTransport : System.IEquatable<UiPath.Ipc.ClientTransport>
     {
         protected ClientTransport() { }
@@ -42,11 +30,6 @@ namespace UiPath.Ipc
         public void Add(System.Type contractType, object? instance) { }
         public System.Collections.Generic.IEnumerator<UiPath.Ipc.EndpointSettings> GetEnumerator() { }
     }
-    public abstract class EndpointConfig : System.IEquatable<UiPath.Ipc.EndpointConfig>
-    {
-        protected EndpointConfig() { }
-        public System.TimeSpan RequestTimeout { get; init; }
-    }
     [System.Serializable]
     public sealed class EndpointNotFoundException : System.ArgumentOutOfRangeException
     {
@@ -58,7 +41,7 @@ namespace UiPath.Ipc
     {
         public EndpointSettings(System.Type contractType, System.IServiceProvider serviceProvider) { }
         public EndpointSettings(System.Type contractType, object? serviceInstance = null) { }
-        public System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeCall { get; set; }
+        public System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeIncommingCall { get; set; }
         public System.Type ContractType { get; }
         public System.Threading.Tasks.TaskScheduler? Scheduler { get; set; }
         public object? ServiceInstance { get; }
@@ -107,19 +90,16 @@ namespace UiPath.Ipc
         public static System.IO.Pipes.PipeSecurity LocalOnly(this System.IO.Pipes.PipeSecurity pipeSecurity) { }
         public static bool PipeExists(string pipeName, int timeout = 1) { }
     }
-    public interface ISerializer
-    {
-        object? Deserialize(string json, System.Type type);
-        System.Threading.Tasks.ValueTask<T?> DeserializeAsync<T>(System.IO.Stream json, Microsoft.Extensions.Logging.ILogger? logger);
-        string Serialize(object? obj);
-        void Serialize(object? obj, System.IO.Stream stream);
-    }
-    public sealed class IpcClient
+    public sealed class IpcClient : UiPath.Ipc.Peer
     {
         [System.Obsolete("Constructors of types with required members are not supported in this version of " +
             "your compiler.", true)]
         public IpcClient() { }
-        public UiPath.Ipc.ClientConfig Config { get; init; }
+        public System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeConnect { get; set; }
+        public System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeOutgoingCall { get; set; }
+        public UiPath.Ipc.EndpointCollection? Callbacks { get; set; }
+        public string DebugName { get; set; }
+        public Microsoft.Extensions.Logging.ILogger? Logger { get; init; }
         public UiPath.Ipc.ClientTransport Transport { get; init; }
         public TProxy GetProxy<TProxy>()
             where TProxy :  class { }
@@ -133,26 +113,20 @@ namespace UiPath.Ipc
         public void Dispose() { }
         protected override object? Invoke(System.Reflection.MethodInfo? targetMethod, object?[]? args) { }
     }
-    public sealed class IpcServer : System.IAsyncDisposable
+    public sealed class IpcServer : UiPath.Ipc.Peer, System.IAsyncDisposable
     {
         [System.Obsolete("Constructors of types with required members are not supported in this version of " +
             "your compiler.", true)]
         public IpcServer() { }
         public UiPath.Ipc.EndpointCollection Endpoints { get; init; }
-        public System.Collections.Generic.IReadOnlyList<UiPath.Ipc.ListenerConfig> Listeners { get; init; }
-        public System.Threading.Tasks.TaskScheduler? Scheduler { get; init; }
-        public System.IServiceProvider ServiceProvider { get; init; }
+        public UiPath.Ipc.ServerTransport Transport { get; init; }
         public System.Threading.Tasks.ValueTask DisposeAsync() { }
+        [System.Diagnostics.CodeAnalysis.MemberNotNull(new string[] {
+                "Transport",
+                "_accepter"})]
         public void Start() { }
         public System.Threading.Tasks.Task WaitForStart() { }
         public System.Threading.Tasks.Task WaitForStop() { }
-    }
-    public abstract class ListenerConfig : UiPath.Ipc.EndpointConfig, System.IEquatable<UiPath.Ipc.ListenerConfig>
-    {
-        protected ListenerConfig() { }
-        public System.Security.Cryptography.X509Certificates.X509Certificate? Certificate { get; init; }
-        public int ConcurrentAccepts { get; init; }
-        public byte MaxReceivedMessageSizeInMegabytes { get; init; }
     }
     public class Message
     {
@@ -170,6 +144,13 @@ namespace UiPath.Ipc
         public Message(TPayload payload) { }
         public TPayload Payload { get; }
     }
+    public abstract class Peer
+    {
+        protected Peer() { }
+        public System.TimeSpan RequestTimeout { get; set; }
+        public System.Threading.Tasks.TaskScheduler? Scheduler { get; set; }
+        public System.IServiceProvider? ServiceProvider { get; set; }
+    }
     [System.Serializable]
     public class RemoteException : System.Exception
     {
@@ -181,37 +162,32 @@ namespace UiPath.Ipc
             where TException : System.Exception { }
         public override string ToString() { }
     }
-}
-namespace UiPath.Ipc.Extensibility
-{
-    public interface IListenerConfig<TSelf, TListenerState, TConnectionState>
-        where TSelf : UiPath.Ipc.ListenerConfig, UiPath.Ipc.Extensibility.IListenerConfig<TSelf, TListenerState, TConnectionState>
-        where TListenerState : System.IAsyncDisposable
+    public abstract class ServerTransport
     {
-        System.Threading.Tasks.ValueTask<System.IO.Stream> AwaitConnection(TListenerState listenerState, TConnectionState connectionState, System.Threading.CancellationToken ct);
-        TConnectionState CreateConnectionState(UiPath.Ipc.IpcServer server, TListenerState listenerState);
-        TListenerState CreateListenerState(UiPath.Ipc.IpcServer server);
-        System.Collections.Generic.IEnumerable<string> Validate();
+        protected ServerTransport() { }
+        public int ConcurrentAccepts { get; set; }
+        public byte MaxReceivedMessageSizeInMegabytes { get; set; }
+        public System.Security.Cryptography.X509Certificates.X509Certificate? Certificate { get; init; }
+        protected abstract UiPath.Ipc.ServerTransport.IServerState CreateServerState();
+        protected abstract System.Collections.Generic.IEnumerable<string?> ValidateCore();
+        protected static string? IsNotNull<T>(T? propertyValue, [System.Runtime.CompilerServices.CallerArgumentExpression("propertyValue")] string? propertyName = null) { }
+        protected interface IServerConnectionSlot : System.IDisposable
+        {
+            System.Threading.Tasks.ValueTask<System.IO.Stream> AwaitConnection(System.Threading.CancellationToken ct);
+        }
+        protected interface IServerState : System.IAsyncDisposable
+        {
+            UiPath.Ipc.ServerTransport.IServerConnectionSlot CreateConnectionSlot();
+        }
     }
 }
 namespace UiPath.Ipc.Transport.NamedPipe
 {
-    public sealed class NamedPipeListener : UiPath.Ipc.ListenerConfig, System.IEquatable<UiPath.Ipc.Transport.NamedPipe.NamedPipeListener>, UiPath.Ipc.Extensibility.IListenerConfig<UiPath.Ipc.Transport.NamedPipe.NamedPipeListener, UiPath.Ipc.Transport.NamedPipe.NamedPipeListenerState, UiPath.Ipc.Transport.NamedPipe.NamedPipeServerConnectionState>
+    public sealed class NamedPipeClientTransport : UiPath.Ipc.ClientTransport, System.IEquatable<UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport>
     {
         [System.Obsolete("Constructors of types with required members are not supported in this version of " +
             "your compiler.", true)]
-        public NamedPipeListener() { }
-        [Newtonsoft.Json.JsonIgnore]
-        public System.Action<System.IO.Pipes.PipeSecurity>? AccessControl { get; init; }
-        public string PipeName { get; init; }
-        public string ServerName { get; init; }
-        public override string ToString() { }
-    }
-    public sealed class NamedPipeTransport : UiPath.Ipc.ClientTransport, System.IEquatable<UiPath.Ipc.Transport.NamedPipe.NamedPipeTransport>
-    {
-        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
-            "your compiler.", true)]
-        public NamedPipeTransport() { }
+        public NamedPipeClientTransport() { }
         public bool AllowImpersonation { get; init; }
         public string PipeName { get; init; }
         public string ServerName { get; init; }
@@ -219,46 +195,63 @@ namespace UiPath.Ipc.Transport.NamedPipe
         public override string ToString() { }
         public override void Validate() { }
     }
+    public sealed class NamedPipeServerTransport : UiPath.Ipc.ServerTransport
+    {
+        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
+            "your compiler.", true)]
+        public NamedPipeServerTransport() { }
+        [Newtonsoft.Json.JsonIgnore]
+        public System.Action<System.IO.Pipes.PipeSecurity>? AccessControl { get; init; }
+        public string PipeName { get; init; }
+        public string ServerName { get; init; }
+        protected override UiPath.Ipc.ServerTransport.IServerState CreateServerState() { }
+        public override string ToString() { }
+        protected override System.Collections.Generic.IEnumerable<string?> ValidateCore() { }
+    }
 }
 namespace UiPath.Ipc.Transport.Tcp
 {
-    public sealed class TcpListener : UiPath.Ipc.ListenerConfig, System.IEquatable<UiPath.Ipc.Transport.Tcp.TcpListener>, UiPath.Ipc.Extensibility.IListenerConfig<UiPath.Ipc.Transport.Tcp.TcpListener, UiPath.Ipc.Transport.Tcp.TcpListenerState, UiPath.Ipc.Transport.Tcp.TcpServerConnectionState>
+    public sealed class TcpClientTransport : UiPath.Ipc.ClientTransport, System.IEquatable<UiPath.Ipc.Transport.Tcp.TcpClientTransport>
     {
         [System.Obsolete("Constructors of types with required members are not supported in this version of " +
             "your compiler.", true)]
-        public TcpListener() { }
-        public System.Net.IPEndPoint EndPoint { get; init; }
-        public override string ToString() { }
-    }
-    public sealed class TcpTransport : UiPath.Ipc.ClientTransport, System.IEquatable<UiPath.Ipc.Transport.Tcp.TcpTransport>
-    {
-        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
-            "your compiler.", true)]
-        public TcpTransport() { }
+        public TcpClientTransport() { }
         public System.Net.IPEndPoint EndPoint { get; init; }
         public override UiPath.Ipc.IClientState CreateState() { }
         public override string ToString() { }
         public override void Validate() { }
+    }
+    public sealed class TcpServerTransport : UiPath.Ipc.ServerTransport
+    {
+        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
+            "your compiler.", true)]
+        public TcpServerTransport() { }
+        public System.Net.IPEndPoint EndPoint { get; init; }
+        protected override UiPath.Ipc.ServerTransport.IServerState CreateServerState() { }
+        public override string ToString() { }
+        protected override System.Collections.Generic.IEnumerable<string?> ValidateCore() { }
     }
 }
 namespace UiPath.Ipc.Transport.WebSocket
 {
-    public sealed class WebSocketListener : UiPath.Ipc.ListenerConfig, System.IEquatable<UiPath.Ipc.Transport.WebSocket.WebSocketListener>, UiPath.Ipc.Extensibility.IListenerConfig<UiPath.Ipc.Transport.WebSocket.WebSocketListener, UiPath.Ipc.Transport.WebSocket.WebSocketListenerState, UiPath.Ipc.Transport.WebSocket.WebSocketServerConnectionState>
+    public sealed class WebSocketClientTransport : UiPath.Ipc.ClientTransport, System.IEquatable<UiPath.Ipc.Transport.WebSocket.WebSocketClientTransport>
     {
         [System.Obsolete("Constructors of types with required members are not supported in this version of " +
             "your compiler.", true)]
-        public WebSocketListener() { }
-        public System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Net.WebSockets.WebSocket>> Accept { get; init; }
-        public override string ToString() { }
-    }
-    public sealed class WebSocketTransport : UiPath.Ipc.ClientTransport, System.IEquatable<UiPath.Ipc.Transport.WebSocket.WebSocketTransport>
-    {
-        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
-            "your compiler.", true)]
-        public WebSocketTransport() { }
+        public WebSocketClientTransport() { }
         public System.Uri Uri { get; init; }
         public override UiPath.Ipc.IClientState CreateState() { }
         public override string ToString() { }
         public override void Validate() { }
+    }
+    public sealed class WebSocketServerTransport : UiPath.Ipc.ServerTransport, System.IAsyncDisposable, System.IDisposable, UiPath.Ipc.ServerTransport.IServerConnectionSlot, UiPath.Ipc.ServerTransport.IServerState
+    {
+        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
+            "your compiler.", true)]
+        public WebSocketServerTransport() { }
+        public System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Net.WebSockets.WebSocket>> Accept { get; init; }
+        protected override UiPath.Ipc.ServerTransport.IServerState CreateServerState() { }
+        public override string ToString() { }
+        protected override System.Collections.Generic.IEnumerable<string?> ValidateCore() { }
     }
 }
