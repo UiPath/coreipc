@@ -2,7 +2,7 @@
 
 namespace UiPath.Ipc;
 
-public sealed class IpcClient : Peer, IClientConfig
+public sealed class IpcClient : IpcBase, IClientConfig
 {
     public EndpointCollection? Callbacks { get; set; }
 
@@ -63,7 +63,7 @@ public sealed class IpcClient : Peer, IClientConfig
         Callbacks.OrDefault(),
         endpoint => endpoint with
         {
-            BeforeIncommingCall = null, // callbacks don't support BeforeCall
+            BeforeIncomingCall = null, // callbacks don't support BeforeCall
             Scheduler = endpoint.Scheduler ?? Scheduler
         });
 }

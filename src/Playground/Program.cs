@@ -44,7 +44,7 @@ internal class Program
                 typeof(Contracts.IServerOperations), // DEVINE
                 new EndpointSettings(typeof(Contracts.IServerOperations)) // ASTALALT
                 {
-                    BeforeIncommingCall = async (callInfo, _) =>
+                    BeforeIncomingCall = async (callInfo, _) =>
                     {
                         Console.WriteLine($"Server: {callInfo.Method.Name}");
                     }

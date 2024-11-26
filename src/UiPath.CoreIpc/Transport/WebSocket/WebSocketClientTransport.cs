@@ -7,9 +7,9 @@ public sealed record WebSocketClientTransport : ClientTransport
     public required Uri Uri { get; init; }
     public override string ToString() => $"WebSocketClient={Uri}";
 
-    public override IClientState CreateState() => new WebSocketClientState();
+    internal override IClientState CreateState() => new WebSocketClientState();
 
-    public override void Validate()
+    internal override void Validate()
     {
         if (Uri is null)
         {

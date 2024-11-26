@@ -11,10 +11,10 @@ public sealed class NamedPipeServerTransport : ServerTransport
     [JsonIgnore]
     public AccessControlDelegate? AccessControl { get; init; }
 
-    protected internal override IServerState CreateServerState()
+    internal override IServerState CreateServerState()
     => new ServerState { Transport = this };
 
-    protected override IEnumerable<string?> ValidateCore()
+    internal override IEnumerable<string?> ValidateCore()
     {
         yield return IsNotNull(PipeName);
         yield return IsNotNull(ServerName);
@@ -69,7 +69,15 @@ public sealed class NamedPipeServerTransport : ServerTransport
 
         public required NamedPipeServerStream Stream { get; init; }
 
-        void IDisposable.Dispose() => Stream.Dispose();
+        ValueTask IAsyncDisposable.DisposeAsync()
+        {
+#if NET461
+            Stream.Dispose();
+            return default;
+#else
+            return Stream.DisposeAsync();
+#endif
+        }
 
         async ValueTask<Stream> IServerConnectionSlot.AwaitConnection(CancellationToken ct)
         {

@@ -11,9 +11,9 @@ public sealed record NamedPipeClientTransport : ClientTransport
 
     public override string ToString() => $"ClientPipe={PipeName}";
 
-    public override IClientState CreateState() => new NamedPipeClientState();
+    internal override IClientState CreateState() => new NamedPipeClientState();
 
-    public override void Validate()
+    internal override void Validate()
     {
         if (PipeName is null or "")
         {

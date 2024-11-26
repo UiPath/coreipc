@@ -13,11 +13,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "Playground\Playground.csproj", "{F0365E40-DA73-4583-A363-89CBEF68A4C6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc.Http", "UiPath.CoreIpc.Http\UiPath.CoreIpc.Http.csproj", "{8776E55A-D4EB-4C3A-8FA2-29E9A1CAE469}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.Ipc.Tests", "UiPath.Ipc.Tests\UiPath.Ipc.Tests.csproj", "{E238E183-92CF-48A6-890F-C422853D6656}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UiPath.CoreIpc.Extensions.Abstractions", "UiPath.CoreIpc.Extensions.Abstractions\UiPath.CoreIpc.Extensions.Abstractions.csproj", "{F519AE2B-88A6-482E-A6E2-B525F71F566D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UiPath.CoreIpc.Extensions.BidirectionalHttp", "UiPath.CoreIpc.Extensions.BidirectionalHttp\UiPath.CoreIpc.Extensions.BidirectionalHttp.csproj", "{CE41844B-0F4F-4A5D-9AF9-77B58BE6ECD1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,10 +33,6 @@ Global
 		{F0365E40-DA73-4583-A363-89CBEF68A4C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F0365E40-DA73-4583-A363-89CBEF68A4C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F0365E40-DA73-4583-A363-89CBEF68A4C6}.Release|Any CPU.Build.0 = Release|Any CPU
-		{8776E55A-D4EB-4C3A-8FA2-29E9A1CAE469}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8776E55A-D4EB-4C3A-8FA2-29E9A1CAE469}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8776E55A-D4EB-4C3A-8FA2-29E9A1CAE469}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8776E55A-D4EB-4C3A-8FA2-29E9A1CAE469}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E238E183-92CF-48A6-890F-C422853D6656}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{E238E183-92CF-48A6-890F-C422853D6656}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E238E183-92CF-48A6-890F-C422853D6656}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -45,6 +41,10 @@ Global
 		{F519AE2B-88A6-482E-A6E2-B525F71F566D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F519AE2B-88A6-482E-A6E2-B525F71F566D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F519AE2B-88A6-482E-A6E2-B525F71F566D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE41844B-0F4F-4A5D-9AF9-77B58BE6ECD1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE41844B-0F4F-4A5D-9AF9-77B58BE6ECD1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE41844B-0F4F-4A5D-9AF9-77B58BE6ECD1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE41844B-0F4F-4A5D-9AF9-77B58BE6ECD1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

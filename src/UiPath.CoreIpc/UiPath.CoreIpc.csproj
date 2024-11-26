@@ -54,7 +54,7 @@
   <ItemGroup Condition="'$(TargetFramework)' == 'net461'">
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="6.0.0" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <Using Include="System.Reflection" />
     <Using Include="System.Diagnostics" />
@@ -65,7 +65,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="UiPath.Ipc.TV" />
-    <!--<InternalsVisibleTo Include="IpcRoslynCompletionService" />-->
+    <InternalsVisibleTo Include="UiPath.CoreIpc.Extensions.Abstractions" />
   </ItemGroup>
 </Project>

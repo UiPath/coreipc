@@ -8,7 +8,9 @@ public abstract class ServerTransport
     public int ConcurrentAccepts { get; set; } = 5;
     public byte MaxReceivedMessageSizeInMegabytes { get; set; } = 2;
 
-    public X509Certificate? Certificate { get; init; }
+    // TODO: Will be decommissioned altogether.
+    internal X509Certificate? Certificate { get; init; }
+
     internal int MaxMessageSize => MaxReceivedMessageSizeInMegabytes * 1024 * 1024;
 
     // TODO: Maybe decommission.
@@ -34,12 +36,12 @@ public abstract class ServerTransport
         return sslStream;
     }
 
-    protected internal abstract IServerState CreateServerState();
+    internal abstract IServerState CreateServerState();
 
     internal IEnumerable<string> Validate()
     => ValidateCore().Where(x => x is not null).Select(x => $"{GetType().Name}.{x}");
-    protected abstract IEnumerable<string?> ValidateCore();
-    protected static string? IsNotNull<T>(T? propertyValue, [CallerArgumentExpression(nameof(propertyValue))] string? propertyName = null)
+    internal abstract IEnumerable<string?> ValidateCore();
+    internal static string? IsNotNull<T>(T? propertyValue, [CallerArgumentExpression(nameof(propertyValue))] string? propertyName = null)
     {
         if (propertyValue is null)
         {
@@ -48,11 +50,11 @@ public abstract class ServerTransport
         return null;
     }
 
-    protected internal interface IServerState : IAsyncDisposable
+    internal interface IServerState : IAsyncDisposable
     {
         IServerConnectionSlot CreateConnectionSlot();
     }
-    protected internal interface IServerConnectionSlot : IDisposable
+    internal interface IServerConnectionSlot : IAsyncDisposable
     {
         ValueTask<Stream> AwaitConnection(CancellationToken ct);
     }

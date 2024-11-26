@@ -1,6 +1,6 @@
 ﻿namespace UiPath.Ipc;
 
-public interface IClientState : IDisposable
+internal interface IClientState : IDisposable
 {
     Stream? Network { get; }
 

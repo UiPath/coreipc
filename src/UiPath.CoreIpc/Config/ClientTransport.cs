@@ -2,6 +2,6 @@
 
 public abstract record ClientTransport
 {
-    public abstract IClientState CreateState();
-    public abstract void Validate();
+    internal abstract IClientState CreateState();
+    internal abstract void Validate();
 }

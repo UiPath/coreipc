@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\UiPath.CoreIpc.Http\UiPath.CoreIpc.Http.csproj" />
+    <ProjectReference Include="..\UiPath.CoreIpc.Extensions.BidirectionalHttp\UiPath.CoreIpc.Extensions.BidirectionalHttp.csproj" />
     <ProjectReference Include="..\UiPath.CoreIpc\UiPath.CoreIpc.csproj" />
   </ItemGroup>
   

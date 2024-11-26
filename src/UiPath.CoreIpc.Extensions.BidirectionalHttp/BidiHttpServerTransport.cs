@@ -7,20 +7,20 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Channels;
 
-namespace UiPath.Ipc.Http;
+namespace UiPath.CoreIpc.Extensions.BidirectionalHttp;
 
 using static Constants;
 
-public sealed partial class BidiHttpServerTransport : ServerTransport
+public sealed partial class BidiHttpServerTransport : ServerTransportBase
 {
     public required Uri Uri { get; init; }
 
-    protected override IServerState CreateServerState()
+    protected override ServerState CreateState()
     => new BidiHttpServerState(this);
 
-    protected override IEnumerable<string?> ValidateCore() => [];
+    protected override IEnumerable<string?> Validate() => [];
 
-    private sealed class BidiHttpServerState : IServerState
+    private sealed class BidiHttpServerState : ServerState
     {
         private readonly CancellationTokenSource _cts = new();
         private readonly HttpListener _httpListener;
@@ -46,7 +46,7 @@ public sealed partial class BidiHttpServerTransport : ServerTransport
             _disposing = new(DisposeCore);
         }
 
-        public ValueTask DisposeAsync() => new(_disposing.Value);
+        public override ValueTask DisposeAsync() => new(_disposing.Value);
 
         private async Task DisposeCore()
         {
@@ -110,33 +110,26 @@ public sealed partial class BidiHttpServerTransport : ServerTransport
             }
         }
 
-        IServerConnectionSlot IServerState.CreateConnectionSlot() => new BidiHttpServerConnectionSlot(this);
+        public override ServerConnectionSlot CreateServerConnectionSlot() => new BidiHttpServerConnectionSlot(this);
+
     }
 
-    private sealed class BidiHttpServerConnectionSlot : Stream, IServerConnectionSlot, IAsyncDisposable
+    private sealed class BidiHttpServerConnectionSlot : ServerConnectionSlot
     {
         private readonly Pipe _pipe = new();
-
-        private readonly BidiHttpServerState _listenerState;
-
+        private readonly BidiHttpServerState _serverState;
+        private readonly Lazy<Task> _disposing;
         private readonly CancellationTokenSource _cts = new();
         private readonly AsyncLock _lock = new();
         private (Guid connectionId, Uri reverseUri)? _connection = null;
         private HttpClient? _client;
         private Task? _processing = null;
-        private readonly Lazy<Task> _disposing;
 
         public BidiHttpServerConnectionSlot(BidiHttpServerState serverState)
         {
-            _listenerState = serverState;
+            _serverState = serverState;
             _disposing = new(DisposeCore);
         }
-
-        public
-#if !NET461
-        override
-#endif
-        ValueTask DisposeAsync() => new(_disposing.Value);
 
         private async Task DisposeCore()
         {
@@ -156,7 +149,7 @@ public sealed partial class BidiHttpServerTransport : ServerTransport
             _cts.Dispose();
         }
 
-        public async Task WaitForConnection(CancellationToken ct)
+        public override async ValueTask<Stream> AwaitConnection(CancellationToken ct)
         {
             using (await _lock.LockAsync(ct))
             {
@@ -165,24 +158,28 @@ public sealed partial class BidiHttpServerTransport : ServerTransport
                     throw new InvalidOperationException();
                 }
 
-                _connection = await _listenerState.NewConnections.ReadAsync(ct);
+                _connection = await _serverState.NewConnections.ReadAsync(ct);
 
                 _client = new()
                 {
                     BaseAddress = _connection.Value.reverseUri,
                     DefaultRequestHeaders =
-                {
-                    { ConnectionIdHeader, _connection.Value.connectionId.ToString() }
-                }
+                    {
+                        { ConnectionIdHeader, _connection.Value.connectionId.ToString() }
+                    }
                 };
 
                 _processing = ProcessContexts(_cts.Token);
+
+                return new Adapter(this);
             }
         }
 
+        public override ValueTask DisposeAsync() => new(_disposing.Value);
+
         private async Task ProcessContexts(CancellationToken ct)
         {
-            var reader = _listenerState.GetConnectionChannel(_connection!.Value.connectionId);
+            var reader = _serverState.GetConnectionChannel(_connection!.Value.connectionId);
 
             while (await reader.WaitToReadAsync(ct))
             {
@@ -221,58 +218,67 @@ public sealed partial class BidiHttpServerTransport : ServerTransport
             }
         }
 
-        ValueTask<Stream> IServerConnectionSlot.AwaitConnection(CancellationToken ct)
+        private sealed class Adapter : Stream
         {
-            throw new NotImplementedException();
-        }
+            private readonly BidiHttpServerConnectionSlot _slot;
 
-
-
-        public override bool CanRead => true;
-        public override bool CanSeek => false;
-        public override bool CanWrite => true;
-
-        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
-        {
-            var memory = new Memory<byte>(buffer, offset, count);
-            var readResult = await _pipe.Reader.ReadAsync(ct);
-
-            var take = (int)Math.Min(readResult.Buffer.Length, memory.Length);
-
-            readResult.Buffer.Slice(start: 0, length: take).CopyTo(memory.Span);
-            _pipe.Reader.AdvanceTo(readResult.Buffer.GetPosition(take));
-
-            return take;
-        }
-
-        public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct)
-        {
-            var memory = new ReadOnlyMemory<byte>(buffer, offset, count);
-            if (_client is null)
+            public Adapter(BidiHttpServerConnectionSlot slot)
             {
-                throw new InvalidOperationException();
+                _slot = slot;
             }
 
-            HttpContent content =
+            public
+#if !NET461
+            override
+#endif
+            ValueTask DisposeAsync() => _slot.DisposeAsync();
+
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => true;
+
+            public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+            {
+                var memory = new Memory<byte>(buffer, offset, count);
+                var readResult = await _slot._pipe.Reader.ReadAsync(ct);
+
+                var take = (int)Math.Min(readResult.Buffer.Length, memory.Length);
+
+                readResult.Buffer.Slice(start: 0, length: take).CopyTo(memory.Span);
+                _slot._pipe.Reader.AdvanceTo(readResult.Buffer.GetPosition(take));
+
+                return take;
+            }
+
+            public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+            {
+                var memory = new ReadOnlyMemory<byte>(buffer, offset, count);
+                if (_slot._client is null)
+                {
+                    throw new InvalidOperationException();
+                }
+
+                HttpContent content =
 #if NET461
         new ByteArrayContent(memory.ToArray());
 #else
-            new ReadOnlyMemoryContent(memory);
+                new ReadOnlyMemoryContent(memory);
 #endif
 
-            await _client.PostAsync(requestUri: "", content, ct);
+                await _slot._client.PostAsync(requestUri: "", content, ct);
+            }
+
+            public override Task FlushAsync(CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+            public override void Flush() => throw new NotImplementedException();
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotImplementedException();
+            public override void SetLength(long value) => throw new NotImplementedException();
+            public override int Read(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+
+            public override long Length => throw new NotImplementedException();
+            public override long Position { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
         }
-
-        public override Task FlushAsync(CancellationToken cancellationToken)
-        => Task.CompletedTask;
-
-        public override void Flush() => throw new NotImplementedException();
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotImplementedException();
-        public override void SetLength(long value) => throw new NotImplementedException();
-        public override int Read(byte[] buffer, int offset, int count) => throw new NotImplementedException();
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotImplementedException();
-
-        public override long Length => throw new NotImplementedException();
-        public override long Position { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
     }
 }
