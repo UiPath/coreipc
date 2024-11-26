@@ -87,7 +87,7 @@ public abstract class TestBase : IAsyncLifetime
 
             var endpointSettings = new EndpointSettings(ContractType)
             {
-                BeforeIncommingCall = (callInfo, ct) =>
+                BeforeIncomingCall = (callInfo, ct) =>
                 {
                     _serverBeforeCalls.Add(callInfo);
                     return _tailBeforeCall?.Invoke(callInfo, ct) ?? Task.CompletedTask;

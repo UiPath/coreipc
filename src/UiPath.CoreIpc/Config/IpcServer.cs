@@ -2,7 +2,7 @@
 
 namespace UiPath.Ipc;
 
-public sealed class IpcServer : Peer, IAsyncDisposable
+public sealed class IpcServer : IpcBase, IAsyncDisposable
 {
     public required EndpointCollection Endpoints { get; init; }
     public required ServerTransport Transport { get; init; }
@@ -163,7 +163,7 @@ public sealed class IpcServer : Peer, IAsyncDisposable
             }
             catch (Exception ex)
             {
-                slot.Dispose();
+                await slot.DisposeAsync();
                 _newConnection.OnError(ex);
                 return;
             }

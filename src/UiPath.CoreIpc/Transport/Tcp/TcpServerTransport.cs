@@ -7,14 +7,14 @@ public sealed class TcpServerTransport : ServerTransport
 {
     public required IPEndPoint EndPoint { get; init; }
 
-    protected internal override IServerState CreateServerState()
+    internal override IServerState CreateServerState()
     {
         var listener = new TcpListener(EndPoint);
         listener.Start(backlog: ConcurrentAccepts);
         return new ServerState() { TcpListener = listener };
     }
 
-    protected override IEnumerable<string?> ValidateCore()
+    internal override IEnumerable<string?> ValidateCore()
     {
         yield return IsNotNull(EndPoint);
     }
@@ -51,6 +51,6 @@ public sealed class TcpServerTransport : ServerTransport
             return tcpClient.GetStream();
         }
 
-        void IDisposable.Dispose() { }
+        ValueTask IAsyncDisposable.DisposeAsync() => default;
     }
 }

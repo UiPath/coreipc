@@ -8,9 +8,9 @@ public sealed record TcpClientTransport : ClientTransport
 
     public override string ToString() => $"TcpClient={EndPoint}";
 
-    public override IClientState CreateState() => new TcpClientState();
+    internal override IClientState CreateState() => new TcpClientState();
 
-    public override void Validate()
+    internal override void Validate()
     {
         if (EndPoint is null)
         {
