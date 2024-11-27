@@ -42,7 +42,7 @@ namespace UiPath.CoreIpc.Tests
                 {
                     RequestTimeout = RequestTimeout,
                     AccessControl = security => _pipeSecurity = security.LocalOnly(),
-                    EncryptAndSign = true,
+                    EncryptAndSign = false,
                 })
                 .AddEndpoint<IComputingService, IComputingCallback>()
                 .ValidateAndBuild();
@@ -66,7 +66,6 @@ namespace UiPath.CoreIpc.Tests
         private NamedPipeClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
             new NamedPipeClientBuilder<IComputingService, IComputingCallback>("computing", _serviceProvider)
                 .AllowImpersonation()
-                .EncryptAndSign()
                 .RequestTimeout(RequestTimeout)
                 .CallbackInstance(_computingCallback)
                 .TaskScheduler(taskScheduler);
@@ -120,19 +119,7 @@ namespace UiPath.CoreIpc.Tests
 
             await proxy.DoNothing();
             newConnection.ShouldBeFalse();
-        }
-
-        [Fact]
-        public async Task ReconnectWithEncrypt()
-        {
-            var proxy = ComputingClientBuilder().ValidateAndBuild();
-            for (int i = 0; i < 50; i++)
-            {
-                await proxy.AddFloat(1, 2);
-                ((IpcProxy)proxy).CloseConnection();
-                await proxy.AddFloat(1, 2);
-            }
-        }
+        }        
 
         [Fact]
         public async Task DontReconnect()

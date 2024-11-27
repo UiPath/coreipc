@@ -28,6 +28,7 @@ jobs:
     steps:
       - template: azp-initialization.yaml
       - template: azp-dotnet.yaml
+      - template: azp-dotnet-dist.yaml
 
   - job:
     displayName: 'node.js'

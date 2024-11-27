@@ -1,10 +1,36 @@
 steps:
+# Runtime version should match with SDK version.
+# The runtime should be the one that is contained in SDK.
+# https://dotnet.microsoft.com/en-us/download/dotnet/6.0
+  - powershell: |
+      Write-Host "##vso[task.setvariable variable=DotnetRuntimeVersion;]8.0.8"
+      Write-Host "##vso[task.setvariable variable=DOTNET_NOLOGO;]true"
+    displayName: 'Use .NET Runtime 8.0.8'
+
+  - task: UseDotNet@2
+    displayName: 'Use .NET SDK 6.0.317'
+    inputs:
+      packageType: 'sdk'
+      version: '6.0.317'
+
+  - task: UseDotNet@2
+    displayName: 'Use .NET SDK 8.0.400'
+    inputs:
+      packageType: 'sdk'
+      version: 8.0.400
 
     # Read $(Version) from the UiPath.CoreIpc.csproj file
   - powershell: |
+      Write-Host "env:DotNet_MainProjectPath is ---$env:DotNet_MainProjectPath---"
+  
       $xml = [Xml] ( Get-Content $env:DotNet_MainProjectPath )
       $version = [String] $xml.Project.PropertyGroup.Version
+
+      Write-Host "Version is ---$version---"
+
       $version = $version.Trim()
+
+      Write-Host "Version after trimming is ---$version---"
       
       Write-Host "##vso[task.setvariable variable=Version;]$version"
     displayName: '$(Label_Initialization) Read $[Version] from the csproj'
