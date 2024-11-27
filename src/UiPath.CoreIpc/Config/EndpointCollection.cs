@@ -2,7 +2,7 @@
 
 namespace UiPath.Ipc;
 
-public class EndpointCollection : IEnumerable, IEnumerable<EndpointSettings>
+public class EndpointCollection : IEnumerable<EndpointSettings>
 {
     internal readonly Dictionary<Type, EndpointSettings> Endpoints = new();
 
