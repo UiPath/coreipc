@@ -64,7 +64,7 @@ public sealed class RobotTestsOverNamedPipes : RobotTests
         => RobotIpcHelpers.CreateProxy<TContract>(
             pipeName,
             requestTimeout: TimeSpan.FromSeconds(40),
-            callbacks: new EndpointCollection()
+            callbacks: new ContractCollection()
             {
                 { typeof(TCallback), Instance }
             },
@@ -79,7 +79,7 @@ internal static partial class RobotIpcHelpers
     public static TContract CreateProxy<TContract>(
         string pipeName,
         TimeSpan? requestTimeout = null,
-        EndpointCollection? callbacks = null,
+        ContractCollection? callbacks = null,
         IServiceProvider? provider = null,
         Action? beforeConnect = null,
         BeforeCallHandler? beforeCall = null,
@@ -199,7 +199,7 @@ internal static partial class RobotIpcHelpers
             => $"New {name} is {@new?.ToString() ?? "null"} but was originally {old?.ToString() ?? "null"}.";
         }
     }
-    internal readonly record struct CreateProxyRequest(Key ActualKey, Params Params, EndpointCollection? Callbacks)
+    internal readonly record struct CreateProxyRequest(Key ActualKey, Params Params, ContractCollection? Callbacks)
     {
         public bool Equals(CreateProxyRequest other) => ActualKey.Equals(other.ActualKey);
         public override int GetHashCode() => ActualKey.GetHashCode();
@@ -208,11 +208,11 @@ internal static partial class RobotIpcHelpers
 
     internal readonly struct EquatableEndpointSet : IEquatable<EquatableEndpointSet>
     {
-        public static EquatableEndpointSet From(EndpointCollection? endpoints, bool haveProvider)
+        public static EquatableEndpointSet From(ContractCollection? endpoints, bool haveProvider)
         {
             return Pal(endpoints?.AsEnumerable(), haveProvider);
 
-            static EquatableEndpointSet Pal(IEnumerable<EndpointSettings>? endpoints, bool haveProvider)
+            static EquatableEndpointSet Pal(IEnumerable<ContractSettings>? endpoints, bool haveProvider)
             {
                 var items = endpoints?.AsEnumerable();
 
@@ -237,9 +237,9 @@ internal static partial class RobotIpcHelpers
         }
 
         public static readonly EquatableEndpointSet Empty = new([]);
-        private readonly HashSet<EndpointSettings> _set;
+        private readonly HashSet<ContractSettings> _set;
 
-        private EquatableEndpointSet(HashSet<EndpointSettings> set) => _set = set;
+        private EquatableEndpointSet(HashSet<ContractSettings> set) => _set = set;
 
         public bool Equals(EquatableEndpointSet other) => _set.SetEquals(other._set);
         public override bool Equals(object? obj) => obj is EquatableEndpointSet other && Equals(other);
@@ -248,7 +248,7 @@ internal static partial class RobotIpcHelpers
         public override string ToString()
         {
             return $"[{string.Join(", ", _set.Select(Pal))}]";
-            static string Pal(EndpointSettings endpointSettings)
+            static string Pal(ContractSettings endpointSettings)
             => $"{endpointSettings.ContractType.Name},sp:{RuntimeHelpers.GetHashCode(endpointSettings.ServiceProvider)},instance:{RuntimeHelpers.GetHashCode(endpointSettings.ServiceInstance)}";
         }
     }

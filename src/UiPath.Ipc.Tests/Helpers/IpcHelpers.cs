@@ -47,7 +47,7 @@ internal static class IpcClientExtensions
     public static async Task<IpcServer> WithRequestTimeout(this Task<IpcServer> ipcServerTask, TimeSpan requestTimeout)
     => (await ipcServerTask).WithRequestTimeout(requestTimeout);
 
-    public static IpcClient WithCallbacks(this IpcClient ipcClient, EndpointCollection callbacks)
+    public static IpcClient WithCallbacks(this IpcClient ipcClient, ContractCollection callbacks)
     {
         ipcClient.Callbacks = callbacks;
         return ipcClient;

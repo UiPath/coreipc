@@ -4,7 +4,7 @@ namespace UiPath.Ipc;
 
 public sealed class IpcServer : IpcBase, IAsyncDisposable
 {
-    public required EndpointCollection Endpoints { get; init; }
+    public required ContractCollection Endpoints { get; init; }
     public required ServerTransport Transport { get; init; }
 
     private readonly object _lock = new();
@@ -87,9 +87,11 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
 
     internal RouterConfig CreateRouterConfig(IpcServer server) => RouterConfig.From(
         server.Endpoints,
-        endpoint => endpoint with
+        endpoint =>
         {
-            Scheduler = endpoint.Scheduler ?? server.Scheduler
+            var clone = new ContractSettings(endpoint);
+            clone.Scheduler ??= server.Scheduler;
+            return clone;
         });
 
     private sealed class ObserverAdapter<T> : IObserver<T>

@@ -16,41 +16,26 @@ namespace UiPath.Ipc
         public System.Reflection.MethodInfo Method { get; }
         public bool NewConnection { get; }
     }
-    public abstract class ClientTransport : System.IEquatable<UiPath.Ipc.ClientTransport>
+    public abstract class ClientTransport : System.IEquatable<UiPath.Ipc.ClientTransport> { }
+    public class ContractCollection : System.Collections.Generic.IEnumerable<UiPath.Ipc.ContractSettings>, System.Collections.IEnumerable
     {
-        protected ClientTransport() { }
-    }
-    public class EndpointCollection : System.Collections.Generic.IEnumerable<UiPath.Ipc.EndpointSettings>, System.Collections.IEnumerable
-    {
-        public EndpointCollection() { }
-        public void Add(System.Type type) { }
-        public void Add(UiPath.Ipc.EndpointSettings endpointSettings) { }
+        public ContractCollection() { }
+        public void Add(System.Type contractType) { }
+        public void Add(UiPath.Ipc.ContractSettings endpointSettings) { }
         public void Add(System.Type contractType, object? instance) { }
-        public System.Collections.Generic.IEnumerator<UiPath.Ipc.EndpointSettings> GetEnumerator() { }
+        public System.Collections.Generic.IEnumerator<UiPath.Ipc.ContractSettings> GetEnumerator() { }
+    }
+    public sealed class ContractSettings
+    {
+        public ContractSettings(System.Type contractType, System.IServiceProvider serviceProvider) { }
+        public ContractSettings(System.Type contractType, object? serviceInstance = null) { }
+        public System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeIncomingCall { get; set; }
+        public System.Threading.Tasks.TaskScheduler? Scheduler { get; set; }
     }
     public sealed class EndpointNotFoundException : System.ArgumentException
     {
         public string EndpointName { get; }
         public string ServerDebugName { get; }
-    }
-    public class EndpointSettings : System.IEquatable<UiPath.Ipc.EndpointSettings>
-    {
-        public EndpointSettings(System.Type contractType, System.IServiceProvider serviceProvider) { }
-        public EndpointSettings(System.Type contractType, object? serviceInstance = null) { }
-        public System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeIncomingCall { get; set; }
-        public System.Type ContractType { get; }
-        public System.Threading.Tasks.TaskScheduler? Scheduler { get; set; }
-        public object? ServiceInstance { get; }
-        public System.IServiceProvider? ServiceProvider { get; }
-        public void Validate() { }
-        public virtual UiPath.Ipc.EndpointSettings WithServiceProvider(System.IServiceProvider? serviceProvider) { }
-    }
-    public sealed class EndpointSettings<TContract> : UiPath.Ipc.EndpointSettings, System.IEquatable<UiPath.Ipc.EndpointSettings<TContract>>
-        where TContract :  class
-    {
-        public EndpointSettings(System.IServiceProvider serviceProvider) { }
-        public EndpointSettings(TContract? serviceInstance = null) { }
-        public override UiPath.Ipc.EndpointSettings WithServiceProvider(System.IServiceProvider? serviceProvider) { }
     }
     public class Error : System.IEquatable<UiPath.Ipc.Error>
     {
@@ -94,7 +79,7 @@ namespace UiPath.Ipc
         public IpcClient() { }
         public System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeConnect { get; set; }
         public System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeOutgoingCall { get; set; }
-        public UiPath.Ipc.EndpointCollection? Callbacks { get; set; }
+        public UiPath.Ipc.ContractCollection? Callbacks { get; set; }
         public Microsoft.Extensions.Logging.ILogger? Logger { get; init; }
         public UiPath.Ipc.ClientTransport Transport { get; init; }
         public TProxy GetProxy<TProxy>()
@@ -114,7 +99,7 @@ namespace UiPath.Ipc
         [System.Obsolete("Constructors of types with required members are not supported in this version of " +
             "your compiler.", true)]
         public IpcServer() { }
-        public UiPath.Ipc.EndpointCollection Endpoints { get; init; }
+        public UiPath.Ipc.ContractCollection Endpoints { get; init; }
         public UiPath.Ipc.ServerTransport Transport { get; init; }
         public System.Threading.Tasks.ValueTask DisposeAsync() { }
         [System.Diagnostics.CodeAnalysis.MemberNotNull(new string[] {
@@ -152,7 +137,6 @@ namespace UiPath.Ipc
     }
     public abstract class ServerTransport
     {
-        protected ServerTransport() { }
         public int ConcurrentAccepts { get; set; }
         public byte MaxReceivedMessageSizeInMegabytes { get; set; }
     }

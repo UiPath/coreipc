@@ -2,7 +2,7 @@
 
 public sealed class IpcClient : IpcBase, IClientConfig
 {
-    public EndpointCollection? Callbacks { get; set; }
+    public ContractCollection? Callbacks { get; set; }
 
     public ILogger? Logger { get; init; }
     public BeforeConnectHandler? BeforeConnect { get; set; }
@@ -23,24 +23,6 @@ public sealed class IpcClient : IpcBase, IClientConfig
     }
     public TProxy GetProxy<TProxy>() where TProxy : class => GetServiceClient(typeof(TProxy)).GetProxy<TProxy>();
 
-    // TODO: should decommission?
-    internal void Validate()
-    {
-        var haveDeferredInjectedCallbacks = Callbacks?.Any(x => x.Service.MaybeGetServiceProvider() is null && x.Service.MaybeGetInstance() is null) ?? false;
-
-        if (haveDeferredInjectedCallbacks && ServiceProvider is null)
-        {
-            throw new InvalidOperationException("ServiceProvider is required when you register injectable callbacks. Consider registering a callback instance.");
-        }
-
-        if (Transport is null)
-        {
-            throw new InvalidOperationException($"{Transport} is required.");
-        }
-
-        Transport.Validate();
-    }
-
     internal ILogger? GetLogger(string name)
     {
         if (Logger is not null)
@@ -59,9 +41,11 @@ public sealed class IpcClient : IpcBase, IClientConfig
     internal RouterConfig CreateCallbackRouterConfig()
     => RouterConfig.From(
         Callbacks.OrDefault(),
-        endpoint => endpoint with
+        endpoint =>
         {
-            BeforeIncomingCall = null, // callbacks don't support BeforeCall
-            Scheduler = endpoint.Scheduler ?? Scheduler
+            var clone = new ContractSettings(endpoint);
+            clone.BeforeIncomingCall = null; // callbacks don't support BeforeIncomingCall
+            clone.Scheduler ??= Scheduler; 
+            return clone;
         });
 }

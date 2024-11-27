@@ -67,7 +67,7 @@ public abstract class TestBase : IAsyncLifetime
 
     protected abstract void ConfigureSpecificServices(IServiceCollection services);
 
-    protected virtual EndpointCollection? Callbacks => [];
+    protected virtual ContractCollection? Callbacks => [];
 
     private Task<IpcServer?> CreateIpcServer()
     {
@@ -85,7 +85,7 @@ public abstract class TestBase : IAsyncLifetime
             var serverTransport = await CreateServerTransport();
             ConfigTransportBase(serverTransport);
 
-            var endpointSettings = new EndpointSettings(ContractType)
+            var endpointSettings = new ContractSettings(ContractType)
             {
                 BeforeIncomingCall = (callInfo, ct) =>
                 {
@@ -104,7 +104,7 @@ public abstract class TestBase : IAsyncLifetime
             };
         }
     }
-    protected IpcClient? CreateIpcClient(EndpointCollection? callbacks = null) 
+    protected IpcClient? CreateIpcClient(ContractCollection? callbacks = null) 
     {
         if (_overrideConfig is null)
         {

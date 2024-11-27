@@ -17,7 +17,7 @@ public abstract class RobotTests : TestBase
 
     protected sealed override IpcProxy? IpcProxy => Proxy as IpcProxy;
     protected sealed override Type ContractType => typeof(IStudioOperations);
-    protected override EndpointCollection? Callbacks => new()
+    protected override ContractCollection? Callbacks => new()
     {
         { typeof(IStudioEvents), _studioEvents }
     };

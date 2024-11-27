@@ -24,7 +24,7 @@ public abstract class ComputingTests : SpyTestBase
 
     protected sealed override IpcProxy? IpcProxy => Proxy as IpcProxy;
     protected sealed override Type ContractType => typeof(IComputingService);
-    protected override EndpointCollection? Callbacks => new()
+    protected override ContractCollection? Callbacks => new()
     {
         { typeof(IComputingCallback), _computingCallback }
     };
