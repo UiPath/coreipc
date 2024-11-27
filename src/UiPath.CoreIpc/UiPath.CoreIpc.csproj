@@ -5,7 +5,7 @@
     <RootNamespace>UiPath.CoreIpc</RootNamespace>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Authors>UiPath</Authors>
-    <Version>2.0.1</Version>
+    <Version>2.0.1.1</Version>
     <PackageProjectUrl>https://github.com/UiPath/CoreIpc/</PackageProjectUrl>
     <PackageTags>json-rpc rpc ipc netcore wcf</PackageTags>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -25,6 +25,7 @@
     <PackageReference Include="System.IO.Pipes.AccessControl" Version="4.5.1" />
     <PackageReference Include="System.Reflection.DispatchProxy" Version="4.7.1" />
     <PackageReference Include="Nito.AsyncEx" Version="5.0.0" />
+    <PackageReference Include="System.Private.Uri" Version="4.3.2" />
   </ItemGroup>
 
 </Project>
