@@ -1,8 +1,8 @@
 ﻿namespace UiPath.Ipc;
 
-internal readonly record struct RouterConfig(IReadOnlyDictionary<string, EndpointSettings> Endpoints)
+internal readonly record struct RouterConfig(IReadOnlyDictionary<string, ContractSettings> Endpoints)
 {
-    public static RouterConfig From(EndpointCollection endpoints, Func<EndpointSettings, EndpointSettings> transform)
+    public static RouterConfig From(ContractCollection endpoints, Func<ContractSettings, ContractSettings> transform)
     {
         ContractToSettingsMap nameToEndpoint = [];
 
@@ -127,7 +127,7 @@ internal abstract record ServiceFactory
 
 internal readonly struct Route
 {
-    public static Route From(IServiceProvider? serviceProvider, EndpointSettings endpointSettings)
+    public static Route From(IServiceProvider? serviceProvider, ContractSettings endpointSettings)
     => new Route()
     {
         Service = endpointSettings.Service.WithProvider(serviceProvider),

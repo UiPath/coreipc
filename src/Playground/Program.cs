@@ -42,7 +42,7 @@ internal class Program
             Endpoints = new()
             {
                 typeof(Contracts.IServerOperations), // DEVINE
-                new EndpointSettings(typeof(Contracts.IServerOperations)) // ASTALALT
+                new ContractSettings(typeof(Contracts.IServerOperations)) // ASTALALT
                 {
                     BeforeIncomingCall = async (callInfo, _) =>
                     {

@@ -10,7 +10,7 @@ internal static class DefaultsExtensions
     public static BeforeCallHandler OrDefault(this BeforeCallHandler? beforeCallHandler) => beforeCallHandler ?? DefaultBeforeCallHandler;
     public static TaskScheduler OrDefault(this TaskScheduler? scheduler) => scheduler ?? TaskScheduler.Default;
     public static ContractToSettingsMap OrDefault(this ContractToSettingsMap? map) => map ?? EmptyContractToSettingsMap;
-    public static EndpointCollection OrDefault(this EndpointCollection? endpoints) => endpoints ?? new();
+    public static ContractCollection OrDefault(this ContractCollection? endpoints) => endpoints ?? new();
 
     public static Func<T>? MaybeCreateServiceFactory<T>(this IServiceProvider? serviceProvider) where T : class
     {

@@ -183,6 +183,7 @@ internal sealed class ServiceClientProper : ServiceClient
     public ServiceClientProper(IpcClient client, Type interfaceType) : base(interfaceType)
     {
         _client = client;
+        client.Transport.Validate();
         _clientState = client.Transport.CreateState();
     }
 
