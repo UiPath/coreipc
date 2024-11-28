@@ -155,7 +155,7 @@ class Program
             }
         });
 
-        await Task.WhenAll(ipcServers.Select(ipcServer => ipcServer.WaitForStop()));
+        await Task.Delay(Timeout.InfiniteTimeSpan);
 
         IpcServer CreateAndStartIpcServer(ServerTransport transport)
         {
