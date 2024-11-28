@@ -3,6 +3,7 @@ using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.WebSockets;
 using System.Threading;
@@ -88,23 +89,9 @@ class Program
         thread.Context.SynchronizationContext.Send(_ => Thread.CurrentThread.Name = "GuiThread", null);
         var scheduler = thread.Context.Scheduler;
 
-        var ipcServer = new IpcServer()
-        {
-            Endpoints = new()
-            {
-                typeof(IAlgebra),
-                typeof(ICalculus),
-                typeof(IBrittleService),
-                typeof(IEnvironmentVariableGetter),
-                typeof(IDtoService)
-            },
-            Listeners = [
-                ..EnumerateListeners(pipeName, webSocketUrl)
-            ],
-            ServiceProvider = sp,
-            Scheduler = scheduler
-        };
-        ipcServer.Start();
+        var ipcServers = EnumerateServerTransports(pipeName, webSocketUrl)
+            .Select(CreateAndStartIpcServer)
+            .ToArray();
 
         _ = Task.Run(async () =>
         {
@@ -122,16 +109,13 @@ class Program
                     {
                         yield return new IpcClient
                         {
-                            Config = new()
-                            {
-                                ServiceProvider = sp,
-                                RequestTimeout = TimeSpan.FromHours(5),
-                                Callbacks = new()
+                            ServiceProvider = sp,
+                            RequestTimeout = TimeSpan.FromHours(5),
+                            Callbacks = new()
                                 {
                                     { typeof(IArithmetic), callback }
                                 },
-                            },
-                            Transport = new WebSocketTransport
+                            Transport = new WebSocketClientTransport
                             {
                                 Uri = new(webSocketUrl),
                             }
@@ -144,16 +128,13 @@ class Program
                     {
                         yield return new IpcClient
                         {
-                            Config = new()
+                            ServiceProvider = sp,
+                            RequestTimeout = TimeSpan.FromHours(5),
+                            Callbacks = new()
                             {
-                                ServiceProvider = sp,
-                                RequestTimeout = TimeSpan.FromHours(5),
-                                Callbacks = new()
-                                {
-                                    { typeof(IArithmetic), callback }
-                                }
+                                { typeof(IArithmetic), callback }
                             },
-                            Transport = new NamedPipeTransport()
+                            Transport = new NamedPipeClientTransport()
                             {
                                 PipeName = pipeName,
                             }
@@ -174,20 +155,41 @@ class Program
             }
         });
 
-        await ipcServer.WaitForStop();
+        await Task.WhenAll(ipcServers.Select(ipcServer => ipcServer.WaitForStop()));
 
-        IEnumerable<ListenerConfig> EnumerateListeners(string? pipeName, string? webSocketUrl)
+        IpcServer CreateAndStartIpcServer(ServerTransport transport)
+        {
+            var ipcServer = new IpcServer()
+            {
+                Endpoints = new()
+                {
+                    typeof(IAlgebra),
+                    typeof(ICalculus),
+                    typeof(IBrittleService),
+                    typeof(IEnvironmentVariableGetter),
+                    typeof(IDtoService)
+                },
+                Transport = transport,
+                ServiceProvider = sp,
+                Scheduler = scheduler
+            };
+            ipcServer.Start();
+            return ipcServer;
+        }
+
+
+        IEnumerable<ServerTransport> EnumerateServerTransports(string? pipeName, string? webSocketUrl)
         {
             if (pipeName is not null)
             {
-                yield return new NamedPipeListener() { PipeName = pipeName };
+                yield return new NamedPipeServerTransport() { PipeName = pipeName };
             }
 
             if (webSocketUrl is not null)
             {
                 string url = CurateWebSocketUrl(webSocketUrl);
                 var accept = new HttpSysWebSocketsListener(url).Accept;
-                yield return new WebSocketListener() { Accept = accept };
+                yield return new WebSocketServerTransport() { Accept = accept };
             }
 
             static string CurateWebSocketUrl(string raw)
