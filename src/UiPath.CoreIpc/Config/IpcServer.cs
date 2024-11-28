@@ -9,7 +9,6 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
 
     private readonly object _lock = new();
     private readonly TaskCompletionSource<object?> _listening = new();
-    private readonly TaskCompletionSource<object?> _stopped = new();
     private readonly CancellationTokenSource _ctsActiveConnections = new();
 
     private bool _disposeStarted;
@@ -70,7 +69,6 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
         Start();
         return _accepter.StartedAccepting;
     }
-    public Task WaitForStop() => _stopped.Task;
 
     internal ILogger? CreateLogger(string category) => ServiceProvider.MaybeCreateLogger(category);
 
@@ -82,7 +80,6 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
     private void OnNewConnectionError(Exception ex)
     {
         Trace.TraceError($"Failed to accept new connection. Ex: {ex}");
-        _stopped.TrySetException(ex);
     }
 
     internal RouterConfig CreateRouterConfig(IpcServer server) => RouterConfig.From(

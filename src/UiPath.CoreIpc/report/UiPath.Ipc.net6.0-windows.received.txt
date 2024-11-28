@@ -107,7 +107,6 @@ namespace UiPath.Ipc
                 "_accepter"})]
         public void Start() { }
         public System.Threading.Tasks.Task WaitForStart() { }
-        public System.Threading.Tasks.Task WaitForStop() { }
     }
     public class Message
     {
