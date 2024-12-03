@@ -20,8 +20,8 @@ internal static class Impl
     {
         public async Task<bool> Register(Message? m = null)
         {
-            var clientOps = m!.GetCallback<Contracts.IClientOperations>();
-            var clientOps2 = m.GetCallback<Contracts.IClientOperations2>();
+            var clientOps = m!.Client.GetCallback<Contracts.IClientOperations>();
+            var clientOps2 = m.Client.GetCallback<Contracts.IClientOperations2>();
 
             var added = clients.Add(new(clientOps, clientOps2));
 

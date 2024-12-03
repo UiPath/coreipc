@@ -34,7 +34,7 @@ public sealed class SystemService : ISystemService
     {
         try
         {
-            _ = await message.GetCallback<IUnregisteredCallback>().SomeMethod();
+            _ = await message.Client.GetCallback<IUnregisteredCallback>().SomeMethod();
             return null;
         }
         catch (Exception ex)
@@ -75,8 +75,8 @@ public sealed class SystemService : ISystemService
 
     public async Task<int> AddIncrement(int x, int y, Message message = null!)
     {
-        var sum = await message.GetCallback<IComputingCallbackBase>().AddInts(x, y);
-        var result = await message.GetCallback<IArithmeticCallback>().Increment(sum);
+        var sum = await message.Client.GetCallback<IComputingCallbackBase>().AddInts(x, y);
+        var result = await message.Client.GetCallback<IArithmeticCallback>().Increment(sum);
         return result;
     }
 }
