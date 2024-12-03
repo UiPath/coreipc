@@ -32,7 +32,7 @@ public sealed class ComputingService(ILogger<ComputingService> logger) : IComput
     public async Task<string> GetCallbackThreadName(TimeSpan waitOnServer, Message message = null!, CancellationToken cancellationToken = default)
     {
         await Task.Delay(waitOnServer);
-        return await message.GetCallback<IComputingCallback>().GetThreadName();
+        return await message.Client.GetCallback<IComputingCallback>().GetThreadName();
     }
 
     public async Task<ComplexNumber> AddComplexNumberList(IReadOnlyList<ComplexNumber> numbers)
@@ -47,7 +47,7 @@ public sealed class ComputingService(ILogger<ComputingService> logger) : IComput
 
     public async Task<int> MultiplyInts(int x, int y, Message message = null!)
     {
-        var callback = message.GetCallback<IComputingCallbackBase>();
+        var callback = message.Client.GetCallback<IComputingCallbackBase>();
 
         var result = 0;
         for (int i = 0; i < y; i++)

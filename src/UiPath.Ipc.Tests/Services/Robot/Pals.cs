@@ -49,7 +49,7 @@ internal sealed class Callback<T> where T : class
     public Callback(Message message)
     {
         Client = message.Client;
-        _callback = message.GetCallback<T>();
+        _callback = message.Client.GetCallback<T>();
     }
 
     public void Invoke(Func<T, Task> call) => InvokeAsync(call).TraceError();

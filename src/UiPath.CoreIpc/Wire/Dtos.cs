@@ -7,12 +7,9 @@ namespace UiPath.Ipc;
 public class Message
 {
     [JsonIgnore]
-    public IClient Client { get; set; }
+    public IClient Client { get; set; } = null!;
     [JsonIgnore]
     public TimeSpan RequestTimeout { get; set; }
-    public TCallbackInterface GetCallback<TCallbackInterface>() where TCallbackInterface : class => 
-        Client.GetCallback<TCallbackInterface>();
-    public void ImpersonateClient(Action action) => Client.Impersonate(action);
 }
 public class Message<TPayload> : Message
 {
