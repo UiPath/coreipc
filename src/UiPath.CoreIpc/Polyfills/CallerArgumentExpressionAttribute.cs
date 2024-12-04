@@ -32,5 +32,4 @@ internal sealed class CallerArgumentExpressionAttribute : Attribute
     public string ParameterName { get; }
 }
 
-
 #endif

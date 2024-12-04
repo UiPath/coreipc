@@ -2,7 +2,7 @@
 
 namespace System.Linq;
 
-public static class EnumerableExtensions
+internal static class EnumerableExtensions
 {
     public static IEnumerable<T> Prepend<T>(this IEnumerable<T> enumerable, T element)
     {
