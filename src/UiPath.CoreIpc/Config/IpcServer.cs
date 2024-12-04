@@ -36,7 +36,6 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
         _ctsActiveConnections.Dispose();
     }
 
-    [MemberNotNull(nameof(Transport), nameof(_accepter))]
     public void Start()
     {
         lock (_lock)
@@ -67,7 +66,7 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
     public Task WaitForStart()
     {
         Start();
-        return _accepter.StartedAccepting;
+        return _accepter!.StartedAccepting;
     }
 
     internal ILogger? CreateLogger(string category) => ServiceProvider.MaybeCreateLogger(category);
