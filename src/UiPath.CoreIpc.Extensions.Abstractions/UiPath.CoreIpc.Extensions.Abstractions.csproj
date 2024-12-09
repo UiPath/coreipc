@@ -8,6 +8,8 @@
     <ImplicitUsings>true</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    <AssemblyName>UiPath.Ipc.Extensions.Abstractions</AssemblyName>
+    <RootNamespace>UiPath.Ipc.Extensions.Abstractions</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

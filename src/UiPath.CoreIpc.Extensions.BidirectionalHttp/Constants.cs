@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc.Extensions.BidirectionalHttp;
+﻿namespace UiPath.Ipc.Extensions.BidirectionalHttp;
 
 internal static class Constants
 {

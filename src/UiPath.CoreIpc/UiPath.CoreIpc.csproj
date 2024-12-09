@@ -41,6 +41,7 @@
     <InternalsVisibleTo Include="UiPath.CoreIpc.Tests" />
     <InternalsVisibleTo Include="UiPath.CoreIpc.BackCompat" />
     <InternalsVisibleTo Include="UiPath.Ipc.Tests" />
+    <InternalsVisibleTo Include="UiPath.Ipc.Extensions.Abstractions" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net461'">
@@ -54,9 +55,5 @@
     <Using Include="System.Runtime.CompilerServices" />
     <Using Include="Microsoft.Extensions.Logging" />
     <Using Include="Microsoft.Extensions.DependencyInjection" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <InternalsVisibleTo Include="UiPath.CoreIpc.Extensions.Abstractions" />
   </ItemGroup>
 </Project>

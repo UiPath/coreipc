@@ -1,6 +1,4 @@
-﻿using UiPath.Ipc;
-
-namespace UiPath.CoreIpc.Extensions.Abstractions;
+﻿namespace UiPath.Ipc.Extensions.Abstractions;
 
 public abstract class ServerTransportBase : ServerTransport
 {

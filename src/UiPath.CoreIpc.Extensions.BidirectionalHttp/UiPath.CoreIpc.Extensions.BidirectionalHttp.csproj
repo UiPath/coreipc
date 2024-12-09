@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>preview</LangVersion>
+    <AssemblyName>UiPath.Ipc.Extensions.BidirectionalHttp</AssemblyName>
+    <RootNamespace>UiPath.Ipc.Extensions.BidirectionalHttp</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

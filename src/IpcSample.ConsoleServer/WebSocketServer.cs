@@ -1,8 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.Ipc.BackCompat;
+using UiPath.Ipc;
 using UiPath.Ipc.Transport.WebSocket;
-namespace UiPath.Ipc.Tests;
+namespace UiPath.CoreIpc.Tests;
 class WebSocketServer
 {
     //private static readonly Timer _timer = new Timer(_ =>
@@ -21,28 +21,44 @@ class WebSocketServer
         var serviceProvider = ConfigureServices();
         // build and run service host
         //var data = File.ReadAllBytes(@"../../../../localhost.pfx");
-        var host = new ServiceHostBuilder(serviceProvider)
-            .UseWebSockets(new WebSocketListener()
+
+        await using var ipcServer = new IpcServer
+        {
+            Transport = new WebSocketServerTransport
             {
                 Accept = new HttpSysWebSocketsListener("http://localhost:1212/wsDemo/").Accept,
-                RequestTimeout = TimeSpan.FromSeconds(2),
-                //Certificate = new X509Certificate(data, "1"),
-            })
-            .AddEndpoint<IComputingService>()
-            .AddEndpoint<ISystemService>()
-            .ValidateAndBuild();
-        await await Task.WhenAny(host.RunAsync(), Task.Run(async () =>
+            },
+            ServiceProvider = serviceProvider,
+            Endpoints = new()
+            {
+                typeof(IComputingService),
+                typeof(ISystemService)
+            },
+            RequestTimeout = TimeSpan.FromSeconds(2),
+        };
+
+        Console.WriteLine(typeof(int).Assembly);
+
+        ipcServer.Start();
+        await ipcServer.WaitForStart();
+        Console.WriteLine("Server started.");
+
+        // console cancellationtoken
+        var tcs = new TaskCompletionSource<object?>();
+        Console.CancelKeyPress += (_, e) =>
         {
-            Console.WriteLine(typeof(int).Assembly);
-            Console.ReadLine();
-            await host.DisposeAsync();
-        }));
+            e.Cancel = true;
+            tcs.TrySetResult(null);
+        };
+        await tcs.Task;
+        await ipcServer.DisposeAsync();
+
         Console.WriteLine("Server stopped.");
         return;
     }
     private static IServiceProvider ConfigureServices() =>
         new ServiceCollection()
-            .AddIpcWithLogging()
+            .AddLogging()
             .AddSingleton<IComputingService, ComputingService>()
             .AddSingleton<ISystemService, SystemService>()
             .BuildServiceProvider();

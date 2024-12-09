@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.Ipc.BackCompat;
+using UiPath.Ipc;
 using UiPath.Ipc.Transport.NamedPipe;
 
-namespace UiPath.Ipc.Tests;
+namespace UiPath.CoreIpc.Tests;
 
 class Server
 {
@@ -21,30 +21,39 @@ class Server
         Console.WriteLine(SynchronizationContext.Current);
         var serviceProvider = ConfigureServices();
         // build and run service host
-        var host = new ServiceHostBuilder(serviceProvider)
-            .UseNamedPipes(new NamedPipeListener()
-            {
-                PipeName = "test",
-                RequestTimeout = TimeSpan.FromSeconds(2),
-                //AccessControl = security => security.AllowCurrentUser(),
-            })
-            .AddEndpoint<IComputingService>()
-            .AddEndpoint<ISystemService>()
-            .ValidateAndBuild();
 
-        await await Task.WhenAny(host.RunAsync(), Task.Run(async () =>
+        await using var ipcServer = new IpcServer
         {
-            Console.WriteLine(typeof(int).Assembly);
-            Console.ReadLine();
-            await host.DisposeAsync();
-        }));
+            Transport = new NamedPipeServerTransport { PipeName = "test" },
+            ServiceProvider = serviceProvider,
+            Endpoints = new()
+            {
+                typeof(IComputingService),
+                typeof(ISystemService)
+            },
+            RequestTimeout = TimeSpan.FromSeconds(2),
+        };
+
+        Console.WriteLine(typeof(int).Assembly);
+        ipcServer.Start();
+        await ipcServer.WaitForStart();
+        Console.WriteLine("Server started.");
+
+        var tcs = new TaskCompletionSource<object?>();
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            tcs.TrySetResult(null);
+        };
+        await tcs.Task;        
+        await ipcServer.DisposeAsync();
 
         Console.WriteLine("Server stopped.");
     }
 
     private static IServiceProvider ConfigureServices() =>
         new ServiceCollection()
-            .AddIpcWithLogging()
+            .AddLogging()
             .AddSingleton<IComputingService, ComputingService>()
             .AddSingleton<ISystemService, SystemService>()
             .BuildServiceProvider();

@@ -1,1 +1,1 @@
-﻿global using UiPath.CoreIpc.Extensions.Abstractions;
+﻿global using UiPath.Ipc.Extensions.Abstractions;
