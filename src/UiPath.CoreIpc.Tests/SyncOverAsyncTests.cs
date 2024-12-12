@@ -1,6 +1,6 @@
 ﻿using UiPath.Ipc.Transport.NamedPipe;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public class SyncOverAsyncTests
 {

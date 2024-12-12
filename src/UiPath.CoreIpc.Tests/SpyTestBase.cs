@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using Xunit.Abstractions;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public abstract class SpyTestBase : TestBase
 {

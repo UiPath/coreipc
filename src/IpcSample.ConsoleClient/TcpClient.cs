@@ -2,15 +2,15 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
-using UiPath.Ipc;
 using UiPath.Ipc.Transport.Tcp;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
-class TcpClient
+internal static class TcpClient
 {
-    static readonly IPEndPoint SystemEndPoint = new(IPAddress.Loopback, 3131);
-    static async Task _Main(string[] args)
+    private static readonly IPEndPoint SystemEndPoint = new(IPAddress.Loopback, 3131);
+
+    public static async Task _Main(string[] args)
     {
         Console.WriteLine(typeof(int).Assembly);
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
@@ -118,8 +118,8 @@ class TcpClient
             callbackProxy.Dispose();
             callbackProxy.Dispose();
             //((IpcProxy)callbackProxy).CloseConnection();
-            ((IpcProxy)computingClient).CloseConnection();
-            ((IpcProxy)systemClient).CloseConnection();
+            await ((IpcProxy)computingClient).CloseConnection();
+            await ((IpcProxy)systemClient).CloseConnection();
         }
         finally
         {

@@ -9,7 +9,7 @@ using UiPath.Ipc.Transport.Tcp;
 using UiPath.Ipc.Transport.WebSocket;
 using Xunit.Abstractions;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public abstract class ComputingTests : SpyTestBase
 {
@@ -156,7 +156,7 @@ public abstract class ComputingTests : SpyTestBase
         await Proxy.AddFloats(1, 2).ShouldBeAsync(3);
         callCount.ShouldBe(1);
 
-        await IpcProxy.CloseConnection();
+        await (IpcProxy?.CloseConnection() ?? default);
         await Proxy.AddFloats(1, 2).ShouldBeAsync(3);
         callCount.ShouldBe(2);
     }

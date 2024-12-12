@@ -126,13 +126,14 @@ public static class IOHelpers
 
     public static PipeSecurity AllowCurrentUser(this PipeSecurity pipeSecurity, bool onlyNonAdmin = false)
     {
-        using (var currentIdentity = WindowsIdentity.GetCurrent())
+        using (var currentIdentity = WindowsIdentity.GetCurrent()!)
         {
             if (onlyNonAdmin && new WindowsPrincipal(currentIdentity).IsInRole(WindowsBuiltInRole.Administrator))
             {
                 return pipeSecurity;
             }
-            pipeSecurity.Allow(currentIdentity.User, PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance);
+
+            pipeSecurity.Allow(currentIdentity.User!, PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance);
         }
         return pipeSecurity;
     }

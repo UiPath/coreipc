@@ -1,20 +1,12 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.Ipc;
 using UiPath.Ipc.Transport.NamedPipe;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
-class Server
+internal static class Server
 {
-    //private static readonly Timer _timer = new Timer(_ =>
-    //{
-    //    Console.WriteLine("GC.Collect");
-    //    GC.Collect();
-    //    GC.WaitForPendingFinalizers();
-    //    GC.Collect();
-    //}, null, 0, 3000);
-    static async Task Main()
+    public static async Task Main()
     {
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
         //GuiLikeSyncContext.Install();

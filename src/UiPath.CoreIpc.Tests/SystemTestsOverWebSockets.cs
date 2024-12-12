@@ -1,7 +1,7 @@
 ﻿using UiPath.Ipc.Transport.WebSocket;
 using Xunit.Abstractions;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public sealed class SystemTestsOverWebSockets : SystemTests
 {

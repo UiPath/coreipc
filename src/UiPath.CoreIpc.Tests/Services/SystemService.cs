@@ -3,7 +3,7 @@ using System.Buffers;
 using System.Globalization;
 using System.Text;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public sealed class SystemService : ISystemService
 {

@@ -2,7 +2,7 @@
 using System.Net;
 using System.Threading.Channels;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public class HttpSysWebSocketsListener : IAsyncDisposable
 {

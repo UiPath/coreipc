@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using UiPath.Ipc.Transport.NamedPipe;
 using Xunit.Abstractions;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public sealed class RobotTestsOverNamedPipes : RobotTests
 {
@@ -113,9 +113,9 @@ internal static partial class RobotIpcHelpers
             new(actualKey, requestedParams, callbacks),
             CreateClient);
 
-        if (requestedParams != originalParams)
+        if (requestedParams - originalParams is { } ex)
         {
-            throw requestedParams - originalParams;
+            throw ex;
         }
 
         return client.GetProxy<TContract>();

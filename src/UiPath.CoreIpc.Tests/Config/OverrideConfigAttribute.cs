@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc.Tests;
+﻿namespace UiPath.Ipc.Tests;
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 internal sealed class OverrideConfigAttribute : Attribute

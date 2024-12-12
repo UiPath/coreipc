@@ -3,7 +3,7 @@ using Xunit.Sdk;
 
 [assembly: TestFramework(typeName: "UiPath.Ipc.Tests.CustomTestFramework", assemblyName: "UiPath.Ipc.Tests")]
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public readonly struct CustomTestContext
 {

@@ -1,4 +1,4 @@
-﻿namespace UiPath.CoreIpc.Tests;
+﻿namespace UiPath.Ipc.Tests;
 
 public readonly record struct TestRunId(Guid Value)
 {

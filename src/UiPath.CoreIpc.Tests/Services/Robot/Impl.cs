@@ -1,7 +1,7 @@
 ﻿using Nito.AsyncEx;
 using Nito.Disposables;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public class StudioOperations : IStudioOperations
 {

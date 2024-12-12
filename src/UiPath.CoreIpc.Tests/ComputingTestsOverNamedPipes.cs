@@ -1,7 +1,7 @@
 ﻿using UiPath.Ipc.Transport.NamedPipe;
 using Xunit.Abstractions;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public sealed class ComputingTestsOverNamedPipes : ComputingTests
 {

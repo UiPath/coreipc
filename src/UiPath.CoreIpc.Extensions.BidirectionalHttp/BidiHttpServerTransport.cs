@@ -13,7 +13,7 @@ using static Constants;
 
 public sealed partial class BidiHttpServerTransport : ServerTransportBase
 {
-    public required Uri Uri { get; init; }
+    public required Uri Uri { get; set; }
 
     protected override ServerState CreateState()
     => new BidiHttpServerState(this);

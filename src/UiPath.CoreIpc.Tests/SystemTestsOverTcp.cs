@@ -2,7 +2,7 @@
 using UiPath.Ipc.Transport.Tcp;
 using Xunit.Abstractions;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public sealed class SystemTestsOverTcp : SystemTests
 {

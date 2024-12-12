@@ -1,0 +1,5 @@
+<Project>
+    <PropertyGroup>
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    </PropertyGroup>
+</Project>

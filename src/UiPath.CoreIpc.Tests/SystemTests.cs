@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Channels;
 using Xunit.Abstractions;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public abstract class SystemTests : TestBase
 {

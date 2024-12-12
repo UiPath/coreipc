@@ -1,14 +1,13 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
 using System.Text;
-using UiPath.Ipc;
 using UiPath.Ipc.Transport.NamedPipe;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
-class Client
+internal static class Client
 {
-    static async Task Main(string[] args)
+    public static async Task Main(string[] args)
     {
         Console.WriteLine(typeof(int).Assembly);
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));

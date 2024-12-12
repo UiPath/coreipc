@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Xunit.Abstractions;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 public abstract class TestBase : IAsyncLifetime
 {

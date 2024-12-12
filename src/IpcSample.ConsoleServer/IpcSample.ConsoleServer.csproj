@@ -6,6 +6,7 @@
     <ApplicationManifest>app1.manifest</ApplicationManifest>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>true</ImplicitUsings>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>

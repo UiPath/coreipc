@@ -1,25 +1,17 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.Ipc;
 using UiPath.Ipc.Transport.Tcp;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 using IPEndPoint = System.Net.IPEndPoint;
 using IPAddress = System.Net.IPAddress;
 
-class TcpServer
+internal static class TcpServer
 {
-    static readonly IPEndPoint SystemEndPoint = new(IPAddress.Any, 3131);
-    //private static readonly Timer _timer = new Timer(_ =>
-    //{
-    //    Console.WriteLine("GC.Collect");
-    //    GC.Collect();
-    //    GC.WaitForPendingFinalizers();
-    //    GC.Collect();
-    //}, null, 0, 3000);
+    private static readonly IPEndPoint SystemEndPoint = new(IPAddress.Any, 3131);
 
-    static async Task _Main()
+    public static async Task _Main()
     {
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
         //GuiLikeSyncContext.Install();

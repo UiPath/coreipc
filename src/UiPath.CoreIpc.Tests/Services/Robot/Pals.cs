@@ -1,7 +1,8 @@
 ﻿using Nito.AsyncEx;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 internal sealed class Callbacks<T> where T : class
 {
@@ -11,11 +12,13 @@ internal sealed class Callbacks<T> where T : class
 
     public bool TryRegister(Message message, out Callback<T> callback) // false if already registered
     {
-        callback = _callbacks.FirstOrDefault(c => c.Client == message.Client);
-        if (callback != null)
+        var existingCallback = _callbacks.FirstOrDefault(c => c.Client == message.Client);
+        if (existingCallback is not null)
         {
+            callback = existingCallback;
             return false;
         }
+
         callback = new Callback<T>(message);
         _callbacks.Add(callback);
         Trace.TraceInformation($"{nameof(Callbacks<T>)}: Client {callback.GetHashCode()} added");

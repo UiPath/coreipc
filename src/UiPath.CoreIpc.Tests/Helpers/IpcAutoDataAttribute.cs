@@ -1,7 +1,7 @@
 ﻿using AutoFixture;
 using AutoFixture.Xunit2;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
 internal class IpcAutoDataAttribute : AutoDataAttribute
 {

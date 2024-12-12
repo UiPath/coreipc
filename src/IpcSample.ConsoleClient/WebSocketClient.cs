@@ -1,14 +1,13 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
 using System.Text;
-using UiPath.Ipc;
 using UiPath.Ipc.Transport.WebSocket;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
-class WebSocketClient
+internal static class WebSocketClient
 {
-    static async Task _Main(string[] args)
+    public static async Task _Main(string[] args)
     {
         Console.WriteLine(typeof(int).Assembly);
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
