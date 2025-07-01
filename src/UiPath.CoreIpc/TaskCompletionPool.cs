@@ -7,6 +7,7 @@ internal static class TaskCompletionPool<T>
     public sealed class ManualResetValueTaskSource : IValueTaskSource<T>, IValueTaskSource
     {
         private ManualResetValueTaskSourceCore<T> _core; // mutable struct; do not make this readonly
+        public string MethodName { get; set; }
         public bool RunContinuationsAsynchronously { get => _core.RunContinuationsAsynchronously; set => _core.RunContinuationsAsynchronously = value; }
         public short Version => _core.Version;
         public ValueTask<T> ValueTask() => new(this, Version);

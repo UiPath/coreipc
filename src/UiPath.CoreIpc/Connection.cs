@@ -46,6 +46,7 @@ public sealed class Connection : IDisposable
     internal async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
     {
         var requestCompletion = Rent();
+        requestCompletion.MethodName = request.MethodName;
         var requestId = request.Id;
         _requests[requestId] = requestCompletion;
         var tokenRegistration = token.UnsafeRegister(_cancelRequest, requestId);
@@ -211,7 +212,7 @@ public sealed class Connection : IDisposable
                 var length = BitConverter.ToInt32(_buffer, startIndex: 1);
                 if (length > _maxMessageSize)
                 {
-                    throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
+                    throw new InvalidDataException($"Message too large. {Environment.NewLine} The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes. {Environment.NewLine} Active method calls: {string.Join(Environment.NewLine, _requests.Values.Select(r => r.MethodName))}");
                 }
                 _nestedStream.Reset(length);
                 await HandleMessage();
