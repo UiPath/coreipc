@@ -14,10 +14,20 @@ public class SystemTcpTests : SystemTests<TcpClientBuilder<ISystemService>>
         base.BeforeCallServerSide();
     }
     IPEndPoint GetEndPoint() => new(IPAddress.Loopback, _port);
+
+    public override void Initialize()
+    {
+        _port = GetAvailablePort();
+    }
 }
 public class ComputingTcpTests : ComputingTests<TcpClientBuilder<IComputingService, IComputingCallback>>
 {
-    protected static readonly IPEndPoint ComputingEndPoint = new(IPAddress.Loopback, 2121+GetCount());
+    public override void Initialize()
+    {
+        ComputingEndPoint = new(IPAddress.Loopback, GetAvailablePort());
+    }
+
+    protected IPEndPoint ComputingEndPoint;
     protected override TcpClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
         new TcpClientBuilder<IComputingService, IComputingCallback>(ComputingEndPoint, _serviceProvider)
             .RequestTimeout(RequestTimeout)

@@ -20,9 +20,24 @@ public abstract class TestBase : IDisposable
     //}
     public TestBase()
     {
+        Initialize();
+
         _guiThread.SynchronizationContext.Send(() => Thread.CurrentThread.Name = "GuiThread");
         _serviceProvider = IpcHelpers.ConfigureServices();
     }
+
+    public int GetAvailablePort()
+    {
+        var endPoint = new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0);
+        var listener = new System.Net.Sockets.TcpListener(endPoint);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+
+        return port;
+    }
+
+    public abstract void Initialize();
 
     protected static int GetCount() => Interlocked.Increment(ref Count);
 

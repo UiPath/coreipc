@@ -16,6 +16,7 @@ public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : Servi
         _computingHost.RunAsync(GuiScheduler);
         _computingClient = ComputingClientBuilder(GuiScheduler).SerializeParametersAsObjects().ValidateAndBuild();
     }
+
     protected abstract TBuilder ComputingClientBuilder(TaskScheduler taskScheduler = null);
     [Fact]
     public async Task ReconnectWithEncrypt()
