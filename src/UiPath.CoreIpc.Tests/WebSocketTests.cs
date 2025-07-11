@@ -18,7 +18,7 @@ public class SystemWebSocketTests : SystemTests<WebSocketClientBuilder<ISystemSe
     [Fact]
     public override  async void BeforeCallServerSide()
     {
-        _port++;
+        _port = GetAvailablePort();
         base.BeforeCallServerSide();
     }
 #if !NET461
