@@ -26,16 +26,25 @@ public class SystemWebSocketTests : SystemTests<WebSocketClientBuilder<ISystemSe
     public override Task UploadNoRead() => base.UploadNoRead();
 #endif
     string GetEndPoint() => $"://localhost:{_port}/";
+    public override void Initialize()
+    {
+        _port = GetAvailablePort();
+    }
 }
 public class ComputingWebSocketsTests : ComputingTests<WebSocketClientBuilder<IComputingService, IComputingCallback>>
 {
-    protected static readonly string ComputingEndPoint = $"://localhost:{1212+GetCount()}/";
+    protected string ComputingEndPoint;
     HttpSysWebSocketsListener _listener;
     protected override WebSocketClientBuilder<IComputingService, IComputingCallback> ComputingClientBuilder(TaskScheduler taskScheduler = null) =>
         new WebSocketClientBuilder<IComputingService, IComputingCallback>(new("ws"+ComputingEndPoint), _serviceProvider)
             .RequestTimeout(RequestTimeout)
             .CallbackInstance(_computingCallback)
             .TaskScheduler(taskScheduler);
+
+    public override void Initialize()
+    {
+        ComputingEndPoint = $"://localhost:{GetAvailablePort()}/";
+    }
     protected override ServiceHostBuilder Configure(ServiceHostBuilder serviceHostBuilder)
     {
         _listener = new HttpSysWebSocketsListener("http" + ComputingEndPoint);

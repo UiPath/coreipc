@@ -23,6 +23,10 @@ public class SystemNamedPipeTests : SystemTests<NamedPipeClientBuilder<ISystemSe
         _pipeName = "beforeCall";
         base.BeforeCallServerSide();
     }
+
+    public override void Initialize()
+    {
+    }
 #if WINDOWS
     [Fact]
     public async Task PipeSecurityForWindows()
@@ -50,4 +54,8 @@ public class ComputingNamedPipeTests : ComputingTests<NamedPipeClientBuilder<ICo
             .RequestTimeout(RequestTimeout)
             .CallbackInstance(_computingCallback)
             .TaskScheduler(taskScheduler);
+
+    public override void Initialize()
+    {
+    }
 }
