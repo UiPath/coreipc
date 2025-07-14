@@ -162,7 +162,7 @@ internal sealed class Connection : IDisposable
     private async ValueTask SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken)
     {
         Logger?.LogInformation("Connection.SendMessage: Awaiting the acquiring of the sendLock");
-        await _sendLock.WaitAsync(cancellationToken); /// ---------
+        await _sendLock.WaitAsync(cancellationToken);
 
         try
         {
@@ -407,7 +407,7 @@ internal sealed class Connection : IDisposable
         }
     }
 
-    private void Log(Exception ex) => Logger.LogException(ex, DebugName);
+    private void Log(Exception ex) => Logger?.LogException(ex, DebugName);
     private void Log(string message)
     {
         if (Logger is null)

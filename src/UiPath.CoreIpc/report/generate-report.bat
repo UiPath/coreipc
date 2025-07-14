@@ -36,6 +36,6 @@ REM generate-public-api --target-frameworks "net6.0-windows" --assembly UiPath.I
 REM generate-public-api --target-frameworks "net6.0"         --assembly UiPath.Ipc.dll --project-path "%projectPath%" --output-directory "%outputPath%"
 REM generate-public-api --target-frameworks "net461"         --assembly UiPath.Ipc.dll --project-path "%projectPath%" --output-directory "%outputPath%"
 
-generate-public-api --target-frameworks "net6.0-windows" --assembly UiPath.Ipc.dll --project-path "D:\Alt\coreipc\src\UiPath.CoreIpc\UiPath.CoreIpc.csproj" --output-directory "D:\Alt\coreipc\src\UiPath.CoreIpc\report" --verbose --leave-artifacts
+generate-public-api --target-frameworks "net6.0-windows" --assembly UiPath.Ipc.dll --project-path "%projectPath%" --output-directory "%outputPath%" --verbose --leave-artifacts
 REM generate-public-api --target-frameworks "net6.0"         --assembly UiPath.Ipc.dll --project-path "D:\Alt\coreipc\src\UiPath.CoreIpc\UiPath.CoreIpc.csproj" --output-directory "D:\Alt\coreipc\src\UiPath.CoreIpc\report" --verbose
 REM generate-public-api --target-frameworks "net461"         --assembly UiPath.Ipc.dll --project-path "D:\Alt\coreipc\src\UiPath.CoreIpc\UiPath.CoreIpc.csproj" --output-directory "D:\Alt\coreipc\src\UiPath.CoreIpc\report" --verbose
