@@ -6,7 +6,7 @@ public sealed class EndpointNotFoundException : ArgumentException
     public string EndpointName { get; }
 
     internal EndpointNotFoundException(string paramName, string serverDebugName, string endpointName)
-    : base(paramName, FormatMessage(serverDebugName, endpointName))
+    : base(FormatMessage(serverDebugName, endpointName), paramName)
     {
         ServerDebugName = serverDebugName;
         EndpointName = endpointName;
