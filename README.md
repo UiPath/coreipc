@@ -191,14 +191,16 @@ var ipcServer = new IpcServer
 | RequestTimeout | TimeSpan? | **Optional**, defaults to infinity: Interval after which the honoring of requests will time out. |
 
 
-#### ii. `IpcServer` - declared properties
+#### ii. `IpcServer`
+
+**Declared properties**
 
 | Property | Type | Notes |
 | -------- | ---- | ----- |
 | Endpoints | ContractCollection  | **Required**: The collection of `ContractSettings`, which specifies the services to be exposed over Ipc. |
 | Transport | ServerTransport |  **Required**: The server's transport, meaning whether it accepts connection over Named Pipes, TCP/IP, WebSockets, or a custom communication mechanism. |
 
-#### iii. `IpcServer` - methods
+**Methods**
 
 | Method | Description |
 | ------ | ----------- |
@@ -208,14 +210,16 @@ var ipcServer = new IpcServer
 
 <hr />
 
-#### iii. `IpcClient` - declared properties
+#### iii. `IpcClient`
+
+**Declared properties*
 
 | Property | Type | Notes |
 | -------- | ---- | ----- |
 | Callbacks | ContractCollection  | **Optional**: The collection of `ContractSettings`, which specifies the services to be exposed over Ipc **as callbacks**. |
 | Transport | ClientTransport |  **Required**: The client's transport, meaning whether it connects to the server over Named Pipes, TCP/IP, WebSockets, or a custom communication mechanism. |
 
-#### iv. `IpcClient` - methods
+**Methods**
 
 | Method | Notes |
 | ------ | ----- |

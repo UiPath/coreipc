@@ -12,4 +12,4 @@ steps:
       projects: '$(DotNet_SessionSolution)'
       publishTestResults: true
       testRunTitle: '.NET tests'
-      arguments: ' --configuration $(DotNet_BuildConfiguration) --logger "console;verbosity=detailed" -p:Version="$(FullVersion)" -p:DefineConstantsEx="CI"'
+      arguments: '--no-build --configuration $(DotNet_BuildConfiguration) --logger "console;verbosity=detailed" -p:Version="$(FullVersion)" -p:DefineConstantsEx="CI"'

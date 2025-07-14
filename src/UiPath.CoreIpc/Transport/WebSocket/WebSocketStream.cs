@@ -5,7 +5,7 @@ namespace UiPath.Ipc.Transport.WebSocket;
 using WebSocket = System.Net.WebSockets.WebSocket;
 
 /// <summary>
-/// Exposes a <see cref="WebSock"/> as a <see cref="Stream"/>.
+/// Exposes a <see cref="WebSocket"/> as a <see cref="Stream"/>.
 /// https://github.com/AArnott/Nerdbank.Streams/blob/main/src/Nerdbank.Streams/WebSocketStream.cs
 /// </summary>
 internal class WebSocketStream : Stream
