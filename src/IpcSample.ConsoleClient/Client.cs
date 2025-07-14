@@ -67,7 +67,7 @@ internal static class Client
                     new ComplexNumber{ I = 0.2f, J = 0.1f },
                     new ComplexNumber{ I = 0.3f, J = 0.5f },
                 ], cancellationToken);
-                Console.WriteLine($"[TEST 2] sum of 2 complex number is:  {result3}", cancellationToken);
+                Console.WriteLine($"[TEST 2] sum of 2 complex number is: {result3}");
 
                 // test 4: call IPC service method without parameter or return
                 await systemClient.FireAndForgetWithCt(cancellationToken);

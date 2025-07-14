@@ -27,7 +27,7 @@ internal class Server
     private readonly TimeSpan _requestTimeout;
 
     private ILogger? Logger => _connection.Logger;
-    private bool LogEnabled => Logger.Enabled();
+    private bool LogEnabled => _connection.LogEnabled;
     public string DebugName => _connection.DebugName;
 
     public Server(Router router, TimeSpan requestTimeout, Connection connection, IClient? client = null)

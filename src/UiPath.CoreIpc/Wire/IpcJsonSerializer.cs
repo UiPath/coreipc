@@ -29,8 +29,8 @@ internal class IpcJsonSerializer : IArrayPool<char>
         serializer.Serialize(writer, obj);
         writer.Flush();
     }
-    public char[] Rent(int minimumLength) => ArrayPool<char>.Shared.Rent(minimumLength);
-    public void Return(char[]? array)
+    char[] IArrayPool<char>.Rent(int minimumLength) => ArrayPool<char>.Shared.Rent(minimumLength);
+    void IArrayPool<char>.Return(char[]? array)
     {
         if (array is null)
         {

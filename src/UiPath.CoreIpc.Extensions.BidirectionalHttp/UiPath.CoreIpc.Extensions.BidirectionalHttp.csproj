@@ -4,7 +4,7 @@
     <TargetFrameworks>net6.0;net461;net6.0-windows</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <LangVersion>preview</LangVersion>
+    <LangVersion>latest</LangVersion>
     <AssemblyName>UiPath.Ipc.Extensions.BidirectionalHttp</AssemblyName>
     <RootNamespace>UiPath.Ipc.Extensions.BidirectionalHttp</RootNamespace>
   </PropertyGroup>

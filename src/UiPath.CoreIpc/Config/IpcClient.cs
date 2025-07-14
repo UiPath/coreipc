@@ -23,21 +23,6 @@ public sealed class IpcClient : IpcBase, IClientConfig
     }
     public TProxy GetProxy<TProxy>() where TProxy : class => GetServiceClient(typeof(TProxy)).GetProxy<TProxy>();
 
-    internal ILogger? GetLogger(string name)
-    {
-        if (Logger is not null)
-        {
-            return Logger;
-        }
-
-        if (ServiceProvider?.GetService<ILoggerFactory>() is not { } loggerFactory)
-        {
-            return null;
-        }
-
-        return loggerFactory.CreateLogger(name);
-    }
-
     internal RouterConfig CreateCallbackRouterConfig()
     => RouterConfig.From(
         Callbacks.OrDefault(),

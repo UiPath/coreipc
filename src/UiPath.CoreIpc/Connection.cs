@@ -45,15 +45,15 @@ internal sealed class Connection : IDisposable
 
     public override string ToString() => DebugName;
     public string NewRequestId() => Interlocked.Increment(ref _requestCounter).ToString();
-    internal Task Listen() => _receiveLoop.Value;
+    public Task Listen() => _receiveLoop.Value;
 
-    internal event Func<Request, ValueTask>? RequestReceived;
-    internal event Action<string>? CancellationReceived;
+    public event Func<Request, ValueTask>? RequestReceived;
+    public event Action<string>? CancellationReceived;
     public event EventHandler<EventArgs>? Closed;
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-    internal async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
+    public async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
     {
         var requestCompletion = Rent();
         var requestId = request.Id;
@@ -98,7 +98,7 @@ internal sealed class Connection : IDisposable
             requestCompletion.Return();
         }
     }
-    internal ValueTask Send(Request request, CancellationToken token)
+    public ValueTask Send(Request request, CancellationToken token)
     {
         Logger?.LogInformation("Connection.Send...");
         var uploadStream = request.UploadStream;
@@ -107,7 +107,7 @@ internal sealed class Connection : IDisposable
             SendMessage(MessageType.Request, requestBytes, token) :
             SendStream(MessageType.UploadRequest, requestBytes, uploadStream, token);
     }
-    void CancelRequest(string requestId)
+    private void CancelRequest(string requestId)
     {
         CancelServerCall(requestId).LogException(Logger, this);
         if (_requests.TryRemove(requestId, out var requestCompletion))
@@ -118,7 +118,7 @@ internal sealed class Connection : IDisposable
         Task CancelServerCall(string requestId) =>
             SendMessage(MessageType.CancellationRequest, SerializeToStream(new CancellationRequest(requestId)), default).AsTask();
     }
-    internal ValueTask Send(Response response, CancellationToken cancellationToken)
+    public ValueTask Send(Response response, CancellationToken cancellationToken)
     {
         var responseBytes = SerializeToStream(response);
         return response.DownloadStream == null ?
@@ -162,7 +162,8 @@ internal sealed class Connection : IDisposable
     private async ValueTask SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken)
     {
         Logger?.LogInformation("Connection.SendMessage: Awaiting the acquiring of the sendLock");
-        await _sendLock.WaitAsync(cancellationToken);
+        await _sendLock.WaitAsync(cancellationToken); /// ---------
+
         try
         {
             Logger?.LogInformation($"Connection.SendMessage: sendLock was successfully aquired. Pushing the bytes onto the network. ByteCount: {data.Length}");
