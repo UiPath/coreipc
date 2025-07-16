@@ -132,22 +132,21 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
 
         private async Task LoopAccept(CancellationToken ct)
         {
-            try
+            while (!ct.IsCancellationRequested)
             {
-                while (!ct.IsCancellationRequested)
-                {
-                    await Accept(ct);
-                }
-            }
-            catch (OperationCanceledException ex) when (ex.CancellationToken == ct)
-            {
-                // Ignore
+                await TryAccept(ct); /// this method doesn't throw, and in case of non-<see cref="OperationCanceledException"/> exceptions,
+                                     /// it will notify the <see cref="_newConnection"/> observer.
             }
 
             _newConnection.OnCompleted();
         }
 
-        private async Task Accept(CancellationToken ct)
+        /// <summary>
+        /// This method returns when a new connection is accepted, or when cancellation or another error occurs.
+        /// In case of cancellation or error, it will dispose of the underlying resources and will suppress the exception.
+        /// In case of an error (not a cancellation), it will notify the observer about the error.
+        /// </summary>
+        private async Task TryAccept(CancellationToken ct)
         {
             var slot = _serverState.CreateConnectionSlot();
 
@@ -159,11 +158,14 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
                 var newConnection = await taskNewConnection;
                 _newConnection.OnNext(newConnection);
             }
+            catch (OperationCanceledException ex) when (ex.CancellationToken == ct)
+            {
+                await slot.DisposeAsync();
+            }
             catch (Exception ex)
             {
                 await slot.DisposeAsync();
                 _newConnection.OnError(ex);
-                return;
             }
         }
 
