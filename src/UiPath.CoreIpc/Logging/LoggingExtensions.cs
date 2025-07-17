@@ -31,28 +31,28 @@ internal static partial class LoggingExtensions
     [LoggerMessage(
         EventId = (int)Event.ServiceClient_Calling, 
         EventName = nameof(Event.ServiceClient_Calling), 
-        Level = LogLevel.Information, 
+        Level = LogLevel.Debug, 
         Message = $$"""{{ServiceClient}} calling {methodName} {requestId} {debugName}.""")]
     public static partial void ServiceClient_Calling(this ILogger logger, string methodName, string requestId, string debugName);
 
     [LoggerMessage(
         EventId = (int)Event.ServiceClient_CalledSuccessfully,
         EventName = nameof(Event.ServiceClient_CalledSuccessfully),
-        Level = LogLevel.Information,
+        Level = LogLevel.Debug,
         Message = $$"""{{ServiceClient}} successfully called a remote method. MethodName={methodName}, RequestId={requestId}, DebugName={debugName}.""")]
     public static partial void ServiceClient_CalledSuccessfully(this ILogger logger, string methodName, string requestId, string debugName);
 
     [LoggerMessage(
         EventId = (int)Event.ServiceClient_FailedToCall,
         EventName = nameof(Event.ServiceClient_FailedToCall),
-        Level = LogLevel.Error,
+        Level = LogLevel.Debug,
         Message = $$"""{{ServiceClient}} failed to call a remote method. MethodName={methodName}, RequestId={requestId}, DebugName={debugName}.""")]
     public static partial void ServiceClient_FailedToCall(this ILogger logger, string methodName, string requestId, string debugName, Exception ex);
 
     [LoggerMessage(
         EventId = (int)Event.ServiceClient_Dispose,
         EventName = nameof(Event.ServiceClient_Dispose),
-        Level = LogLevel.Information,
+        Level = LogLevel.Debug,
         Message = $$"""{{ServiceClient}} disposed. DebugName={debugName}.""")]
     public static partial void ServiceClient_Dispose(this ILogger logger, string debugName);
 
@@ -66,7 +66,7 @@ internal static partial class LoggingExtensions
     [LoggerMessage(
         EventId = (int)Event.Connection_ReceiveLoopEndedSuccessfully,
         EventName = nameof(Event.Connection_ReceiveLoopEndedSuccessfully),
-        Level = LogLevel.Information,
+        Level = LogLevel.Debug,
         Message = $$"""{{Connection}} receive loop ended successfully. DebugName={debugName}.""")]
     public static partial void Connection_ReceiveLoopEndedSuccessfully(this ILogger logger, string debugName);
 }

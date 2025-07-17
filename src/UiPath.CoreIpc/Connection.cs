@@ -67,7 +67,7 @@ internal sealed class Connection : IDisposable
         }
         catch (Exception ex)
         {
-            Logger?.LogError($"Caught exception while sending the request. Ex: {ex}");
+            Logger?.LogTrace($"Caught exception while sending the request. Ex: {ex}");
             tokenRegistration.Dispose();
             if (_requests.TryRemove(requestId, out _))
             {
