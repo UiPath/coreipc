@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace UiPath.CoreIpc.NodeInterop;
+namespace UiPath.Ipc.NodeInterop;
 
 using static Contracts;
 
@@ -20,7 +20,7 @@ internal static class ServiceImpls
 
         public async Task<int> Multiply(int x, int y, Message message = default!)
         {
-            var arithmetic = message.GetCallback<IArithmetic>();
+            var arithmetic = message.Client.GetCallback<IArithmetic>();
 
             int result = 0;
             for (int i = 0; i < x; i++)
@@ -32,7 +32,7 @@ internal static class ServiceImpls
         }
         public async Task<bool> TestMessage(Message<int> message)
         {
-            var arithmetic = message.GetCallback<IArithmetic>();
+            var arithmetic = message.Client.GetCallback<IArithmetic>();
             return await arithmetic.SendMessage(message);
         }
 

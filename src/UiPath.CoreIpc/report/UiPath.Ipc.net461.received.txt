@@ -1,0 +1,196 @@
+[assembly: System.Reflection.AssemblyMetadata("RepositoryUrl", "https://github.com/UiPath/coreipc.git")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Playground")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("UiPath.CoreIpc.BackCompat")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("UiPath.CoreIpc.Extensions.Abstractions")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("UiPath.CoreIpc.Tests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("UiPath.Ipc.Tests")]
+[assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.6.1", FrameworkDisplayName=".NET Framework 4.6.1")]
+namespace UiPath.Ipc
+{
+    public readonly struct CallInfo
+    {
+        public CallInfo(bool newConnection, System.Reflection.MethodInfo method, object?[] arguments) { }
+        public object?[] Arguments { get; }
+        public System.Reflection.MethodInfo Method { get; }
+        public bool NewConnection { get; }
+    }
+    public abstract class ClientTransport : System.IEquatable<UiPath.Ipc.ClientTransport> { }
+    public class ContractCollection : System.Collections.Generic.IEnumerable<UiPath.Ipc.ContractSettings>, System.Collections.IEnumerable
+    {
+        public ContractCollection() { }
+        public void Add(System.Type contractType) { }
+        public void Add(UiPath.Ipc.ContractSettings endpointSettings) { }
+        public void Add(System.Type contractType, object? instance) { }
+        public System.Collections.Generic.IEnumerator<UiPath.Ipc.ContractSettings> GetEnumerator() { }
+    }
+    public sealed class ContractSettings
+    {
+        public ContractSettings(System.Type contractType, System.IServiceProvider serviceProvider) { }
+        public ContractSettings(System.Type contractType, object? serviceInstance = null) { }
+        public System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeIncomingCall { get; set; }
+        public System.Threading.Tasks.TaskScheduler? Scheduler { get; set; }
+    }
+    public sealed class EndpointNotFoundException : System.ArgumentException
+    {
+        public string EndpointName { get; }
+        public string ServerDebugName { get; }
+    }
+    public class Error : System.IEquatable<UiPath.Ipc.Error>
+    {
+        public Error(string Message, string StackTrace, string Type, UiPath.Ipc.Error? InnerError) { }
+        public UiPath.Ipc.Error? InnerError { get; init; }
+        public string Message { get; init; }
+        public string StackTrace { get; init; }
+        public string Type { get; init; }
+        public override string ToString() { }
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull("exception")]
+        public static UiPath.Ipc.Error? FromException(System.Exception? exception) { }
+    }
+    public interface IClient
+    {
+        TCallbackInterface GetCallback<TCallbackInterface>()
+            where TCallbackInterface :  class;
+        void Impersonate(System.Action action);
+    }
+    public static class IOHelpers
+    {
+        public static System.IO.Pipes.PipeSecurity Allow(this System.IO.Pipes.PipeSecurity pipeSecurity, System.Security.Principal.IdentityReference sid, System.IO.Pipes.PipeAccessRights pipeAccessRights) { }
+        public static System.IO.Pipes.PipeSecurity Allow(this System.IO.Pipes.PipeSecurity pipeSecurity, System.Security.Principal.WellKnownSidType sid, System.IO.Pipes.PipeAccessRights pipeAccessRights) { }
+        public static System.IO.Pipes.PipeSecurity AllowCurrentUser(this System.IO.Pipes.PipeSecurity pipeSecurity, bool onlyNonAdmin = false) { }
+        public static System.IO.Pipes.PipeSecurity Deny(this System.IO.Pipes.PipeSecurity pipeSecurity, System.Security.Principal.IdentityReference sid, System.IO.Pipes.PipeAccessRights pipeAccessRights) { }
+        public static System.IO.Pipes.PipeSecurity Deny(this System.IO.Pipes.PipeSecurity pipeSecurity, System.Security.Principal.WellKnownSidType sid, System.IO.Pipes.PipeAccessRights pipeAccessRights) { }
+        public static System.IO.Pipes.PipeSecurity LocalOnly(this System.IO.Pipes.PipeSecurity pipeSecurity) { }
+        [System.ComponentModel.Browsable(false)]
+        public static bool PipeExists(string pipeName, int timeout = 1) { }
+    }
+    public abstract class IpcBase
+    {
+        protected IpcBase() { }
+        public System.TimeSpan RequestTimeout { get; set; }
+        public System.Threading.Tasks.TaskScheduler? Scheduler { get; set; }
+        public System.IServiceProvider? ServiceProvider { get; set; }
+    }
+    public sealed class IpcClient : UiPath.Ipc.IpcBase
+    {
+        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
+            "your compiler.", true)]
+        public IpcClient() { }
+        public System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeConnect { get; set; }
+        public System.Func<UiPath.Ipc.CallInfo, System.Threading.CancellationToken, System.Threading.Tasks.Task>? BeforeOutgoingCall { get; set; }
+        public UiPath.Ipc.ContractCollection? Callbacks { get; set; }
+        public Microsoft.Extensions.Logging.ILogger? Logger { get; init; }
+        public UiPath.Ipc.ClientTransport Transport { get; init; }
+        public TProxy GetProxy<TProxy>()
+            where TProxy :  class { }
+    }
+    public class IpcProxy : System.Reflection.DispatchProxy, System.IDisposable
+    {
+        public IpcProxy() { }
+        public System.IO.Stream? Network { get; }
+        public event System.EventHandler ConnectionClosed;
+        public System.Threading.Tasks.ValueTask CloseConnection() { }
+        public void Dispose() { }
+        protected override object? Invoke(System.Reflection.MethodInfo? targetMethod, object?[]? args) { }
+    }
+    public sealed class IpcServer : UiPath.Ipc.IpcBase, System.IAsyncDisposable
+    {
+        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
+            "your compiler.", true)]
+        public IpcServer() { }
+        public UiPath.Ipc.ContractCollection Endpoints { get; init; }
+        public UiPath.Ipc.ServerTransport Transport { get; init; }
+        public System.Threading.Tasks.ValueTask DisposeAsync() { }
+        public void Start() { }
+        public System.Threading.Tasks.Task WaitForStart() { }
+    }
+    public class Message
+    {
+        public Message() { }
+        [Newtonsoft.Json.JsonIgnore]
+        public UiPath.Ipc.IClient Client { get; set; }
+        [Newtonsoft.Json.JsonIgnore]
+        public System.TimeSpan RequestTimeout { get; set; }
+    }
+    public class Message<TPayload> : UiPath.Ipc.Message
+    {
+        public Message(TPayload payload) { }
+        public TPayload Payload { get; }
+    }
+    public class RemoteException : System.Exception
+    {
+        public RemoteException(UiPath.Ipc.Error error) { }
+        public UiPath.Ipc.RemoteException? InnerException { get; }
+        public override string StackTrace { get; }
+        public string Type { get; }
+        public bool Is<TException>()
+            where TException : System.Exception { }
+        public override string ToString() { }
+    }
+    public abstract class ServerTransport
+    {
+        public int ConcurrentAccepts { get; set; }
+        public byte MaxReceivedMessageSizeInMegabytes { get; set; }
+    }
+}
+namespace UiPath.Ipc.Transport.NamedPipe
+{
+    public sealed class NamedPipeClientTransport : UiPath.Ipc.ClientTransport, System.IEquatable<UiPath.Ipc.Transport.NamedPipe.NamedPipeClientTransport>
+    {
+        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
+            "your compiler.", true)]
+        public NamedPipeClientTransport() { }
+        public bool AllowImpersonation { get; init; }
+        public string PipeName { get; init; }
+        public string ServerName { get; init; }
+        public override string ToString() { }
+    }
+    public sealed class NamedPipeServerTransport : UiPath.Ipc.ServerTransport
+    {
+        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
+            "your compiler.", true)]
+        public NamedPipeServerTransport() { }
+        [Newtonsoft.Json.JsonIgnore]
+        public System.Action<System.IO.Pipes.PipeSecurity>? AccessControl { get; init; }
+        public string PipeName { get; init; }
+        public string ServerName { get; init; }
+        public override string ToString() { }
+    }
+}
+namespace UiPath.Ipc.Transport.Tcp
+{
+    public sealed class TcpClientTransport : UiPath.Ipc.ClientTransport, System.IEquatable<UiPath.Ipc.Transport.Tcp.TcpClientTransport>
+    {
+        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
+            "your compiler.", true)]
+        public TcpClientTransport() { }
+        public System.Net.IPEndPoint EndPoint { get; init; }
+        public override string ToString() { }
+    }
+    public sealed class TcpServerTransport : UiPath.Ipc.ServerTransport
+    {
+        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
+            "your compiler.", true)]
+        public TcpServerTransport() { }
+        public System.Net.IPEndPoint EndPoint { get; init; }
+        public override string ToString() { }
+    }
+}
+namespace UiPath.Ipc.Transport.WebSocket
+{
+    public sealed class WebSocketClientTransport : UiPath.Ipc.ClientTransport, System.IEquatable<UiPath.Ipc.Transport.WebSocket.WebSocketClientTransport>
+    {
+        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
+            "your compiler.", true)]
+        public WebSocketClientTransport() { }
+        public System.Uri Uri { get; init; }
+        public override string ToString() { }
+    }
+    public sealed class WebSocketServerTransport : UiPath.Ipc.ServerTransport
+    {
+        [System.Obsolete("Constructors of types with required members are not supported in this version of " +
+            "your compiler.", true)]
+        public WebSocketServerTransport() { }
+        public System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Net.WebSockets.WebSocket>> Accept { get; init; }
+        public override string ToString() { }
+    }
+}

@@ -10,7 +10,7 @@ variables:
   DotNet_MainProjectName: 'UiPath.CoreIpc'
   DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
-
+  
   NodeJS_DotNet_BuildConfiguration: 'Debug'
   NodeJS_ProjectPath: './src/Clients/js'
   NodeJS_ArchivePath: './src/Clients/js/dist/pack/nodejs.zip'
@@ -23,32 +23,32 @@ stages:
 - stage: Build
   displayName: '🏭 Build' 
   jobs:
-    # The following 3 jobs will run in parallel:  
-    - job:
-      displayName: '.NET on Windows'
-      pool:
+  # The following 3 jobs will run in parallel:            
+  - job:
+    displayName: '.NET on Windows'
+    pool:
         vmImage: 'windows-2022'
-      steps:
-        - template: azp-initialization.yaml
-        - template: azp-dotnet.yaml
-        - template: azp-dotnet-dist.yaml
-  
-    - job:
-      displayName: 'node.js on Windows'
-      pool:
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-dotnet.yaml
+      - template: azp-dotnet-dist.yaml
+
+  - job:
+    displayName: 'node.js on Windows'
+    pool:
         vmImage: 'windows-2022'
-      steps:
-        - template: azp-initialization.yaml
-        - template: azp-nodejs.yaml
-        - template: azp-nodejs-dist.yaml
-  
-    - job:
-      displayName: 'node.js on Ubuntu'
-      pool:
-        vmImage: 'ubuntu-20.04'
-      steps:
-        - template: azp-initialization.yaml
-        - template: azp-nodejs.yaml
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-nodejs.yaml
+      - template: azp-nodejs-dist.yaml
+
+  - job:
+    displayName: 'node.js on Ubuntu'
+    pool:
+      vmImage: 'ubuntu-22.04'
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-nodejs.yaml
 
 - stage: Publish
   displayName: 🚚 Publish

@@ -1,22 +1,17 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using System.Net;
-using UiPath.CoreIpc.Tcp;
+using UiPath.Ipc.Transport.Tcp;
 
-namespace UiPath.CoreIpc.Tests;
+namespace UiPath.Ipc.Tests;
 
-class TcpServer
+using IPEndPoint = System.Net.IPEndPoint;
+using IPAddress = System.Net.IPAddress;
+
+internal static class TcpServer
 {
-    static readonly IPEndPoint SystemEndPoint = new(IPAddress.Any, 3131);
-    //private static readonly Timer _timer = new Timer(_ =>
-    //{
-    //    Console.WriteLine("GC.Collect");
-    //    GC.Collect();
-    //    GC.WaitForPendingFinalizers();
-    //    GC.Collect();
-    //}, null, 0, 3000);
+    private static readonly IPEndPoint SystemEndPoint = new(IPAddress.Any, 3131);
 
-    static async Task _Main()
+    public static async Task _Main()
     {
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
         //GuiLikeSyncContext.Install();
@@ -24,29 +19,38 @@ class TcpServer
         var serviceProvider = ConfigureServices();
         // build and run service host
         var data = File.ReadAllBytes(@"../../../../localhost.pfx");
-        var host = new ServiceHostBuilder(serviceProvider)
-            .UseTcp(new TcpSettings(SystemEndPoint)
-            {
-                RequestTimeout = TimeSpan.FromSeconds(2),
-                //Certificate = new X509Certificate(data, "1"),
-            })
-            .AddEndpoint<IComputingService, IComputingCallback>()
-            .AddEndpoint<ISystemService>()
-            .ValidateAndBuild();
 
-        await await Task.WhenAny(host.RunAsync(), Task.Run(() =>
+        await using var ipcServer = new IpcServer
         {
-            Console.WriteLine(typeof(int).Assembly);
-            Console.ReadLine();
-            host.Dispose();
-        }));
+            Transport = new TcpServerTransport { EndPoint = SystemEndPoint },
+            ServiceProvider = serviceProvider,
+            Endpoints = new()
+            {
+                typeof(IComputingService),
+                typeof(ISystemService)
+            },
+            RequestTimeout = TimeSpan.FromSeconds(2),
+        };
+        ipcServer.Start();
+        await ipcServer.WaitForStart();
+
+        Console.WriteLine("Server started.");
+
+        var tcs = new TaskCompletionSource<object?>();
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            tcs.TrySetResult(null);
+        };
+        await tcs.Task;
+        await ipcServer.DisposeAsync();
 
         Console.WriteLine("Server stopped.");
     }
 
     private static IServiceProvider ConfigureServices() =>
         new ServiceCollection()
-            .AddIpcWithLogging()
+            .AddLogging()
             .AddSingleton<IComputingService, ComputingService>()
             .AddSingleton<ISystemService, SystemService>()
             .BuildServiceProvider();

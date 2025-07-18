@@ -1,11 +1,13 @@
-﻿using System.Text;
+﻿using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
-using UiPath.CoreIpc.WebSockets;
-using Microsoft.Extensions.DependencyInjection;
-namespace UiPath.CoreIpc.Tests;
-class WebSocketClient
+using System.Text;
+using UiPath.Ipc.Transport.WebSocket;
+
+namespace UiPath.Ipc.Tests;
+
+internal static class WebSocketClient
 {
-    static async Task _Main(string[] args)
+    public static async Task _Main(string[] args)
     {
         Console.WriteLine(typeof(int).Assembly);
         Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
@@ -31,45 +33,48 @@ class WebSocketClient
     {
         Uri uri = new("ws://localhost:1212/wsDemo/");
         var serviceProvider = ConfigureServices();
-        var callback = new ComputingCallback { Id = "custom made" };
-        var computingClientBuilder = new WebSocketClientBuilder<IComputingService, IComputingCallback>(uri, serviceProvider).SerializeParametersAsObjects()
-            .CallbackInstance(callback)/*.EncryptAndSign("localhost")*/.RequestTimeout(TimeSpan.FromSeconds(2));
+        var callback = new ComputingCallback();
+        var ipcClient = new IpcClient
+        {
+            Transport = new WebSocketClientTransport { Uri = uri },
+            Callbacks = new()
+            {
+                { typeof(IComputingCallback), callback }
+            },
+            ServiceProvider = serviceProvider,
+            RequestTimeout = TimeSpan.FromSeconds(2)
+        };
         var stopwatch = Stopwatch.StartNew();
         int count = 0;
         try
         {
-            var computingClient = computingClientBuilder.ValidateAndBuild();
-            var systemClient =
-                new WebSocketClientBuilder<ISystemService>(uri).SerializeParametersAsObjects()
-                //.EncryptAndSign("localhost")
-                .RequestTimeout(TimeSpan.FromSeconds(2))
-                .Logger(serviceProvider)
-                .ValidateAndBuild();
+            var computingClient = ipcClient.GetProxy<IComputingService>();;
+            var systemClient = ipcClient.GetProxy<ISystemService>();
             var watch = Stopwatch.StartNew();
             //using (var file = File.OpenRead(@"C:\Windows\DPINST.log"))
             //{
             //    Console.WriteLine(await systemClient.Upload(file));
             //}
-            for (int i =0; i<50;i++)
+            for (int i = 0; i < 50; i++)
             {
                 // test 1: call IPC service method with primitive types
-                float result1 = await computingClient.AddFloat(1.23f, 4.56f, cancellationToken);
+                float result1 = await computingClient.AddFloats(1.23f, 4.56f, cancellationToken);
                 count++;
                 Console.WriteLine($"[TEST 1] sum of 2 floating number is: {result1}");
                 // test 2: call IPC service method with complex types
-                ComplexNumber result2 = await computingClient.AddComplexNumber(
-                       new ComplexNumber(0.1f, 0.3f),
-                       new ComplexNumber(0.2f, 0.6f), cancellationToken);
-                Console.WriteLine($"[TEST 2] sum of 2 complexe number is: {result2.A}+{result2.B}i");
+                ComplexNumber result2 = await computingClient.AddComplexNumbers(
+                       new ComplexNumber { I = 0.1f, J = 0.3f },
+                       new ComplexNumber{ I = 0.2f, J = 0.6f }, cancellationToken);
+                Console.WriteLine($"[TEST 2] sum of 2 complexe number is: {result2}");
 
                 // test 3: call IPC service method with an array of complex types
-                ComplexNumber result3 = await computingClient.AddComplexNumbers(new[]
-                {
-                    new ComplexNumber(0.5f, 0.4f),
-                    new ComplexNumber(0.2f, 0.1f),
-                    new ComplexNumber(0.3f, 0.5f),
-                }, cancellationToken);
-                Console.WriteLine($"[TEST 3] sum of 3 complexe number is: {result3.A}+{result3.B}i", cancellationToken);
+                ComplexNumber result3 = await computingClient.AddComplexNumberList(
+                [
+                    new ComplexNumber{ I = 0.5f, J = 0.4f },
+                    new ComplexNumber{ I = 0.2f, J = 0.1f },
+                    new ComplexNumber{ I = 0.3f, J = 0.5f },
+                ], cancellationToken);
+                Console.WriteLine($"[TEST 3] sum of 3 complexe number is: {result3}", cancellationToken);
 
                 // test 4: call IPC service method without parameter or return
                 //await systemClient.DoNothing(cancellationToken);
@@ -77,11 +82,11 @@ class WebSocketClient
                 //((IDisposable)systemClient).Dispose();
 
                 // test 5: call IPC service method with enum parameter
-                string text = await systemClient.ConvertText("hEllO woRd!", TextStyle.Upper, cancellationToken);
+                string text = await systemClient.DanishNameOfDay(DayOfWeek.Sunday, cancellationToken);
                 Console.WriteLine($"[TEST 5] {text}");
 
                 // test 6: call IPC service method returning GUID
-                Guid generatedId = await systemClient.GetGuid(Guid.NewGuid(), cancellationToken);
+                Guid generatedId = await systemClient.EchoGuidAfter(Guid.NewGuid(), waitOnServer: default, ct: cancellationToken);
                 Console.WriteLine($"[TEST 6] generated ID is: {generatedId}");
 
                 // test 7: call IPC service method with byte array
@@ -90,7 +95,7 @@ class WebSocketClient
                 Console.WriteLine($"[TEST 7] reverse bytes");
 
                 // test 8: call IPC service method with callback
-                var userName = await computingClient.SendMessage(new SystemMessage { Text = "client text" }, cancellationToken);
+                var userName = await computingClient.SendMessage(ct: cancellationToken);
                 Console.WriteLine($"[TEST 8] client identity : {userName}");
 
                 //// test 9: call IPC service method with message parameter
@@ -111,8 +116,8 @@ class WebSocketClient
             callbackProxy.Dispose();
             callbackProxy.Dispose();
             //((IpcProxy)callbackProxy).CloseConnection();
-            ((IpcProxy)computingClient).CloseConnection();
-            ((IpcProxy)systemClient).CloseConnection();
+            await ((IpcProxy)computingClient).CloseConnection();
+            await ((IpcProxy)systemClient).CloseConnection();
         }
         finally
         {
@@ -128,6 +133,6 @@ class WebSocketClient
 
     private static IServiceProvider ConfigureServices() =>
         new ServiceCollection()
-            .AddIpcWithLogging()
+            .AddLogging()
             .BuildServiceProvider();
 }

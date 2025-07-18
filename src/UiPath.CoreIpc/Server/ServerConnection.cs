@@ -1,85 +1,80 @@
-﻿using System.Net.Security;
-namespace UiPath.CoreIpc;
+﻿using System.IO.Pipes;
 
-public interface IClient
+namespace UiPath.Ipc;
+
+internal sealed class ServerConnection : IClient, IDisposable, IClientConfig
 {
-    TCallbackInterface GetCallback<TCallbackInterface>(Type callbackContract, bool objectParameters) where TCallbackInterface : class;
-    void Impersonate(Action action);
-}
-abstract class ServerConnection : IClient, IDisposable
-{
-    private readonly ConcurrentDictionary<Type, object> _callbacks = new();
-    protected readonly Listener _listener;
-    private Connection _connection;
-    private Task<Connection> _connectionAsTask;
-    private Server _server;
-    protected ServerConnection(Listener listener) => _listener = listener;
-    public ILogger Logger => _listener.Logger;
-    public ListenerSettings Settings => _listener.Settings;
-    public abstract Task<Stream> AcceptClient(CancellationToken cancellationToken);
-    public virtual void Impersonate(Action action) => action();
-    TCallbackInterface IClient.GetCallback<TCallbackInterface>(Type callbackContract, bool objectParameters) where TCallbackInterface : class
+    public static void CreateAndListen(IpcServer server, Stream network, CancellationToken ct)
     {
-        if (callbackContract == null)
+        _ = Task.Run(async () =>
         {
-            throw new InvalidOperationException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's not configured.");
-        }
-        return (TCallbackInterface)_callbacks.GetOrAdd(callbackContract, CreateCallback);
-        TCallbackInterface CreateCallback(Type callbackContract)
-        {
-            if (!typeof(TCallbackInterface).IsAssignableFrom(callbackContract))
-            {
-                throw new ArgumentException($"Callback contract mismatch. Requested {typeof(TCallbackInterface)}, but it's {callbackContract}.");
-            }
-            if (_listener.LogEnabled)
-            {
-                _listener.Log($"Create callback {callbackContract} {_listener.Name}");
-            }
-            _connectionAsTask ??= Task.FromResult(_connection);
-            var serviceClient = new ServiceClient<TCallbackInterface>(_connection.Serializer, Settings.RequestTimeout, Logger, (_, _) => _connectionAsTask)
-            {
-                ObjectParameters = objectParameters
-            };
-            return serviceClient.CreateProxy();
-        }
+            _ = new ServerConnection(server, await server.Transport.MaybeAuthenticate(network), ct);
+        });
     }
-    public async Task Listen(Stream network, CancellationToken cancellationToken)
+
+    private readonly string _debugName;
+    private readonly ILogger? _logger;
+    private readonly ConcurrentDictionary<Type, object> _callbacks = new();
+    private readonly IpcServer _ipcServer;
+
+    private readonly Stream _network;
+    private readonly Connection _connection;
+    private readonly Server _server;
+
+    private readonly Task _listening;
+
+    private ServerConnection(IpcServer server, Stream network, CancellationToken ct)
     {
-        var stream = await AuthenticateAsServer();
-        var serializer = Settings.ServiceProvider.GetRequiredService<ISerializer>();
-        _connection = new(stream, serializer, Logger, _listener.Name, _listener.MaxMessageSize);
-        _server = new(Settings, _connection, this);
+        _ipcServer = server;
+
+        _debugName = $"{nameof(ServerConnection)} {RuntimeHelpers.GetHashCode(this)}";
+        _logger = server.CreateLogger(_debugName);
+
+        _network = network;
+
+        _connection = new Connection(network, _debugName, _logger, maxMessageSize: _ipcServer.Transport.MaxMessageSize);
+        _server = new Server(new Router(_ipcServer), _ipcServer.RequestTimeout, _connection, client: this);
+
+        _listening = Listen(ct);
+    }
+
+    private async Task Listen(CancellationToken ct)
+    {
         // close the connection when the service host closes
-        using (cancellationToken.UnsafeRegister(state => ((Connection)state).Dispose(), _connection))
+        using (ct.UnsafeRegister(_ => _connection.Dispose(), state: null))
         {
             await _connection.Listen();
         }
-        return;
-        async Task<Stream> AuthenticateAsServer()
+    }
+
+    void IDisposable.Dispose() => _network.Dispose();
+
+    TCallbackInterface IClient.GetCallback<TCallbackInterface>()
+    {
+        return (TCallbackInterface)_callbacks.GetOrAdd(typeof(TCallbackInterface), CreateCallback);
+
+        TCallbackInterface CreateCallback(Type callbackContract)
         {
-            var certificate = Settings.Certificate;
-            if (certificate == null)
-            {
-                return network;
-            }
-            var sslStream = new SslStream(network);
-            try
-            {
-                await sslStream.AuthenticateAsServerAsync(certificate);
-            }
-            catch
-            {
-                sslStream.Dispose();
-                throw;
-            }
-            Debug.Assert(sslStream.IsEncrypted && sslStream.IsSigned);
-            return sslStream;
+            _logger?.LogInformation($"Create callback {callbackContract}.");
+            return new ServiceClientForCallback<TCallbackInterface>(_connection, config: this).GetProxy();
         }
     }
-    protected virtual void Dispose(bool disposing){}
-    public void Dispose()
+    void IClient.Impersonate(Action action)
     {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
+        if (_connection.Network is not NamedPipeServerStream pipeStream)
+        {
+            action();
+            return;
+        }
+
+        pipeStream.RunAsClient(() => action());
     }
+
+    #region IServiceClientConfig 
+    TimeSpan IClientConfig.RequestTimeout => _ipcServer.RequestTimeout;
+    BeforeConnectHandler? IClientConfig.BeforeConnect => null;
+    BeforeCallHandler? IClientConfig.BeforeOutgoingCall => null;
+    ILogger? IClientConfig.Logger => _logger;
+    string IClientConfig.GetComputedDebugName() => _debugName;
+    #endregion
 }

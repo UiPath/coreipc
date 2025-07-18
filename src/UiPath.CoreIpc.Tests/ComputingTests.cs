@@ -1,129 +1,306 @@
-﻿namespace UiPath.CoreIpc.Tests;
+﻿using Newtonsoft.Json;
+using Nito.AsyncEx;
+using Nito.Disposables;
+using NSubstitute;
+using System.Runtime.InteropServices;
+using System.Text;
+using UiPath.Ipc.Transport.NamedPipe;
+using UiPath.Ipc.Transport.Tcp;
+using UiPath.Ipc.Transport.WebSocket;
+using Xunit.Abstractions;
 
-public abstract class ComputingTests<TBuilder> : TestBase where TBuilder : ServiceClientBuilder<TBuilder, IComputingService>
+namespace UiPath.Ipc.Tests;
+
+public abstract class ComputingTests : SpyTestBase
 {
-    protected readonly ServiceHost _computingHost;
-    protected readonly IComputingService _computingClient;
-    protected readonly ComputingService _computingService;
-    protected readonly ComputingCallback _computingCallback;
-    public ComputingTests()
+    #region " Setup "
+    protected readonly ComputingCallback _computingCallback = new();
+
+    private readonly Lazy<ComputingService> _service;
+    private readonly Lazy<IComputingService?> _proxy;
+
+    protected ComputingService Service => _service.Value;
+    protected IComputingService Proxy => _proxy.Value!;
+
+    protected sealed override IpcProxy? IpcProxy => Proxy as IpcProxy;
+    protected sealed override Type ContractType => typeof(IComputingService);
+    protected override ContractCollection? Callbacks => new()
     {
-        _computingCallback = new ComputingCallback { Id = Guid.NewGuid().ToString() };
-        _computingService = (ComputingService)_serviceProvider.GetService<IComputingService>();
-        _computingHost = Configure(new ServiceHostBuilder(_serviceProvider))
-            .AddEndpoint<IComputingService, IComputingCallback>()
-            .ValidateAndBuild();
-        _computingHost.RunAsync(GuiScheduler);
-        _computingClient = ComputingClientBuilder(GuiScheduler).SerializeParametersAsObjects().ValidateAndBuild();
+        { typeof(IComputingCallback), _computingCallback }
+    };
+
+    protected ComputingTests(ITestOutputHelper outputHelper) : base(outputHelper)
+    {
+        ServiceProvider.InjectLazy(out _service);
+        CreateLazyProxy(out _proxy);
     }
-    protected abstract TBuilder ComputingClientBuilder(TaskScheduler taskScheduler = null);
-    [Fact]
-    public async Task ReconnectWithEncrypt()
+
+    protected override void ConfigureSpecificServices(IServiceCollection services)
+    => services
+        .AddSingleton<SystemService>()
+        .AddSingletonAlias<ISystemService, SystemService>()
+        .AddSingleton<ComputingService>()
+        .AddSingletonAlias<IComputingService, ComputingService>()
+        ;
+
+    protected override TimeSpan ServerRequestTimeout => Timeouts.DefaultRequest;
+    #endregion
+
+    [Theory, IpcAutoData]
+    public async Task Calls_ShouldWork(float x, float y)
     {
-        for (int i = 0; i < 50; i++)
+        await Proxy.AddFloats(x, y).ShouldBeAsync(x + y);
+    }
+
+    [Theory, IpcAutoData]
+    public Task ConcurrentCalls_ShouldWork(float sameX, float sameY) => Task.WhenAll(Enumerable.Range(1, 50).Select(_ => Calls_ShouldWork(sameX, sameY)));
+
+    [Theory, IpcAutoData]
+    public async Task CallsWithStructParamsAndReturns_ShouldWork(ComplexNumber a, ComplexNumber b)
+    => await Proxy.AddComplexNumbers(a, b).ShouldBeAsync(a + b);
+
+    [Fact]
+    public async Task ClientCancellations_ShouldWork()
+    {
+        using var cts = new CancellationTokenSource();
+
+        var taskWaiting = Proxy.Wait(Timeout.InfiniteTimeSpan, cts.Token);
+
+        await Task.Delay(Timeouts.Short);
+
+        taskWaiting.IsCompleted.ShouldBeFalse();
+
+        cts.Cancel();
+
+        await taskWaiting.ShouldCompleteInAsync(Timeouts.Short).ShouldThrowAsync<OperationCanceledException>(); // in-process scheduling fast
+
+        await Proxy.Wait(TimeSpan.Zero).ShouldCompleteInAsync(Timeouts.IpcRoundtrip).ShouldBeAsync(true); // connection still alive
+    }
+
+    [Fact, OverrideConfig(typeof(ShortClientTimeout))]
+    public async Task ClientTimeouts_ShouldWork()
+    {
+        await Proxy.Wait(Timeout.InfiniteTimeSpan).ShouldThrowAsync<TimeoutException>();
+
+        await Proxy.GetCallbackThreadName(
+            waitOnServer: TimeSpan.Zero,
+            message: new()
+            {
+                RequestTimeout = Timeouts.DefaultRequest
+            })
+            .ShouldBeAsync(Names.GuiThreadName)
+            .ShouldNotThrowAsync();
+    }
+
+    private sealed class ShortClientTimeout : OverrideConfig
+    {
+        public override IpcClient? Override(Func<IpcClient> client) => client().WithRequestTimeout(TimeSpan.FromMilliseconds(10));
+    }
+
+    [Theory, IpcAutoData]
+    public async Task CallsWithArraysOfStructsAsParams_ShouldWork(ComplexNumber a, ComplexNumber b, ComplexNumber c)
+    => await Proxy.AddComplexNumberList([a, b, c]).ShouldBeAsync(a + b + c);
+
+    [Fact]
+    public async Task Callbacks_ShouldWork()
+    => await Proxy.GetCallbackThreadName(waitOnServer: TimeSpan.Zero).ShouldBeAsync(Names.GuiThreadName);
+
+    [Fact]
+    public async Task CallbacksWithParams_ShouldWork()
+    => await Proxy.MultiplyInts(7, 1).ShouldBeAsync(7);
+
+    [Fact]
+    public async Task ConcurrentCallbacksWithParams_ShouldWork()
+    => await Task.WhenAll(
+        Enumerable.Range(1, 50).Select(_ => CallbacksWithParams_ShouldWork()));
+
+    [Fact]
+    public async Task BeforeCall_ShouldApplyToCallsButNotToToCallbacks()
+    {
+        await Proxy.GetCallbackThreadName(TimeSpan.Zero).ShouldBeAsync(Names.GuiThreadName);
+
+        _clientBeforeCalls.ShouldContain(x => x.Method.Name == nameof(IComputingService.GetCallbackThreadName));
+        _clientBeforeCalls.ShouldNotContain(x => x.Method.Name == nameof(IComputingCallback.GetThreadName));
+
+        _serverBeforeCalls.ShouldContain(x => x.Method.Name == nameof(IComputingService.GetCallbackThreadName));
+        _serverBeforeCalls.ShouldNotContain(x => x.Method.Name == nameof(IComputingCallback.GetThreadName));
+    }
+
+    [Fact]
+    public async Task ServerBeforeCall_WhenSync_ShouldShareAsyncLocalContextWithTheTargetMethodCall()
+    {
+        await Proxy.GetCallContext().ShouldBeAsync(null);
+
+        var id = $"{Guid.NewGuid():N}";
+        var expectedCallContext = $"{nameof(IComputingService.GetCallContext)}-{id}";
+
+        _tailBeforeCall = (callInfo, _) =>
         {
-            await _computingClient.AddFloat(1, 2);
-            ((IpcProxy)_computingClient).CloseConnection();
-            await _computingClient.AddFloat(1, 2);
-        }
+            ComputingService.Context = $"{callInfo.Method.Name}-{id}";
+            return Task.CompletedTask;
+        };
+
+        await Proxy.GetCallContext().ShouldBeAsync(expectedCallContext);
     }
 
     [Fact]
-    public async Task AddFloat()
+    [OverrideConfig(typeof(SetBeforeConnect))]
+    public async Task BeforeConnect_ShouldWork()
     {
-        var result = await _computingClient.AddFloat(1.23f, 4.56f);
-        result.ShouldBe(5.79f);
+        int callCount = 0;
+        SetBeforeConnect.Set(async _ => callCount++);
+
+        await Proxy.AddFloats(1, 2).ShouldBeAsync(3);
+        callCount.ShouldBe(1);
+
+        await Proxy.AddFloats(1, 2).ShouldBeAsync(3);
+        callCount.ShouldBe(1);
+
+        await (IpcProxy?.CloseConnection() ?? default);
+        await Proxy.AddFloats(1, 2).ShouldBeAsync(3);
+        callCount.ShouldBe(2);
     }
 
-    [Fact]
-    public Task AddFloatConcurrently() => Task.WhenAll(Enumerable.Range(1, 100).Select(_ => AddFloat()));
-
-    [Fact]
-    public async Task AddComplexNumber()
+    private sealed class SetBeforeConnect : OverrideConfig
     {
-        var result = await _computingClient.AddComplexNumber(new ComplexNumber(1f, 3f), new ComplexNumber(2f, 5f));
-        result.ShouldBe(new ComplexNumber(3f, 8f));
+        private static readonly AsyncLocal<BeforeConnectHandler> ValueStorage = new();
+        public static void Set(BeforeConnectHandler value) => ValueStorage.Value = value;
+
+        public override IpcClient? Override(Func<IpcClient> client)
+        => client().WithBeforeConnect(ct => ValueStorage.Value.ShouldNotBeNull().Invoke(ct));
     }
 
-    [Fact]
-    public async Task ClientCancellation()
+#if !NET461 && !CI
+    [SkippableFact]
+#endif
+    [OverrideConfig(typeof(DisableInProcClientServer))]
+    public async Task BeforeConnect_ShouldStartExternalServerJIT()
     {
-        using (var cancellationSource = new CancellationTokenSource(10))
+        Skip.IfNot(RuntimeInformation.IsOSPlatform(OSPlatform.Windows), "Test works only on Windows.");
+
+        using var whereDotNet = new Process
         {
-            _computingClient.Infinite(cancellationSource.Token).ShouldThrow<TaskCanceledException>();
-        }
-        await AddFloat();
-    }
+            StartInfo =
+            {
+                FileName = "where.exe",
+                Arguments = "dotnet.exe",
+            }
+        };
+        var pathDotNet = await whereDotNet.RunReturnStdOut();
 
-    [Fact]
-    public async Task ClientTimeout()
-    {
-        var proxy = ComputingClientBuilder().SerializeParametersAsObjects().RequestTimeout(TimeSpan.FromMilliseconds(10)).ValidateAndBuild();
-        proxy.Infinite().ShouldThrow<TimeoutException>().Message.ShouldBe($"{nameof(_computingClient.Infinite)} timed out.");
-        await proxy.GetCallbackThreadName(new Message { RequestTimeout = RequestTimeout });
-        ((IDisposable)proxy).Dispose();
-        ((IpcProxy)proxy).CloseConnection();
-    }
+        var externalServerParams = RandomServerParams();
+        var arg = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(externalServerParams)));
 
-    [Fact]
-    public async Task TimeoutPerRequest()
-    {
-        for (int i = 0; i < 20; i++)
+        var pipeName = $"{Guid.NewGuid():N}";
+
+        using var serverProcess = new Process
         {
-            var request = new SystemMessage { RequestTimeout = TimeSpan.FromTicks(10), Delay = 100 };
-            Exception exception = null;
+            StartInfo =
+            {
+                FileName = pathDotNet,
+                Arguments = $"\"{Assembly.GetExecutingAssembly().Location}\" {arg}",
+                UseShellExecute = false,
+            },
+        };
+        using var killProcess = new Disposable(() =>
+        {
             try
             {
-                await _computingClient.SendMessage(request);
+                serverProcess.Kill();
             }
-            catch (TimeoutException ex)
+            catch
             {
-                exception = ex;
             }
-            catch (RemoteException ex)
-            {
-                exception = ex;
-                ex.Is<TimeoutException>().ShouldBeTrue();
-            }
-            exception.Message.ShouldBe($"{nameof(_computingClient.SendMessage)} timed out.");
-            await AddFloat();
-        }
-    }
-
-    [Fact]
-    public Task InfiniteVoid() => _computingClient.InfiniteVoid();
-
-    [Fact]
-    public async Task AddComplexNumbers()
-    {
-        var result = await _computingClient.AddComplexNumbers(new[]
-        {
-            new ComplexNumber(0.5f, 0.4f),
-            new ComplexNumber(0.2f, 0.1f),
-            new ComplexNumber(0.3f, 0.5f),
+            _outputHelper.WriteLine("Killed server process");
         });
-        result.ShouldBe(new ComplexNumber(1f, 1f));
+        var proxy = new IpcClient
+        {
+            Scheduler = GuiScheduler,
+            BeforeConnect = async (_) =>
+            {
+                serverProcess.Start();
+                var time = TimeSpan.FromSeconds(1);
+                _outputHelper.WriteLine($"Server started. Waiting {time}. PID={serverProcess.Id}");
+                await Task.Delay(time);
+            },
+            Transport = externalServerParams.CreateClientTransport()
+        }.GetProxy<IComputingService>();
+
+        await proxy.AddFloats(1, 2).ShouldBeAsync(3);
     }
 
-    [Fact]
-    public async Task GetCallbackThreadName() => (await _computingClient.GetCallbackThreadName()).ShouldBe("GuiThread");
-
-    [Fact]
-    public Task CallbackConcurrently() => Task.WhenAll(Enumerable.Range(1, 50).Select(_ => Callback()));
-
-    [Fact]
-    public async Task Callback()
+    [SkippableFact]
+    public async Task ManyConnections_ShouldWork()
     {
-        var message = new SystemMessage { Text = Guid.NewGuid().ToString() };
-        var returnValue = await _computingClient.SendMessage(message);
-        returnValue.ShouldBe($"{Environment.UserName}_{_computingCallback.Id}_{message.Text}");
+        const int CParallelism = 10;
+        const int CTimesEach = 100;
+
+        await Enumerable.Range(1, CParallelism)
+            .Select(async index =>
+            {
+                var mockCallback = Substitute.For<IComputingCallback>();
+                mockCallback.AddInts(0, 1).Returns(1);
+
+                var proxy = CreateIpcClient(callbacks: new()
+                {
+                    { typeof(IComputingCallback), mockCallback }
+                })!.GetProxy<IComputingService>();
+
+                foreach (var time in Enumerable.Range(1, CTimesEach))
+                {
+                    await (proxy as IpcProxy)!.CloseConnection();
+
+                    mockCallback.ClearReceivedCalls();
+                    await proxy.MultiplyInts(1, 1).ShouldBeAsync(1);
+                    await mockCallback.Received().AddInts(0, 1);
+                }
+            })
+            .WhenAll();
     }
 
-    public override void Dispose()
+    public abstract IAsyncDisposable? RandomTransportPair(out ServerTransport listener, out ClientTransport transport);
+
+    public abstract ExternalServerParams RandomServerParams();
+    public readonly record struct ExternalServerParams(ServerKind Kind, string? PipeName = null, int Port = 0)
     {
-        ((IDisposable)_computingClient).Dispose();
-        ((IpcProxy)_computingClient).CloseConnection();
-        _computingHost.Dispose();
-        base.Dispose();
+        public IAsyncDisposable? CreateListenerConfig(out ServerTransport listenerConfig)
+        {
+            switch (Kind)
+            {
+                case ServerKind.NamedPipes:
+                    {
+                        listenerConfig = new NamedPipeServerTransport() { PipeName = PipeName! };
+                        return null;
+                    }
+                case ServerKind.Tcp:
+                    {
+                        listenerConfig = new TcpServerTransport() { EndPoint = new(System.Net.IPAddress.Loopback, Port) };
+                        return null;
+                    }
+                case ServerKind.WebSockets:
+                    {
+                        var context = new WebSocketContext(Port);
+                        listenerConfig = new WebSocketServerTransport { Accept = context.Accept };
+                        return context;
+                    }
+                default:
+                    throw new NotSupportedException($"Kind not supported. Kind was {Kind}");
+            }
+        }
+
+        public ClientTransport CreateClientTransport() => Kind switch
+        {
+            ServerKind.NamedPipes => new NamedPipeClientTransport() { PipeName = PipeName! },
+            ServerKind.Tcp => new TcpClientTransport() { EndPoint = new(System.Net.IPAddress.Loopback, Port) },
+            ServerKind.WebSockets => new WebSocketClientTransport() { Uri = new($"ws://localhost:{Port}") },
+            _ => throw new NotSupportedException($"Kind not supported. Kind was {Kind}")
+        };
+    }
+    public enum ServerKind { NamedPipes, Tcp, WebSockets }
+
+    private sealed class DisableInProcClientServer : OverrideConfig
+    {
+        public override async Task<IpcServer?> Override(Func<Task<IpcServer>> ipcServerFactory) => null;
+        public override IpcClient? Override(Func<IpcClient> client) => null;
     }
 }
