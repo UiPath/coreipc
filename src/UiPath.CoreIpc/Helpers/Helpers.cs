@@ -139,23 +139,8 @@ public static class IOHelpers
     }
 
     [Browsable(false)]
-    [EditorBrowsable( EditorBrowsableState.Never)]
-    public static bool PipeExists(string pipeName, int timeout = 1)
-    {
-        try
-        {
-            using (var client = new NamedPipeClientStream(pipeName))
-            {
-                client.Connect(timeout);
-            }
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Trace.WriteLine(ex.ToString());
-        }
-        return false;
-    }
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static bool PipeExists(string pipeName, int timeoutMilliseconds = 1) => PipeHelper.PipeExists(pipeName, timeoutMilliseconds);
 
     internal static ValueTask WriteMessage(this Stream stream, MessageType messageType, Stream data, CancellationToken cancellationToken = default)
     {
@@ -188,6 +173,41 @@ public static class IOHelpers
     }
     internal static Task WriteBuffer(this Stream stream, byte[] buffer, CancellationToken cancellationToken) =>
         stream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
+
+    private static readonly IPipeHelper PipeHelper = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? new PipeUtilsWindows() : new PipeUtilsPortable();
+
+    private interface IPipeHelper
+    {
+        bool PipeExists(string pipeName, int timeoutMilliseconds);
+    }
+
+    private sealed class PipeUtilsWindows : IPipeHelper
+    {
+        public bool PipeExists(string pipeName, int timeoutMilliseconds) => WaitNamedPipe($@"\\.\pipe\{pipeName}", timeoutMilliseconds);
+
+        [DllImport("kernel32", CharSet = CharSet.Unicode)]
+        private static extern bool WaitNamedPipe(string pipeName, int timeoutMilliseconds);
+    }
+
+    private sealed class PipeUtilsPortable : IPipeHelper
+    {
+        public bool PipeExists(string pipeName, int timeoutMilliseconds)
+        {
+            try
+            {
+                using (var client = new NamedPipeClientStream(pipeName))
+                {
+                    client.Connect(timeoutMilliseconds);
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine(ex.ToString());
+            }
+            return false;
+        }
+    }
 }
 internal static class Validator
 {

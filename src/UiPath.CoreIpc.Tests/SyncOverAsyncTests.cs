@@ -15,7 +15,7 @@ public class SyncOverAsyncTests
         var pipeName = $"{Guid.NewGuid():N}";
 
         await using var ipcServer = CreateServer(pipeName);
-        await ipcServer.WaitForStart();
+        ipcServer.Start();
 
         var ipcClient = CreateClient(pipeName);
 

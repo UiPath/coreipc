@@ -63,12 +63,6 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
         }
     }
 
-    public Task WaitForStart()
-    {
-        Start();
-        return _accepter!.StartedAccepting;
-    }
-
     internal ILogger? CreateLogger(string category) => ServiceProvider.MaybeCreateLogger(category);
 
     private void OnNewConnection(Stream network)
@@ -107,10 +101,7 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
         private readonly ServerTransport.IServerState _serverState;
         private readonly Task _running;
         private readonly IObserver<Stream> _newConnection;
-        private readonly TaskCompletionSource<object?> _tcsStartedAccepting = new();
         private readonly Lazy<Task> _dispose;
-
-        public Task StartedAccepting => _tcsStartedAccepting.Task;
 
         public Accepter(ServerTransport transport, IObserver<Stream> connected)
         {
@@ -152,11 +143,8 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
 
             try
             {
-                var taskNewConnection = slot.AwaitConnection(ct);
-                _tcsStartedAccepting.TrySetResult(null);
-
-                var newConnection = await taskNewConnection;
-                _newConnection.OnNext(newConnection);
+                var newConnection = await slot.AwaitConnection(ct);
+                _ = Task.Run(() => _newConnection.OnNext(newConnection));
             }
             catch (OperationCanceledException ex) when (ex.CancellationToken == ct)
             {

@@ -16,7 +16,7 @@ public sealed class NamedPipeSmokeTests
             var ipcClient = CreateClient(pipeName);
             var proxy = ipcClient.GetProxy<IComputingService>();
 
-            await ipcServer.WaitForStart();
+            ipcServer.Start();
             await proxy.AddFloats(2, 3).ShouldBeAsync(5);
         }
 
