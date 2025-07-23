@@ -32,7 +32,6 @@ internal static class TcpServer
             RequestTimeout = TimeSpan.FromSeconds(2),
         };
         ipcServer.Start();
-        await ipcServer.WaitForStart();
 
         Console.WriteLine("Server started.");
 

@@ -28,7 +28,6 @@ internal static class Server
 
         Console.WriteLine(typeof(int).Assembly);
         ipcServer.Start();
-        await ipcServer.WaitForStart();
         Console.WriteLine("Server started.");
 
         var tcs = new TaskCompletionSource<object?>();

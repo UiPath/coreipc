@@ -81,8 +81,14 @@ public sealed class NamedPipeServerTransport : ServerTransport
 
         async ValueTask<Stream> IServerConnectionSlot.AwaitConnection(CancellationToken ct)
         {
-            await Stream.WaitForConnectionAsync(ct);
-            return Stream;
+            // on Linux WaitForConnectionAsync has to be cancelled with Dispose
+            using (ct.Register(StartDisposal))
+            {
+                await Stream.WaitForConnectionAsync(ct);
+                return Stream;
+            }
+
+            void StartDisposal() => (this as IAsyncDisposable).DisposeAsync().AsTask().TraceError(); // We trace the error even we don't expect Dispose/DisposeAsync to ever throw.
         }
     }
 }

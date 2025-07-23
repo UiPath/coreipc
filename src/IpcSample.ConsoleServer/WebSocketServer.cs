@@ -31,7 +31,6 @@ class WebSocketServer
         Console.WriteLine(typeof(int).Assembly);
 
         ipcServer.Start();
-        await ipcServer.WaitForStart();
         Console.WriteLine("Server started.");
 
         // console cancellationtoken
