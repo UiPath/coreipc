@@ -88,7 +88,7 @@ public sealed class NamedPipeServerTransport : ServerTransport
                 return Stream;
             }
 
-            void StartDisposal() => (this as IAsyncDisposable).DisposeAsync().AsTask().TraceError(); // We trace the eror even we don't expect Dispose/DisposeAsync to ever throw.
+            void StartDisposal() => (this as IAsyncDisposable).DisposeAsync().AsTask().TraceError(); // We trace the error even we don't expect Dispose/DisposeAsync to ever throw.
         }
     }
 }

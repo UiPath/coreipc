@@ -8,7 +8,6 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
     public required ServerTransport Transport { get; init; }
 
     private readonly object _lock = new();
-    private readonly TaskCompletionSource<object?> _listening = new();
     private readonly CancellationTokenSource _ctsActiveConnections = new();
 
     private bool _disposeStarted;
@@ -144,7 +143,7 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
             try
             {
                 var newConnection = await slot.AwaitConnection(ct);
-                _ = Task.Run(() => _newConnection.OnNext(newConnection));
+                _newConnection.OnNext(newConnection);
             }
             catch (OperationCanceledException ex) when (ex.CancellationToken == ct)
             {
