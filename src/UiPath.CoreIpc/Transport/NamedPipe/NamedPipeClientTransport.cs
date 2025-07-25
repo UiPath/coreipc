@@ -5,9 +5,9 @@ namespace UiPath.Ipc.Transport.NamedPipe;
 
 public record NamedPipeClientTransport : ClientTransport
 {
-    public required string PipeName { get; init; }
-    public string ServerName { get; init; } = ".";
-    public bool AllowImpersonation { get; init; }
+    public required string PipeName { get; set; }
+    public string ServerName { get; set; } = ".";
+    public bool AllowImpersonation { get; set; }
 
     public override string ToString() => $"ClientPipe={PipeName}";
 

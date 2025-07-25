@@ -4,7 +4,7 @@ namespace UiPath.Ipc.Transport.WebSocket;
 
 public sealed record WebSocketClientTransport : ClientTransport
 {
-    public required Uri Uri { get; init; }
+    public required Uri Uri { get; set; }
     public override string ToString() => $"WebSocketClient={Uri}";
 
     internal override IClientState CreateState() => new WebSocketClientState();
