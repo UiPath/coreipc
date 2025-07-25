@@ -53,7 +53,7 @@ internal abstract class ServiceClient : IDisposable
         {
             CancellationToken cancellationToken = default;
             TimeSpan messageTimeout = default;
-            TimeSpan clientTimeout = Config.RequestTimeout;
+            TimeSpan clientTimeout = Config.RequestTimeout.OrInfinite();
             Stream? uploadStream = null;
             var methodName = method.Name;
 

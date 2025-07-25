@@ -23,7 +23,9 @@ internal record Request(string Endpoint, string Id, string MethodName, string[] 
 
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
 
-    public  TimeSpan GetTimeout(TimeSpan defaultTimeout) => TimeoutInSeconds == 0 ? defaultTimeout : TimeSpan.FromSeconds(TimeoutInSeconds);
+    public  TimeSpan GetTimeout(TimeSpan? defaultTimeout) => TimeoutInSeconds == 0 
+        ? defaultTimeout.OrInfinite() 
+        : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
 record CancellationRequest(string RequestId);
 

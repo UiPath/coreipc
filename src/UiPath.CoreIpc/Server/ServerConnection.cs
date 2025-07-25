@@ -71,7 +71,7 @@ internal sealed class ServerConnection : IClient, IDisposable, IClientConfig
     }
 
     #region IServiceClientConfig 
-    TimeSpan IClientConfig.RequestTimeout => _ipcServer.RequestTimeout;
+    TimeSpan? IClientConfig.RequestTimeout => _ipcServer.RequestTimeout;
     BeforeConnectHandler? IClientConfig.BeforeConnect => null;
     BeforeCallHandler? IClientConfig.BeforeOutgoingCall => null;
     ILogger? IClientConfig.Logger => _logger;

@@ -12,6 +12,8 @@ internal static class DefaultsExtensions
     public static ContractToSettingsMap OrDefault(this ContractToSettingsMap? map) => map ?? EmptyContractToSettingsMap;
     public static ContractCollection OrDefault(this ContractCollection? endpoints) => endpoints ?? new();
 
+    public static TimeSpan OrInfinite(this TimeSpan? timeout) => timeout ?? Timeout.InfiniteTimeSpan;
+
     public static Func<T>? MaybeCreateServiceFactory<T>(this IServiceProvider? serviceProvider) where T : class
     {
         if (serviceProvider is null)
