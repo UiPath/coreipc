@@ -15,12 +15,17 @@ internal class IpcJsonSerializer : IArrayPool<char>
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
     public async ValueTask<T?> DeserializeAsync<T>(Stream json, ILogger? logger)
-    {        
+    {
         using var stream = IOHelpers.GetStream((int)json.Length);
         await json.CopyToAsync(stream);
         stream.Position = 0;
         using var reader = CreateReader(new StreamReader(stream));
-        return StringArgsSerializer.Deserialize<T>(reader);
+        var result = StringArgsSerializer.Deserialize<T>(reader);
+        if (stream.Position != json.Length)
+        {
+            throw new InvalidOperationException("Buffer underrun detected.");
+        }
+        return result;
     }
     public void Serialize(object? obj, Stream stream) => Serialize(obj, new StreamWriter(stream), StringArgsSerializer);
     private void Serialize(object? obj, TextWriter streamWriter, JsonSerializer serializer)
