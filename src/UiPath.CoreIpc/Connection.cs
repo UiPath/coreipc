@@ -372,7 +372,7 @@ internal sealed class Connection : IDisposable
             Log(ex);
         }
     }
-    private void OnRequestReceived(Request request)
+    private void OnRequestReceived(Request? request)
     {
         _ = OnRequestReceivedAsyncSafe(request);
     }
