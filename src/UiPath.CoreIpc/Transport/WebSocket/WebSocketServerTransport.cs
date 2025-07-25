@@ -2,7 +2,7 @@
 
 public sealed class WebSocketServerTransport : ServerTransport
 {
-    public required Accept Accept { get; init; }
+    public required Accept Accept { get; set; }
 
     internal override IServerState CreateServerState() => new State { Transport = this };
 

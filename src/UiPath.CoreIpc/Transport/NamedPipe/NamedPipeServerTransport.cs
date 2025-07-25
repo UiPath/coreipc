@@ -6,10 +6,10 @@ namespace UiPath.Ipc.Transport.NamedPipe;
 
 public sealed class NamedPipeServerTransport : ServerTransport
 {
-    public required string PipeName { get; init; }
-    public string ServerName { get; init; } = ".";
+    public required string PipeName { get; set; }
+    public string ServerName { get; set; } = ".";
     [JsonIgnore]
-    public AccessControlDelegate? AccessControl { get; init; }
+    public AccessControlDelegate? AccessControl { get; set; }
 
     internal override IServerState CreateServerState()
     => new ServerState { Transport = this };

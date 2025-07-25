@@ -4,8 +4,8 @@ namespace UiPath.Ipc;
 
 public sealed class IpcServer : IpcBase, IAsyncDisposable
 {
-    public required ContractCollection Endpoints { get; init; }
-    public required ServerTransport Transport { get; init; }
+    public required ContractCollection Endpoints { get; set; }
+    public required ServerTransport Transport { get; set; }
 
     private readonly object _lock = new();
     private readonly CancellationTokenSource _ctsActiveConnections = new();

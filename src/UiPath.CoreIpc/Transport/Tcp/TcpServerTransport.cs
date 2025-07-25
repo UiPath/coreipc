@@ -5,7 +5,7 @@ namespace UiPath.Ipc.Transport.Tcp;
 
 public sealed class TcpServerTransport : ServerTransport
 {
-    public required IPEndPoint EndPoint { get; init; }
+    public required IPEndPoint EndPoint { get; set; }
 
     internal override IServerState CreateServerState()
     {

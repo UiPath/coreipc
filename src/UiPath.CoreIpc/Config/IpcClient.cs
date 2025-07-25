@@ -4,13 +4,13 @@ public sealed class IpcClient : IpcBase, IClientConfig
 {
     public ContractCollection? Callbacks { get; set; }
 
-    public ILogger? Logger { get; init; }
+    public ILogger? Logger { get; set; }
     public BeforeConnectHandler? BeforeConnect { get; set; }
     public BeforeCallHandler? BeforeOutgoingCall { get; set; }
 
     internal string DebugName { get; set; } = null!;
 
-    public required ClientTransport Transport { get; init; }
+    public required ClientTransport Transport { get; set; }
 
     string IClientConfig.GetComputedDebugName() => DebugName ?? Transport.ToString();
 

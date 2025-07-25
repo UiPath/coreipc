@@ -4,7 +4,7 @@ namespace UiPath.Ipc.Transport.Tcp;
 
 public sealed record TcpClientTransport : ClientTransport
 {
-    public required IPEndPoint EndPoint { get; init; }
+    public required IPEndPoint EndPoint { get; set; }
 
     public override string ToString() => $"TcpClient={EndPoint}";
 
