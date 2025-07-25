@@ -24,13 +24,13 @@ internal class Server
     private readonly IClient? _client;
     private readonly ConcurrentDictionary<string, PooledCancellationTokenSource> _requests = new();
 
-    private readonly TimeSpan _requestTimeout;
+    private readonly TimeSpan? _requestTimeout;
 
     private ILogger? Logger => _connection.Logger;
     private bool LogEnabled => _connection.LogEnabled;
     public string DebugName => _connection.DebugName;
 
-    public Server(Router router, TimeSpan requestTimeout, Connection connection, IClient? client = null)
+    public Server(Router router, TimeSpan? requestTimeout, Connection connection, IClient? client = null)
     {
         _router = router;
         _requestTimeout = requestTimeout;
