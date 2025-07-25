@@ -17,15 +17,7 @@ internal class IpcJsonSerializer : IArrayPool<char>
     public async ValueTask<T?> DeserializeAsync<T>(Stream json, ILogger? logger)
     {
         using var stream = IOHelpers.GetStream((int)json.Length);
-        try
-        {
-            await json.CopyToAsync(stream);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine(ex);
-            throw;
-        }
+        await json.CopyToAsync(stream);
         stream.Position = 0;
         using var reader = CreateReader(new StreamReader(stream));
         var result = StringArgsSerializer.Deserialize<T>(reader);
