@@ -27,7 +27,7 @@ internal sealed class ServerConnection : IClient, IDisposable, IClientConfig
     {
         _ipcServer = server;
 
-        _debugName = $"{nameof(ServerConnection)} {RuntimeHelpers.GetHashCode(this)}";
+        _debugName = $"{typeof(ServerConnection)} {RuntimeHelpers.GetHashCode(this)}";
         _logger = server.CreateLogger(_debugName);
 
         _network = network;
