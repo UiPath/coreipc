@@ -47,6 +47,7 @@ public interface ISystemService
     Task<string> DanishNameOfDay(DayOfWeek day, CancellationToken ct);
 
     Task<byte[]> ReverseBytes(byte[] bytes, CancellationToken ct = default);
+    Task<bool> ThrowWithData(string serializedkey, object? serializedValue, string notSerializedKey);
 }
 
 public interface IUnregisteredCallback

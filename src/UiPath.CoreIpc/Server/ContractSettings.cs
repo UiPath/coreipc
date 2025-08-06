@@ -7,10 +7,12 @@ public sealed class ContractSettings
     public TaskScheduler? Scheduler { get; set; }
     public BeforeCallHandler? BeforeIncomingCall { get; set; }
     internal ServiceFactory Service { get; }
+    public Func<CallInfo?, Exception, Exception>? OnError { get; set; }
 
     internal Type ContractType => Service.Type;
     internal object? ServiceInstance => Service.MaybeGetInstance();
     internal IServiceProvider? ServiceProvider => Service.MaybeGetServiceProvider();
+
 
     public ContractSettings(Type contractType, object? serviceInstance = null) : this(
         serviceInstance is not null
@@ -40,5 +42,6 @@ public sealed class ContractSettings
         Scheduler = other.Scheduler;
         BeforeIncomingCall = other.BeforeIncomingCall;
         Service = other.Service;
+        OnError = other.OnError;
     }
 }

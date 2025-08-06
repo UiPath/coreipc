@@ -24,6 +24,7 @@ public abstract class TestBase : IAsyncLifetime
 
     protected readonly ConcurrentBag<CallInfo> _serverBeforeCalls = new();
     protected BeforeCallHandler? _tailBeforeCall = null;
+    protected Func<CallInfo?, Exception, Exception>? _onError;
 
     public TestBase(ITestOutputHelper outputHelper)
     {
@@ -91,7 +92,8 @@ public abstract class TestBase : IAsyncLifetime
                 {
                     _serverBeforeCalls.Add(callInfo);
                     return _tailBeforeCall?.Invoke(callInfo, ct) ?? Task.CompletedTask;
-                }
+                },
+                OnError = (callInfo, exception) => _onError?.Invoke(callInfo, exception) ?? exception
             };
 
             return new()

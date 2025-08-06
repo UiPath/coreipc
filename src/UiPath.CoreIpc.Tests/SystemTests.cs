@@ -142,6 +142,51 @@ public abstract class SystemTests : TestBase
         marshalledExceptionType.ShouldBe(typeof(EndpointNotFoundException).FullName);
     }
 
+#if !NET461 //netframework only works with old style serializable types, so this won't work
+
+    [Fact]
+    public async Task ExceptionDataIsMarshalledForObject()
+    => await ExceptionDataIsMarshalled(new ComplexNumber { I = 1, J = 2});
+
+    [Fact]
+    public async Task ExceptionDataIsMarshalledForArray()
+    => await ExceptionDataIsMarshalled(new string[] { "bla", "bla" });
+
+#endif
+
+    [Theory]
+    [InlineData("someString")]
+    [InlineData(2L)]
+    [InlineData(true)]
+    [InlineData(null)]
+    [InlineData(12.34d)]
+    public async Task ExceptionDataIsMarshalled(object? value)
+    {
+        const string notSerialized = "notSerializedKey";
+        const string notSerialized2 = "notSerializedKey2";
+        const string InlineDataKey = "somekey";
+        const string OnErrorDataKey = "extraData";
+        Error.SerializableDataKeys.Add(InlineDataKey);
+        Error.SerializableDataKeys.Add(OnErrorDataKey);
+        Error.SerializableDataKeys.Remove(notSerialized);
+
+        _onError = (callInfo, ex) =>
+        {
+            ex.Data.Add(OnErrorDataKey, value);
+            ex.Data.Add(notSerialized2, value);
+            var readValue = ex.Data[OnErrorDataKey];
+            readValue.ShouldBe(value);
+            return ex;
+        };
+
+        var ex = await Proxy.ThrowWithData(InlineDataKey, value, notSerialized).ShouldThrowAsync<RemoteException>();
+        AsJtokenOrPrimitive(ex.Data[InlineDataKey]).ShouldBeEquivalentTo(AsJtokenOrPrimitive(value));
+        ex.Data.Contains(notSerialized).ShouldBeFalse();
+        AsJtokenOrPrimitive(ex.Data[OnErrorDataKey]).ShouldBeEquivalentTo(AsJtokenOrPrimitive(value));
+
+        object? AsJtokenOrPrimitive(object? value) => value is null || value.GetType().IsPrimitive ? value : Newtonsoft.Json.Linq.JToken.FromObject(value);
+    }
+
     [Fact]
     public async Task ServerCallingInexistentCallback_ShouldThrow2()
     => await Proxy.AddIncrement(1, 2).ShouldThrowAsync<RemoteException>()

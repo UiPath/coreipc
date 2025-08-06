@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace UiPath.Ipc;
 
@@ -48,17 +49,40 @@ internal record Response(string RequestId, string? Data = null, Error? Error = n
     }
 }
 
-public record Error(string Message, string StackTrace, string Type, Error? InnerError)
+public record Error(string Message, string StackTrace, string Type, Error? InnerError, IReadOnlyDictionary<string, object?>? Data)
 {
+    public static readonly HashSet<string> SerializableDataKeys = ["UiPath.ErrorInfo.Error"];
+
     [return: NotNullIfNotNull("exception")]
     public static Error? FromException(Exception? exception)
-    => exception is null 
-        ? null 
+    => exception is null
+        ? null
         : new(
-            Message: exception.Message, 
-            StackTrace: exception.StackTrace ?? exception.GetBaseException().StackTrace!, 
-            Type: GetExceptionType(exception), 
-            InnerError: FromException(exception.InnerException));
+            Message: exception.Message,
+            StackTrace: exception.StackTrace ?? exception.GetBaseException().StackTrace!,
+            Type: GetExceptionType(exception),
+            InnerError: FromException(exception.InnerException),
+            Data: GetExceptionData(exception));
+
+    private static IReadOnlyDictionary<string, object?>? GetExceptionData(Exception exception)
+    {
+        Dictionary<string, object?>? data = null;
+        foreach (var key in SerializableDataKeys)
+        {
+            if (exception.Data.Contains(key))
+            {
+                data ??= [];
+                var value = exception.Data[key];
+                data[key] = value switch
+                {
+                    null or string or int or bool or Int64 or double or decimal or float => value,
+                    _ => JToken.FromObject(value, IpcJsonSerializer.StringArgsSerializer)
+                };
+            }
+        }
+        return data;
+    }
+
     public override string ToString() => new RemoteException(this).ToString();
 
     private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName!;
@@ -70,6 +94,14 @@ public class RemoteException : Exception
     {
         Type = error.Type;
         StackTrace = error.StackTrace;
+        if (error.Data != null)
+        {
+            foreach (var key in error.Data)
+            {
+                var value = key.Value;
+                Data[key.Key] = value;
+            }
+        }
     }
     public string Type { get; }
     public override string StackTrace { get; }

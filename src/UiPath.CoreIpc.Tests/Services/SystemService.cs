@@ -102,4 +102,13 @@ public sealed class SystemService : ISystemService
         }
         return Task.FromResult(bytes);
     }
+
+    public async Task<bool> ThrowWithData(string serializedkey, object? serializedValue, string notSerializedKey)
+    {
+        var ex = new NotImplementedException();
+        ex.Data[serializedkey] = serializedValue;
+        ex.Data[notSerializedKey] = serializedValue;
+        await Task.Yield();
+        throw ex;
+    }
 }

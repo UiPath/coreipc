@@ -9,7 +9,7 @@ internal class IpcJsonSerializer : IArrayPool<char>
 {
     public static readonly IpcJsonSerializer Instance = new();
 
-    static readonly JsonSerializer StringArgsSerializer = new() { CheckAdditionalContent = true };
+    internal static readonly JsonSerializer StringArgsSerializer = new() { CheckAdditionalContent = true };
 
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]

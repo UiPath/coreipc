@@ -3,4 +3,6 @@ export class CoreIpcError extends Error {
         super(message);
         this.name = 'CoreIpcError';
     }
+
+    data?: { [key: string]: any }
 }

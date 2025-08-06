@@ -102,6 +102,16 @@ internal class Server
             }
             catch (Exception ex) when (response is null)
             {
+                try
+                {
+                    ex = route.OnError?.Invoke(null, ex) ?? ex;
+                }
+                catch (Exception handlerEx)
+                {
+                    ex = new AggregateException(
+                        $"Error while handling error for {request}.",
+                        ex, handlerEx);
+                }
                 await OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName));
             }
             finally

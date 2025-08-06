@@ -134,6 +134,7 @@ internal readonly struct Route
         BeforeCall = endpointSettings.BeforeIncomingCall,
         Scheduler = endpointSettings.Scheduler.OrDefault(),
         LoggerFactory = serviceProvider.MaybeCreateServiceFactory<ILoggerFactory>(),
+        OnError = endpointSettings.OnError,
     };
 
     public required ServiceFactory Service { get; init; }
@@ -141,4 +142,5 @@ internal readonly struct Route
     public TaskScheduler Scheduler { get; init; }
     public BeforeCallHandler? BeforeCall { get; init; }
     public Func<ILoggerFactory>? LoggerFactory { get; init; }
+    public Func<CallInfo?, Exception, Exception>? OnError { get; init; }
 }
