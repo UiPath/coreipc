@@ -145,9 +145,10 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
                 var newConnection = await slot.AwaitConnection(ct);
                 _newConnection.OnNext(newConnection);
             }
-            catch (OperationCanceledException ex) when (ex.CancellationToken == ct)
+            catch (OperationCanceledException)
             {
                 await slot.DisposeAsync();
+                /// we don't notify the observer, as <see cref="OperationCanceledException"/> is expected
             }
             catch (Exception ex)
             {
