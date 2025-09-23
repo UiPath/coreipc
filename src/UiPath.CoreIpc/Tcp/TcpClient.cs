@@ -39,7 +39,19 @@ namespace UiPath.CoreIpc.Tcp
                 _tcpClient = new();
                 using var token = cancellationToken.Register(Dispose);
                 var endPoint = ((ITcpKey)ConnectionKey).EndPoint;
-                await _tcpClient.ConnectAsync(endPoint.Address, endPoint.Port);
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        await _tcpClient.ConnectAsync(endPoint.Address, endPoint.Port);
+                        return;
+                    }
+                    catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionRefused)
+                    {
+                        await Task.Delay(10, cancellationToken);
+                    }
+                }
             }
         }
     }
