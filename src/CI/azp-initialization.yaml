@@ -18,11 +18,11 @@ steps:
     env:
       DotNet_MainProjectPath: $(DotNet_MainProjectPath)
 
-  # If $(PublishRelease) != "true" then compute $(FullVersion) as $(Version)-20210811-12-fix
+  # If $(PublishRelease) != "true" then compute $(FullVersion) as $(Version)-20210811-12-fix2
   - task: VariableTransformTask@1
     displayName: '$(Label_Initialization) Compute $[FullVersion] when $[PublishRelease] is not true'
     inputs:
-      value: '$(Version)-20210811-12-fix'
+      value: '$(Version)-$(Build.BuildNumber)'
       variableName: 'FullVersion'
       IsSecret: false
       transformAction: 'none'
@@ -37,3 +37,9 @@ steps:
       IsSecret: false
       transformAction: 'none'
     condition: eq(variables['PublishRelease'], 'true')
+
+  - powershell: |
+      wget http://security.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2.24_amd64.deb
+      sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2.24_amd64.deb
+    displayName: 'Install OpenSSL 1.1'
+    condition: eq( variables['Agent.OS'], 'Linux' )

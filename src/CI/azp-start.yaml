@@ -25,7 +25,7 @@ jobs:
   - job:
     displayName: '.NET on Windows'
     pool:
-      vmImage: 'windows-2019'
+      vmImage: 'windows-latest'
     steps:
       - template: azp-initialization.yaml
       - template: azp-dotnet.yaml
@@ -34,7 +34,7 @@ jobs:
   - job:
     displayName: 'node.js on Windows'
     pool:
-      vmImage: 'windows-2019'
+      vmImage: 'windows-latest'
     steps:
       - template: azp-initialization.yaml
       - template: azp-nodejs.yaml
@@ -43,7 +43,7 @@ jobs:
   - job:
     displayName: 'node.js on Ubuntu'
     pool:
-      vmImage: 'ubuntu-20.04'
+      vmImage: 'ubuntu-latest'
     steps:
       - template: azp-initialization.yaml
       - template: azp-nodejs.yaml
