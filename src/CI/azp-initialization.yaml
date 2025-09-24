@@ -22,7 +22,7 @@ steps:
   - task: VariableTransformTask@1
     displayName: '$(Label_Initialization) Compute $[FullVersion] when $[PublishRelease] is not true'
     inputs:
-      value: '$(Version)-20210811-12-fix2'
+      value: '$(Version)-$(Build.BuildNumber)'
       variableName: 'FullVersion'
       IsSecret: false
       transformAction: 'none'
