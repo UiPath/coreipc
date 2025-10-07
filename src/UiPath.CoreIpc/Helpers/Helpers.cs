@@ -89,7 +89,7 @@ internal static class Helpers
 }
 public static class IOHelpers
 {
-    const int MaxBytes = 100 * 1024 * 1024;
+    const int MaxBytes = 10 * 1024 * 1024;
     private static readonly RecyclableMemoryStreamManager Pool = new(MaxBytes, MaxBytes);
     internal static MemoryStream GetStream(int size = 0) => Pool.GetStream("IpcMessage", size);
     internal const int HeaderLength = sizeof(int) + 1;
