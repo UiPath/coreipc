@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Net.Sockets;
 
 namespace UiPath.Ipc.Transport.Tcp;
 
@@ -21,7 +22,7 @@ public sealed record TcpClientTransport : ClientTransport
 
 internal sealed class TcpClientState : IClientState
 {
-    private System.Net.Sockets.TcpClient? _tcpClient;
+    private TcpClient? _tcpClient;
 
     public Stream? Network { get; private set; }
 
@@ -34,7 +35,7 @@ internal sealed class TcpClientState : IClientState
     {
         var transport = client.Transport as TcpClientTransport ?? throw new InvalidOperationException();
 
-        _tcpClient = new System.Net.Sockets.TcpClient();
+        _tcpClient = new();
 #if NET461
         using var ctreg = ct.Register(_tcpClient.Dispose);
         try
@@ -47,7 +48,21 @@ internal sealed class TcpClientState : IClientState
             throw new OperationCanceledException(ct);
         }
 #else
-        await _tcpClient.ConnectAsync(transport.EndPoint.Address, transport.EndPoint.Port, ct);
+        // ported from support/v21.10 (https://github.com/UiPath/coreipc/pull/119)
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                await _tcpClient.ConnectAsync(transport.EndPoint, ct);
+                break;
+            }
+            catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionRefused)
+            {
+                await Task.Delay(10, ct);
+            }
+        }
+
 #endif
         Network = _tcpClient.GetStream();
     }
