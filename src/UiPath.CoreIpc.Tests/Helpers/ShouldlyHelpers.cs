@@ -1,4 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace UiPath.Ipc.Tests;
 
@@ -75,7 +77,7 @@ internal static class ShouldlyHelpers
             throw new ShouldAssertException($"The task {taskExpression} should stall for at least {lease} but it completed faster.");
         }
         catch (OperationCanceledException ex) when (ex.CancellationToken == cts.Token)
-        {            
+        {
         }
     }
 
@@ -113,5 +115,24 @@ internal static class ShouldlyHelpers
     {
         await task;
         return value;
+    }
+
+    public static void ShouldPartiallyContainInOrder(this IEnumerable<string> haystack, IReadOnlyList<string> needles)
+    {
+        int expected = 0;
+        if (ConditionFulfilled()) { return; }
+
+        foreach (var candidate in haystack)
+        {
+            if (candidate.Contains(needles[expected]))
+            {
+                expected++;
+                if (ConditionFulfilled()) { return; }
+            }
+        }
+
+        throw new ShouldAssertException($"Expected `{nameof(haystack)}` to contain the following items \r\n{string.Join("\r\n", needles)} in order. The actual contents are:\r\n{string.Join("\r\n", haystack)}");
+
+        bool ConditionFulfilled() => expected >= needles.Count;
     }
 }

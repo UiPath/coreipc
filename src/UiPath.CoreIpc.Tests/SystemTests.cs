@@ -1,6 +1,6 @@
 ﻿using AutoFixture;
-using AutoFixture.Xunit2;
 using Microsoft.Extensions.Hosting;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Channels;
 using Xunit.Abstractions;
