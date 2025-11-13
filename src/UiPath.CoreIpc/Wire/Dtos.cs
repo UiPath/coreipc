@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Text;
@@ -67,26 +68,22 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
 
 public class RemoteException : Exception
 {
+    private const string StackTraceSeparator = "--- End of stack trace from previous location ---";
+    private string? _remoteStackTrace = null;
 
     public RemoteException(Error error) : base(error.Message, error.InnerError == null ? null : new RemoteException(error.InnerError))
     {
         Type = error.Type;
         if (error.StackTrace is not null)
         {
-            SetRemoteStackTrace(error.StackTrace);
+            _remoteStackTrace = error.StackTrace.TrimEnd('\r', '\n');
         }
     }
-#if NETCOREAPP
-    private void SetRemoteStackTrace(string stackTrace) => _ = ExceptionDispatchInfo.SetRemoteStackTrace(this, stackTrace);
-#else
-    private const string StackTraceSeparator = "--- End of stack trace from previous location ---";
-    private string? _remoteStackTrace = null;
 
-    private void SetRemoteStackTrace(string stackTrace) => _remoteStackTrace = stackTrace?.TrimEnd('\r', '\n') ?? "";
-    public override string StackTrace => _remoteStackTrace is null 
+    public override string? StackTrace => _remoteStackTrace is null 
         ? base.StackTrace
         : $"{_remoteStackTrace}\r\n{StackTraceSeparator}\r\n{base.StackTrace}";
-#endif
+
     public string Type { get; }
     public new RemoteException? InnerException => base.InnerException as RemoteException;
     public override string ToString()

@@ -131,7 +131,7 @@ internal static class ShouldlyHelpers
             }
         }
 
-        throw new ShouldAssertException($"Expected `{nameof(haystack)}` to contain the following items \r\n{string.Join("\r\n", needles)} in order. The actual contents are:\r\n{string.Join("\r\n", haystack)}");
+        throw new ShouldAssertException($"Expected `{nameof(haystack)}` to contain {string.Join("\r\n", needles)} partially and in order. First missing item is: {needles[expected]}");
 
         bool ConditionFulfilled() => expected >= needles.Count;
     }
