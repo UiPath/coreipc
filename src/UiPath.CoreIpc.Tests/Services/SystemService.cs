@@ -1,6 +1,6 @@
-﻿using Castle.Core;
-using System.Buffers;
+﻿using System.Buffers;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace UiPath.Ipc.Tests;

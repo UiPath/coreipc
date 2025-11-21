@@ -1,6 +1,8 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using Newtonsoft.Json;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.ExceptionServices;
 using System.Text;
-using Newtonsoft.Json;
 
 namespace UiPath.Ipc;
 
@@ -66,13 +68,23 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
 
 public class RemoteException : Exception
 {
+    private const string StackTraceSeparator = "--- End of stack trace from previous location ---";
+    private string? _remoteStackTrace = null;
+
     public RemoteException(Error error) : base(error.Message, error.InnerError == null ? null : new RemoteException(error.InnerError))
     {
         Type = error.Type;
-        StackTrace = error.StackTrace;
+        if (error.StackTrace is not null)
+        {
+            _remoteStackTrace = error.StackTrace.TrimEnd('\r', '\n');
+        }
     }
+
+    public override string? StackTrace => _remoteStackTrace is null 
+        ? base.StackTrace
+        : $"{_remoteStackTrace}\r\n{StackTraceSeparator}\r\n{base.StackTrace}";
+
     public string Type { get; }
-    public override string StackTrace { get; }
     public new RemoteException? InnerException => base.InnerException as RemoteException;
     public override string ToString()
     {

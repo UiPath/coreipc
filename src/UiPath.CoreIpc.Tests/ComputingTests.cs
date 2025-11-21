@@ -2,6 +2,7 @@
 using Nito.AsyncEx;
 using Nito.Disposables;
 using NSubstitute;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using UiPath.Ipc.Transport.NamedPipe;
@@ -257,6 +258,38 @@ public abstract class ComputingTests : SpyTestBase
             })
             .WhenAll();
     }
+
+
+    [Theory]
+    [InlineData(false, 
+        nameof(ComputingService.ServerFrame2),
+        nameof(ComputingService.ServerFrame1),
+        nameof(ClientFrame2),
+        nameof(ClientFrame1))]
+    [InlineData(true,
+        nameof(ComputingCallback.CallbackFrame2),
+        nameof(ComputingCallback.CallbackFrame1),
+        nameof(ComputingService.GatewayFrame2),
+        nameof(ComputingService.GatewayFrame1),
+        nameof(ClientFrame2),
+        nameof(ClientFrame1))]
+    public async Task RemoteExceptionStackTrace_ShouldAlsoIncludeRemoteCallerFrames(bool callGateway, params string[] expectedFrames)
+    {
+        var act = async () => await ClientFrame1(callGateway);
+        var exception = await act.ShouldThrowAsync<RemoteException>();
+
+        exception.StackTrace
+            .ShouldNotBeNull()
+            .Split('\n')
+            .ShouldPartiallyContainInOrder(expectedFrames);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private async Task ClientFrame1(bool callGateway) => await ClientFrame2(callGateway);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private async Task ClientFrame2(bool callGateway) => _ = await (callGateway ? Proxy.DivideByZeroGateway() : Proxy.DivideByZero());
+
 
     public abstract IAsyncDisposable? RandomTransportPair(out ServerTransport listener, out ClientTransport transport);
 

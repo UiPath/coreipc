@@ -15,6 +15,8 @@ public interface IComputingService : IComputingServiceBase
     Task<int> MultiplyInts(int x, int y, Message message = null!);
     Task<string?> GetCallContext();
     Task<string> SendMessage(Message m = null!, CancellationToken ct = default);
+    Task<bool> DivideByZero();
+    Task<bool> DivideByZeroGateway(Message m = null);
 }
 
 public interface IComputingCallbackBase
@@ -25,6 +27,7 @@ public interface IComputingCallbackBase
 public interface IComputingCallback : IComputingCallbackBase
 {
     Task<string> GetThreadName();
+    Task<bool> DivideByZeroOnClient();
 }
 
 public interface IArithmeticCallback

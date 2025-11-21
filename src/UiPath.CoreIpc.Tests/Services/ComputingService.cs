@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Runtime.CompilerServices;
 
 namespace UiPath.Ipc.Tests;
 
@@ -67,4 +68,26 @@ public sealed class ComputingService(ILogger<ComputingService> logger) : IComput
     {
         return await m.Client.GetCallback<IComputingCallback>().GetThreadName();
     }
+
+    public async Task<bool> DivideByZero()
+    {
+        ServerFrame1();
+        return true;
+    }
+
+    public async Task<bool> DivideByZeroGateway(Message m = null!)
+    {
+        return await GatewayFrame1(m);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void ServerFrame1() => ServerFrame2();
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void ServerFrame2() => throw new DivideByZeroException();
+
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static async Task<bool> GatewayFrame1(Message m) => await GatewayFrame2(m);
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static async Task<bool> GatewayFrame2(Message m) => await m.Client.GetCallback<IComputingCallback>().DivideByZeroOnClient();
 }
