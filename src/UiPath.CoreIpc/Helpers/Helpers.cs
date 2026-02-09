@@ -60,7 +60,7 @@ internal static class Helpers
 
         if (logger is not null)
         {
-            logger.LogError(ex, message);
+            logger.LogError(message);
             return;
         }
 

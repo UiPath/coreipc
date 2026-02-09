@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 
 namespace UiPath.Ipc.Transport.NamedPipe;
@@ -79,16 +80,30 @@ public sealed class NamedPipeServerTransport : ServerTransport
 #endif
         }
 
+        private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+
         async ValueTask<Stream> IServerConnectionSlot.AwaitConnection(CancellationToken ct)
         {
-            // on Linux WaitForConnectionAsync has to be cancelled with Dispose
-            using (ct.Register(StartDisposal))
+            if (IsWindows)
             {
                 await Stream.WaitForConnectionAsync(ct);
                 return Stream;
             }
 
-            void StartDisposal() => (this as IAsyncDisposable).DisposeAsync().AsTask().TraceError(); // We trace the error even we don't expect Dispose/DisposeAsync to ever throw.
+            // on Linux WaitForConnectionAsync has to be cancelled with Dispose
+            using (ct.Register(StartDisposal))
+            {
+                try
+                {
+                    await Stream.WaitForConnectionAsync();
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+                return Stream;
+            }
+
+            void StartDisposal() => (this as IAsyncDisposable).DisposeAsync().AsTask().TraceError(); // We trace the error even though we don't expect Dispose/DisposeAsync to ever throw.
         }
     }
 }
