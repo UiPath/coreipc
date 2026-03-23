@@ -30,6 +30,9 @@ export interface IpcBase<TAddressBuilder extends AddressBuilder> {
     readonly proxy: IpcBase.ProxySource<TAddressBuilder>;
     readonly config: IpcBase.Configuration<TAddressBuilder>;
     readonly callback: Callback<TAddressBuilder>;
+
+    disposeChannel(configure: AddressSelectionDelegate<TAddressBuilder>): Promise<void>;
+    disposeAllChannels(): Promise<void>;
 }
 
 export module IpcBase {
@@ -121,6 +124,15 @@ export abstract class IpcBaseImpl<TAddressBuilder extends AddressBuilder = any>
         const builder = new this.addressBuilder();
         configure(builder);
         return builder.assertAddress();
+    }
+
+    public async disposeChannel(configure: AddressSelectionDelegate<TAddressBuilder>): Promise<void> {
+        const address = this.getAddress(configure);
+        await this.wire.disposeChannel(address.key);
+    }
+
+    public async disposeAllChannels(): Promise<void> {
+        await this.wire.disposeAllChannels();
     }
 }
 

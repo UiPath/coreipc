@@ -6,6 +6,7 @@ import {
     ArgumentOutOfRangeError,
     SocketStream,
     UnknownError,
+    PromisePal,
 } from '../../../bcl';
 
 import { ConnectHelper, Address } from '../..';
@@ -80,7 +81,7 @@ export class RpcChannel implements IRpcChannel {
         );
 
         this._$messageStream.catch((_) => {
-            const __ = this.disposeAsync();
+            Trace.traceErrorNoThrow(this.disposeAsync());
         });
     }
 

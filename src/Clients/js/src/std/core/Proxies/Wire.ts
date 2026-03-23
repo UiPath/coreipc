@@ -26,5 +26,20 @@ export class Wire {
                 this._messageStreamFactory));
     }
 
+    async disposeChannel(addressKey: string): Promise<void> {
+        const channelManager = this._map.get(addressKey);
+        if (channelManager) {
+            this._map.delete(addressKey);
+            await channelManager.disposeAsync();
+        }
+    }
+
+    async disposeAllChannels(): Promise<void> {
+        const channelManagers = [...this._map.values()];
+        this._map.clear();
+
+        await Promise.all(channelManagers.map(cm => cm.disposeAsync()));
+    }
+
     private readonly _map = new Dictionary<string, ChannelManager>();
 }
