@@ -1,4 +1,4 @@
-import { CancellationToken, PublicCtor, Timeout, TimeSpan } from '../..';
+import { CancellationToken, IAsyncDisposable, PublicCtor, Timeout, TimeSpan } from '../..';
 
 import {
     IServiceProvider,
@@ -17,7 +17,7 @@ import { RpcRequestFactory } from '.';
 import { Observer } from 'rxjs';
 
 /* @internal */
-export class ChannelManager {
+export class ChannelManager implements IAsyncDisposable {
     private _latestChannel: IRpcChannel | undefined;
 
     constructor(
@@ -26,6 +26,15 @@ export class ChannelManager {
         private readonly _rpcChannelFactory: IRpcChannelFactory,
         private readonly _messageStreamFactory?: IMessageStream.Factory,
     ) {}
+
+    async disposeAsync(): Promise<void> {
+        const channel = this._latestChannel;
+        this._latestChannel = undefined;
+
+        if (channel && !channel.isDisposed) {
+            await channel.disposeAsync();
+        }
+    }
 
     async invokeMethod<TService>(service: PublicCtor<TService>, methodName: keyof TService & string, args: unknown[]): Promise<unknown> {
         const [rpcRequest, returnsPromiseOf, ct, timeout] = RpcRequestFactory.create(

@@ -39,7 +39,14 @@ export class MessageStream implements IMessageStream {
     }
     public async disposeAsync(): Promise<void> {
         this._ctsLoop.cancel();
-        await this._loop;
+
+        try {
+            await this._loop;
+        } catch (error) { 
+            if (!(error instanceof OperationCanceledError)) {
+                Trace.log(UnknownError.ensureError(error));
+            }
+        }
 
         this._stream.dispose();
     }
