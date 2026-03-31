@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31919.166
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11620.152
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UiPath.CoreIpc", "UiPath.CoreIpc\UiPath.CoreIpc.csproj", "{58200319-1F71-4E22-894D-7E69E0CD0B57}"
 EndProject
@@ -25,6 +25,12 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IpcSample.ConsoleClient", "IpcSample.ConsoleClient\IpcSample.ConsoleClient.csproj", "{2FF5D17E-E2E2-4A1E-B813-D681291EF3A7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IpcSample.ConsoleServer", "IpcSample.ConsoleServer\IpcSample.ConsoleServer.csproj", "{3CC0CFD7-528E-4091-A89D-DDCA3C0C3FED}"
+EndProject
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "UiPath-Ipc-Ts", "Clients\js\UiPath-Ipc-Ts.esproj", "{7450F7B5-045C-5087-0ABF-C241D6B2A6D8}"
+EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "UiPath-Ipc-Py-Playground", "Clients\python\UiPath-Ipc-Py-Playground\UiPath-Ipc-Py-Playground.pyproj", "{E8A44749-F192-4BD4-970B-4966FA82F209}"
+EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "UiPath-Ipc-Py", "Clients\python\UiPath-Ipc-Py\UiPath-Ipc-Py.pyproj", "{E6DB4BBE-E413-487E-B8ED-2667139F5928}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -60,6 +66,16 @@ Global
 		{3CC0CFD7-528E-4091-A89D-DDCA3C0C3FED}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3CC0CFD7-528E-4091-A89D-DDCA3C0C3FED}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3CC0CFD7-528E-4091-A89D-DDCA3C0C3FED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7450F7B5-045C-5087-0ABF-C241D6B2A6D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7450F7B5-045C-5087-0ABF-C241D6B2A6D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7450F7B5-045C-5087-0ABF-C241D6B2A6D8}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{7450F7B5-045C-5087-0ABF-C241D6B2A6D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7450F7B5-045C-5087-0ABF-C241D6B2A6D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7450F7B5-045C-5087-0ABF-C241D6B2A6D8}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{E8A44749-F192-4BD4-970B-4966FA82F209}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E8A44749-F192-4BD4-970B-4966FA82F209}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E6DB4BBE-E413-487E-B8ED-2667139F5928}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E6DB4BBE-E413-487E-B8ED-2667139F5928}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
