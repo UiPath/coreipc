@@ -26,6 +26,7 @@
     <Compile Include="playground\run_server.py" />
     <Compile Include="playground\run_client.py" />
     <Compile Include="playground\run_both.py" />
+    <Compile Include="playground\interop_with_dotnet.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="pyproject.toml" />
