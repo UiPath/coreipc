@@ -1,0 +1,46 @@
+steps:
+  - task: UseDotNet@2
+    inputs:
+      version: 6.0.x
+
+  - task: UsePythonVersion@0
+    displayName: 'Use Python 3.13'
+    inputs:
+      versionSpec: '3.13'
+      addToPath: true
+      architecture: 'x64'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Build "UiPath.CoreIpc.csproj" (net6.0)'
+    inputs:
+      projects: '$(DotNet_MainProjectPath)'
+      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net6.0 -p:Version="$(FullVersion)"'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Build "UiPath.CoreIpc.NodeInterop.csproj" (net6.0)'
+    inputs:
+      projects: '$(NodeJS_DotNetNodeInteropProject)'
+      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net6.0 -p:Version="$(FullVersion)"'
+
+  - task: CmdLine@2
+    displayName: 'pip install -e .[test]'
+    inputs:
+      workingDirectory: '$(Python_ProjectPath)'
+      script: |
+        python -m pip install --upgrade pip
+        python -m pip install -e .[test]
+
+  - task: CmdLine@2
+    displayName: 'pytest (unit + integration + interop)'
+    condition: succeeded()
+    inputs:
+      workingDirectory: '$(Python_ProjectPath)'
+      script: 'python -m pytest tests -v --junitxml=reports/junit.xml'
+
+  - task: PublishTestResults@2
+    displayName: 'Publish Python Test Results'
+    condition: succeededOrFailed()
+    inputs:
+      testRunner: JUnit
+      testRunTitle: 'Python ($(Agent.OS) $(Agent.OSArchitecture))'
+      testResultsFiles: '$(Python_ProjectPath)/reports/junit.xml'

@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>UiPath.CoreIpc — Cross-Language Support Matrix</title>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --ink: #1a1a1a;
+      --muted: #6b6b6b;
+      --rule: #e3e3e3;
+      --accent: #2659d9;
+      --yes: #127a2b;
+      --yes-bg: #e6f4ea;
+      --no: #8a0f21;
+      --no-bg: #fae7ea;
+      --partial: #8a5a10;
+      --partial-bg: #fdf3e0;
+      --later: #304a7a;
+      --later-bg: #e6ecf6;
+      --codebg: #f2f2f2;
+      --code: #2a2a2a;
+      --lang-cs: #5c2d91;
+      --lang-ts: #2d79c7;
+      --lang-py: #306998;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1b1f;
+        --surface: #24262b;
+        --ink: #e9e9ea;
+        --muted: #9a9a9f;
+        --rule: #36383e;
+        --accent: #7fa6ff;
+        --yes: #7fd394;
+        --yes-bg: #16321e;
+        --no: #ff9aa7;
+        --no-bg: #3a1a1e;
+        --partial: #f1c378;
+        --partial-bg: #3a2a14;
+        --later: #9db8ef;
+        --later-bg: #1d2538;
+        --codebg: #2e3036;
+        --code: #dcdcdc;
+        --lang-cs: #c79df7;
+        --lang-ts: #7fbbf5;
+        --lang-py: #8fb7df;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+    main { max-width: 1280px; margin: 0 auto; padding: 32px 20px 60px; }
+    header { border-bottom: 1px solid var(--rule); padding-bottom: 16px; margin-bottom: 24px; }
+    header h1 { margin: 0 0 4px; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+    header .sub { color: var(--muted); font-size: 13px; }
+    header .meta { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .intro { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+      padding: 14px 16px; margin-bottom: 24px; font-size: 14px; }
+    .intro p { margin: 0 0 8px; }
+    .intro p:last-child { margin-bottom: 0; }
+    .langs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+      margin-bottom: 24px; }
+    .lang { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+      padding: 12px 14px; font-size: 13px; }
+    .lang h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+    .lang h3 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+      vertical-align: middle; margin-right: 7px; }
+    .lang.cs h3 .dot { background: var(--lang-cs); }
+    .lang.ts h3 .dot { background: var(--lang-ts); }
+    .lang.py h3 .dot { background: var(--lang-py); }
+    .lang .path { color: var(--muted); font-size: 12px; display: block; margin-top: 4px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0 0 28px;
+      padding: 12px 14px; background: var(--surface); border: 1px solid var(--rule);
+      border-radius: 6px; font-size: 13px; }
+    .legend span.item { display: inline-flex; align-items: center; gap: 6px; }
+    .badge { display: inline-block; min-width: 22px; padding: 1px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 700; text-align: center; line-height: 1.5; }
+    .badge.yes { color: var(--yes); background: var(--yes-bg); }
+    .badge.no { color: var(--no); background: var(--no-bg); }
+    .badge.partial { color: var(--partial); background: var(--partial-bg); }
+    .badge.later { color: var(--later); background: var(--later-bg); }
+    section { margin-top: 32px; }
+    section h2 { font-size: 15px; letter-spacing: 0.02em; text-transform: uppercase;
+      color: var(--muted); font-weight: 650; margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface);
+      border: 1px solid var(--rule); border-radius: 6px; overflow: hidden;
+      table-layout: fixed; }
+    thead th { background: var(--surface); text-align: left; padding: 10px 12px;
+      font-size: 13px; font-weight: 600; color: var(--muted);
+      border-bottom: 1px solid var(--rule); }
+    thead th.feature { width: 22%; }
+    thead th.lang-col { width: 26%; }
+    tbody td { padding: 10px 12px; border-top: 1px solid var(--rule); vertical-align: top;
+      font-size: 13.5px; }
+    tbody tr:first-child td { border-top: none; }
+    td.feature { font-weight: 550; font-size: 14px; }
+    td.cell { font-size: 13px; }
+    td.cell .detail { display: block; margin-top: 6px; color: var(--muted); line-height: 1.45; }
+    td.cell.cs .badge { border-left: 3px solid var(--lang-cs); padding-left: 8px; }
+    sup.fn { color: var(--accent); font-weight: 600; font-size: 11px;
+      text-decoration: none; margin-left: 3px; }
+    code { font-family: "SF Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+      font-size: 12px; background: var(--codebg); color: var(--code);
+      padding: 1px 5px; border-radius: 4px; }
+    .footnotes { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--rule);
+      font-size: 13px; color: var(--muted); }
+    .footnotes ol { padding-left: 22px; }
+    .footnotes li { margin-bottom: 10px; }
+    .footnotes li:target { background: var(--later-bg); padding: 4px 8px;
+      border-radius: 4px; }
+    a { color: var(--accent); }
+    @media (max-width: 900px) {
+      table { font-size: 12px; table-layout: auto; }
+      .langs { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>UiPath.CoreIpc &mdash; Cross-Language Support Matrix</h1>
+    <div class="sub">Feature parity across the three first-party implementations of the CoreIpc wire protocol.</div>
+    <div class="meta">Repo root &middot; Wire protocol: 5-byte binary frame header <code>[1B type][4B LE u32 length]</code> + JSON payload.</div>
+  </header>
+
+  <div class="intro">
+    <p>All three implementations speak the same wire protocol over the same transports: a <strong>C#</strong> reference that's been in production for years, a <strong>TypeScript/Node.js</strong> port that targets browsers as well as Node, and a newer <strong>Python</strong> port (async/asyncio). Each can act as either client or server and interoperate freely with the other two.</p>
+    <p>This table catalogues what each implementation actually ships in its current mainline. Where a feature is available in one language but not another, the cell explains the equivalent idiom (or why the gap exists).</p>
+  </div>
+
+  <div class="langs">
+    <div class="lang cs">
+      <h3><span class="dot"></span>C# (reference)</h3>
+      <div>Target: <code>net461</code> + <code>net6.0+</code>. Serializer: Newtonsoft.Json. Proxy: <code>DispatchProxy.Create&lt;T, IpcProxy&gt;</code>.</div>
+      <span class="path">src/UiPath.CoreIpc/</span>
+    </div>
+    <div class="lang ts">
+      <h3><span class="dot"></span>TypeScript (Node + Web)</h3>
+      <div>Target: Node.js (named pipe, WebSocket) and browser (WebSocket only). Serializer: <code>JSON.stringify</code>. Proxy: prototype-weaving via <code>DispatchProxy/Weaver.ts</code>.</div>
+      <span class="path">src/Clients/js/</span>
+    </div>
+    <div class="lang py">
+      <h3><span class="dot"></span>Python (async)</h3>
+      <div>Target: Python 3.11+, asyncio. Serializer: stdlib <code>json</code>. Proxy: <code>__getattr__</code> holder.</div>
+      <span class="path">src/Clients/python/</span>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="item"><span class="badge yes">&#10003;</span> supported</span>
+    <span class="item"><span class="badge partial">&#9642;</span> partial / with caveats</span>
+    <span class="item"><span class="badge later">later</span> planned / deferred</span>
+    <span class="item"><span class="badge no">&#10007;</span> not supported (and not planned)</span>
+  </div>
+
+  <section>
+    <h2>1. Transports</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="feature">Feature</th>
+          <th class="lang-col">C#</th>
+          <th class="lang-col">TypeScript</th>
+          <th class="lang-col">Python</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Named pipe</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>System.IO.Pipes.NamedPipeServerStream</code> + <code>NamedPipeClientStream</code> with <code>PipeDirection.InOut</code>, <code>PipeOptions.Asynchronous</code>, byte mode. Windows ACLs configurable via <code>AccessControl</code> delegate.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Node only. <code>net</code> module connects to <code>\\.\pipe\&lt;name&gt;</code> on Windows. Browser build explicitly excludes this transport.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;<sup class="fn"><a href="#fn1">1</a></sup></span>
+            <span class="detail">Cross-platform. Windows: asyncio <code>ProactorEventLoop</code> pipe APIs (<code>create_pipe_connection</code>, <code>start_serving_pipe</code>). Linux/macOS: <code>AF_UNIX</code> socket at <code>$TMPDIR/CoreFxPipe_&lt;name&gt;</code>, matching the path .NET and the TS port use on Unix.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">TCP</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>TcpListener</code> / <code>TcpClient</code> with <code>ConcurrentAccepts</code>, retry on <code>ConnectionRefused</code>.</span></td>
+          <td class="cell ts"><span class="badge no">&#10007;</span>
+            <span class="detail">Not implemented; TS clients use named pipe (Node) or WebSocket (both).</span></td>
+          <td class="cell py"><span class="badge no">&#10007;<sup class="fn"><a href="#fn2">2</a></sup></span>
+            <span class="detail">Dropped from Python v1 scope. The transport ABC in <code>coreipc/transport/base.py</code> is the only surface a future TCP module would touch.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">WebSocket</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>System.Net.WebSockets.ClientWebSocket</code> + pluggable server <code>Accept</code> delegate; binary message type. <code>WebSocketStream</code> adapts to the <code>Stream</code> contract.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Node: <code>ws</code> npm package. Browser: native <code>WebSocket</code>. Same codebase drives both via a thin <code>Socket</code> abstraction.</span></td>
+          <td class="cell py"><span class="badge later">later</span>
+            <span class="detail">Deferred. Anticipated path: <code>websockets</code> package wrapped to expose (reader, writer) like the other transports.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>2. RPC primitives</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="feature">Feature</th>
+          <th class="lang-col">C#</th>
+          <th class="lang-col">TypeScript</th>
+          <th class="lang-col">Python</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Interface-as-contract</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail">Declare a C# interface. Endpoint name = <code>typeof(T).Name</code>. No code generation or attributes required.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Decorated class: <code>@ipc.$service</code> + <code>@ipc.$operation</code>. Method bodies are stub <code>throw void 0</code>. Runtime reflection builds the proxy.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>@service</code> on the class + <code>@operation</code> on each async method. Endpoint name = class name, matching C#.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Async request / response</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>Task&lt;T&gt;</code>-returning methods. Response <code>Data</code> = <code>IpcJsonSerializer.Serialize(result)</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>Promise&lt;T&gt;</code>-returning methods. Each argument pre-stringified into the wire <code>Parameters</code> array.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>async def &hellip; -&gt; T</code>. Return type annotation drives result deserialization.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">One-way (void) methods</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>Task</code>-returning methods are fire-and-forget: the server replies with empty <code>Data</code> immediately and continues the method in the background.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Declared as <code>Promise&lt;void&gt;</code>; follows the same fire-and-forget dispatch as C#.</span></td>
+          <td class="cell py"><span class="badge partial">&#9642;<sup class="fn"><a href="#fn3">3</a></sup></span>
+            <span class="detail">Python awaits <code>async def &hellip; -&gt; None</code> before responding (simpler semantics; functionally equivalent for correct code).</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Multiplexed concurrent calls</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>ConcurrentDictionary&lt;string, ManualResetValueTaskSource&gt;</code> tracks pending calls by <code>Request.Id</code> on each <code>Connection</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>RpcChannel</code>'s outgoing-call table maps request id &rarr; <code>PromiseCompletionSource</code>.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>Connection._pending: dict[str, asyncio.Future]</code>. Covered by <code>test_concurrent_calls_on_single_connection</code>.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Lazy connect + reuse</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>ServiceClientProper.EnsureConnection</code> reuses a live <code>Connection</code>; only the first call pays the handshake.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>ChannelManager</code> keeps one connection per address; all proxies share it.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>IpcClient.get_proxy()</code> is cheap; first real call opens the pipe via <code>_LazyChannel</code>.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Automatic reconnect</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail">Silent reconnect on the next call after a disconnect; existing pending requests fail fast.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>ChannelManager</code> discards a broken channel and opens a new one on subsequent calls.</span></td>
+          <td class="cell py"><span class="badge later">later</span>
+            <span class="detail">v1 raises on disconnect; caller retries. Straightforward to add in <code>client.py</code>.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. Cancellation</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="feature">Feature</th>
+          <th class="lang-col">C#</th>
+          <th class="lang-col">TypeScript</th>
+          <th class="lang-col">Python</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Client cancels in-flight call</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail">Pass a <code>CancellationToken</code>; on cancel the client sends <code>CancellationRequest{RequestId}</code> and throws <code>OperationCanceledException</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>CancellationTokenSource</code>/<code>CancellationToken</code> in <code>bcl/cancellation/</code>. Cancellation surfaces as <code>OperationCanceledError</code>.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail">Same pattern. Raises <code>asyncio.CancelledError</code> at the call site once the server acknowledges. <code>dispatch/cancellation.py</code>.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Server-side CancellationToken parameter</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail">Parameter of type <code>CancellationToken</code>; replaced with <code>""</code> on the wire; reconstructed server-side and cancelled by incoming <code>CancellationRequest</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Last-parameter convention; serialized as empty string; rebuilt from the server-side per-call token.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail">Annotate a param as <code>CancellationToken | None</code>. Server binds via <code>CancellationTokenSource.from_event(cancel_event)</code>.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Per-call timeout (<code>Request.TimeoutInSeconds</code>)</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>Message.RequestTimeout</code> or <code>IpcClient.RequestTimeout</code> feeds <code>Request.TimeoutInSeconds</code>; enforced on both sides.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Configured per-address/service via <code>ConfigStore</code>; per-call override via <code>Message.RequestTimeout</code>.</span></td>
+          <td class="cell py"><span class="badge partial">&#9642;<sup class="fn"><a href="#fn4">4</a></sup></span>
+            <span class="detail">Emitted on the wire so the server honours it, but the Python client doesn't yet run a local timer.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Per-operation timeout attribute</td>
+          <td class="cell cs"><span class="badge no">&#10007;</span>
+            <span class="detail">Use <code>Message.RequestTimeout</code> at the call site instead.</span></td>
+          <td class="cell ts"><span class="badge no">&#10007;</span>
+            <span class="detail">Use <code>ConfigStore</code> per-service timeout.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;<sup class="fn"><a href="#fn5">5</a></sup></span>
+            <span class="detail"><code>@operation(timeout_seconds=5.0)</code> at declaration time. Pattern borrowed from GenericIPC's <code>[RpcTimeout]</code>.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>4. Bidirectional callbacks</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="feature">Feature</th>
+          <th class="lang-col">C#</th>
+          <th class="lang-col">TypeScript</th>
+          <th class="lang-col">Python</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Server &rarr; client reverse call (same connection)</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail">Service method takes a <code>Message</code> param; <code>message.Client.GetCallback&lt;IArithmetic&gt;()</code> returns a proxy that reuses the connection via <code>ServiceClientForCallback</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Same approach: server-side <code>Message.Client</code> yields a callback proxy bound to the incoming connection.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>msg.client.get_callback(IArithmetic).Sum(...)</code>. <code>CallbackClient</code> wraps the <code>Connection</code>. Covered by <code>test_bidirectional_callback</code>.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Register callback contracts on client</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>IpcClient.Callbacks</code> dictionary of <code>{typeof(IArithmetic): instance}</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>ipc.callback.forAddress(&hellip;).forService&lt;IArithmetic&gt;('IArithmetic').is(instance)</code>.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>IpcClient.with_callback(IArithmetic, instance)</code>. Client's <code>_callback_router</code> dispatches incoming requests.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>5. Streams (large payloads)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="feature">Feature</th>
+          <th class="lang-col">C#</th>
+          <th class="lang-col">TypeScript</th>
+          <th class="lang-col">Python</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Upload stream (request payload + trailing bytes)</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>MessageType.UploadRequest</code> (=3). Request metadata then an 8-byte length prefix, then raw bytes streamed over the connection without buffering.</span></td>
+          <td class="cell ts"><span class="badge no">&#10007;</span>
+            <span class="detail">TS port does not implement stream messages.</span></td>
+          <td class="cell py"><span class="badge no">&#10007;<sup class="fn"><a href="#fn6">6</a></sup></span>
+            <span class="detail">Out of scope for v1. The enum value is preserved; an incoming <code>UploadRequest</code> frame is rejected with <code>UnsupportedMessageTypeError</code>.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Download stream (response payload + trailing bytes)</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>MessageType.DownloadResponse</code> (=4). Symmetric to upload, for methods returning <code>Stream</code>.</span></td>
+          <td class="cell ts"><span class="badge no">&#10007;</span>
+            <span class="detail">TS port does not implement stream messages.</span></td>
+          <td class="cell py"><span class="badge no">&#10007;<sup class="fn"><a href="#fn6">6</a></sup></span>
+            <span class="detail">Out of scope for v1; same rejection behaviour as <code>UploadRequest</code>.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>6. Errors</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="feature">Feature</th>
+          <th class="lang-col">C#</th>
+          <th class="lang-col">TypeScript</th>
+          <th class="lang-col">Python</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Remote exception raised client-side</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>RemoteException</code>. <code>Is&lt;TException&gt;()</code> helper for type matching.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>RemoteError</code>, with endpoint/method context.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>RemoteError(wire_error)</code>, exposed via <code>coreipc</code> top-level.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Preserve remote Type + StackTrace</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>Error.Type</code> is the full CLR type name; <code>StackTrace</code> preserved across the wire.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Both fields round-tripped through <code>IpcError</code>.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail">Attributes <code>.remote_type</code>, <code>.remote_stack_trace</code>, and <code>.wire_error</code> on every <code>RemoteError</code>.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Nested InnerError chain</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>RemoteException.InnerException</code> recurses through <code>Error.InnerError</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Recurses through nested <code>IpcError</code> objects.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail">Chained via Python's <code>__cause__</code>, so traceback printing reads naturally.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">EndpointNotFoundException surfaced as typed error</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>UiPath.Ipc.EndpointNotFoundException</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Classified from the remote error type name.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>EndpointNotFoundError</code> subclass of <code>RemoteError</code>; <code>classify()</code> maps by <code>Type</code>.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>7. Message context parameter</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="feature">Feature</th>
+          <th class="lang-col">C#</th>
+          <th class="lang-col">TypeScript</th>
+          <th class="lang-col">Python</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Plain <code>Message</code> (connection context)</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>Message.Client</code> + <code>Message.RequestTimeout</code>. <code>[JsonIgnore]</code> on both &mdash; the wire doesn't carry them.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Mirrors the C# shape; populated per-call on the server side.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail">Parameter annotated as <code>Message | None</code>; injected server-side; skipped on the wire by the proxy.</span></td>
+        </tr>
+        <tr>
+          <td class="feature"><code>Message&lt;T&gt;</code> with Payload</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail">Generic <code>Message&lt;TPayload&gt;</code>; <code>Payload</code> serialized, <code>Client</code> and <code>RequestTimeout</code> stay <code>[JsonIgnore]</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Exercised by the end-to-end <code>TestMessage</code> callback scenario.</span></td>
+          <td class="cell py"><span class="badge later">later</span>
+            <span class="detail">Not yet. Needed to port the TS <code>TestMessage</code> test verbatim.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>8. Observability</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="feature">Feature</th>
+          <th class="lang-col">C#</th>
+          <th class="lang-col">TypeScript</th>
+          <th class="lang-col">Python</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Per-call tracer hooks</td>
+          <td class="cell cs"><span class="badge partial">&#9642;<sup class="fn"><a href="#fn7">7</a></sup></span>
+            <span class="detail">Only <code>Microsoft.Extensions.Logging.ILogger</code>. No first-class per-call tracer type.</span></td>
+          <td class="cell ts"><span class="badge partial">&#9642;</span>
+            <span class="detail">Logger-based diagnostics only.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>IpcTracer</code> base class + <code>ConsoleTracer</code> with hooks for call-sent, return-received, cancel-sent, request-received, response-sent, error. Borrowed from GenericIPC's <code>IRpcTracer</code>.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Before-call interceptor</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>BeforeIncomingCall</code> / <code>BeforeOutgoingCall</code> delegates receive <code>CallInfo</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Same hook shape as C#.</span></td>
+          <td class="cell py"><span class="badge later">later</span>
+            <span class="detail">Not yet exposed. Natural place: <code>IpcClient.on_before_outgoing_call()</code>/<code>IpcServer.on_before_incoming_call()</code>.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>9. Wire compatibility</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="feature">Feature</th>
+          <th class="lang-col">C#</th>
+          <th class="lang-col">TypeScript</th>
+          <th class="lang-col">Python</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">5-byte frame header</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>HeaderLength = sizeof(int) + 1</code>. Max message size default 2 MB via <code>MaxReceivedMessageSizeInMegabytes</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Same framing via <code>MessageStream.ts</code>.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>wire/framing.py</code> uses <code>struct.Struct('&lt;BI')</code>; same 2 MB default.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Newtonsoft-compatible PascalCase JSON</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail">Newtonsoft.Json defaults. Null values emitted, PascalCase record-property names.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Hand-shaped to match Newtonsoft output byte-for-byte.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail">Stdlib <code>json.dumps</code> with PascalCase keys and compact separators. Interop-tested against the C# test server.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Per-argument pre-stringified <code>Parameters[]</code></td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>ServiceClient.SerializeArguments</code> JSON-stringifies each arg into its own slot.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>Converter.ts</code> mirrors the pattern with <code>JSON.stringify</code>.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail"><code>_BoundOperation</code> in <code>dispatch/proxy.py</code> does the same <code>json.dumps</code>-per-arg.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Pluggable codec seam</td>
+          <td class="cell cs"><span class="badge no">&#10007;</span>
+            <span class="detail">Hard-bound to Newtonsoft. Swapping codecs requires reaching into <code>IpcJsonSerializer</code>.</span></td>
+          <td class="cell ts"><span class="badge no">&#10007;</span>
+            <span class="detail">Hard-bound to <code>JSON</code>.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;<sup class="fn"><a href="#fn8">8</a></sup></span>
+            <span class="detail"><code>wire/codec.py</code> defines a <code>Codec</code> ABC; <code>Connection</code> and <code>dispatch/</code> depend only on it. A fake in-memory codec exercises the seam in <code>test_codec_seam.py</code>.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>10. Test &amp; interop</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="feature">Feature</th>
+          <th class="lang-col">C#</th>
+          <th class="lang-col">TypeScript</th>
+          <th class="lang-col">Python</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="feature">Unit test framework</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail">xUnit + AutoFixture + Shouldly + NSubstitute. <code>src/UiPath.CoreIpc.Tests/</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Jasmine (Node) + Karma/Chrome (Web); Chai + Sinon.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail">pytest + pytest-asyncio. 28 unit tests across framing, codec, codec-seam, contract, proxy, cancellation.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">In-process integration</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail">Transport-layered: <code>ComputingTestsOverNamedPipes</code>, <code>&hellip;OverTcp</code>, <code>&hellip;OverWebSockets</code>.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Node: named pipe + WebSocket via <code>end-to-end.test.ts</code>. Browser: WebSocket only.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail">Named pipe only for v1. 5 scenarios: round-trip, concurrency, cancellation, remote error, callback.</span></td>
+        </tr>
+        <tr>
+          <td class="feature">Cross-language interop harness</td>
+          <td class="cell cs"><span class="badge yes">&#10003;</span>
+            <span class="detail">The reference server; everyone else connects to it.</span></td>
+          <td class="cell ts"><span class="badge yes">&#10003;</span>
+            <span class="detail">Spawns <code>UiPath.CoreIpc.NodeInterop.dll</code> and waits for <code>###{"Kind":"ReadyToConnect"}</code> on stdout before connecting.</span></td>
+          <td class="cell py"><span class="badge yes">&#10003;</span>
+            <span class="detail">Same harness pattern in <code>tests/interop/dotnet_host.py</code>. Auto-skips if the .NET DLL isn't built. 4 tests pass against the unmodified C# server.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="footnotes">
+    <h2 style="margin-bottom: 12px;">Footnotes</h2>
+    <ol>
+      <li id="fn1"><strong>Named pipe &mdash; Python.</strong> Single class (<code>NamedPipeClientTransport</code> / <code>NamedPipeServerTransport</code>) that branches by platform: Windows uses asyncio's <code>ProactorEventLoop</code> pipe APIs (<code>create_pipe_connection</code>, <code>start_serving_pipe</code>); Linux/macOS uses an <code>AF_UNIX</code> socket whose path is computed as <code>$TMPDIR/CoreFxPipe_&lt;name&gt;</code> &mdash; the same convention .NET's <code>NamedPipeServerStream</code> uses on Unix and that the TS port mirrors in <code>node/Platform.ts</code>. Stale socket files are unlinked before bind. Path interop has been tested against the C# server; the same on-Linux path means a Python peer can talk to a TS or .NET peer with no translation.</li>
+      <li id="fn2"><strong>TCP &mdash; Python.</strong> Dropped from v1 at user request. Not hard to add: the transport ABC in <code>transport/base.py</code> is the only surface touched.</li>
+      <li id="fn3"><strong>One-way semantics.</strong> C# and TS dispatch <code>Task</code>/<code>Promise&lt;void&gt;</code>-returning methods fire-and-forget (respond with empty <code>Data</code> immediately, run the method in the background). Python awaits them before responding. Functionally equivalent for correct code; the difference matters only for benchmarking.</li>
+      <li id="fn4"><strong>TimeoutInSeconds enforcement.</strong> Emitted on the wire (so the server honours it), but the Python client doesn't yet start a local timer. The per-operation attribute in note 5 gives a more-ergonomic equivalent.</li>
+      <li id="fn5"><strong>Per-operation timeout attribute.</strong> <code>@operation(timeout_seconds=5.0)</code> sets <code>Request.TimeoutInSeconds</code> for that method. Pattern borrowed from GenericIPC's <code>[RpcTimeout(5000)]</code>. Neither the C# nor the TS port has this as an attribute; callers use <code>Message.RequestTimeout</code> instead.</li>
+      <li id="fn6"><strong>Streams.</strong> Defined in the C# <code>MessageType</code> enum (<code>UploadRequest=3</code>, <code>DownloadResponse=4</code>). Python v1 decodes the enum but rejects those two types with a clear <code>UnsupportedMessageTypeError</code>. TS has no stream support either.</li>
+      <li id="fn7"><strong>Tracing &mdash; C#/TS.</strong> Both have <code>ILogger</code>/logger-based diagnostics but no first-class per-call tracer object. Python's <code>IpcTracer</code> is modelled after GenericIPC's <code>IRpcTracer</code> and complements (rather than replaces) logging.</li>
+      <li id="fn8"><strong>Pluggable codec.</strong> The C# and TS implementations hard-bind to Newtonsoft-style JSON. Python factors the codec into a <code>Codec</code> ABC (<code>wire/codec.py</code>) so a future JSON-RPC 2.0, MessagePack, or other codec can be dropped in without touching transport, connection, or dispatch.</li>
+    </ol>
+  </div>
+</main>
+</body>
+</html>
