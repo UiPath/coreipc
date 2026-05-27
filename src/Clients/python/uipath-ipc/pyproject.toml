@@ -1,0 +1,13 @@
+[project]
+name = "uipath-ipc"
+version = "0.1.0"
+description = "Python client for UiPath.Ipc — an interface-based RPC framework over Named Pipes, TCP, and WebSockets."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Eduard Dumitru", email = "eduard.dumitru@uipath.com" },
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
