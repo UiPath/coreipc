@@ -28,9 +28,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IpcSample.ConsoleServer", "
 EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "UiPath-Ipc-Ts", "Clients\js\UiPath-Ipc-Ts.esproj", "{7450F7B5-045C-5087-0ABF-C241D6B2A6D8}"
 EndProject
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "UiPath-Ipc-Py-Playground", "Clients\python\UiPath-Ipc-Py-Playground\UiPath-Ipc-Py-Playground.pyproj", "{E8A44749-F192-4BD4-970B-4966FA82F209}"
-EndProject
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "UiPath-Ipc-Py", "Clients\python\UiPath-Ipc-Py\UiPath-Ipc-Py.pyproj", "{E6DB4BBE-E413-487E-B8ED-2667139F5928}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "uipath-ipc", "Clients\python\uipath-ipc\uipath-ipc.pyproj", "{81E13EF5-2D0E-4E47-A9B3-F4A48ABC8AD9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -72,10 +70,8 @@ Global
 		{7450F7B5-045C-5087-0ABF-C241D6B2A6D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7450F7B5-045C-5087-0ABF-C241D6B2A6D8}.Release|Any CPU.Build.0 = Release|Any CPU
 		{7450F7B5-045C-5087-0ABF-C241D6B2A6D8}.Release|Any CPU.Deploy.0 = Release|Any CPU
-		{E8A44749-F192-4BD4-970B-4966FA82F209}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E8A44749-F192-4BD4-970B-4966FA82F209}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E6DB4BBE-E413-487E-B8ED-2667139F5928}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E6DB4BBE-E413-487E-B8ED-2667139F5928}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{81E13EF5-2D0E-4E47-A9B3-F4A48ABC8AD9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{81E13EF5-2D0E-4E47-A9B3-F4A48ABC8AD9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

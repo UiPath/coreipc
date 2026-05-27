@@ -8,6 +8,14 @@ authors = [
     { name = "Eduard Dumitru", email = "eduard.dumitru@uipath.com" },
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
