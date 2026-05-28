@@ -2,7 +2,11 @@
 
 from .client import IpcClient, IpcConnection
 from .errors import RemoteException
-from .transport import ClientTransport, NamedPipeClientTransport
+from .transport import (
+    ClientTransport,
+    NamedPipeClientTransport,
+    TcpClientTransport,
+)
 
 __all__ = [
     "ClientTransport",
@@ -10,4 +14,5 @@ __all__ = [
     "IpcConnection",
     "NamedPipeClientTransport",
     "RemoteException",
+    "TcpClientTransport",
 ]
