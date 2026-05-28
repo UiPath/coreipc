@@ -42,19 +42,25 @@ variables:
   NodeJS_DotNetNodeInteropSolution: './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop.sln'
 
 stages:
-# ---------------------------------------------------------------------
-# Build
-# ---------------------------------------------------------------------
-# Skipped when `reuseArtifactsFromBuildId` is set — in that case the
-# Publish stages pull their artifacts from the specified prior build
-# instead of running Build here.
-# ---------------------------------------------------------------------
-- stage: Build
-  displayName: '🏭 Build'
+# =====================================================================
+# Build stages — one per technology, all run in parallel.
+# =====================================================================
+# Each Publish_X stage depends only on its own Build_X, so a fast
+# technology (e.g. NuGet) doesn't have to wait for a slow one (e.g.
+# Python integration tests against the .NET test server) before
+# publishing.
+#
+# All three Build stages share the same "skip when reuse-id is set"
+# condition. `dependsOn: []` on the second and third opt out of
+# Azure DevOps's default "depend on the previous stage in YAML order"
+# behaviour, so they actually run concurrently.
+# =====================================================================
+
+- stage: Build_NuGet
+  displayName: '🏭 Build NuGet'
   # '0' (default) or '' both mean "no reuse — run Build normally".
   condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
   jobs:
-  # The following 3 jobs will run in parallel.
   - job: NuGet_DotNet_Windows
     displayName: 'NuGet — .NET on Windows'
     pool:
@@ -64,6 +70,11 @@ stages:
       - template: azp-dotnet.yaml
       - template: azp-dotnet-dist.yaml
 
+- stage: Build_NPM
+  displayName: '🏭 Build NPM'
+  dependsOn: []
+  condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
+  jobs:
   - job: NPM_Node_Web_Windows
     displayName: 'NPM — Node + Web on Windows'
     pool:
@@ -81,6 +92,11 @@ stages:
       - template: azp-initialization.yaml
       - template: azp-nodejs.yaml
 
+- stage: Build_Python
+  displayName: '🏭 Build Python'
+  dependsOn: []
+  condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
+  jobs:
   - job: Python_Windows
     displayName: 'Python — Windows'
     pool:
@@ -98,21 +114,24 @@ stages:
       - template: azp-initialization.yaml
       - template: azp-python.yaml
 
-# ---------------------------------------------------------------------
+# =====================================================================
+# Publish stages — each depends only on its corresponding Build stage,
+# so they unblock independently as their Build finishes.
+# =====================================================================
+
 # Publish — NuGet
 # ---------------------------------------------------------------------
-# The whole stage is omitted at compile time when `publishNuGet` is
-# false — so a default CI run has no "Publish NuGet" entry in the UI
-# at all, and the rejection-as-failure footgun is impossible. When
-# it does run, approval is gated by the `NuGet-Packages` environment.
-# ---------------------------------------------------------------------
+# Stage omitted at compile time when `publishNuGet` is false — default
+# CI runs have no "Publish NuGet" entry in the UI at all, and the
+# rejection-as-failure footgun is impossible. When it does run, approval
+# is gated by the `NuGet-Packages` environment.
 - ${{ if eq(parameters.publishNuGet, true) }}:
   - stage: Publish_NuGet
     displayName: '🚚 Publish NuGet'
-    dependsOn: Build
-    # Build can legitimately be Skipped (reuseArtifactsFromBuildId set);
-    # we still want Publish to proceed in that case.
-    condition: in(dependencies.Build.result, 'Succeeded', 'Skipped')
+    dependsOn: Build_NuGet
+    # Build_NuGet can legitimately be Skipped (reuseArtifactsFromBuildId
+    # set); we still want Publish to proceed in that case.
+    condition: in(dependencies.Build_NuGet.result, 'Succeeded', 'Skipped')
     jobs:
     - deployment: Publish_NuGet_Package
       displayName: '📦 Publish NuGet to UiPath-Internal'
@@ -127,16 +146,12 @@ stages:
                 parameters:
                   reuseArtifactsFromBuildId: ${{ parameters.reuseArtifactsFromBuildId }}
 
-# ---------------------------------------------------------------------
 # Publish — NPM
-# ---------------------------------------------------------------------
-# Same shape as Publish_NuGet, gated on `publishNpm`.
-# ---------------------------------------------------------------------
 - ${{ if eq(parameters.publishNpm, true) }}:
   - stage: Publish_NPM
     displayName: '🚚 Publish NPM'
-    dependsOn: Build
-    condition: in(dependencies.Build.result, 'Succeeded', 'Skipped')
+    dependsOn: Build_NPM
+    condition: in(dependencies.Build_NPM.result, 'Succeeded', 'Skipped')
     jobs:
     - deployment: Publish_NPM_Packages
       displayName: '📦 Publish NPM (Node + Web)'
@@ -151,18 +166,14 @@ stages:
                 parameters:
                   reuseArtifactsFromBuildId: ${{ parameters.reuseArtifactsFromBuildId }}
 
-# ---------------------------------------------------------------------
 # Publish — PyPI
-# ---------------------------------------------------------------------
-# Same shape as Publish_NuGet / Publish_NPM, gated on `publishPyPI`.
 # Pushes the wheel + sdist to the project-scoped Azure Artifacts feed
 # `uipath-ipc-deps` (PyPI upstream/downstream already configured).
-# ---------------------------------------------------------------------
 - ${{ if eq(parameters.publishPyPI, true) }}:
   - stage: Publish_PyPI
     displayName: '🚚 Publish PyPI'
-    dependsOn: Build
-    condition: in(dependencies.Build.result, 'Succeeded', 'Skipped')
+    dependsOn: Build_Python
+    condition: in(dependencies.Build_Python.result, 'Succeeded', 'Skipped')
     jobs:
     - deployment: Publish_PyPI_Package
       displayName: '📦 Publish Python wheel + sdist to uipath-ipc-deps'
