@@ -7,7 +7,12 @@ parameters:
     default: false
 
   - name: publishNpm
-    displayName: 'Publish NPM packages (Node + Web) to GitHub Packages'
+    displayName: 'Publish NPM packages (Node + Web) to uipath-ipc-deps (+ GitHub Packages best-effort)'
+    type: boolean
+    default: false
+
+  - name: publishPyPI
+    displayName: 'Publish Python package (wheel + sdist) to uipath-ipc-deps'
     type: boolean
     default: false
 
@@ -75,6 +80,21 @@ stages:
       - template: azp-initialization.yaml
       - template: azp-nodejs.yaml
 
+  - job: Python_Windows
+    displayName: 'Python — Windows'
+    pool:
+        vmImage: 'windows-2022'
+    steps:
+      - template: azp-python.yaml
+      - template: azp-python-dist.yaml
+
+  - job: Python_Linux
+    displayName: 'Python — Linux (test-only)'
+    pool:
+      vmImage: 'ubuntu-22.04'
+    steps:
+      - template: azp-python.yaml
+
 # ---------------------------------------------------------------------
 # Publish — NuGet
 # ---------------------------------------------------------------------
@@ -125,5 +145,31 @@ stages:
           deploy:
             steps:
               - template: azp-js.publish-npm.steps.yaml
+                parameters:
+                  reuseArtifactsFromBuildId: ${{ parameters.reuseArtifactsFromBuildId }}
+
+# ---------------------------------------------------------------------
+# Publish — PyPI
+# ---------------------------------------------------------------------
+# Same shape as Publish_NuGet / Publish_NPM, gated on `publishPyPI`.
+# Pushes the wheel + sdist to the project-scoped Azure Artifacts feed
+# `uipath-ipc-deps` (PyPI upstream/downstream already configured).
+# ---------------------------------------------------------------------
+- ${{ if eq(parameters.publishPyPI, true) }}:
+  - stage: Publish_PyPI
+    displayName: '🚚 Publish PyPI'
+    dependsOn: Build
+    condition: in(dependencies.Build.result, 'Succeeded', 'Skipped')
+    jobs:
+    - deployment: Publish_PyPI_Package
+      displayName: '📦 Publish Python wheel + sdist to uipath-ipc-deps'
+      environment: 'PyPI-Packages'
+      pool:
+        vmImage: 'ubuntu-latest'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: azp-python.publish.steps.yaml
                 parameters:
                   reuseArtifactsFromBuildId: ${{ parameters.reuseArtifactsFromBuildId }}

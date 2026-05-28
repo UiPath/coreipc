@@ -1,0 +1,26 @@
+steps:
+  - task: UsePythonVersion@0
+    displayName: 'Use Python 3.12'
+    inputs:
+      versionSpec: '3.12'
+      addToPath: true
+      architecture: x64
+
+  - script: |
+      python -m pip install --upgrade pip
+      python -m pip install -e ".[dev]" build
+    displayName: 'Python: install package + dev extras + build'
+    workingDirectory: '$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc'
+
+  - script: python -m pytest -v --junitxml=$(Build.SourcesDirectory)/python-test-results.xml
+    displayName: 'Python: run tests (unit + integration)'
+    workingDirectory: '$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc'
+
+  - task: PublishTestResults@2
+    displayName: 'Python: publish test results'
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: 'python-test-results.xml'
+      searchFolder: '$(Build.SourcesDirectory)'
+      testRunTitle: 'Python tests ($(Agent.OS) $(Agent.OSArchitecture))'

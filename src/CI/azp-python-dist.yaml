@@ -1,0 +1,21 @@
+steps:
+  - script: python -m build
+    displayName: 'Python: build wheel + sdist'
+    workingDirectory: '$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc'
+
+  - task: CopyFiles@2
+    displayName: 'Python: stage wheel + sdist'
+    inputs:
+      SourceFolder: 'src/Clients/python/uipath-ipc/dist'
+      Contents: |
+        *.whl
+        *.tar.gz
+      TargetFolder: '$(Build.ArtifactStagingDirectory)/python'
+      CleanTargetFolder: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Python: publish the Python package artifact'
+    inputs:
+      ArtifactName: 'Python package'
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)/python'
+      ArtifactType: 'Container'

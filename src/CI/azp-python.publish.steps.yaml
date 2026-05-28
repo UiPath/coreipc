@@ -1,0 +1,44 @@
+parameters:
+  - name: reuseArtifactsFromBuildId
+    type: string
+    default: ''
+
+steps:
+- checkout: none
+
+# Pull the Python artifact: from the current run by default, or from a
+# previously-completed build if `reuseArtifactsFromBuildId` is set.
+- ${{ if eq(parameters.reuseArtifactsFromBuildId, '') }}:
+  - download: current
+    artifact: 'Python package'
+- ${{ if ne(parameters.reuseArtifactsFromBuildId, '') }}:
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download Python package from build ${{ parameters.reuseArtifactsFromBuildId }}'
+    inputs:
+      buildType: specific
+      project: $(System.TeamProject)
+      pipeline: $(System.DefinitionId)
+      buildVersionToDownload: specific
+      buildId: ${{ parameters.reuseArtifactsFromBuildId }}
+      artifactName: 'Python package'
+      targetPath: '$(Pipeline.Workspace)/Python package'
+
+- task: UsePythonVersion@0
+  displayName: 'Use Python 3.12'
+  inputs:
+    versionSpec: '3.12'
+    addToPath: true
+
+- script: python -m pip install --upgrade twine
+  displayName: 'Install twine'
+
+# TwineAuthenticate writes a .pypirc with the Azure Artifacts feed's auth
+# and exports PYPIRC_PATH for the next step to consume.
+- task: TwineAuthenticate@1
+  displayName: 'Authenticate twine with uipath-ipc-deps'
+  inputs:
+    artifactFeed: 'CoreIpc/uipath-ipc-deps'
+
+- script: |
+    python -m twine upload -r uipath-ipc-deps --config-file $(PYPIRC_PATH) "$(Pipeline.Workspace)/Python package/"*
+  displayName: 'Upload wheel + sdist to uipath-ipc-deps'
