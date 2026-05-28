@@ -43,10 +43,11 @@ class NamedPipeClientTransport(ClientTransport):
     def _posix_address(self) -> str:
         return f"/tmp/CoreFxPipe_{self.pipe_name}"
 
-    # When the .NET server is accepting connections it's also constantly
-    # recycling pipe instances. There's a small window between one connection
-    # being accepted and the next pipe instance being created during which
-    # CreateFile fails with ERROR_FILE_NOT_FOUND. Retry briefly to ride it out.
+    # Brief retry on FileNotFoundError to ride out two race windows:
+    #   - Windows: between accepting one connection and creating the next
+    #     pipe instance, CreateFile transiently fails with ERROR_FILE_NOT_FOUND.
+    #   - POSIX: the .NET server signals readiness before its accept-loop has
+    #     actually bound the Unix Domain Socket file at /tmp/CoreFxPipe_<name>.
     _CONNECT_RETRY_DELAYS = (0.0, 0.05, 0.1, 0.2, 0.5, 1.0)
 
     async def _connect_windows(
@@ -73,4 +74,13 @@ class NamedPipeClientTransport(ClientTransport):
     async def _connect_posix(
         self,
     ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        return await asyncio.open_unix_connection(self._posix_address)
+        last: BaseException | None = None
+        for delay in self._CONNECT_RETRY_DELAYS:
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                return await asyncio.open_unix_connection(self._posix_address)
+            except FileNotFoundError as ex:
+                last = ex
+        assert last is not None
+        raise last
