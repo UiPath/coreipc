@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 from typing import TYPE_CHECKING, Any
@@ -56,13 +57,18 @@ class _IpcProxy:
     async def _invoke(self, method_name: str, args: tuple[Any, ...]) -> Any:
         params = [json.dumps(a) for a in args]
         conn = await self._client._ensure_connected()
+        timeout = self._client.request_timeout
         req = Request(
             endpoint=self._endpoint_name,
             method_name=method_name,
             parameters=params,
             id=conn.next_id(),
+            timeout_in_seconds=timeout,
         )
-        resp = await conn.send_request(req)
+        if timeout is not None:
+            resp = await asyncio.wait_for(conn.send_request(req), timeout=timeout)
+        else:
+            resp = await conn.send_request(req)
         if resp.error is not None:
             raise RemoteException.from_error(resp.error)
         if resp.data is None:

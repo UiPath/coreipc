@@ -25,10 +25,24 @@ class IpcClient:
             result = await svc.AddFloats(1.5, 2.5)
     """
 
-    def __init__(self, transport: ClientTransport) -> None:
+    def __init__(
+        self,
+        transport: ClientTransport,
+        request_timeout: float | None = None,
+    ) -> None:
+        """Create a new client.
+
+        Args:
+            transport: The transport that opens the underlying stream.
+            request_timeout: Seconds before an in-flight call gives up.
+                Applies both client-side (raises asyncio.TimeoutError) and
+                server-side (Request.TimeoutInSeconds). ``None`` (default)
+                disables both timeouts.
+        """
         self._transport = transport
         self._connection: IpcConnection | None = None
         self._connect_lock = asyncio.Lock()
+        self.request_timeout = request_timeout
 
     async def _ensure_connected(self) -> IpcConnection:
         if self._connection is not None and not self._connection.is_closed:
