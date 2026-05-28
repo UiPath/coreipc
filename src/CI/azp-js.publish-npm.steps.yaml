@@ -48,7 +48,7 @@ steps:
     command: 'publish'
     workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/node'
     publishRegistry: 'useFeed'
-    publishFeedCombined: 'CoreIpc/9a5bdfb1-0ab4-40b9-b9d2-de4cf6c011eb'
+    publishFeed: 'CoreIpc/9a5bdfb1-0ab4-40b9-b9d2-de4cf6c011eb'
 
 - task: Npm@1
   displayName: 'Publish to Azure Artifacts (uipath-ipc-deps) — Web'
@@ -56,7 +56,7 @@ steps:
     command: 'publish'
     workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/web'
     publishRegistry: 'useFeed'
-    publishFeedCombined: 'CoreIpc/9a5bdfb1-0ab4-40b9-b9d2-de4cf6c011eb'
+    publishFeed: 'CoreIpc/9a5bdfb1-0ab4-40b9-b9d2-de4cf6c011eb'
 
 # ---------------------------------------------------------------------
 # Secondary target: GitHub Packages (best-effort, currently expected to fail)
