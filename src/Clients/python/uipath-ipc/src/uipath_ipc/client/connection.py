@@ -77,6 +77,10 @@ class IpcConnection:
 
     # --- public API --------------------------------------------------------
 
+    @property
+    def is_closed(self) -> bool:
+        return self._closed
+
     def next_id(self) -> str:
         return str(next(self._id_counter))
 

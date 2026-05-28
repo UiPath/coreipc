@@ -1,0 +1,160 @@
+"""Tests for IpcClient + dynamic proxy."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import struct
+from abc import ABC, abstractmethod
+
+import pytest
+
+from uipath_ipc import IpcClient, RemoteException
+from uipath_ipc.transport.base import ClientTransport
+from uipath_ipc.wire import Error, MessageType, Response
+
+
+# --- a fake transport that lets us drive both sides -----------------------
+
+class _BufferWriter:
+    def __init__(self) -> None:
+        self.buffer = bytearray()
+
+    def write(self, data: bytes) -> None:
+        self.buffer.extend(data)
+
+    async def drain(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+    async def wait_closed(self) -> None:
+        pass
+
+
+class _FakeTransport(ClientTransport):
+    def __init__(self) -> None:
+        self.reader = asyncio.StreamReader()
+        self.writer = _BufferWriter()
+
+    async def connect(self):  # type: ignore[override]
+        return self.reader, self.writer  # type: ignore[return-value]
+
+
+def _response_frame(resp: Response) -> bytes:
+    payload = resp.to_json().encode("utf-8")
+    return struct.pack("<Bi", int(MessageType.RESPONSE), len(payload)) + payload
+
+
+# --- example contract -----------------------------------------------------
+
+class IComputingService(ABC):
+    @abstractmethod
+    async def AddFloats(self, x: float, y: float) -> float: ...
+
+    @abstractmethod
+    async def Notify(self, message: str) -> None: ...
+
+
+# --- proxy tests ----------------------------------------------------------
+
+async def test_proxy_round_trips_a_call() -> None:
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(IComputingService)
+        task = asyncio.create_task(svc.AddFloats(1.5, 2.5))
+        await asyncio.sleep(0)
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="4.0")))
+        result = await asyncio.wait_for(task, timeout=1.0)
+        assert result == 4.0
+
+
+async def test_proxy_serializes_args_as_individual_json_strings() -> None:
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(IComputingService)
+        task = asyncio.create_task(svc.AddFloats(1.5, 2.5))
+        await asyncio.sleep(0)
+
+        # Decode the request that was written
+        buf = bytes(t.writer.buffer)
+        msg_type = buf[0]
+        payload_len = int.from_bytes(buf[1:5], "little", signed=True)
+        payload = buf[5:5 + payload_len].decode("utf-8")
+        req_obj = json.loads(payload)
+
+        assert msg_type == int(MessageType.REQUEST)
+        assert req_obj["Endpoint"] == "IComputingService"
+        assert req_obj["MethodName"] == "AddFloats"
+        assert req_obj["Parameters"] == ["1.5", "2.5"]   # each arg JSON-encoded
+
+        # Tidy up the pending task
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="4.0")))
+        await asyncio.wait_for(task, timeout=1.0)
+
+
+async def test_proxy_void_return() -> None:
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(IComputingService)
+        task = asyncio.create_task(svc.Notify("hi"))
+        await asyncio.sleep(0)
+        # Response with no data
+        t.reader.feed_data(_response_frame(Response(request_id="1", data=None)))
+        result = await asyncio.wait_for(task, timeout=1.0)
+        assert result is None
+
+
+async def test_proxy_raises_on_error_response() -> None:
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(IComputingService)
+        task = asyncio.create_task(svc.AddFloats(1.0, 2.0))
+        await asyncio.sleep(0)
+        err = Error(message="boom", type_name="System.InvalidOperationException")
+        t.reader.feed_data(_response_frame(Response(request_id="1", error=err)))
+
+        with pytest.raises(RemoteException) as ex_info:
+            await asyncio.wait_for(task, timeout=1.0)
+        assert ex_info.value.error.message == "boom"
+        assert ex_info.value.error.type_name == "System.InvalidOperationException"
+
+
+async def test_proxy_unknown_method_raises_attribute_error() -> None:
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(IComputingService)
+        with pytest.raises(AttributeError):
+            _ = svc.DoesNotExist  # type: ignore[attr-defined]
+
+
+# --- client lifecycle tests -----------------------------------------------
+
+async def test_client_lazily_connects() -> None:
+    """No connection is opened until the first call."""
+    t = _FakeTransport()
+    client = IpcClient(t)
+    assert client._connection is None
+    # Trigger a call
+    svc = client.get_proxy(IComputingService)
+    task = asyncio.create_task(svc.AddFloats(1.0, 2.0))
+    await asyncio.sleep(0)
+    assert client._connection is not None
+    # Tidy up
+    t.reader.feed_data(_response_frame(Response(request_id="1", data="3.0")))
+    await asyncio.wait_for(task, timeout=1.0)
+    await client.aclose()
+
+
+async def test_client_async_context_closes_connection() -> None:
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(IComputingService)
+        task = asyncio.create_task(svc.AddFloats(1.0, 2.0))
+        await asyncio.sleep(0)
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="3.0")))
+        await asyncio.wait_for(task, timeout=1.0)
+        assert client._connection is not None
+    # After exit, connection should be cleared
+    assert client._connection is None
