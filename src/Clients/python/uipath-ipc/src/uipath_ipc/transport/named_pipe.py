@@ -43,17 +43,32 @@ class NamedPipeClientTransport(ClientTransport):
     def _posix_address(self) -> str:
         return f"/tmp/CoreFxPipe_{self.pipe_name}"
 
+    # When the .NET server is accepting connections it's also constantly
+    # recycling pipe instances. There's a small window between one connection
+    # being accepted and the next pipe instance being created during which
+    # CreateFile fails with ERROR_FILE_NOT_FOUND. Retry briefly to ride it out.
+    _CONNECT_RETRY_DELAYS = (0.0, 0.05, 0.1, 0.2, 0.5, 1.0)
+
     async def _connect_windows(
         self,
     ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         loop = asyncio.get_running_loop()
-        reader = asyncio.StreamReader()
-        protocol = asyncio.StreamReaderProtocol(reader)
-        transport, _ = await loop.create_pipe_connection(  # type: ignore[attr-defined]
-            lambda: protocol, self._windows_address
-        )
-        writer = asyncio.StreamWriter(transport, protocol, reader, loop)
-        return reader, writer
+        last: BaseException | None = None
+        for delay in self._CONNECT_RETRY_DELAYS:
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                reader = asyncio.StreamReader()
+                protocol = asyncio.StreamReaderProtocol(reader)
+                transport, _ = await loop.create_pipe_connection(  # type: ignore[attr-defined]
+                    lambda: protocol, self._windows_address
+                )
+                writer = asyncio.StreamWriter(transport, protocol, reader, loop)
+                return reader, writer
+            except FileNotFoundError as ex:
+                last = ex
+        assert last is not None
+        raise last
 
     async def _connect_posix(
         self,
