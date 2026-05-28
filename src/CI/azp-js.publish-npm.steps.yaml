@@ -35,15 +35,61 @@ steps:
     destinationFolder: '$(System.DefaultWorkingDirectory)/unzipped'
     cleanDestinationFolder: true
 
+# ---------------------------------------------------------------------
+# Primary target: project-scoped Azure Artifacts feed `uipath-ipc-deps`.
+# ---------------------------------------------------------------------
+# Authenticated via the pipeline's built-in identity (already an
+# administrator on the feed — see CoreIpc/_artifacts/feed/uipath-ipc-deps).
+# No PAT, no service connection, no rotation policy to fight with.
+# ---------------------------------------------------------------------
 - task: Npm@1
-  displayName: 'Publish NPM (NodeJS)'
+  displayName: 'Publish to Azure Artifacts (uipath-ipc-deps) — NodeJS'
+  inputs:
+    command: 'publish'
+    workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/node'
+    publishRegistry: 'useFeed'
+    publishFeedCombined: 'CoreIpc/9a5bdfb1-0ab4-40b9-b9d2-de4cf6c011eb'
+
+- task: Npm@1
+  displayName: 'Publish to Azure Artifacts (uipath-ipc-deps) — Web'
+  inputs:
+    command: 'publish'
+    workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/web'
+    publishRegistry: 'useFeed'
+    publishFeedCombined: 'CoreIpc/9a5bdfb1-0ab4-40b9-b9d2-de4cf6c011eb'
+
+# ---------------------------------------------------------------------
+# Secondary target: GitHub Packages (best-effort, currently expected to fail)
+# ---------------------------------------------------------------------
+# Following the May 11–12, 2026 npm supply-chain incident (Mini Shai-Hulud
+# / TanStack), UiPath revoked classic GitHub PATs org-wide and is migrating
+# everyone to fine-grained PATs. Fine-grained PATs don't have the Packages
+# permission available at org level for UiPath — so the existing
+# `PublishNPM` service connection can no longer authenticate.
+#
+# Per Liviu Bud's #dev announcement on 2026-05-25, a sanctioned pipeline-
+# auth replacement is being worked on but not yet available:
+#   https://uipath.enterprise.slack.com/archives/CMDRA3VFH/p1779699547818419
+#
+# We leave the GitHub Packages publish wired up with continueOnError so
+# (a) the run doesn't fail when the publish fails on policy, and
+# (b) the publish resumes automatically the moment the service connection
+#     is updated with whatever the platform team ships.
+#
+# Each Publish_NPM run will be marked "Succeeded with issues" until then.
+# Revert continueOnError when the publish path is healthy again.
+# ---------------------------------------------------------------------
+- task: Npm@1
+  displayName: 'Publish to GitHub Packages — NodeJS (best-effort)'
+  continueOnError: true
   inputs:
     command: 'publish'
     workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/node'
     publishEndpoint: PublishNPM
 
 - task: Npm@1
-  displayName: 'Publish NPM (Web)'
+  displayName: 'Publish to GitHub Packages — Web (best-effort)'
+  continueOnError: true
   inputs:
     command: 'publish'
     workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/web'
