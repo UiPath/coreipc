@@ -75,22 +75,30 @@ class Request:
     timeout_in_seconds: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        # .NET's Request.TimeoutInSeconds is a non-nullable `double`, with 0
+        # as the "no timeout, use server default" sentinel. Sending JSON null
+        # makes Newtonsoft.Json throw on Request deserialization (it cannot
+        # convert null → double) and the server drops the connection.
         return {
             "Endpoint": self.endpoint,
             "MethodName": self.method_name,
             "Parameters": list(self.parameters),
             "Id": self.id,
-            "TimeoutInSeconds": self.timeout_in_seconds,
+            "TimeoutInSeconds": self.timeout_in_seconds
+            if self.timeout_in_seconds is not None
+            else 0.0,
         }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Request:
+        timeout = d.get("TimeoutInSeconds")
         return cls(
             endpoint=d["Endpoint"],
             method_name=d["MethodName"],
             parameters=list(d["Parameters"]),
             id=d.get("Id", "0"),
-            timeout_in_seconds=d.get("TimeoutInSeconds"),
+            # 0 / 0.0 from the wire decodes to None — both mean "no timeout".
+            timeout_in_seconds=None if timeout in (None, 0, 0.0) else timeout,
         )
 
     def to_json(self) -> str:

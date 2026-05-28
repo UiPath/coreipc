@@ -128,7 +128,13 @@ async def test_no_timeout_default_waits_indefinitely() -> None:
         await asyncio.wait_for(task, timeout=1.0)
 
 
-async def test_request_timeout_in_seconds_field_omitted_by_default() -> None:
+async def test_request_timeout_in_seconds_field_is_zero_by_default() -> None:
+    """No client-side timeout sends ``TimeoutInSeconds: 0`` on the wire.
+
+    The .NET Request.TimeoutInSeconds is a non-nullable double, with 0 as the
+    sentinel for 'no timeout, use the server's default'. Emitting null would
+    make the .NET-side Newtonsoft.Json deserializer reject the whole request.
+    """
     t = _FakeTransport()
     async with IpcClient(t) as client:
         svc = client.get_proxy(IComputingService)
@@ -137,7 +143,7 @@ async def test_request_timeout_in_seconds_field_omitted_by_default() -> None:
 
         frames = _split_frames(bytes(t.writer.buffer))
         req_payload = json.loads(frames[0][1].decode("utf-8"))
-        assert req_payload["TimeoutInSeconds"] is None
+        assert req_payload["TimeoutInSeconds"] == 0
 
         # Tidy up
         t.reader.feed_data(_response_frame(Response(request_id="1", data="3.0")))
