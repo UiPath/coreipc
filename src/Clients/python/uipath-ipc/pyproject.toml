@@ -12,6 +12,7 @@ authors = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "debugpy",
 ]
 
 [build-system]
