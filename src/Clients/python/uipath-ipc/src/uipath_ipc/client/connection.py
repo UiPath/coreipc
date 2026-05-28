@@ -16,6 +16,7 @@ import itertools
 
 from ..transport.base import ClientTransport
 from ..wire import (
+    CancellationRequest,
     MessageType,
     Request,
     Response,
@@ -87,8 +88,9 @@ class IpcConnection:
     async def send_request(self, req: Request) -> Response:
         """Send a request and await the matching response.
 
-        The Response is returned even if `Error` is set — exception
-        translation is the caller's concern (Phase C.1).
+        If the awaiting task is cancelled, a best-effort
+        `CancellationRequest` is sent to the server with the matching id,
+        and `CancelledError` is re-raised so the cancellation propagates.
         """
         if self._closed:
             raise ConnectionError("connection is closed")
@@ -100,8 +102,27 @@ class IpcConnection:
             payload = req.to_json().encode("utf-8")
             await write_frame(self._writer, MessageType.REQUEST, payload)
             return await fut
+        except asyncio.CancelledError:
+            # Fire-and-forget — the awaiting task is being torn down, but
+            # the cancellation message can still go out on the writer.
+            asyncio.create_task(self._safe_send_cancellation(req.id))
+            raise
         finally:
             self._pending.pop(req.id, None)
+
+    async def _safe_send_cancellation(self, request_id: str) -> None:
+        """Best-effort: send a CancellationRequest, swallow any errors."""
+        if self._closed:
+            return
+        try:
+            payload = (
+                CancellationRequest(request_id=request_id)
+                .to_json()
+                .encode("utf-8")
+            )
+            await write_frame(self._writer, MessageType.CANCELLATION_REQUEST, payload)
+        except Exception:
+            pass
 
     # --- receive loop ------------------------------------------------------
 
