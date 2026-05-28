@@ -48,8 +48,13 @@ class IpcClient:
         if self._connection is not None and not self._connection.is_closed:
             return self._connection
         async with self._connect_lock:
-            if self._connection is None or self._connection.is_closed:
-                self._connection = await IpcConnection.open(self._transport)
+            if self._connection is not None and not self._connection.is_closed:
+                return self._connection
+            # Tear down the dead connection (no-op if already cleaned up)
+            # before re-dialing through the transport.
+            if self._connection is not None:
+                await self._connection.aclose()
+            self._connection = await IpcConnection.open(self._transport)
         return self._connection
 
     def get_proxy(self, contract: type[T]) -> T:

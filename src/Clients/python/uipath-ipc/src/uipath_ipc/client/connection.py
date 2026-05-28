@@ -140,6 +140,9 @@ class IpcConnection:
             self._fail_pending(ex)
         except Exception as ex:  # noqa: BLE001 — surface anything unexpected via futures
             self._fail_pending(ex)
+        finally:
+            # Mark closed so the owning IpcClient knows to re-dial on next call.
+            self._closed = True
 
     def _handle_response(self, payload: bytes) -> None:
         resp = Response.from_json(payload.decode("utf-8"))
