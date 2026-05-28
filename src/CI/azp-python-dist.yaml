@@ -1,4 +1,10 @@
 steps:
+  # Bind the Python package version to the same source NuGet/NPM use
+  # ($(FullVersion), computed in azp-initialization.yaml). Maps the .NET-
+  # style pre-release suffix to a PEP 440 local-version segment.
+  - script: python $(Build.SourcesDirectory)/src/CI/stamp-python-version.py "$(FullVersion)" "$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc/pyproject.toml"
+    displayName: 'Python: stamp $(FullVersion) into pyproject.toml'
+
   - script: python -m build
     displayName: 'Python: build wheel + sdist'
     workingDirectory: '$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc'

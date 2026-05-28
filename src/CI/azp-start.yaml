@@ -86,6 +86,7 @@ stages:
     pool:
         vmImage: 'windows-2022'
     steps:
+      - template: azp-initialization.yaml
       - template: azp-python.yaml
       - template: azp-python-dist.yaml
 
@@ -94,6 +95,7 @@ stages:
     pool:
       vmImage: 'ubuntu-22.04'
     steps:
+      - template: azp-initialization.yaml
       - template: azp-python.yaml
 
 # ---------------------------------------------------------------------
