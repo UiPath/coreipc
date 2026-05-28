@@ -17,9 +17,9 @@ parameters:
     default: false
 
   - name: reuseArtifactsFromBuildId
-    displayName: 'Reuse artifacts from a previous successful build (skips Build)'
+    displayName: 'Reuse artifacts from build ID (0 = no, run Build normally)'
     type: string
-    default: ''
+    default: '0'
 
 variables:
   SCG_KILL_SWITCH: 'true' # Because our integration with the Aikido Safe Chain pipeline decorator (SGC rollout) is still buggy: https://uipath-product.slack.com/archives/CMCKWF5TR/p1780002214456709
@@ -51,7 +51,8 @@ stages:
 # ---------------------------------------------------------------------
 - stage: Build
   displayName: '🏭 Build'
-  condition: eq('${{ parameters.reuseArtifactsFromBuildId }}', '')
+  # '0' (default) or '' both mean "no reuse — run Build normally".
+  condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
   jobs:
   # The following 3 jobs will run in parallel.
   - job: NuGet_DotNet_Windows

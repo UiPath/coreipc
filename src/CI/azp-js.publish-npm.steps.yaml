@@ -7,11 +7,12 @@ steps:
 - checkout: none
 
 # Pull the NPM artifact: from the current run by default, or from a
-# previously-completed build if `reuseArtifactsFromBuildId` is set.
-- ${{ if eq(parameters.reuseArtifactsFromBuildId, '') }}:
+# previously-completed build if `reuseArtifactsFromBuildId` is a real id.
+# '0' (default) and '' both mean "no reuse — pull from current run".
+- ${{ if in(parameters.reuseArtifactsFromBuildId, '0', '') }}:
   - download: current
     artifact: 'NPM package'
-- ${{ if ne(parameters.reuseArtifactsFromBuildId, '') }}:
+- ${{ if not(in(parameters.reuseArtifactsFromBuildId, '0', '')) }}:
   - task: DownloadPipelineArtifact@2
     displayName: 'Download NPM package from build ${{ parameters.reuseArtifactsFromBuildId }}'
     inputs:
