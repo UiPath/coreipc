@@ -25,5 +25,5 @@ packages = ["src/uipath_ipc"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
-    "integration: tests that talk to a real .NET server (gated by --integration)",
+    "integration: tests that talk to a real .NET server (skip with --no-integration)",
 ]

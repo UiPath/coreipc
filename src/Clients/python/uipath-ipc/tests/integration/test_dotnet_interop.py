@@ -1,8 +1,7 @@
 """End-to-end tests against the real .NET IpcSample.ConsoleServer.
 
-Skipped by default. Run with::
-
-    pytest --integration
+These run as part of the default ``pytest`` invocation. Pass
+``--no-integration`` to skip them (e.g. for fast unit-only loops).
 
 The .NET server is started once per pytest session by the
 `dotnet_server` fixture (see conftest.py). It exposes IComputingService
