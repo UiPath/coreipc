@@ -117,8 +117,8 @@ async def test_proxy_raises_on_error_response() -> None:
 
         with pytest.raises(RemoteException) as ex_info:
             await asyncio.wait_for(task, timeout=1.0)
-        assert ex_info.value.error.message == "boom"
-        assert ex_info.value.error.type_name == "System.InvalidOperationException"
+        assert ex_info.value.message == "boom"
+        assert ex_info.value.type_name == "System.InvalidOperationException"
 
 
 async def test_proxy_unknown_method_raises_attribute_error() -> None:

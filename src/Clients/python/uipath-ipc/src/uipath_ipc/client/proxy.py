@@ -64,7 +64,7 @@ class _IpcProxy:
         )
         resp = await conn.send_request(req)
         if resp.error is not None:
-            raise RemoteException(resp.error)
+            raise RemoteException.from_error(resp.error)
         if resp.data is None:
             return None
         return json.loads(resp.data)
