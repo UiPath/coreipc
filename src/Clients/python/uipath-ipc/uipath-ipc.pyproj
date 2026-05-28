@@ -22,15 +22,9 @@
     <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="src\uipath_ipc\__init__.py" />
-    <Compile Include="tests\test_smoke.py" />
-    <Compile Include="tests\wire\__init__.py" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="src\" />
-    <Folder Include="src\uipath_ipc" />
-    <Folder Include="tests\" />
-    <Folder Include="tests\wire\" />
+    <!-- Glob over all Python files; PTVS will rewrite this if you Add/Remove via Solution Explorer.
+         Manage files via filesystem / external editor to keep the glob intact. -->
+    <Compile Include="**\*.py" Exclude=".venv\**;**\__pycache__\**;build\**;dist\**;*.egg-info\**" />
   </ItemGroup>
   <ItemGroup>
     <Interpreter Include=".venv\">
@@ -46,6 +40,13 @@
   <ItemGroup>
     <Content Include="pyproject.toml" />
     <Content Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="src\" />
+    <Folder Include="src\uipath_ipc\" />
+    <Folder Include="src\uipath_ipc\wire\" />
+    <Folder Include="tests\" />
+    <Folder Include="tests\wire\" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
 </Project>
