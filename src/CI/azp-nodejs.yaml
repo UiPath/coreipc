@@ -29,11 +29,63 @@
 
   - task: Npm@1
     displayName: 'Npm Install'
+    # ---------------------------------------------------------------------
+    # Safe Chain Guard (SCG) bypass — see azp-start.yaml SCG_KILL_SWITCH
+    # ---------------------------------------------------------------------
+    # The UiPath DevOps team rolled out an organization-wide pipeline
+    # decorator that injects pre/post steps installing the Aikido Safe
+    # Chain shims (https://www.aikido.dev/blog/introducing-safe-chain).
+    # The decorator replaces /usr/bin/npm (and npx, python, etc.) with
+    # /home/vsts/.safe-chain/shims/* so every install goes through a
+    # malware-scanning proxy that also blocks packages younger than 2 days.
+    #
+    # In practice the shim has had recurring interop issues with both
+    # Azure Artifacts feeds and GitHub Packages downloads — it surfaces
+    # them as opaque 400/403 errors whose text mentions Azure Storage SAS
+    # signatures, which sends you on a long wild-goose chase before you
+    # realize the shim is what's failing, not the registry. The DevOps
+    # team ships SCG_KILL_SWITCH as the designed escape hatch (lives in
+    # the pipeline-level `variables:` block in azp-start.yaml — it MUST
+    # be at pipeline scope; setting it as task `env:` is too late, the
+    # shim is installed in pre-job before any task env is read).
+    #
+    # Short story for whoever's debugging this next:
+    #   - CI for the CoreIpc Python-client PR (#125) started failing on
+    #     `npm install` with `npm ERR! code E403 ... Server failed to
+    #     authenticate the request. Make sure the value of Authorization
+    #     header is formed correctly including the signature.` while
+    #     pulling yocto-queue-0.1.0.tgz.
+    #   - The error appeared to be Azure-Storage-side (the URL in the
+    #     log was a *.blob.core.windows.net SAS URL).
+    #   - Switching from the org-level `npm-packages` feed to a project-
+    #     scoped `uipath-ipc-deps` feed didn't help — same blob, same
+    #     symptom.
+    #   - Eventually traced via #devops Slack threads to the SCG shim
+    #     being the real culprit. SCG_KILL_SWITCH=true (pipeline scope!)
+    #     unblocks it.
+    #
+    # References:
+    #   - SCG rollout announcement by Russell Boley (2026-04-24, #devops):
+    #     https://uipath.enterprise.slack.com/archives/CMCKWF5TR/p1777039233780949
+    #   - Stefan Botan reporting an analogous SCG-induced npm failure on
+    #     a SemanticProxy build, with SCG_KILL_SWITCH workaround
+    #     confirmed by the DevOps team (2026-05-13, #devops):
+    #     https://uipath.enterprise.slack.com/archives/CMCKWF5TR/p1778680523566469
+    #
+    # Trade-off: the kill switch opts this pipeline out of SCG-side
+    # malware scanning across npm, npx, pip, poetry, python — every
+    # shim SCG installs. Acceptable here — the CoreIpc deps are a
+    # narrow, stable set, and SCG keeps malfunctioning. Revisit when
+    # the DevOps fix lands.
     inputs:
         command: 'install'
         workingDir: $(NodeJS_ProjectPath)
         customRegistry: 'useFeed'
-        customFeed: '424ca518-1f12-456b-a4f6-888197fc15ee'
+        # Project-scoped feed `uipath-ipc-deps` (CoreIpc) mirroring
+        # npmjs.org. Project-owned so the CoreIpc team controls retention,
+        # permissions, and which upstreams are allowed. (See the rename
+        # from `EddiesExperimentalFeed` in the same conversation.)
+        customFeed: 'CoreIpc/9a5bdfb1-0ab4-40b9-b9d2-de4cf6c011eb'
     
   - task: CmdLine@2
     displayName: 'Npm Run Build'
