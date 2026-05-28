@@ -24,3 +24,6 @@ packages = ["src/uipath_ipc"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: tests that talk to a real .NET server (gated by --integration)",
+]
