@@ -1,5 +1,21 @@
 name: $(Date:yyyyMMdd)$(Rev:-rr)
 
+parameters:
+  - name: publishNuGet
+    displayName: 'Publish NuGet package to UiPath-Internal feed'
+    type: boolean
+    default: false
+
+  - name: publishNpm
+    displayName: 'Publish NPM packages (Node + Web) to GitHub Packages'
+    type: boolean
+    default: false
+
+  - name: reuseArtifactsFromBuildId
+    displayName: 'Reuse artifacts from a previous successful build (skips Build)'
+    type: string
+    default: ''
+
 variables:
   SCG_KILL_SWITCH: 'true' # Because our integration with the Aikido Safe Chain pipeline decorator (SGC rollout) is still buggy: https://uipath-product.slack.com/archives/CMCKWF5TR/p1780002214456709
   Label_Initialization: 'Initialization:'
@@ -11,7 +27,7 @@ variables:
   DotNet_MainProjectName: 'UiPath.CoreIpc'
   DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
-  
+
   NodeJS_DotNet_BuildConfiguration: 'Debug'
   NodeJS_ProjectPath: './src/Clients/js'
   NodeJS_ArchivePath: './src/Clients/js/dist/pack/nodejs.zip'
@@ -21,12 +37,20 @@ variables:
   NodeJS_DotNetNodeInteropSolution: './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop.sln'
 
 stages:
+# ---------------------------------------------------------------------
+# Build
+# ---------------------------------------------------------------------
+# Skipped when `reuseArtifactsFromBuildId` is set — in that case the
+# Publish stages pull their artifacts from the specified prior build
+# instead of running Build here.
+# ---------------------------------------------------------------------
 - stage: Build
-  displayName: '🏭 Build' 
+  displayName: '🏭 Build'
+  condition: eq('${{ parameters.reuseArtifactsFromBuildId }}', '')
   jobs:
-  # The following 3 jobs will run in parallel:            
-  - job:
-    displayName: '.NET on Windows'
+  # The following 3 jobs will run in parallel.
+  - job: NuGet_DotNet_Windows
+    displayName: 'NuGet — .NET on Windows'
     pool:
         vmImage: 'windows-2022'
     steps:
@@ -34,8 +58,8 @@ stages:
       - template: azp-dotnet.yaml
       - template: azp-dotnet-dist.yaml
 
-  - job:
-    displayName: 'node.js on Windows'
+  - job: NPM_Node_Web_Windows
+    displayName: 'NPM — Node + Web on Windows'
     pool:
         vmImage: 'windows-2022'
     steps:
@@ -43,25 +67,63 @@ stages:
       - template: azp-nodejs.yaml
       - template: azp-nodejs-dist.yaml
 
-  - job:
-    displayName: 'node.js on Ubuntu'
+  - job: NPM_Node_Web_Linux
+    displayName: 'NPM — Node + Web on Linux (test-only)'
     pool:
       vmImage: 'ubuntu-22.04'
     steps:
       - template: azp-initialization.yaml
       - template: azp-nodejs.yaml
 
-- stage: Publish
-  displayName: 🚚 Publish
-  dependsOn: Build
-  jobs:
-  - deployment: Publish_NPM_Packages
-    displayName: '📦 Publish NPM Packages'
-    environment: 'NPM-Packages'
-    pool:
-      vmImage: ubuntu-latest
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-            - template: azp-js.publish-npm.steps.yaml
+# ---------------------------------------------------------------------
+# Publish — NuGet
+# ---------------------------------------------------------------------
+# The whole stage is omitted at compile time when `publishNuGet` is
+# false — so a default CI run has no "Publish NuGet" entry in the UI
+# at all, and the rejection-as-failure footgun is impossible. When
+# it does run, approval is gated by the `NuGet-Packages` environment.
+# ---------------------------------------------------------------------
+- ${{ if eq(parameters.publishNuGet, true) }}:
+  - stage: Publish_NuGet
+    displayName: '🚚 Publish NuGet'
+    dependsOn: Build
+    # Build can legitimately be Skipped (reuseArtifactsFromBuildId set);
+    # we still want Publish to proceed in that case.
+    condition: in(dependencies.Build.result, 'Succeeded', 'Skipped')
+    jobs:
+    - deployment: Publish_NuGet_Package
+      displayName: '📦 Publish NuGet to UiPath-Internal'
+      environment: 'NuGet-Packages'
+      pool:
+        vmImage: 'windows-2022'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: azp-nuget.publish.steps.yaml
+                parameters:
+                  reuseArtifactsFromBuildId: ${{ parameters.reuseArtifactsFromBuildId }}
+
+# ---------------------------------------------------------------------
+# Publish — NPM
+# ---------------------------------------------------------------------
+# Same shape as Publish_NuGet, gated on `publishNpm`.
+# ---------------------------------------------------------------------
+- ${{ if eq(parameters.publishNpm, true) }}:
+  - stage: Publish_NPM
+    displayName: '🚚 Publish NPM'
+    dependsOn: Build
+    condition: in(dependencies.Build.result, 'Succeeded', 'Skipped')
+    jobs:
+    - deployment: Publish_NPM_Packages
+      displayName: '📦 Publish NPM (Node + Web)'
+      environment: 'NPM-Packages'
+      pool:
+        vmImage: ubuntu-latest
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: azp-js.publish-npm.steps.yaml
+                parameters:
+                  reuseArtifactsFromBuildId: ${{ parameters.reuseArtifactsFromBuildId }}

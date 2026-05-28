@@ -1,0 +1,31 @@
+parameters:
+  - name: reuseArtifactsFromBuildId
+    type: string
+    default: ''
+
+steps:
+- checkout: none
+
+# Pull the NuGet artifact: from the current run by default, or from a
+# previously-completed build if `reuseArtifactsFromBuildId` is set.
+- ${{ if eq(parameters.reuseArtifactsFromBuildId, '') }}:
+  - download: current
+    artifact: 'NuGet package'
+- ${{ if ne(parameters.reuseArtifactsFromBuildId, '') }}:
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download NuGet package from build ${{ parameters.reuseArtifactsFromBuildId }}'
+    inputs:
+      buildType: specific
+      project: $(System.TeamProject)
+      pipeline: $(System.DefinitionId)
+      buildVersionToDownload: specific
+      buildId: ${{ parameters.reuseArtifactsFromBuildId }}
+      artifactName: 'NuGet package'
+      targetPath: '$(Pipeline.Workspace)/NuGet package'
+
+- task: DotNetCoreCLI@2
+  displayName: 'dotnet push to UiPath-Internal'
+  inputs:
+    command: push
+    packagesToPush: '$(Pipeline.Workspace)/NuGet package/**/*.nupkg'
+    publishVstsFeed: 'Public.Feeds/UiPath-Internal'

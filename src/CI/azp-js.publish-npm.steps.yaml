@@ -1,11 +1,29 @@
+parameters:
+  - name: reuseArtifactsFromBuildId
+    type: string
+    default: ''
+
 steps:
 - checkout: none
 
-- download: current
-  artifact: 'NPM package'
-  # The destination path is $(Pipeline.Workspace)
+# Pull the NPM artifact: from the current run by default, or from a
+# previously-completed build if `reuseArtifactsFromBuildId` is set.
+- ${{ if eq(parameters.reuseArtifactsFromBuildId, '') }}:
+  - download: current
+    artifact: 'NPM package'
+- ${{ if ne(parameters.reuseArtifactsFromBuildId, '') }}:
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download NPM package from build ${{ parameters.reuseArtifactsFromBuildId }}'
+    inputs:
+      buildType: specific
+      project: $(System.TeamProject)
+      pipeline: $(System.DefinitionId)
+      buildVersionToDownload: specific
+      buildId: ${{ parameters.reuseArtifactsFromBuildId }}
+      artifactName: 'NPM package'
+      targetPath: '$(Pipeline.Workspace)/NPM package'
 
-- task: NodeTool@0 
+- task: NodeTool@0
   displayName: 'Use Node.js 20.11.0'
   inputs:
     versionSpec: '20.11.0'
