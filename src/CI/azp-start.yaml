@@ -1,6 +1,21 @@
 name: $(Date:yyyyMMdd)$(Rev:-rr)
 
 parameters:
+  - name: buildNuGet
+    displayName: 'Build NuGet'
+    type: boolean
+    default: true
+
+  - name: buildNpm
+    displayName: 'Build NPM (Node + Web)'
+    type: boolean
+    default: true
+
+  - name: buildPython
+    displayName: 'Build Python'
+    type: boolean
+    default: true
+
   - name: publishNuGet
     displayName: 'Publish NuGet package to UiPath-Internal feed'
     type: boolean
@@ -50,77 +65,91 @@ stages:
 # Python integration tests against the .NET test server) before
 # publishing.
 #
-# All three Build stages share the same "skip when reuse-id is set"
-# condition. `dependsOn: []` on the second and third opt out of
-# Azure DevOps's default "depend on the previous stage in YAML order"
-# behaviour, so they actually run concurrently.
+# Each Build_X is included at compile time only when its `buildX`
+# parameter is true (default). Unchecking buildX removes the entire
+# Build_X stage from the run. `dependsOn: []` makes the included
+# Build stages start in parallel rather than serializing along YAML
+# order.
+#
+# Stage-level runtime `condition` still applies inside the stage:
+# Build_X is Skipped when `reuseArtifactsFromBuildId` is a real id
+# (so the publish path can pull from that build instead).
 # =====================================================================
 
-- stage: Build_NuGet
-  displayName: '🏭 Build NuGet'
-  # '0' (default) or '' both mean "no reuse — run Build normally".
-  condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
-  jobs:
-  - job: NuGet_DotNet_Windows
-    displayName: 'NuGet — .NET on Windows'
-    pool:
-        vmImage: 'windows-2022'
-    steps:
-      - template: azp-initialization.yaml
-      - template: azp-dotnet.yaml
-      - template: azp-dotnet-dist.yaml
+- ${{ if eq(parameters.buildNuGet, true) }}:
+  - stage: Build_NuGet
+    displayName: '🏭 Build NuGet'
+    dependsOn: []
+    # '0' (default) or '' both mean "no reuse — run Build normally".
+    condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
+    jobs:
+    - job: NuGet_DotNet_Windows
+      displayName: 'NuGet — .NET on Windows'
+      pool:
+          vmImage: 'windows-2022'
+      steps:
+        - template: azp-initialization.yaml
+        - template: azp-dotnet.yaml
+        - template: azp-dotnet-dist.yaml
 
-- stage: Build_NPM
-  displayName: '🏭 Build NPM'
-  dependsOn: []
-  condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
-  jobs:
-  - job: NPM_Node_Web_Windows
-    displayName: 'NPM — Node + Web on Windows'
-    pool:
-        vmImage: 'windows-2022'
-    steps:
-      - template: azp-initialization.yaml
-      - template: azp-nodejs.yaml
-      - template: azp-nodejs-dist.yaml
+- ${{ if eq(parameters.buildNpm, true) }}:
+  - stage: Build_NPM
+    displayName: '🏭 Build NPM'
+    dependsOn: []
+    condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
+    jobs:
+    - job: NPM_Node_Web_Windows
+      displayName: 'NPM — Node + Web on Windows'
+      pool:
+          vmImage: 'windows-2022'
+      steps:
+        - template: azp-initialization.yaml
+        - template: azp-nodejs.yaml
+        - template: azp-nodejs-dist.yaml
 
-  - job: NPM_Node_Web_Linux
-    displayName: 'NPM — Node + Web on Linux (test-only)'
-    pool:
-      vmImage: 'ubuntu-22.04'
-    steps:
-      - template: azp-initialization.yaml
-      - template: azp-nodejs.yaml
+    - job: NPM_Node_Web_Linux
+      displayName: 'NPM — Node + Web on Linux (test-only)'
+      pool:
+        vmImage: 'ubuntu-22.04'
+      steps:
+        - template: azp-initialization.yaml
+        - template: azp-nodejs.yaml
 
-- stage: Build_Python
-  displayName: '🏭 Build Python'
-  dependsOn: []
-  condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
-  jobs:
-  - job: Python_Windows
-    displayName: 'Python — Windows'
-    pool:
-        vmImage: 'windows-2022'
-    steps:
-      - template: azp-initialization.yaml
-      - template: azp-python.yaml
-      - template: azp-python-dist.yaml
+- ${{ if eq(parameters.buildPython, true) }}:
+  - stage: Build_Python
+    displayName: '🏭 Build Python'
+    dependsOn: []
+    condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
+    jobs:
+    - job: Python_Windows
+      displayName: 'Python — Windows'
+      pool:
+          vmImage: 'windows-2022'
+      steps:
+        - template: azp-initialization.yaml
+        - template: azp-python.yaml
+        - template: azp-python-dist.yaml
 
-  - job: Python_Linux
-    displayName: 'Python — Linux (test-only)'
-    pool:
-      vmImage: 'ubuntu-22.04'
-    steps:
-      - template: azp-initialization.yaml
-      - template: azp-python.yaml
+    - job: Python_Linux
+      displayName: 'Python — Linux (test-only)'
+      pool:
+        vmImage: 'ubuntu-22.04'
+      steps:
+        - template: azp-initialization.yaml
+        - template: azp-python.yaml
 
 # =====================================================================
 # Publish stages — each depends only on its corresponding Build stage,
 # so they unblock independently as their Build finishes.
+#
+# When a Build_X is excluded at compile time (buildX=false), its
+# matching Publish_X has no Build to depend on; we set `dependsOn: []`
+# in that case so the Publish runs immediately. The artifact download
+# inside the publish template will fail clearly if there's neither a
+# current-build artifact nor a `reuseArtifactsFromBuildId` to pull from.
 # =====================================================================
 
 # Publish — NuGet
-# ---------------------------------------------------------------------
 # Stage omitted at compile time when `publishNuGet` is false — default
 # CI runs have no "Publish NuGet" entry in the UI at all, and the
 # rejection-as-failure footgun is impossible. When it does run, approval
@@ -128,10 +157,13 @@ stages:
 - ${{ if eq(parameters.publishNuGet, true) }}:
   - stage: Publish_NuGet
     displayName: '🚚 Publish NuGet'
-    dependsOn: Build_NuGet
-    # Build_NuGet can legitimately be Skipped (reuseArtifactsFromBuildId
-    # set); we still want Publish to proceed in that case.
-    condition: in(dependencies.Build_NuGet.result, 'Succeeded', 'Skipped')
+    ${{ if eq(parameters.buildNuGet, true) }}:
+      dependsOn: Build_NuGet
+      # Build_NuGet can legitimately be Skipped (reuseArtifactsFromBuildId
+      # set); we still want Publish to proceed in that case.
+      condition: in(dependencies.Build_NuGet.result, 'Succeeded', 'Skipped')
+    ${{ else }}:
+      dependsOn: []
     jobs:
     - deployment: Publish_NuGet_Package
       displayName: '📦 Publish NuGet to UiPath-Internal'
@@ -150,8 +182,11 @@ stages:
 - ${{ if eq(parameters.publishNpm, true) }}:
   - stage: Publish_NPM
     displayName: '🚚 Publish NPM'
-    dependsOn: Build_NPM
-    condition: in(dependencies.Build_NPM.result, 'Succeeded', 'Skipped')
+    ${{ if eq(parameters.buildNpm, true) }}:
+      dependsOn: Build_NPM
+      condition: in(dependencies.Build_NPM.result, 'Succeeded', 'Skipped')
+    ${{ else }}:
+      dependsOn: []
     jobs:
     - deployment: Publish_NPM_Packages
       displayName: '📦 Publish NPM (Node + Web)'
@@ -172,8 +207,11 @@ stages:
 - ${{ if eq(parameters.publishPyPI, true) }}:
   - stage: Publish_PyPI
     displayName: '🚚 Publish PyPI'
-    dependsOn: Build_Python
-    condition: in(dependencies.Build_Python.result, 'Succeeded', 'Skipped')
+    ${{ if eq(parameters.buildPython, true) }}:
+      dependsOn: Build_Python
+      condition: in(dependencies.Build_Python.result, 'Succeeded', 'Skipped')
+    ${{ else }}:
+      dependsOn: []
     jobs:
     - deployment: Publish_PyPI_Package
       displayName: '📦 Publish Python wheel + sdist to uipath-ipc-deps'
