@@ -6,7 +6,7 @@ This package speaks the same wire protocol as the .NET package, so a Python clie
 
 ## Status
 
-- **Scope**: client only. Server, callbacks (bidirectional), and stream uploads/downloads are not included.
+- **Scope**: client only. Bidirectional callbacks are supported; a server side and stream uploads/downloads are not.
 - **Transports**: Named Pipe, TCP. (WebSocket is on the roadmap.)
 - **Python**: 3.10+.
 
@@ -105,6 +105,31 @@ except RemoteException as ex:
 
 `__cause__` is set on the exception chain so Python tracebacks display the inner errors naturally.
 
+### Callbacks (server → client)
+
+The server can invoke methods on objects that *the client* hosts. Define the callback contract, pass an instance to `IpcClient(callbacks={...})`, and the proxy on the server side can call into your Python object:
+
+```python
+from abc import ABC, abstractmethod
+
+
+class IClientCallback(ABC):
+    @abstractmethod
+    async def EchoToClient(self, value: str) -> str: ...
+
+
+class EchoHandler:
+    async def EchoToClient(self, value: str) -> str:
+        return f"echoed: {value}"
+
+
+async with IpcClient(transport, callbacks={IClientCallback: EchoHandler()}) as client:
+    tester = client.get_proxy(ICallbackTester)
+    print(await tester.TriggerEcho("hi"))   # "echoed: hi"
+```
+
+Callback methods may be `async def` or plain `def`. Exceptions raised inside the handler are wired back to the server as `RemoteException`. Server-initiated cancellations cancel the in-flight handler task.
+
 ### Auto-reconnect
 
 The client opens a connection lazily on the first call and reuses it. If the underlying stream drops (server restart, network blip), the **next** call transparently re-dials via the transport. The proxy instance remains valid across reconnects.
@@ -126,7 +151,6 @@ Custom transports are easy: subclass `ClientTransport` and implement `connect()`
 ## What's NOT in this client (yet)
 
 - **Server side** — a Python server isn't planned for the initial port.
-- **Callbacks** (bidirectional). The .NET client supports them; adding them to Python requires the client to host its own dispatcher. Park until needed.
 - **Streams** (UploadRequest / DownloadResponse message types). Add on demand.
 - **WebSocket transport**. Pending; will be an optional extra.
 

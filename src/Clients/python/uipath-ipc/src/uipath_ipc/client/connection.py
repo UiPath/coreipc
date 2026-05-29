@@ -3,20 +3,38 @@
 Owns:
   - the (StreamReader, StreamWriter) pair from a `ClientTransport`,
   - a background receive-loop that decodes frames,
-  - a map of pending requests keyed by Request.id.
+  - a map of pending OUTGOING requests keyed by Request.id (awaited by
+    `send_request`),
+  - a map of in-flight INCOMING request handler tasks (so we can cancel
+    them when the server sends a CancellationRequest),
+  - a single write lock so multiple producers (outgoing requests,
+    callback responses, cancellation messages) can share the writer
+    without interleaving bytes.
 
-`send_request(req)` sends and awaits the matching Response. The connection
-auto-generates IDs (`next_id`).
+Outgoing path:
+  `send_request(req)` writes a Request frame and awaits the matching
+  Response. Caller cancellation triggers a best-effort CancellationRequest.
+
+Incoming path (callbacks):
+  The .NET server can call into the Python client. Pass
+  `callbacks={endpoint_name: instance}` (or via `IpcClient(callbacks=...)`).
+  An incoming Request frame is dispatched to `instance.<method_name>(*args)`;
+  the result is encoded into a Response frame. Exceptions become Error
+  responses. Server cancellations cancel the handler task.
 """
 
 from __future__ import annotations
 
 import asyncio
+import inspect
 import itertools
+import json
+import traceback
 
 from ..transport.base import ClientTransport
 from ..wire import (
     CancellationRequest,
+    Error,
     MessageType,
     Request,
     Response,
@@ -26,27 +44,35 @@ from ..wire import (
 
 
 class IpcConnection:
-    """One duplex stream + the request/response dispatcher around it."""
+    """One duplex stream + the bidirectional request/response dispatcher."""
 
     def __init__(
         self,
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
+        callbacks: dict[str, object] | None = None,
     ) -> None:
         self._reader = reader
         self._writer = writer
+        self._callbacks: dict[str, object] = dict(callbacks or {})
         self._pending: dict[str, asyncio.Future[Response]] = {}
+        self._incoming_handlers: dict[str, asyncio.Task[None]] = {}
         self._id_counter = itertools.count(1)
         self._receive_task: asyncio.Task[None] | None = None
+        self._write_lock = asyncio.Lock()
         self._closed = False
 
     # --- lifecycle ---------------------------------------------------------
 
     @classmethod
-    async def open(cls, transport: ClientTransport) -> IpcConnection:
+    async def open(
+        cls,
+        transport: ClientTransport,
+        callbacks: dict[str, object] | None = None,
+    ) -> IpcConnection:
         """Connect via the transport, wrap the stream in a new connection."""
         reader, writer = await transport.connect()
-        conn = cls(reader, writer)
+        conn = cls(reader, writer, callbacks=callbacks)
         conn.start()
         return conn
 
@@ -57,12 +83,16 @@ class IpcConnection:
         self._receive_task = asyncio.create_task(self._receive_loop())
 
     async def aclose(self) -> None:
-        """Close the connection and fail any in-flight requests."""
+        """Close the connection and fail/cancel any in-flight work."""
         if self._closed:
             return
         self._closed = True
         if self._receive_task is not None:
             self._receive_task.cancel()
+        # Cancel in-flight callback handlers so they don't outlive the stream.
+        for task in list(self._incoming_handlers.values()):
+            task.cancel()
+        self._incoming_handlers.clear()
         try:
             self._writer.close()
             await self._writer.wait_closed()
@@ -100,15 +130,20 @@ class IpcConnection:
         self._pending[req.id] = fut
         try:
             payload = req.to_json().encode("utf-8")
-            await write_frame(self._writer, MessageType.REQUEST, payload)
+            await self._send_frame(MessageType.REQUEST, payload)
             return await fut
         except asyncio.CancelledError:
-            # Fire-and-forget — the awaiting task is being torn down, but
-            # the cancellation message can still go out on the writer.
             asyncio.create_task(self._safe_send_cancellation(req.id))
             raise
         finally:
             self._pending.pop(req.id, None)
+
+    # --- frame I/O ---------------------------------------------------------
+
+    async def _send_frame(self, msg_type: MessageType, payload: bytes) -> None:
+        """Write one frame atomically under the write lock."""
+        async with self._write_lock:
+            await write_frame(self._writer, msg_type, payload)
 
     async def _safe_send_cancellation(self, request_id: str) -> None:
         """Best-effort: send a CancellationRequest, swallow any errors."""
@@ -120,7 +155,9 @@ class IpcConnection:
                 .to_json()
                 .encode("utf-8")
             )
-            await write_frame(self._writer, MessageType.CANCELLATION_REQUEST, payload)
+            await self._send_frame(
+                MessageType.CANCELLATION_REQUEST, payload
+            )
         except Exception:
             pass
 
@@ -132,8 +169,11 @@ class IpcConnection:
                 msg_type, payload = await read_frame(self._reader)
                 if msg_type == MessageType.RESPONSE:
                     self._handle_response(payload)
-                # Other message types (cancellation echoes, upload/download)
-                # are not expected on the client receive path right now.
+                elif msg_type == MessageType.REQUEST:
+                    self._handle_incoming_request(payload)
+                elif msg_type == MessageType.CANCELLATION_REQUEST:
+                    self._handle_incoming_cancellation(payload)
+                # UPLOAD_REQUEST / DOWNLOAD_RESPONSE are not yet handled.
         except asyncio.CancelledError:
             raise
         except (asyncio.IncompleteReadError, ConnectionResetError, OSError) as ex:
@@ -149,6 +189,78 @@ class IpcConnection:
         fut = self._pending.get(resp.request_id)
         if fut is not None and not fut.done():
             fut.set_result(resp)
+
+    def _handle_incoming_request(self, payload: bytes) -> None:
+        """Dispatch an incoming Request to a registered callback in a task.
+
+        Runs in a background task so the receive loop stays free for the
+        next frame.
+        """
+        req = Request.from_json(payload.decode("utf-8"))
+        task = asyncio.create_task(self._invoke_callback(req))
+        self._incoming_handlers[req.id] = task
+        task.add_done_callback(
+            lambda _t, rid=req.id: self._incoming_handlers.pop(rid, None)
+        )
+
+    def _handle_incoming_cancellation(self, payload: bytes) -> None:
+        """Cancel an in-flight incoming-request handler by id."""
+        cancel = CancellationRequest.from_json(payload.decode("utf-8"))
+        task = self._incoming_handlers.get(cancel.request_id)
+        if task is not None and not task.done():
+            task.cancel()
+
+    async def _invoke_callback(self, req: Request) -> None:
+        """Run the user's callback for an incoming Request, then send the Response."""
+        try:
+            handler = self._callbacks.get(req.endpoint)
+            if handler is None:
+                raise RuntimeError(
+                    f"no callback registered for endpoint {req.endpoint!r}"
+                )
+            method = getattr(handler, req.method_name, None)
+            if method is None or not callable(method):
+                raise RuntimeError(
+                    f"callback {req.endpoint!r} has no method "
+                    f"{req.method_name!r}"
+                )
+            # Each parameter is an individually JSON-encoded string (wire gotcha).
+            args = [json.loads(p) for p in req.parameters]
+            result = method(*args)
+            if inspect.isawaitable(result):
+                result = await result
+            data = None if result is None else json.dumps(result)
+            resp = Response(request_id=req.id, data=data)
+        except asyncio.CancelledError:
+            # Server cancelled us. Send back a cancellation Error so the
+            # server's pending future resolves (and matches .NET's
+            # OperationCanceledException semantics).
+            resp = Response(
+                request_id=req.id,
+                error=Error(
+                    message="callback cancelled",
+                    type_name="System.OperationCanceledException",
+                ),
+            )
+        except BaseException as ex:
+            resp = Response(
+                request_id=req.id,
+                error=Error(
+                    message=str(ex) or type(ex).__name__,
+                    type_name=type(ex).__name__,
+                    stack_trace=traceback.format_exc(),
+                ),
+            )
+
+        if self._closed:
+            return
+        try:
+            await self._send_frame(
+                MessageType.RESPONSE, resp.to_json().encode("utf-8")
+            )
+        except Exception:
+            # Connection probably tore down — nothing to do.
+            pass
 
     def _fail_pending(self, ex: BaseException) -> None:
         for fut in list(self._pending.values()):

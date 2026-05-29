@@ -47,10 +47,36 @@ class ISystemService(ABC):
     async def ReverseBytes(self, bytes_: list[int]) -> list[int]: ...
 
 
+# Callback contracts — IClientCallback is the contract the *client* hosts;
+# ICallbackTester is the server endpoint that invokes IClientCallback back.
+
+class IClientCallback(ABC):
+    @abstractmethod
+    async def EchoToClient(self, value: str) -> str: ...
+
+    @abstractmethod
+    async def AddOnClient(self, x: int, y: int) -> int: ...
+
+
+class ICallbackTester(ABC):
+    @abstractmethod
+    async def TriggerEcho(self, value: str) -> str: ...
+
+    @abstractmethod
+    async def TriggerAdd(self, x: int, y: int) -> int: ...
+
+
 # --- helpers --------------------------------------------------------------
 
 def _new_client() -> IpcClient:
     return IpcClient(NamedPipeClientTransport(pipe_name=DOTNET_PIPE_NAME))
+
+
+def _new_client_with_callback(callback: object) -> IpcClient:
+    return IpcClient(
+        NamedPipeClientTransport(pipe_name=DOTNET_PIPE_NAME),
+        callbacks={IClientCallback: callback},
+    )
 
 
 # --- tests ----------------------------------------------------------------
@@ -105,3 +131,52 @@ async def test_multiple_calls_reuse_connection(dotnet_server) -> None:
         assert await svc.AddFloats(1.0, 2.0) == 3.0
         assert await svc.AddFloats(3.0, 4.0) == 7.0
         assert await svc.MultiplyInts(5, 6) == 30
+
+
+# --- server-to-client callbacks ------------------------------------------
+
+class _EchoCallback:
+    """Simple IClientCallback implementation for the callback tests."""
+
+    def __init__(self) -> None:
+        self.echo_calls: list[str] = []
+        self.add_calls: list[tuple[int, int]] = []
+
+    async def EchoToClient(self, value: str) -> str:
+        self.echo_calls.append(value)
+        return f"echoed: {value}"
+
+    async def AddOnClient(self, x: int, y: int) -> int:
+        self.add_calls.append((x, y))
+        return x + y
+
+
+async def test_server_invokes_client_callback_echo(dotnet_server) -> None:
+    cb = _EchoCallback()
+    async with _new_client_with_callback(cb) as client:
+        tester = client.get_proxy(ICallbackTester)
+        result = await tester.TriggerEcho("hi from server")
+        assert result == "echoed: hi from server"
+        assert cb.echo_calls == ["hi from server"]
+
+
+async def test_server_invokes_client_callback_with_multiple_args(dotnet_server) -> None:
+    cb = _EchoCallback()
+    async with _new_client_with_callback(cb) as client:
+        tester = client.get_proxy(ICallbackTester)
+        assert await tester.TriggerAdd(7, 8) == 15
+        assert cb.add_calls == [(7, 8)]
+
+
+async def test_multiple_server_initiated_callbacks_on_same_client(dotnet_server) -> None:
+    """Verify a single client handles a series of inbound callbacks."""
+    cb = _EchoCallback()
+    async with _new_client_with_callback(cb) as client:
+        tester = client.get_proxy(ICallbackTester)
+        results = [
+            await tester.TriggerEcho("a"),
+            await tester.TriggerEcho("b"),
+            await tester.TriggerEcho("c"),
+        ]
+        assert results == ["echoed: a", "echoed: b", "echoed: c"]
+        assert cb.echo_calls == ["a", "b", "c"]

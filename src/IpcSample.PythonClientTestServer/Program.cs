@@ -2,10 +2,11 @@
 //
 // Differences from IpcSample.ConsoleServer:
 //   - Console logging is enabled (visible in pytest output).
-//   - WaitForStart() is awaited before printing the READY marker, so the
-//     Python fixture can rely on the pipe actually accepting connections.
-//   - No callback or message-parameter dependencies in the handlers, so
-//     every method works against a callback-less Python client.
+//   - Stable READY marker for the Python fixture.
+//   - Most handlers are callback-free, so the basic test suite works
+//     against a callback-less Python client. ICallbackTester is the
+//     exception — it deliberately exercises the server-to-client
+//     callback path the Python uipath-ipc client added in 0.2.0.
 //   - Pipe name configurable via the first CLI argument; defaults to
 //     "uipath-ipc-py-test".
 
@@ -29,6 +30,30 @@ public interface ISystemService
 {
     Task<string> EchoString(string value, CancellationToken ct = default);
     Task<byte[]> ReverseBytes(byte[] data, CancellationToken ct = default);
+}
+
+/// <summary>
+/// Contract for a callback the *client* hosts and the *server* invokes.
+/// Used by ICallbackTester below to exercise the bidirectional path.
+/// Note: callback interfaces don't declare CancellationToken parameters
+/// (matching the .NET test suite's IComputingCallback convention) — the
+/// server-side caller doesn't include CT in the wire Parameters array.
+/// </summary>
+public interface IClientCallback
+{
+    Task<string> EchoToClient(string value);
+    Task<int> AddOnClient(int x, int y);
+}
+
+/// <summary>
+/// Service the client calls into; each method then calls *back* into
+/// the client's IClientCallback. Lets us verify the server→client
+/// callback path end-to-end from a Python integration test.
+/// </summary>
+public interface ICallbackTester
+{
+    Task<string> TriggerEcho(string value, Message message = null!, CancellationToken ct = default);
+    Task<int> TriggerAdd(int x, int y, Message message = null!, CancellationToken ct = default);
 }
 
 public readonly record struct ComplexNumber
@@ -95,6 +120,26 @@ public sealed class SystemService : ISystemService
     }
 }
 
+public sealed class CallbackTester : ICallbackTester
+{
+    private readonly ILogger<CallbackTester> _logger;
+    public CallbackTester(ILogger<CallbackTester> logger) => _logger = logger;
+
+    public async Task<string> TriggerEcho(string value, Message m, CancellationToken ct)
+    {
+        _logger.LogInformation("TriggerEcho({Value}) → calling client back", value);
+        var cb = m.Client.GetCallback<IClientCallback>();
+        return await cb.EchoToClient(value);
+    }
+
+    public async Task<int> TriggerAdd(int x, int y, Message m, CancellationToken ct)
+    {
+        _logger.LogInformation("TriggerAdd({X}, {Y}) → calling client back", x, y);
+        var cb = m.Client.GetCallback<IClientCallback>();
+        return await cb.AddOnClient(x, y);
+    }
+}
+
 internal static class Program
 {
     public static async Task Main(string[] args)
@@ -105,6 +150,7 @@ internal static class Program
             .AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Information))
             .AddSingleton<IComputingService, ComputingService>()
             .AddSingleton<ISystemService, SystemService>()
+            .AddSingleton<ICallbackTester, CallbackTester>()
             .BuildServiceProvider();
 
         await using var server = new IpcServer
@@ -115,6 +161,7 @@ internal static class Program
             {
                 typeof(IComputingService),
                 typeof(ISystemService),
+                typeof(ICallbackTester),
             },
             RequestTimeout = TimeSpan.FromSeconds(2),
         };

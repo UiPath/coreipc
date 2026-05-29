@@ -29,6 +29,7 @@ class IpcClient:
         self,
         transport: ClientTransport,
         request_timeout: float | None = None,
+        callbacks: dict[type, object] | None = None,
     ) -> None:
         """Create a new client.
 
@@ -38,11 +39,23 @@ class IpcClient:
                 Applies both client-side (raises asyncio.TimeoutError) and
                 server-side (Request.TimeoutInSeconds). ``None`` (default)
                 disables both timeouts.
+            callbacks: Optional dict mapping contract type → instance for
+                server-to-client callbacks. The instance's method names
+                must match the contract's; each method may be ``async``.
+                The instance's class need NOT inherit from the contract
+                (duck-typed). The contract's ``__name__`` is what's used
+                as the endpoint on the wire.
         """
         self._transport = transport
         self._connection: IpcConnection | None = None
         self._connect_lock = asyncio.Lock()
         self.request_timeout = request_timeout
+        # Translate contract-type keys to endpoint-name keys once at
+        # construction; the connection stores by name.
+        self._callbacks: dict[str, object] = {}
+        if callbacks:
+            for contract_type, instance in callbacks.items():
+                self._callbacks[contract_type.__name__] = instance
 
     async def _ensure_connected(self) -> IpcConnection:
         if self._connection is not None and not self._connection.is_closed:
@@ -54,7 +67,9 @@ class IpcClient:
             # before re-dialing through the transport.
             if self._connection is not None:
                 await self._connection.aclose()
-            self._connection = await IpcConnection.open(self._transport)
+            self._connection = await IpcConnection.open(
+                self._transport, callbacks=self._callbacks
+            )
         return self._connection
 
     def get_proxy(self, contract: type[T]) -> T:
