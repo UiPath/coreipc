@@ -106,6 +106,20 @@ async def test_proxy_void_return() -> None:
         assert result is None
 
 
+async def test_proxy_empty_data_return() -> None:
+    """A void op can answer with an empty Data *string* (not null) — e.g. .NET
+    CoreIpc for a Task-returning method. json.loads('') would throw, so the
+    proxy must treat empty Data as None too."""
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(IComputingService)
+        task = asyncio.create_task(svc.Notify("hi"))
+        await asyncio.sleep(0)
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
+        result = await asyncio.wait_for(task, timeout=1.0)
+        assert result is None
+
+
 async def test_proxy_raises_on_error_response() -> None:
     t = _FakeTransport()
     async with IpcClient(t) as client:

@@ -71,6 +71,9 @@ class _IpcProxy:
             resp = await conn.send_request(req)
         if resp.error is not None:
             raise RemoteException.from_error(resp.error)
-        if resp.data is None:
+        # Void / fire-and-forget operations answer with an empty Data string
+        # (not null) — e.g. .NET CoreIpc's response for a `Task`-returning
+        # method. Treat empty (or null) Data as "no return value".
+        if not resp.data:
             return None
         return json.loads(resp.data)
