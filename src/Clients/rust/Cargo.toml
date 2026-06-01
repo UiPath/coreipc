@@ -1,0 +1,29 @@
+[package]
+name = "uipath-coreipc"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Rust client for the UiPath CoreIpc named-pipe/UDS RPC protocol"
+license = "MIT"
+repository = "https://github.com/UiPath/coreipc"
+readme = "README.md"
+
+[dependencies]
+bytes = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+async-trait = "0.1"
+futures-util = { version = "0.3", features = ["sink"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "io-util", "sync", "time", "macros", "process"] }
+tokio-util = { version = "0.7", features = ["codec", "rt"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "io-util", "sync", "time", "macros", "process", "test-util"] }
+tokio-util = { version = "0.7", features = ["codec", "rt"] }
+futures-util = { version = "0.3", features = ["sink"] }
+async-trait = "0.1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
