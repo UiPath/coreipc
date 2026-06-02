@@ -190,6 +190,24 @@ impl Client {
         Ok(decode_ret::<R>(response.data.as_deref())?)
     }
 
+    /// Invoke `endpoint.method(args)` fire-and-forget: send the request frame without awaiting a
+    /// response. Mirrors the reference client's FireAndForget dispatch — the server still sends a void
+    /// Response, which is discarded as orphaned. Returns once the frame is queued.
+    pub async fn notify<A>(&self, endpoint: &str, method: &str, args: A) -> Result<(), RpcError>
+    where
+        A: EncodeArgs,
+    {
+        let parameters = args.encode_args()?;
+        let request = WireRequest {
+            id: self.channel.next_request_id(),
+            timeout_in_seconds: self.default_timeout.as_secs_f64(),
+            endpoint: endpoint.to_string(),
+            method_name: method.to_string(),
+            parameters,
+        };
+        self.channel.send_oneway(request).await
+    }
+
     /// Gracefully close the underlying channel.
     pub fn shutdown(&self) {
         self.channel.shutdown();

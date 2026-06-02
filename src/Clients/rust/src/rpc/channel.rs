@@ -144,6 +144,21 @@ impl RpcChannel {
         }
     }
 
+    /// Send a request frame without registering a pending-response waiter and without awaiting.
+    /// The peer's eventual void Response is discarded as orphaned (no entry in `pending`), mirroring
+    /// the reference client's fire-and-forget dispatch.
+    pub async fn send_oneway(&self, req: WireRequest) -> Result<(), RpcError> {
+        let inner = &self.inner;
+        if inner.closed.load(Ordering::SeqCst) {
+            return Err(RpcError::ConnectionClosed);
+        }
+        let frame = req.to_frame()?;
+        if inner.tx.send(frame).await.is_err() {
+            return Err(RpcError::ConnectionClosed);
+        }
+        Ok(())
+    }
+
     async fn send_cancel(&self, request_id: &str) {
         if let Ok(frame) = (WireCancellation {
             request_id: request_id.to_string(),

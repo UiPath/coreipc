@@ -209,6 +209,57 @@ async fn registered_callback_handles_server_initiated_request() {
 }
 
 #[tokio::test]
+async fn notify_sends_request_without_awaiting_and_tolerates_orphan_response() {
+    let (c, s) = duplex(64 * 1024);
+    let client = client(c);
+    let mut peer = Framed::new(s, MessageCodec::new());
+
+    // notify returns once the frame is queued — no response is awaited.
+    client
+        .notify("IUserOperations", "Subscribe", (serde_json::json!({}),))
+        .await
+        .unwrap();
+
+    // The peer receives the request frame (one param: the empty Message<void> object).
+    let frame = peer.next().await.unwrap().unwrap();
+    assert_eq!(frame.kind, MessageKind::Request);
+    let req: WireRequest = serde_json::from_slice(&frame.data).unwrap();
+    assert_eq!(req.endpoint, "IUserOperations");
+    assert_eq!(req.method_name, "Subscribe");
+    assert_eq!(req.parameters.len(), 1);
+
+    // The server still sends a void Response (our wire mode). It is orphaned (no waiter) and
+    // must be silently discarded — the channel stays healthy, proven by a subsequent call.
+    peer.send(
+        WireResponse { request_id: req.id, data: None, error: None }
+            .to_frame()
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    let call = tokio::spawn({
+        let client = client.clone();
+        async move {
+            client
+                .call::<_, i32>("IAlgebra", "Echo", (7,), None, CancellationToken::new())
+                .await
+        }
+    });
+    let frame = peer.next().await.unwrap().unwrap();
+    let req: WireRequest = serde_json::from_slice(&frame.data).unwrap();
+    assert_eq!(req.method_name, "Echo");
+    peer.send(
+        WireResponse { request_id: req.id, data: Some("7".into()), error: None }
+            .to_frame()
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(call.await.unwrap().unwrap(), 7);
+}
+
+#[tokio::test]
 async fn shutdown_drains_pending_calls() {
     let (c, s) = duplex(64 * 1024);
     let client = client(c);
