@@ -193,6 +193,9 @@ impl Client {
     /// Invoke `endpoint.method(args)` fire-and-forget: send the request frame without awaiting a
     /// response. Mirrors the reference client's FireAndForget dispatch — the server still sends a void
     /// Response, which is discarded as orphaned. Returns once the frame is queued.
+    ///
+    /// `timeout_in_seconds` is sent for the server's benefit only; the client never enforces it
+    /// (there is no response to wait on).
     pub async fn notify<A>(&self, endpoint: &str, method: &str, args: A) -> Result<(), RpcError>
     where
         A: EncodeArgs,
