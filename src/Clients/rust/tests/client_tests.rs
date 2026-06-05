@@ -16,7 +16,7 @@ use tokio_util::codec::Framed;
 use uipath_coreipc::rpc::{WireRequest, WireResponse};
 use uipath_coreipc::wire::{MessageCodec, MessageKind};
 use uipath_coreipc::{
-    CancellationToken, Client, ClientOptions, IncomingHandler, RemoteError, RpcError,
+    CallTimeout, CancellationToken, Client, ClientOptions, IncomingHandler, RemoteError, RpcError,
 };
 
 fn client(stream: DuplexStream) -> Client {
@@ -289,4 +289,47 @@ async fn shutdown_drains_pending_calls() {
         Err(RpcError::ConnectionClosed)
     ));
     assert!(client.is_closed());
+}
+
+#[tokio::test]
+async fn infinite_call_sends_minus_one_ms_and_does_not_time_out() {
+    let (c, s) = duplex(64 * 1024);
+    let client = client(c);
+    let mut peer = Framed::new(s, MessageCodec::new());
+
+    let call = tokio::spawn({
+        let client = client.clone();
+        async move {
+            client
+                .call_with_timeout::<_, bool>(
+                    "IAlgebra",
+                    "Slow",
+                    (),
+                    CallTimeout::Infinite,
+                    CancellationToken::new(),
+                )
+                .await
+        }
+    });
+
+    let frame = peer.next().await.unwrap().unwrap();
+    assert_eq!(frame.kind, MessageKind::Request);
+    let req: WireRequest = serde_json::from_slice(&frame.data).unwrap();
+    assert_eq!(req.timeout_in_seconds, -0.001);
+
+    // Peer replies after ~120ms (simulating a slow operation).
+    tokio::time::sleep(Duration::from_millis(120)).await;
+    peer.send(
+        WireResponse {
+            request_id: req.id,
+            data: Some("true".into()),
+            error: None,
+        }
+        .to_frame()
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+    assert!(call.await.unwrap().unwrap());
 }

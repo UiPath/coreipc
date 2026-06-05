@@ -222,16 +222,35 @@ impl Client {
         A: EncodeArgs,
         R: DeserializeOwned,
     {
+        self.call_with_timeout(endpoint, method, args, CallTimeout::from(timeout), ct)
+            .await
+    }
+
+    /// Like [`Client::call`] but with an explicit [`CallTimeout`] (supports `Infinite`).
+    pub async fn call_with_timeout<A, R>(
+        &self,
+        endpoint: &str,
+        method: &str,
+        args: A,
+        timeout: CallTimeout,
+        ct: CancellationToken,
+    ) -> Result<R, RpcError>
+    where
+        A: EncodeArgs,
+        R: DeserializeOwned,
+    {
         let parameters = args.encode_args()?;
-        let timeout = timeout.unwrap_or(self.default_timeout);
         let request = WireRequest {
             id: self.channel.next_request_id(),
-            timeout_in_seconds: timeout.as_secs_f64(),
+            timeout_in_seconds: timeout.wire_seconds(self.default_timeout),
             endpoint: endpoint.to_string(),
             method_name: method.to_string(),
             parameters,
         };
-        let response = self.channel.call_raw(request, timeout, ct).await?;
+        let response = match timeout.client_window(self.default_timeout) {
+            Some(window) => self.channel.call_raw(request, window, ct).await?,
+            None => self.channel.call_raw_infinite(request, ct).await?,
+        };
         Ok(decode_ret::<R>(response.data.as_deref())?)
     }
 
