@@ -20,6 +20,51 @@ use crate::transport::{default_transport, Transport};
 /// .NET's default request timeout is 40 seconds (`Connection`/`ServiceClient`).
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(40);
 
+/// How long a single `call` waits for its response.
+///
+/// Mirrors the .NET per-call timeout sourced from `Message.RequestTimeout`. `Infinite` reproduces
+/// `Timeout.InfiniteTimeSpan`: the wire `TimeoutInSeconds` is `-0.001`, which the .NET server decodes
+/// (`Request.GetTimeout`) via `TimeSpan.FromSeconds(-0.001)` == -1ms == `Timeout.InfiniteTimeSpan`, so
+/// it never cancels — and the client skips its own timeout entirely.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CallTimeout {
+    /// Use the client's configured default timeout.
+    Default,
+    /// Wait this long, then time out.
+    After(Duration),
+    /// Wait indefinitely (cancellable only via the `CancellationToken`).
+    Infinite,
+}
+
+impl CallTimeout {
+    /// The `TimeoutInSeconds` value to put on the wire, given the client default.
+    pub fn wire_seconds(self, default: Duration) -> f64 {
+        match self {
+            CallTimeout::Default => default.as_secs_f64(),
+            CallTimeout::After(d) => d.as_secs_f64(),
+            CallTimeout::Infinite => -0.001,
+        }
+    }
+
+    /// The client-side enforcement window: `Some(d)` sleeps then times out; `None` never times out.
+    pub fn client_window(self, default: Duration) -> Option<Duration> {
+        match self {
+            CallTimeout::Default => Some(default),
+            CallTimeout::After(d) => Some(d),
+            CallTimeout::Infinite => None,
+        }
+    }
+}
+
+impl From<Option<Duration>> for CallTimeout {
+    fn from(value: Option<Duration>) -> Self {
+        match value {
+            None => CallTimeout::Default,
+            Some(d) => CallTimeout::After(d),
+        }
+    }
+}
+
 /// Tunables for a [`Client`].
 #[derive(Debug, Clone)]
 pub struct ClientOptions {
@@ -219,5 +264,34 @@ impl Client {
     /// True once the channel has closed.
     pub fn is_closed(&self) -> bool {
         self.channel.is_closed()
+    }
+}
+
+#[cfg(test)]
+mod call_timeout_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn from_none_is_default() {
+        assert!(matches!(CallTimeout::from(None), CallTimeout::Default));
+    }
+
+    #[test]
+    fn from_some_is_after() {
+        let t = CallTimeout::from(Some(Duration::from_secs(7)));
+        assert!(matches!(t, CallTimeout::After(d) if d == Duration::from_secs(7)));
+    }
+
+    #[test]
+    fn infinite_wire_seconds_is_minus_one_ms() {
+        // -0.001s == TimeSpan.FromSeconds(-0.001) == -1ms == Timeout.InfiniteTimeSpan in .NET.
+        assert_eq!(CallTimeout::Infinite.wire_seconds(Duration::from_secs(40)), -0.001);
+    }
+
+    #[test]
+    fn finite_wire_seconds_round_trip() {
+        assert_eq!(CallTimeout::After(Duration::from_secs(3)).wire_seconds(Duration::from_secs(40)), 3.0);
+        assert_eq!(CallTimeout::Default.wire_seconds(Duration::from_secs(40)), 40.0);
     }
 }

@@ -17,7 +17,7 @@ pub mod transport;
 pub mod wire;
 
 #[doc(no_inline)]
-pub use client::{Client, ClientOptions, IncomingHandler};
+pub use client::{CallTimeout, Client, ClientOptions, IncomingHandler};
 #[doc(no_inline)]
 pub use connect::{ConnectContext, ConnectStrategy, DefaultConnect};
 #[doc(no_inline)]
