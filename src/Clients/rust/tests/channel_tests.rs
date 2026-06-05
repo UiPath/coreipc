@@ -341,3 +341,34 @@ async fn incoming_cancel_triggers_handler_token() {
     assert_eq!(resp.request_id, "cb");
     assert_eq!(resp.data.as_deref(), Some("\"cancelled\""));
 }
+
+#[tokio::test]
+async fn infinite_call_outlives_what_would_time_out() {
+    let (c, s) = duplex(64 * 1024);
+    let ch = RpcChannel::start(c, Arc::new(NoDispatcher));
+    let mut peer = Framed::new(s, MessageCodec::new());
+
+    let req = request("0", "ISignIn", "SignIn", &[]);
+    let call = tokio::spawn({
+        let ch = ch.clone();
+        async move { ch.call_raw_infinite(req, CancellationToken::new()).await }
+    });
+
+    // Peer reads the request, then waits 150 ms before replying — longer than a
+    // short finite timeout (e.g. 50 ms) would have allowed.
+    let _ = next_request(&mut peer).await;
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    respond(
+        &mut peer,
+        WireResponse {
+            request_id: "0".into(),
+            data: Some("true".into()),
+            error: None,
+        },
+    )
+    .await;
+
+    let resp = call.await.unwrap().unwrap();
+    assert_eq!(resp.data.as_deref(), Some("true"));
+}

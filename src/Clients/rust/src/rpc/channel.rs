@@ -101,6 +101,25 @@ impl RpcChannel {
         timeout: Duration,
         ct: CancellationToken,
     ) -> Result<WireResponse, RpcError> {
+        self.call_inner(req, Some(timeout), ct).await
+    }
+
+    /// Send a request and await its response with NO client-side timeout (cancellable via `ct` only).
+    /// Used for `Message.RequestTimeout = InfiniteTimeSpan` calls such as interactive SignIn.
+    pub async fn call_raw_infinite(
+        &self,
+        req: WireRequest,
+        ct: CancellationToken,
+    ) -> Result<WireResponse, RpcError> {
+        self.call_inner(req, None, ct).await
+    }
+
+    async fn call_inner(
+        &self,
+        req: WireRequest,
+        timeout: Option<Duration>,
+        ct: CancellationToken,
+    ) -> Result<WireResponse, RpcError> {
         let inner = &self.inner;
         if inner.closed.load(Ordering::SeqCst) {
             return Err(RpcError::ConnectionClosed);
@@ -116,12 +135,20 @@ impl RpcChannel {
             return Err(RpcError::ConnectionClosed);
         }
 
+        // `None` => never elapse (infinite wait); `Some(d)` => sleep then time out.
+        let timeout_branch = async {
+            match timeout {
+                Some(d) => tokio::time::sleep(d).await,
+                None => std::future::pending::<()>().await,
+            }
+        };
+
         let outcome = tokio::select! {
             res = orx => match res {
                 Ok(resp) => CallOutcome::Response(resp),
                 Err(_) => CallOutcome::Closed, // sender dropped => disconnect
             },
-            _ = tokio::time::sleep(timeout) => CallOutcome::TimedOut,
+            _ = timeout_branch => CallOutcome::TimedOut,
             _ = ct.cancelled() => CallOutcome::Cancelled,
         };
 
@@ -134,7 +161,7 @@ impl RpcChannel {
             CallOutcome::TimedOut => {
                 inner.pending.lock().unwrap().remove(&id);
                 self.send_cancel(&id).await;
-                Err(RpcError::Timeout(timeout))
+                Err(RpcError::Timeout(timeout.unwrap_or_default()))
             }
             CallOutcome::Cancelled => {
                 inner.pending.lock().unwrap().remove(&id);
