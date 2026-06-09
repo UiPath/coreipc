@@ -63,17 +63,21 @@ def _is_message_annotation(annotation: object) -> bool:
     return get_origin(annotation) is Message
 
 
-# Cache: handler function -> set of its `Message`-typed parameter names.
-# Keyed weakly by the underlying function so it's computed once per method.
-_message_params_cache: "weakref.WeakKeyDictionary[object, frozenset[str]]" = (
+# A handler's argument-binding plan: one tag per parameter (self excluded).
+#   "wire"    -> take the next positional wire argument
+#   "message" -> inject a Message (consumes no wire argument)
+#   "varargs" -> *args: absorb all remaining wire arguments
+#   "skip"    -> **kwargs / keyword-only: not fillable from positional wire
+# Cached weakly by the underlying function so it's computed once per method.
+_binding_plan_cache: "weakref.WeakKeyDictionary[object, tuple[str, ...]]" = (
     weakref.WeakKeyDictionary()
 )
 
 
-def _message_param_names(method: Callable[..., object]) -> frozenset[str]:
-    """Names of the handler's parameters that want a `Message` injected."""
+def _binding_plan(method: Callable[..., object]) -> tuple[str, ...]:
+    """Compute (and cache) how to map wire args onto a handler's parameters."""
     func = getattr(method, "__func__", method)
-    cached = _message_params_cache.get(func)
+    cached = _binding_plan_cache.get(func)
     if cached is not None:
         return cached
 
@@ -81,14 +85,22 @@ def _message_param_names(method: Callable[..., object]) -> frozenset[str]:
         hints = get_type_hints(func)
     except Exception:
         hints = {}
-    names = {
-        name
-        for name, param in inspect.signature(method).parameters.items()
-        if _is_message_annotation(hints.get(name, param.annotation))
-    }
-    result = frozenset(names)
+    plan: list[str] = []
+    for name, param in inspect.signature(method).parameters.items():
+        if param.kind is inspect.Parameter.VAR_POSITIONAL:
+            plan.append("varargs")
+        elif param.kind in (
+            inspect.Parameter.VAR_KEYWORD,
+            inspect.Parameter.KEYWORD_ONLY,
+        ):
+            plan.append("skip")
+        elif _is_message_annotation(hints.get(name, param.annotation)):
+            plan.append("message")
+        else:
+            plan.append("wire")
+    result = tuple(plan)
     try:
-        _message_params_cache[func] = result
+        _binding_plan_cache[func] = result
     except TypeError:
         pass  # builtins / unweakreferenceable callables: just don't cache
     return result
@@ -300,6 +312,14 @@ class IpcConnection:
         finally:
             # Mark closed so the owning IpcClient knows to re-dial on next call.
             self._closed = True
+            # Tear down our own writer so its transport doesn't leak. On peer
+            # disconnect the connection is pruned from any owning IpcServer, so
+            # aclose() won't run for it — this is the only cleanup it gets.
+            try:
+                self._writer.close()
+            except Exception:
+                pass
+            self._fail_pending(ConnectionError("connection closed"))
             # Notify owners (e.g. IpcServer) so they can prune this connection.
             self._notify_closed()
 
@@ -332,34 +352,35 @@ class IpcConnection:
     def _bind_handler_args(
         self, method: Callable[..., object], wire_args: list[object]
     ) -> list[object]:
-        """Map wire args onto the handler's parameters, injecting a `Message`
-        for any `Message`-typed parameter (the .NET trailing-`Message`
-        convention). The fast path (no `Message` param) returns wire_args
-        unchanged.
-        """
-        message_params = _message_param_names(method)
-        if not message_params:
-            return wire_args
+        """Map wire args positionally onto the handler's parameters.
 
-        message: Message[object] = Message(
-            client=self, request_timeout=self.request_timeout
-        )
+        Injects a `Message` for any `Message`-typed parameter (the .NET
+        trailing-`Message` convention) and **ignores extra trailing wire
+        args** — which is how an idiomatic .NET client's optional
+        `CancellationToken` (serialized as one extra parameter per the
+        `Message`/CT convention) is tolerated. A handler may declare `*args`
+        to receive every wire argument. Missing args fall back to defaults.
+        """
+        plan = _binding_plan(method)
+        message: Message[object] | None = None
         sentinel = object()
         wire = iter(wire_args)
         bound: list[object] = []
-        for name, param in inspect.signature(method).parameters.items():
-            if param.kind is inspect.Parameter.VAR_POSITIONAL:
-                bound.extend(wire)
-                continue
-            if param.kind is inspect.Parameter.VAR_KEYWORD:
-                continue
-            if name in message_params:
+        for tag in plan:
+            if tag == "message":
+                if message is None:
+                    message = Message(
+                        client=self, request_timeout=self.request_timeout
+                    )
                 bound.append(message)
-                continue
-            nxt = next(wire, sentinel)
-            if nxt is sentinel:
-                break  # out of wire args — let remaining params use defaults
-            bound.append(nxt)
+            elif tag == "varargs":
+                bound.extend(wire)
+            elif tag == "wire":
+                nxt = next(wire, sentinel)
+                if nxt is sentinel:
+                    break  # out of wire args — remaining params use defaults
+                bound.append(nxt)
+            # "skip": keyword-only / **kwargs — not fillable positionally
         return bound
 
     async def _invoke_callback(self, req: Request) -> None:
