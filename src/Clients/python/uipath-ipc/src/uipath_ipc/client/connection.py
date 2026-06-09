@@ -30,6 +30,7 @@ import inspect
 import itertools
 import json
 import traceback
+from typing import Callable
 
 from ..transport.base import ClientTransport
 from ..wire import (
@@ -41,6 +42,10 @@ from ..wire import (
     read_frame,
     write_frame,
 )
+
+#: Invoked once with the connection when it closes (e.g. to prune it from a
+#: server's live-connection set). Should be synchronous and must not raise.
+CloseCallback = Callable[["IpcConnection"], object]
 
 
 class IpcConnection:
@@ -61,6 +66,8 @@ class IpcConnection:
         self._receive_task: asyncio.Task[None] | None = None
         self._write_lock = asyncio.Lock()
         self._closed = False
+        self._close_callbacks: list[CloseCallback] = []
+        self._close_notified = False
 
     # --- lifecycle ---------------------------------------------------------
 
@@ -99,6 +106,7 @@ class IpcConnection:
         except Exception:
             pass
         self._fail_pending(ConnectionError("connection closed"))
+        self._notify_closed()
 
     async def __aenter__(self) -> IpcConnection:
         return self
@@ -111,6 +119,33 @@ class IpcConnection:
     @property
     def is_closed(self) -> bool:
         return self._closed
+
+    def add_close_callback(self, callback: CloseCallback) -> None:
+        """Register a callback invoked exactly once when this connection closes.
+
+        The callback receives this connection. It fires from whichever path
+        closes the connection first — an explicit `aclose()` or the receive
+        loop ending (peer disconnect / I/O error). If the connection is
+        already closed, the callback runs immediately. Used by `IpcServer`
+        to prune connections from its live set. Callbacks should be
+        synchronous and must not raise.
+        """
+        if self._close_notified:
+            callback(self)
+            return
+        self._close_callbacks.append(callback)
+
+    def _notify_closed(self) -> None:
+        """Fire close callbacks once, swallowing any errors they raise."""
+        if self._close_notified:
+            return
+        self._close_notified = True
+        for cb in self._close_callbacks:
+            try:
+                cb(self)
+            except Exception:
+                pass
+        self._close_callbacks.clear()
 
     def next_id(self) -> str:
         return str(next(self._id_counter))
@@ -183,6 +218,8 @@ class IpcConnection:
         finally:
             # Mark closed so the owning IpcClient knows to re-dial on next call.
             self._closed = True
+            # Notify owners (e.g. IpcServer) so they can prune this connection.
+            self._notify_closed()
 
     def _handle_response(self, payload: bytes) -> None:
         resp = Response.from_json(payload.decode("utf-8"))

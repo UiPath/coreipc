@@ -1,20 +1,22 @@
-"""Named-pipe client transport.
+"""Named-pipe client and server transports.
 
 Cross-platform:
-  - Windows: connects to `\\\\<server>\\pipe\\<name>` via the ProactorEventLoop's
-    `create_pipe_connection`.
-  - POSIX: connects to a Unix Domain Socket at `/tmp/CoreFxPipe_<name>`, which
-    is the location .NET's `NamedPipeClient` uses on Linux/macOS for cross-
-    platform IPC.
+  - Windows: `\\\\<server>\\pipe\\<name>` via the ProactorEventLoop's
+    `create_pipe_connection` (client) / `start_serving_pipe` (server).
+  - POSIX: a Unix Domain Socket at `/tmp/CoreFxPipe_<name>`, which is the
+    location .NET's `NamedPipe{Client,Server}` use on Linux/macOS for
+    cross-platform IPC.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import os
 import sys
 from dataclasses import dataclass
 
-from .base import ClientTransport
+from .base import ClientTransport, ConnectionHandler, ServerHandle, ServerTransport
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,3 +86,72 @@ class NamedPipeClientTransport(ClientTransport):
                 last = ex
         assert last is not None
         raise last
+
+
+class _PipeServerHandle:
+    """Wraps the list of `PipeServer` objects from `start_serving_pipe`."""
+
+    __slots__ = ("_servers",)
+
+    def __init__(self, servers: list) -> None:
+        self._servers = servers
+
+    def close(self) -> None:
+        for server in self._servers:
+            server.close()
+
+    async def wait_closed(self) -> None:  # PipeServers close synchronously
+        return None
+
+
+@dataclass(frozen=True, slots=True)
+class NamedPipeServerTransport(ServerTransport):
+    """Server transport over a named pipe.
+
+    Listens on the local pipe ``pipe_name`` and invokes the connection
+    handler for each accepted client. Multiple clients are served (the
+    listener re-arms after each accept).
+
+    Attributes:
+        pipe_name: The bare pipe name (no prefix), matching the name a
+            client passes to `NamedPipeClientTransport`.
+    """
+
+    pipe_name: str
+
+    @property
+    def _windows_address(self) -> str:
+        return rf"\\.\pipe\{self.pipe_name}"
+
+    @property
+    def _posix_address(self) -> str:
+        return f"/tmp/CoreFxPipe_{self.pipe_name}"
+
+    async def serve(self, on_connection: ConnectionHandler) -> ServerHandle:
+        if sys.platform == "win32":
+            return await self._serve_windows(on_connection)
+        return await self._serve_posix(on_connection)
+
+    async def _serve_windows(self, on_connection: ConnectionHandler) -> ServerHandle:
+        loop = asyncio.get_running_loop()
+
+        def factory() -> asyncio.StreamReaderProtocol:
+            reader = asyncio.StreamReader(loop=loop)
+            return asyncio.StreamReaderProtocol(
+                reader,
+                lambda r, w: on_connection(r, w),
+                loop=loop,
+            )
+
+        servers = await loop.start_serving_pipe(  # type: ignore[attr-defined]
+            factory, self._windows_address
+        )
+        return _PipeServerHandle(servers)
+
+    async def _serve_posix(self, on_connection: ConnectionHandler) -> ServerHandle:
+        # A stale socket file from a previous run blocks bind(); remove it.
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(self._posix_address)
+        return await asyncio.start_unix_server(
+            lambda r, w: on_connection(r, w), self._posix_address
+        )

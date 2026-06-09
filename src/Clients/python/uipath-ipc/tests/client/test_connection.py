@@ -130,6 +130,48 @@ async def test_next_id_increments() -> None:
         await conn.aclose()
 
 
+# --- close callbacks ------------------------------------------------------
+
+async def test_close_callback_fires_on_aclose() -> None:
+    conn, _reader, _writer = await _make_connection()
+    fired: list[IpcConnection] = []
+    conn.add_close_callback(fired.append)
+    await conn.aclose()
+    assert fired == [conn]
+
+
+async def test_close_callback_fires_only_once() -> None:
+    conn, _reader, _writer = await _make_connection()
+    fired: list[IpcConnection] = []
+    conn.add_close_callback(fired.append)
+    await conn.aclose()
+    await conn.aclose()  # second close must not re-fire
+    assert fired == [conn]
+
+
+async def test_close_callback_fires_on_peer_disconnect() -> None:
+    conn, reader, _writer = await _make_connection()
+    fired: list[IpcConnection] = []
+    conn.add_close_callback(fired.append)
+    # Peer hangs up: receive loop ends and should notify close.
+    reader.feed_eof()
+    deadline = asyncio.get_running_loop().time() + 1.0
+    while not fired:
+        if asyncio.get_running_loop().time() > deadline:
+            pytest.fail("close callback did not fire on peer disconnect")
+        await asyncio.sleep(0.01)
+    assert fired == [conn]
+    await conn.aclose()
+
+
+async def test_close_callback_added_after_close_fires_immediately() -> None:
+    conn, _reader, _writer = await _make_connection()
+    await conn.aclose()
+    fired: list[IpcConnection] = []
+    conn.add_close_callback(fired.append)
+    assert fired == [conn]
+
+
 # --- bytes on the wire ----------------------------------------------------
 
 async def test_wire_format_is_request_frame() -> None:
