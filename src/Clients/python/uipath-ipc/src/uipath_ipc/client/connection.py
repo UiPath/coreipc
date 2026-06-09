@@ -30,8 +30,10 @@ import inspect
 import itertools
 import json
 import traceback
-from typing import Callable
+import weakref
+from typing import Callable, TypeVar, cast, get_origin, get_type_hints
 
+from ..message import Message
 from ..transport.base import ClientTransport
 from ..wire import (
     CancellationRequest,
@@ -43,9 +45,70 @@ from ..wire import (
     write_frame,
 )
 
+T = TypeVar("T")
+
 #: Invoked once with the connection when it closes (e.g. to prune it from a
 #: server's live-connection set). Should be synchronous and must not raise.
 CloseCallback = Callable[["IpcConnection"], object]
+
+
+def _is_message_annotation(annotation: object) -> bool:
+    """True if a parameter annotation refers to `Message` or `Message[T]`."""
+    if annotation is Message:
+        return True
+    if isinstance(annotation, str):
+        # `from __future__ import annotations` leaves annotations as strings
+        # when get_type_hints can't resolve them; match by spelling.
+        return annotation == "Message" or annotation.startswith("Message[")
+    return get_origin(annotation) is Message
+
+
+# Cache: handler function -> set of its `Message`-typed parameter names.
+# Keyed weakly by the underlying function so it's computed once per method.
+_message_params_cache: "weakref.WeakKeyDictionary[object, frozenset[str]]" = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _message_param_names(method: Callable[..., object]) -> frozenset[str]:
+    """Names of the handler's parameters that want a `Message` injected."""
+    func = getattr(method, "__func__", method)
+    cached = _message_params_cache.get(func)
+    if cached is not None:
+        return cached
+
+    try:
+        hints = get_type_hints(func)
+    except Exception:
+        hints = {}
+    names = {
+        name
+        for name, param in inspect.signature(method).parameters.items()
+        if _is_message_annotation(hints.get(name, param.annotation))
+    }
+    result = frozenset(names)
+    try:
+        _message_params_cache[func] = result
+    except TypeError:
+        pass  # builtins / unweakreferenceable callables: just don't cache
+    return result
+
+
+class _ConnectionInvoker:
+    """Adapts one open `IpcConnection` to the minimal surface `_IpcProxy`
+    needs — an already-connected `_ensure_connected` plus a `request_timeout`
+    — so reach-back proxies can be built without an owning `IpcClient`."""
+
+    __slots__ = ("_connection", "request_timeout")
+
+    def __init__(
+        self, connection: IpcConnection, request_timeout: float | None
+    ) -> None:
+        self._connection = connection
+        self.request_timeout = request_timeout
+
+    async def _ensure_connected(self) -> IpcConnection:
+        return self._connection
 
 
 class IpcConnection:
@@ -56,10 +119,13 @@ class IpcConnection:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
         callbacks: dict[str, object] | None = None,
+        request_timeout: float | None = None,
     ) -> None:
         self._reader = reader
         self._writer = writer
         self._callbacks: dict[str, object] = dict(callbacks or {})
+        #: Default timeout for reach-back proxies built via `get_callback`.
+        self.request_timeout = request_timeout
         self._pending: dict[str, asyncio.Future[Response]] = {}
         self._incoming_handlers: dict[str, asyncio.Task[None]] = {}
         self._id_counter = itertools.count(1)
@@ -76,10 +142,13 @@ class IpcConnection:
         cls,
         transport: ClientTransport,
         callbacks: dict[str, object] | None = None,
+        request_timeout: float | None = None,
     ) -> IpcConnection:
         """Connect via the transport, wrap the stream in a new connection."""
         reader, writer = await transport.connect()
-        conn = cls(reader, writer, callbacks=callbacks)
+        conn = cls(
+            reader, writer, callbacks=callbacks, request_timeout=request_timeout
+        )
         conn.start()
         return conn
 
@@ -149,6 +218,19 @@ class IpcConnection:
 
     def next_id(self) -> str:
         return str(next(self._id_counter))
+
+    def get_callback(self, contract: type[T]) -> T:
+        """Return a proxy that calls `contract` back over THIS connection.
+
+        The inverse direction of an in-flight request: a handler invoked on
+        this connection can call methods the *peer* hosts (its registered
+        callbacks/services). Mirrors .NET's ``IClient.GetCallback<T>()``.
+        Usually reached via an injected `Message`: ``m.client.get_callback``.
+        """
+        from .proxy import _IpcProxy  # local import avoids an import cycle
+
+        invoker = _ConnectionInvoker(self, self.request_timeout)
+        return cast(T, _IpcProxy(invoker, contract))
 
     async def send_request(self, req: Request) -> Response:
         """Send a request and await the matching response.
@@ -247,6 +329,39 @@ class IpcConnection:
         if task is not None and not task.done():
             task.cancel()
 
+    def _bind_handler_args(
+        self, method: Callable[..., object], wire_args: list[object]
+    ) -> list[object]:
+        """Map wire args onto the handler's parameters, injecting a `Message`
+        for any `Message`-typed parameter (the .NET trailing-`Message`
+        convention). The fast path (no `Message` param) returns wire_args
+        unchanged.
+        """
+        message_params = _message_param_names(method)
+        if not message_params:
+            return wire_args
+
+        message: Message[object] = Message(
+            client=self, request_timeout=self.request_timeout
+        )
+        sentinel = object()
+        wire = iter(wire_args)
+        bound: list[object] = []
+        for name, param in inspect.signature(method).parameters.items():
+            if param.kind is inspect.Parameter.VAR_POSITIONAL:
+                bound.extend(wire)
+                continue
+            if param.kind is inspect.Parameter.VAR_KEYWORD:
+                continue
+            if name in message_params:
+                bound.append(message)
+                continue
+            nxt = next(wire, sentinel)
+            if nxt is sentinel:
+                break  # out of wire args — let remaining params use defaults
+            bound.append(nxt)
+        return bound
+
     async def _invoke_callback(self, req: Request) -> None:
         """Run the user's callback for an incoming Request, then send the Response."""
         try:
@@ -263,7 +378,8 @@ class IpcConnection:
                 )
             # Each parameter is an individually JSON-encoded string (wire gotcha).
             args = [json.loads(p) for p in req.parameters]
-            result = method(*args)
+            call_args = self._bind_handler_args(method, args)
+            result = method(*call_args)
             if inspect.isawaitable(result):
                 result = await result
             data = None if result is None else json.dumps(result)

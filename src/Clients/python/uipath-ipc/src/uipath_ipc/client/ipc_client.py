@@ -68,7 +68,9 @@ class IpcClient:
             if self._connection is not None:
                 await self._connection.aclose()
             self._connection = await IpcConnection.open(
-                self._transport, callbacks=self._callbacks
+                self._transport,
+                callbacks=self._callbacks,
+                request_timeout=self.request_timeout,
             )
         return self._connection
 

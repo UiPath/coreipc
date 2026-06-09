@@ -19,6 +19,7 @@ import pytest
 from uipath_ipc import (
     IpcClient,
     IpcServer,
+    Message,
     NamedPipeClientTransport,
     NamedPipeServerTransport,
     RemoteException,
@@ -190,6 +191,54 @@ async def test_aclose_closes_live_connections() -> None:
     assert server.connection_count == 0
     assert server.handle is None
     await client.aclose()
+
+
+# --- handler-initiated reach-back (Message.client.get_callback) -----------
+
+class IGreeter(ABC):
+    @abstractmethod
+    async def GreetVia(self, name: str) -> str: ...
+
+
+class IClientName(ABC):
+    """Hosted by the *client*; the server's handler calls it back."""
+
+    @abstractmethod
+    async def Decorate(self, name: str) -> str: ...
+
+
+class GreeterService:
+    """Server-hosted; reaches back into the calling client mid-request."""
+
+    async def GreetVia(self, name: str, m: Message) -> str:
+        peer = m.client.get_callback(IClientName)
+        decorated = await peer.Decorate(name)
+        return f"hello {decorated}"
+
+
+class ClientNameImpl:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def Decorate(self, name: str) -> str:
+        self.calls.append(name)
+        return name.upper()
+
+
+async def test_server_handler_reaches_back_into_client_callback() -> None:
+    """Full duplex re-entrancy: client → server → (callback) client → server."""
+    impl = ClientNameImpl()
+    server = IpcServer(TcpServerTransport("127.0.0.1", 0), {IGreeter: GreeterService()})
+    async with server:
+        host, port = _tcp_endpoint(server)
+        client = IpcClient(
+            TcpClientTransport(host, port), callbacks={IClientName: impl}
+        )
+        async with client:
+            svc = client.get_proxy(IGreeter)
+            result = await asyncio.wait_for(svc.GreetVia("bob"), timeout=5)
+            assert result == "hello BOB"
+            assert impl.calls == ["bob"]
 
 
 # --- named pipe loopback --------------------------------------------------

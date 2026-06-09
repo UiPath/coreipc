@@ -39,6 +39,7 @@ class IpcServer:
         self,
         transport: ServerTransport,
         services: dict[type, object],
+        request_timeout: float | None = None,
     ) -> None:
         """Create a server.
 
@@ -49,6 +50,9 @@ class IpcServer:
                 instance's class need NOT inherit from the contract
                 (duck-typed). The contract's ``__name__`` is the endpoint on
                 the wire — matching how `IpcClient.get_proxy` names calls.
+            request_timeout: Default timeout for reach-back proxies a hosted
+                service builds via ``message.client.get_callback(...)``.
+                ``None`` (default) disables the timeout.
         """
         self._transport = transport
         # Translate contract-type keys to endpoint-name keys once; the
@@ -56,6 +60,7 @@ class IpcServer:
         self._services: dict[str, object] = {
             contract.__name__: instance for contract, instance in services.items()
         }
+        self._request_timeout = request_timeout
         self._handle: ServerHandle | None = None
         self._connections: set[IpcConnection] = set()
 
@@ -71,7 +76,12 @@ class IpcServer:
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         """Accept one client: wrap its stream in a service-hosting connection."""
-        conn = IpcConnection(reader, writer, callbacks=self._services)
+        conn = IpcConnection(
+            reader,
+            writer,
+            callbacks=self._services,
+            request_timeout=self._request_timeout,
+        )
         self._connections.add(conn)
         # Prune from the live set when the peer disconnects or we close it.
         conn.add_close_callback(self._connections.discard)
