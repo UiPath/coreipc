@@ -1,0 +1,160 @@
+# =====================================================================
+# Publish pipeline — pushes a CI build's artifacts to the feeds.
+# =====================================================================
+# Run on demand. Takes the id of a completed CI build (azp-ci.yaml run),
+# downloads that build's artifacts, and publishes the selected packages
+# behind their approval-gated environments. Builds nothing itself.
+#
+# Parameters:
+#   - buildId      (required) the CI build/run id to publish from.
+#   - publishNuGet / publishNpm / publishPyPI  (default: all on) — which
+#     packages to publish. At least one must be selected.
+#
+# SETUP (one-time): set the `source:` of the `ci` pipeline resource below to
+# the NAME of your CI pipeline (the one running azp-ci.yaml). The resource is
+# used to resolve the CI pipeline's definition id for the artifact download
+# (and to authorize cross-pipeline artifact access on first run).
+# =====================================================================
+
+name: $(Date:yyyyMMdd)$(Rev:-rr)
+
+trigger: none      # manual only — this pipeline is run on demand with parameters
+pr: none
+
+parameters:
+  - name: buildId
+    displayName: 'CI build (run) id to publish artifacts from (required)'
+    type: string
+
+  - name: publishNuGet
+    displayName: 'Publish NuGet → UiPath-Internal'
+    type: boolean
+    default: true
+
+  - name: publishNpm
+    displayName: 'Publish NPM (Node + Web) → uipath-ipc-deps (+ GitHub Packages best-effort)'
+    type: boolean
+    default: true
+
+  - name: publishPyPI
+    displayName: 'Publish Python (wheel + sdist) → uipath-ipc-deps'
+    type: boolean
+    default: true
+
+resources:
+  pipelines:
+    - pipeline: ci
+      # ⚠️ SET THIS to your CI pipeline's name (the azp-ci.yaml pipeline).
+      # Only `$(resources.pipeline.ci.pipelineID)` is used below — to point the
+      # artifact download at the CI definition; the specific run is `buildId`.
+      source: 'coreipc-ci'
+      trigger: none
+
+variables:
+  # Defensive: keep the Supply Chain Guard shim disabled here too (see the
+  # detailed note in azp-nodejs.yaml). Publish does not run `npm install`, but
+  # this keeps both pipelines consistent.
+  SCG_KILL_SWITCH: 'true'
+
+stages:
+# =====================================================================
+# Input validation (compile-time). Each guard emits a fail-fast stage so a
+# bad/empty invocation surfaces a clear error instead of silently doing
+# nothing. '0' is treated as "not provided" (legacy sentinel).
+# =====================================================================
+- ${{ if in(parameters.buildId, '', '0') }}:
+  - stage: Invalid_Input
+    displayName: '❌ buildId required'
+    jobs:
+    - job: error
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+      - checkout: none
+      - script: |
+          echo "##vso[task.logissue type=error]'buildId' is required: enter the CI build (run) id whose artifacts you want to publish."
+          exit 1
+        displayName: 'buildId is required'
+
+- ${{ if not(or(eq(parameters.publishNuGet, true), eq(parameters.publishNpm, true), eq(parameters.publishPyPI, true))) }}:
+  - stage: Nothing_Selected
+    displayName: '❌ Nothing selected'
+    jobs:
+    - job: error
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+      - checkout: none
+      - script: |
+          echo "##vso[task.logissue type=error]Select at least one package to publish (NuGet, NPM, or PyPI)."
+          exit 1
+        displayName: 'At least one package required'
+
+# =====================================================================
+# Publish stages — only emitted when a real buildId was provided. Each runs
+# independently (dependsOn: []) behind its approval-gated environment, and
+# pulls the artifact from the CI build:
+#   reuseArtifactsFromBuildId = the buildId run
+#   sourcePipelineId          = the CI pipeline definition (via the resource)
+# `- download: none` suppresses the deployment job's implicit artifact
+# download (the publish step template downloads exactly what it needs).
+# =====================================================================
+- ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishNuGet, true)) }}:
+  - stage: Publish_NuGet
+    displayName: '🚚 Publish NuGet'
+    dependsOn: []
+    jobs:
+    - deployment: Publish_NuGet_Package
+      displayName: '📦 Publish NuGet to UiPath-Internal'
+      environment: 'NuGet-Packages'
+      pool:
+        vmImage: 'windows-2022'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - download: none
+              - template: azp-nuget.publish.steps.yaml
+                parameters:
+                  reuseArtifactsFromBuildId: ${{ parameters.buildId }}
+                  sourcePipelineId: $(resources.pipeline.ci.pipelineID)
+
+- ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishNpm, true)) }}:
+  - stage: Publish_NPM
+    displayName: '🚚 Publish NPM'
+    dependsOn: []
+    jobs:
+    - deployment: Publish_NPM_Packages
+      displayName: '📦 Publish NPM (Node + Web)'
+      environment: 'NPM-Packages'
+      pool:
+        vmImage: ubuntu-latest
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - download: none
+              - template: azp-js.publish-npm.steps.yaml
+                parameters:
+                  reuseArtifactsFromBuildId: ${{ parameters.buildId }}
+                  sourcePipelineId: $(resources.pipeline.ci.pipelineID)
+
+- ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishPyPI, true)) }}:
+  - stage: Publish_PyPI
+    displayName: '🚚 Publish PyPI'
+    dependsOn: []
+    jobs:
+    - deployment: Publish_PyPI_Package
+      displayName: '📦 Publish Python wheel + sdist to uipath-ipc-deps'
+      environment: 'PyPI-Packages'
+      pool:
+        vmImage: 'ubuntu-latest'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - download: none
+              - template: azp-python.publish.steps.yaml
+                parameters:
+                  reuseArtifactsFromBuildId: ${{ parameters.buildId }}
+                  sourcePipelineId: $(resources.pipeline.ci.pipelineID)
