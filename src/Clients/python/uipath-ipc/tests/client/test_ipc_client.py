@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 
 import pytest
 
-from uipath_ipc import IpcClient, RemoteException
+from uipath_ipc import IpcClient, Message, RemoteException
 from uipath_ipc.transport.base import ClientTransport
 from uipath_ipc.wire import Error, MessageType, Response
 
@@ -55,6 +55,17 @@ class IComputingService(ABC):
 
     @abstractmethod
     async def Notify(self, message: str) -> None: ...
+
+
+class ITimed(ABC):
+    @abstractmethod
+    async def DoWork(self, m: object) -> None: ...
+
+
+def _sent_request(writer: _BufferWriter) -> dict:
+    buf = bytes(writer.buffer)
+    payload_len = int.from_bytes(buf[1:5], "little", signed=True)
+    return json.loads(buf[5 : 5 + payload_len].decode("utf-8"))
 
 
 # --- proxy tests ----------------------------------------------------------
@@ -141,6 +152,39 @@ async def test_proxy_unknown_method_raises_attribute_error() -> None:
         svc = client.get_proxy(IComputingService)
         with pytest.raises(AttributeError):
             _ = svc.DoesNotExist  # type: ignore[attr-defined]
+
+
+# --- per-call timeout (Message argument) -----------------------------------
+
+async def test_message_arg_sets_per_call_timeout() -> None:
+    """A Message arg's request_timeout overrides the client-wide default for
+    this call and rides the wire (TimeoutInSeconds); a payload-less Message
+    serializes to {}."""
+    t = _FakeTransport()
+    async with IpcClient(t) as client:  # client-wide timeout is None
+        svc = client.get_proxy(ITimed)
+        task = asyncio.create_task(svc.DoWork(Message(request_timeout=2.0)))
+        await asyncio.sleep(0)
+        req = _sent_request(t.writer)
+        assert req["TimeoutInSeconds"] == 2.0
+        assert req["Parameters"] == ["{}"]
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
+        await asyncio.wait_for(task, timeout=1.0)
+
+
+async def test_message_arg_with_payload_serializes_payload() -> None:
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(ITimed)
+        task = asyncio.create_task(
+            svc.DoWork(Message(payload={"k": 1}, request_timeout=5.0))
+        )
+        await asyncio.sleep(0)
+        req = _sent_request(t.writer)
+        assert req["TimeoutInSeconds"] == 5.0
+        assert req["Parameters"] == ['{"Payload": {"k": 1}}']
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
+        await asyncio.wait_for(task, timeout=1.0)
 
 
 # --- client lifecycle tests -----------------------------------------------

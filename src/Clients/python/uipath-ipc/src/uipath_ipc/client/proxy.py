@@ -8,10 +8,18 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from ..errors import RemoteException
+from ..message import Message
 from ..wire import Request
 
 if TYPE_CHECKING:
     from .ipc_client import IpcClient
+
+
+def _message_wire(m: Message) -> dict:
+    """The wire form of a `Message` argument, matching .NET: a payload-less
+    `Message` serializes to `{}`; `Message[T]` to `{"Payload": <payload>}`.
+    `client`/`request_timeout` are transport-only (never serialized)."""
+    return {} if m.payload is None else {"Payload": m.payload}
 
 
 class _IpcProxy:
@@ -55,9 +63,19 @@ class _IpcProxy:
         return call
 
     async def _invoke(self, method_name: str, args: tuple[Any, ...]) -> Any:
-        params = [json.dumps(a) for a in args]
-        conn = await self._client._ensure_connected()
+        # A `Message` argument may carry a per-call timeout (the .NET/TS
+        # mechanism): it overrides the client-wide default for this call only,
+        # and is serialized to its wire form rather than dumped as a plain arg.
         timeout = self._client.request_timeout
+        params: list[str] = []
+        for a in args:
+            if isinstance(a, Message):
+                if a.request_timeout is not None:
+                    timeout = a.request_timeout
+                params.append(json.dumps(_message_wire(a)))
+            else:
+                params.append(json.dumps(a))
+        conn = await self._client._ensure_connected()
         req = Request(
             endpoint=self._endpoint_name,
             method_name=method_name,
