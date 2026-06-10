@@ -1,7 +1,7 @@
 # =====================================================================
 # Publish pipeline — pushes a CI build's artifacts to the feeds.
 # =====================================================================
-# Run on demand. Takes the id of a completed CI build (azp-ci.yaml run),
+# Run on demand. Takes the id of a completed CI build (azp-start.yaml run),
 # downloads that build's artifacts, and publishes the selected packages
 # behind their approval-gated environments. Builds nothing itself.
 #
@@ -11,8 +11,8 @@
 #     packages to publish. At least one must be selected.
 #
 # SETUP (one-time): set the `source:` of the `ci` pipeline resource below to
-# the NAME of your CI pipeline (the one running azp-ci.yaml). The resource is
-# used to resolve the CI pipeline's definition id for the artifact download
+# the NAME of your CI pipeline (the one running azp-start.yaml). The resource
+# is used to resolve the CI pipeline's definition id for the artifact download
 # (and to authorize cross-pipeline artifact access on first run).
 # =====================================================================
 
@@ -44,7 +44,7 @@ parameters:
 resources:
   pipelines:
     - pipeline: ci
-      # ⚠️ SET THIS to your CI pipeline's name (the azp-ci.yaml pipeline).
+      # ⚠️ SET THIS to your CI pipeline's name (the azp-start.yaml pipeline).
       # Only `$(resources.pipeline.ci.pipelineID)` is used below — to point the
       # artifact download at the CI definition; the specific run is `buildId`.
       source: 'coreipc-ci'

@@ -1,40 +1,25 @@
+# =====================================================================
+# CI pipeline — always builds & tests everything, no parameters.
+# =====================================================================
+# Kept at this path (azp-start.yaml) on purpose: the existing CI pipeline
+# definition already points here, and the path resolves on EVERY branch, so
+# CI transitions cleanly as branches merge — no repointing, no "YAML file not
+# found". The file's *content* is what changes (the old combined build+publish
+# pipeline is retired): build/test only, publishing moved to azp-publish.yaml.
+#
+# Builds NuGet (.NET), NPM (Node + Web) and Python in parallel, runs their
+# tests, and publishes each as a pipeline artifact:
+#   'NuGet package' / 'NPM package' / 'Python package'.
+#
+# Pushes to NO feed. Publishing is the separate, manual Publish pipeline
+# (azp-publish.yaml): it takes a CI build id and pushes that build's artifacts
+# to the feeds behind approval-gated environments.
+#
+# Triggers: configure in Azure DevOps (CI on push). The Publish pipeline is
+# manual-only.
+# =====================================================================
+
 name: $(Date:yyyyMMdd)$(Rev:-rr)
-
-parameters:
-  - name: buildNuGet
-    displayName: 'Build NuGet'
-    type: boolean
-    default: true
-
-  - name: buildNpm
-    displayName: 'Build NPM (Node + Web)'
-    type: boolean
-    default: true
-
-  - name: buildPython
-    displayName: 'Build Python'
-    type: boolean
-    default: true
-
-  - name: publishNuGet
-    displayName: 'Publish NuGet package to UiPath-Internal feed'
-    type: boolean
-    default: false
-
-  - name: publishNpm
-    displayName: 'Publish NPM packages (Node + Web) to uipath-ipc-deps (+ GitHub Packages best-effort)'
-    type: boolean
-    default: false
-
-  - name: publishPyPI
-    displayName: 'Publish Python package (wheel + sdist) to uipath-ipc-deps'
-    type: boolean
-    default: false
-
-  - name: reuseArtifactsFromBuildId
-    displayName: 'Reuse artifacts from build ID (0 = no, run Build normally)'
-    type: string
-    default: '0'
 
 variables:
   SCG_KILL_SWITCH: 'true' # Because our integration with the Aikido Safe Chain pipeline decorator (SGC rollout) is still buggy: https://uipath-product.slack.com/archives/CMCKWF5TR/p1780002214456709
@@ -57,171 +42,58 @@ variables:
   NodeJS_DotNetNodeInteropSolution: './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop.sln'
 
 stages:
-# =====================================================================
-# Build stages — one per technology, all run in parallel.
-# =====================================================================
-# Each Publish_X stage depends only on its own Build_X, so a fast
-# technology (e.g. NuGet) doesn't have to wait for a slow one (e.g.
-# Python integration tests against the .NET test server) before
-# publishing.
-#
-# Each Build_X is included at compile time only when its `buildX`
-# parameter is true (default). Unchecking buildX removes the entire
-# Build_X stage from the run. `dependsOn: []` makes the included
-# Build stages start in parallel rather than serializing along YAML
-# order.
-#
-# Stage-level runtime `condition` still applies inside the stage:
-# Build_X is Skipped when `reuseArtifactsFromBuildId` is a real id
-# (so the publish path can pull from that build instead).
-# =====================================================================
-
-- ${{ if eq(parameters.buildNuGet, true) }}:
-  - stage: Build_NuGet
-    displayName: '🏭 Build NuGet'
-    dependsOn: []
-    # '0' (default) or '' both mean "no reuse — run Build normally".
-    condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
-    jobs:
-    - job: NuGet_DotNet_Windows
-      displayName: 'NuGet — .NET on Windows'
-      pool:
-          vmImage: 'windows-2022'
-      steps:
-        - template: azp-initialization.yaml
-        - template: azp-dotnet.yaml
-        - template: azp-dotnet-dist.yaml
-
-- ${{ if eq(parameters.buildNpm, true) }}:
-  - stage: Build_NPM
-    displayName: '🏭 Build NPM'
-    dependsOn: []
-    condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
-    jobs:
-    - job: NPM_Node_Web_Windows
-      displayName: 'NPM — Node + Web on Windows'
-      pool:
-          vmImage: 'windows-2022'
-      steps:
-        - template: azp-initialization.yaml
-        - template: azp-nodejs.yaml
-        - template: azp-nodejs-dist.yaml
-
-    - job: NPM_Node_Web_Linux
-      displayName: 'NPM — Node + Web on Linux (test-only)'
-      pool:
-        vmImage: 'ubuntu-22.04'
-      steps:
-        - template: azp-initialization.yaml
-        - template: azp-nodejs.yaml
-
-- ${{ if eq(parameters.buildPython, true) }}:
-  - stage: Build_Python
-    displayName: '🏭 Build Python'
-    dependsOn: []
-    condition: in('${{ parameters.reuseArtifactsFromBuildId }}', '0', '')
-    jobs:
-    - job: Python_Windows
-      displayName: 'Python — Windows'
-      pool:
-          vmImage: 'windows-2022'
-      steps:
-        - template: azp-initialization.yaml
-        - template: azp-python.yaml
-        - template: azp-python-dist.yaml
-
-    - job: Python_Linux
-      displayName: 'Python — Linux (test-only)'
-      pool:
-        vmImage: 'ubuntu-22.04'
-      steps:
-        - template: azp-initialization.yaml
-        - template: azp-python.yaml
-
-# =====================================================================
-# Publish stages — each depends only on its corresponding Build stage,
-# so they unblock independently as their Build finishes.
-#
-# When a Build_X is excluded at compile time (buildX=false), its
-# matching Publish_X has no Build to depend on; we set `dependsOn: []`
-# in that case so the Publish runs immediately. The artifact download
-# inside the publish template will fail clearly if there's neither a
-# current-build artifact nor a `reuseArtifactsFromBuildId` to pull from.
-# =====================================================================
-
-# Publish — NuGet
-# Stage omitted at compile time when `publishNuGet` is false — default
-# CI runs have no "Publish NuGet" entry in the UI at all, and the
-# rejection-as-failure footgun is impossible. When it does run, approval
-# is gated by the `NuGet-Packages` environment.
-- ${{ if eq(parameters.publishNuGet, true) }}:
-  - stage: Publish_NuGet
-    displayName: '🚚 Publish NuGet'
-    ${{ if eq(parameters.buildNuGet, true) }}:
-      dependsOn: Build_NuGet
-      # Build_NuGet can legitimately be Skipped (reuseArtifactsFromBuildId
-      # set); we still want Publish to proceed in that case.
-      condition: in(dependencies.Build_NuGet.result, 'Succeeded', 'Skipped')
-    ${{ else }}:
-      dependsOn: []
-    jobs:
-    - deployment: Publish_NuGet_Package
-      displayName: '📦 Publish NuGet to UiPath-Internal'
-      environment: 'NuGet-Packages'
-      pool:
+# Build stages — one per technology, all run in parallel (`dependsOn: []`).
+- stage: Build_NuGet
+  displayName: '🏭 Build NuGet'
+  dependsOn: []
+  jobs:
+  - job: NuGet_DotNet_Windows
+    displayName: 'NuGet — .NET on Windows'
+    pool:
         vmImage: 'windows-2022'
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-              - template: azp-nuget.publish.steps.yaml
-                parameters:
-                  reuseArtifactsFromBuildId: ${{ parameters.reuseArtifactsFromBuildId }}
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-dotnet.yaml
+      - template: azp-dotnet-dist.yaml
 
-# Publish — NPM
-- ${{ if eq(parameters.publishNpm, true) }}:
-  - stage: Publish_NPM
-    displayName: '🚚 Publish NPM'
-    ${{ if eq(parameters.buildNpm, true) }}:
-      dependsOn: Build_NPM
-      condition: in(dependencies.Build_NPM.result, 'Succeeded', 'Skipped')
-    ${{ else }}:
-      dependsOn: []
-    jobs:
-    - deployment: Publish_NPM_Packages
-      displayName: '📦 Publish NPM (Node + Web)'
-      environment: 'NPM-Packages'
-      pool:
-        vmImage: ubuntu-latest
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-              - template: azp-js.publish-npm.steps.yaml
-                parameters:
-                  reuseArtifactsFromBuildId: ${{ parameters.reuseArtifactsFromBuildId }}
+- stage: Build_NPM
+  displayName: '🏭 Build NPM'
+  dependsOn: []
+  jobs:
+  - job: NPM_Node_Web_Windows
+    displayName: 'NPM — Node + Web on Windows'
+    pool:
+        vmImage: 'windows-2022'
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-nodejs.yaml
+      - template: azp-nodejs-dist.yaml
 
-# Publish — PyPI
-# Pushes the wheel + sdist to the project-scoped Azure Artifacts feed
-# `uipath-ipc-deps` (PyPI upstream/downstream already configured).
-- ${{ if eq(parameters.publishPyPI, true) }}:
-  - stage: Publish_PyPI
-    displayName: '🚚 Publish PyPI'
-    ${{ if eq(parameters.buildPython, true) }}:
-      dependsOn: Build_Python
-      condition: in(dependencies.Build_Python.result, 'Succeeded', 'Skipped')
-    ${{ else }}:
-      dependsOn: []
-    jobs:
-    - deployment: Publish_PyPI_Package
-      displayName: '📦 Publish Python wheel + sdist to uipath-ipc-deps'
-      environment: 'PyPI-Packages'
-      pool:
-        vmImage: 'ubuntu-latest'
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-              - template: azp-python.publish.steps.yaml
-                parameters:
-                  reuseArtifactsFromBuildId: ${{ parameters.reuseArtifactsFromBuildId }}
+  - job: NPM_Node_Web_Linux
+    displayName: 'NPM — Node + Web on Linux (test-only)'
+    pool:
+      vmImage: 'ubuntu-22.04'
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-nodejs.yaml
+
+- stage: Build_Python
+  displayName: '🏭 Build Python'
+  dependsOn: []
+  jobs:
+  - job: Python_Windows
+    displayName: 'Python — Windows'
+    pool:
+        vmImage: 'windows-2022'
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-python.yaml
+      - template: azp-python-dist.yaml
+
+  - job: Python_Linux
+    displayName: 'Python — Linux (test-only)'
+    pool:
+      vmImage: 'ubuntu-22.04'
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-python.yaml
