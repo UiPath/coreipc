@@ -89,19 +89,27 @@ class NamedPipeClientTransport(ClientTransport):
 
 
 class _PipeServerHandle:
-    """Wraps the list of `PipeServer` objects from `start_serving_pipe`."""
+    """Wraps the list of `PipeServer` objects from `start_serving_pipe`.
 
-    __slots__ = ("_servers",)
+    `PipeServer` has no awaitable close signal, so `wait_closed()` blocks on an
+    Event set by `close()` — matching `asyncio.Server.wait_closed()` semantics
+    (return once the listener has been closed). Without this, `wait_closed()`
+    returns immediately and `IpcServer.serve_forever()` would not block.
+    """
+
+    __slots__ = ("_servers", "_closed")
 
     def __init__(self, servers: list) -> None:
         self._servers = servers
+        self._closed = asyncio.Event()
 
     def close(self) -> None:
         for server in self._servers:
             server.close()
+        self._closed.set()
 
-    async def wait_closed(self) -> None:  # PipeServers close synchronously
-        return None
+    async def wait_closed(self) -> None:
+        await self._closed.wait()
 
 
 @dataclass(frozen=True, slots=True)

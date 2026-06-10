@@ -83,6 +83,14 @@ class _Service:
     async def NoMessage(self, x: int, y: int) -> int:
         return x + y
 
+    async def KwOnlyMessage(self, value: str, *, m: Message) -> str:
+        self.messages.append(m)
+        return f"kw {value}"
+
+    async def OptionalMessage(self, value: str, m: Message | None = None) -> str:
+        self.messages.append(m)
+        return f"opt {value}"
+
 
 def _make_connection(
     svc: _Service,
@@ -153,6 +161,53 @@ async def test_handler_without_message_is_unaffected() -> None:
     try:
         reader.feed_data(_request_frame(Request(
             endpoint="ISvc", method_name="NoMessage", parameters=["3", "4"], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) == 7
+    finally:
+        await conn.aclose()
+
+
+async def test_keyword_only_message_is_injected() -> None:
+    svc = _Service()
+    conn, reader, writer = _make_connection(svc)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="ISvc", method_name="KwOnlyMessage", parameters=['"hi"'], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) == "kw hi"
+        assert svc.messages[0].client is conn
+    finally:
+        await conn.aclose()
+
+
+async def test_optional_message_annotation_is_injected() -> None:
+    svc = _Service()
+    conn, reader, writer = _make_connection(svc)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="ISvc", method_name="OptionalMessage", parameters=['"hi"'], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) == "opt hi"
+        assert svc.messages[0] is not None
+        assert svc.messages[0].client is conn
+    finally:
+        await conn.aclose()
+
+
+async def test_extra_trailing_wire_arg_is_ignored() -> None:
+    """A .NET client serializes a trailing CancellationToken as "" — the extra
+    wire parameter must be ignored, not bound to a handler parameter."""
+    svc = _Service()
+    conn, reader, writer = _make_connection(svc)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="ISvc", method_name="NoMessage", parameters=["3", "4", '""'], id="1",
         )))
         frames = await _wait_for_frames(writer, count=1)
         resp = Response.from_json(frames[0][1].decode("utf-8"))

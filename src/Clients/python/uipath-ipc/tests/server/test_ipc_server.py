@@ -179,6 +179,20 @@ async def test_serve_forever_before_start_raises() -> None:
         await server.serve_forever()
 
 
+async def test_serve_forever_blocks_for_named_pipe_until_aclose() -> None:
+    """Regression: a named-pipe ServerHandle's wait_closed() must block, so
+    serve_forever() doesn't return immediately and tear the server down."""
+    _skip_if_no_pipe_support()
+    name = f"uipath-ipc-srvtest-{uuid.uuid4().hex}"
+    server = IpcServer(NamedPipeServerTransport(name), {})
+    await server.start()
+    serving = asyncio.create_task(server.serve_forever())
+    await asyncio.sleep(0.05)
+    assert not serving.done()  # must still be blocking while the listener is up
+    await server.aclose()
+    await asyncio.wait_for(serving, timeout=5)
+
+
 async def test_aclose_closes_live_connections() -> None:
     server = IpcServer(TcpServerTransport("127.0.0.1", 0), {ICalculator: Calculator()})
     await server.start()

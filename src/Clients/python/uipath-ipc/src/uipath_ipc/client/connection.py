@@ -30,8 +30,9 @@ import inspect
 import itertools
 import json
 import traceback
+import types
 import weakref
-from typing import Callable, TypeVar, cast, get_origin, get_type_hints
+from typing import Callable, TypeVar, Union, cast, get_args, get_origin, get_type_hints
 
 from ..message import Message
 from ..transport.base import ClientTransport
@@ -52,29 +53,52 @@ T = TypeVar("T")
 CloseCallback = Callable[["IpcConnection"], object]
 
 
+_UNION_ORIGINS: tuple[object, ...] = (
+    (Union, types.UnionType) if hasattr(types, "UnionType") else (Union,)
+)
+
+
 def _is_message_annotation(annotation: object) -> bool:
-    """True if a parameter annotation refers to `Message` or `Message[T]`."""
+    """True if a parameter annotation refers to `Message`, `Message[T]`, or an
+    `Optional`/union containing one (e.g. `Message | None`)."""
     if annotation is Message:
         return True
     if isinstance(annotation, str):
         # `from __future__ import annotations` leaves annotations as strings
         # when get_type_hints can't resolve them; match by spelling.
-        return annotation == "Message" or annotation.startswith("Message[")
-    return get_origin(annotation) is Message
+        s = annotation.replace(" ", "")
+        return (
+            s == "Message"
+            or s.startswith("Message[")
+            or s.startswith("Optional[Message")
+            or "Message|None" in s
+        )
+    origin = get_origin(annotation)
+    if origin is Message:
+        return True
+    if origin in _UNION_ORIGINS:
+        return any(_is_message_annotation(arg) for arg in get_args(annotation))
+    return False
 
 
-# A handler's argument-binding plan: one tag per parameter (self excluded).
+# A handler's argument-binding plan: one (tag, name) per parameter (self
+# excluded). tag is one of:
 #   "wire"    -> take the next positional wire argument
-#   "message" -> inject a Message (consumes no wire argument)
+#   "message" -> inject a Message by KEYWORD (consumes no wire argument), so it
+#                works whether the Message param is trailing or keyword-only
 #   "varargs" -> *args: absorb all remaining wire arguments
-#   "skip"    -> **kwargs / keyword-only: not fillable from positional wire
+#   "skip"    -> **kwargs / non-Message keyword-only: not fillable from wire
 # Cached weakly by the underlying function so it's computed once per method.
-_binding_plan_cache: "weakref.WeakKeyDictionary[object, tuple[str, ...]]" = (
+_BindingPlan = tuple[tuple[str, str], ...]
+_binding_plan_cache: "weakref.WeakKeyDictionary[object, _BindingPlan]" = (
     weakref.WeakKeyDictionary()
 )
 
+#: Sentinel for "no more wire args" (avoids allocating one per request).
+_MISSING = object()
 
-def _binding_plan(method: Callable[..., object]) -> tuple[str, ...]:
+
+def _binding_plan(method: Callable[..., object]) -> _BindingPlan:
     """Compute (and cache) how to map wire args onto a handler's parameters."""
     func = getattr(method, "__func__", method)
     cached = _binding_plan_cache.get(func)
@@ -85,42 +109,26 @@ def _binding_plan(method: Callable[..., object]) -> tuple[str, ...]:
         hints = get_type_hints(func)
     except Exception:
         hints = {}
-    plan: list[str] = []
+    plan: list[tuple[str, str]] = []
     for name, param in inspect.signature(method).parameters.items():
         if param.kind is inspect.Parameter.VAR_POSITIONAL:
-            plan.append("varargs")
-        elif param.kind in (
-            inspect.Parameter.VAR_KEYWORD,
-            inspect.Parameter.KEYWORD_ONLY,
-        ):
-            plan.append("skip")
+            plan.append(("varargs", name))
+        elif param.kind is inspect.Parameter.VAR_KEYWORD:
+            plan.append(("skip", name))
+        # Check Message BEFORE keyword-only so a keyword-only Message is still
+        # injected (it's passed by keyword anyway).
         elif _is_message_annotation(hints.get(name, param.annotation)):
-            plan.append("message")
+            plan.append(("message", name))
+        elif param.kind is inspect.Parameter.KEYWORD_ONLY:
+            plan.append(("skip", name))
         else:
-            plan.append("wire")
+            plan.append(("wire", name))
     result = tuple(plan)
     try:
         _binding_plan_cache[func] = result
     except TypeError:
         pass  # builtins / unweakreferenceable callables: just don't cache
     return result
-
-
-class _ConnectionInvoker:
-    """Adapts one open `IpcConnection` to the minimal surface `_IpcProxy`
-    needs — an already-connected `_ensure_connected` plus a `request_timeout`
-    — so reach-back proxies can be built without an owning `IpcClient`."""
-
-    __slots__ = ("_connection", "request_timeout")
-
-    def __init__(
-        self, connection: IpcConnection, request_timeout: float | None
-    ) -> None:
-        self._connection = connection
-        self.request_timeout = request_timeout
-
-    async def _ensure_connected(self) -> IpcConnection:
-        return self._connection
 
 
 class IpcConnection:
@@ -177,17 +185,31 @@ class IpcConnection:
         self._closed = True
         if self._receive_task is not None:
             self._receive_task.cancel()
-        # Cancel in-flight callback handlers so they don't outlive the stream.
+        self._teardown()
+        try:
+            await self._writer.wait_closed()
+        except Exception:
+            pass
+
+    def _teardown(self) -> None:
+        """Idempotent local cleanup shared by `aclose` and the receive loop:
+        cancel in-flight incoming handlers, close the writer, fail pending
+        outgoing requests, and fire close callbacks. Does NOT touch the
+        receive task (the loop calls this from its own `finally`)."""
         for task in list(self._incoming_handlers.values()):
             task.cancel()
         self._incoming_handlers.clear()
         try:
             self._writer.close()
-            await self._writer.wait_closed()
         except Exception:
             pass
         self._fail_pending(ConnectionError("connection closed"))
         self._notify_closed()
+
+    async def _ensure_connected(self) -> IpcConnection:
+        """This connection is already open. Lets `_IpcProxy` drive a reach-back
+        proxy directly off the connection (see `get_callback`)."""
+        return self
 
     async def __aenter__(self) -> IpcConnection:
         return self
@@ -241,8 +263,9 @@ class IpcConnection:
         """
         from .proxy import _IpcProxy  # local import avoids an import cycle
 
-        invoker = _ConnectionInvoker(self, self.request_timeout)
-        return cast(T, _IpcProxy(invoker, contract))
+        # IpcConnection itself satisfies what _IpcProxy needs from a client
+        # (`_ensure_connected` + `request_timeout`), so no adapter is required.
+        return cast(T, _IpcProxy(self, contract))
 
     async def send_request(self, req: Request) -> Response:
         """Send a request and await the matching response.
@@ -310,18 +333,13 @@ class IpcConnection:
         except Exception as ex:  # noqa: BLE001 — surface anything unexpected via futures
             self._fail_pending(ex)
         finally:
-            # Mark closed so the owning IpcClient knows to re-dial on next call.
+            # Mark closed so the owning IpcClient knows to re-dial on next call,
+            # then run the shared teardown. On peer disconnect the connection is
+            # pruned from any owning IpcServer, so aclose() won't run for it —
+            # this is the only cleanup it gets (and it must close the writer so
+            # the transport doesn't leak).
             self._closed = True
-            # Tear down our own writer so its transport doesn't leak. On peer
-            # disconnect the connection is pruned from any owning IpcServer, so
-            # aclose() won't run for it — this is the only cleanup it gets.
-            try:
-                self._writer.close()
-            except Exception:
-                pass
-            self._fail_pending(ConnectionError("connection closed"))
-            # Notify owners (e.g. IpcServer) so they can prune this connection.
-            self._notify_closed()
+            self._teardown()
 
     def _handle_response(self, payload: bytes) -> None:
         resp = Response.from_json(payload.decode("utf-8"))
@@ -351,37 +369,44 @@ class IpcConnection:
 
     def _bind_handler_args(
         self, method: Callable[..., object], wire_args: list[object]
-    ) -> list[object]:
-        """Map wire args positionally onto the handler's parameters.
+    ) -> tuple[list[object], dict[str, object]]:
+        """Map wire args onto a handler's parameters; return (positional, kwargs).
 
-        Injects a `Message` for any `Message`-typed parameter (the .NET
-        trailing-`Message` convention) and **ignores extra trailing wire
-        args** — which is how an idiomatic .NET client's optional
-        `CancellationToken` (serialized as one extra parameter per the
-        `Message`/CT convention) is tolerated. A handler may declare `*args`
-        to receive every wire argument. Missing args fall back to defaults.
+        - Non-`Message` parameters are filled positionally from the wire, in
+          order. A handler may declare `*args` to receive every remaining arg.
+        - A `Message` parameter is injected by **keyword** (so it works whether
+          it's trailing or keyword-only) and consumes no wire arg. Inject the
+          caller handle there — conventionally the last parameter.
+        - **Extra trailing wire args are ignored.** An idiomatic .NET client
+          serializes one wire param per declared argument including a trailing
+          `CancellationToken` (as `""`); ignoring the surplus tolerates that.
+          Note this is positional: if a handler declares more optional params
+          than the caller's contract has real args, a surplus value (e.g. the
+          CT placeholder) can land on an optional param instead of its default.
+          Missing args fall back to their defaults.
         """
         plan = _binding_plan(method)
         message: Message[object] | None = None
-        sentinel = object()
         wire = iter(wire_args)
-        bound: list[object] = []
-        for tag in plan:
+        pos: list[object] = []
+        kwargs: dict[str, object] = {}
+        for tag, name in plan:
             if tag == "message":
                 if message is None:
                     message = Message(
                         client=self, request_timeout=self.request_timeout
                     )
-                bound.append(message)
+                kwargs[name] = message
             elif tag == "varargs":
-                bound.extend(wire)
+                pos.extend(wire)
             elif tag == "wire":
-                nxt = next(wire, sentinel)
-                if nxt is sentinel:
-                    break  # out of wire args — remaining params use defaults
-                bound.append(nxt)
-            # "skip": keyword-only / **kwargs — not fillable positionally
-        return bound
+                nxt = next(wire, _MISSING)
+                if nxt is not _MISSING:
+                    pos.append(nxt)
+                # else: out of wire args — let this param use its default, but
+                # keep scanning so later Message params are still injected.
+            # "skip": **kwargs / non-Message keyword-only — not fillable here.
+        return pos, kwargs
 
     async def _invoke_callback(self, req: Request) -> None:
         """Run the user's callback for an incoming Request, then send the Response."""
@@ -399,8 +424,8 @@ class IpcConnection:
                 )
             # Each parameter is an individually JSON-encoded string (wire gotcha).
             args = [json.loads(p) for p in req.parameters]
-            call_args = self._bind_handler_args(method, args)
-            result = method(*call_args)
+            pos, kwargs = self._bind_handler_args(method, args)
+            result = method(*pos, **kwargs)
             if inspect.isawaitable(result):
                 result = await result
             data = None if result is None else json.dumps(result)
