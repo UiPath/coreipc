@@ -18,8 +18,11 @@ if TYPE_CHECKING:
 
 def _message_wire(m: Message) -> dict:
     """The wire form of a `Message` argument, matching .NET: a payload-less
-    `Message` serializes to `{}`; `Message[T]` to `{"Payload": <payload>}`.
-    `client`/`request_timeout` are transport-only (never serialized)."""
+    `Message` serializes to `{}`; `Message[T]` to `{"Payload": <payload>}`;
+    `wire_body` stands in for a .NET `Message` *subclass* and serializes
+    as-is. `client`/`request_timeout` are transport-only (never serialized)."""
+    if m.wire_body is not None:
+        return m.wire_body
     return {} if m.payload is None else {"Payload": m.payload}
 
 
@@ -91,7 +94,10 @@ class _IpcProxy:
             id=conn.next_id(),
             timeout_in_seconds=timeout,
         )
-        if timeout is not None:
+        # Negative timeout mirrors .NET's Timeout.InfiniteTimeSpan (-1 ms =
+        # -0.001 s on the wire): no client-side deadline, and the server reads
+        # the negative TimeoutInSeconds as "no timeout" too.
+        if timeout is not None and timeout >= 0:
             resp = await asyncio.wait_for(conn.send_request(req), timeout=timeout)
         else:
             resp = await conn.send_request(req)

@@ -16,7 +16,13 @@ from abc import ABC, abstractmethod
 
 import pytest
 
-from uipath_ipc import IpcClient, Message, NamedPipeClientTransport, RemoteException
+from uipath_ipc import (
+    INFINITE_REQUEST_TIMEOUT,
+    IpcClient,
+    Message,
+    NamedPipeClientTransport,
+    RemoteException,
+)
 
 from .conftest import DOTNET_PIPE_NAME
 
@@ -226,6 +232,17 @@ async def test_per_call_timeout_enforces_client_deadline(dotnet_server) -> None:
             await svc.WaitWithMessage("00:00:10", Message(request_timeout=0.5))
         elapsed = asyncio.get_running_loop().time() - start
         assert elapsed < 2.0, f"client deadline did not bound the call ({elapsed:.2f}s)"
+
+
+async def test_infinite_per_call_timeout_overrides_server_default(dotnet_server) -> None:
+    """INFINITE_REQUEST_TIMEOUT (-0.001, .NET Timeout.InfiniteTimeSpan — what
+    the TS client sends for sign-in/disconnect) disables the server's 2s
+    default outright: the 3s operation completes."""
+    async with _new_client() as client:
+        svc = client.get_proxy(IComputingService)
+        assert await svc.WaitWithMessage(
+            "00:00:03", Message(request_timeout=INFINITE_REQUEST_TIMEOUT)
+        ) is True
 
 
 # --- before_call hook (outgoing only — .NET parity) -------------------------

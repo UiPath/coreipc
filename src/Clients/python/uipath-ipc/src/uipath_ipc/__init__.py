@@ -3,7 +3,7 @@
 from .client import IpcClient, IpcConnection
 from .errors import RemoteException
 from .hooks import BeforeCallHandler, BeforeConnectHandler, CallInfo
-from .message import IClient, Message
+from .message import INFINITE_REQUEST_TIMEOUT, IClient, Message
 from .server import IpcServer
 from .transport import (
     ClientTransport,
@@ -20,6 +20,7 @@ __all__ = [
     "CallInfo",
     "ClientTransport",
     "IClient",
+    "INFINITE_REQUEST_TIMEOUT",
     "IpcClient",
     "IpcConnection",
     "IpcServer",

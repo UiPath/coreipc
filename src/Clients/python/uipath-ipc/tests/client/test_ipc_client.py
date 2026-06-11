@@ -9,7 +9,12 @@ from abc import ABC, abstractmethod
 
 import pytest
 
-from uipath_ipc import IpcClient, Message, RemoteException
+from uipath_ipc import (
+    INFINITE_REQUEST_TIMEOUT,
+    IpcClient,
+    Message,
+    RemoteException,
+)
 from uipath_ipc.transport.base import ClientTransport
 from uipath_ipc.wire import Error, MessageType, Response
 
@@ -185,6 +190,48 @@ async def test_message_arg_with_payload_serializes_payload() -> None:
         assert req["Parameters"] == ['{"Payload": {"k": 1}}']
         t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
         await asyncio.wait_for(task, timeout=1.0)
+
+
+async def test_infinite_request_timeout_disables_client_deadline() -> None:
+    """A negative request_timeout (INFINITE_REQUEST_TIMEOUT = -0.001, the
+    .NET Timeout.InfiniteTimeSpan rendition) rides the wire verbatim and
+    applies NO client-side deadline: a response arriving 'late' still wins.
+    (With a naive wait_for(-0.001) this would TimeoutError instantly.)"""
+    t = _FakeTransport()
+    async with IpcClient(t, request_timeout=5.0) as client:  # finite default
+        svc = client.get_proxy(ITimed)
+        task = asyncio.create_task(
+            svc.DoWork(Message(request_timeout=INFINITE_REQUEST_TIMEOUT))
+        )
+        await asyncio.sleep(0)
+        req = _sent_request(t.writer)
+        assert req["TimeoutInSeconds"] == -0.001
+        await asyncio.sleep(0.1)  # response arrives later — call must survive
+        assert not task.done()
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
+        assert await asyncio.wait_for(task, timeout=1.0) is None
+
+
+async def test_message_wire_body_serializes_at_top_level() -> None:
+    """wire_body is the .NET Message-SUBCLASS rendition: the dict IS the
+    argument's wire form (top-level fields, no Payload wrapper)."""
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(ITimed)
+        task = asyncio.create_task(svc.DoWork(
+            Message(wire_body={"ServiceUrl": None}, request_timeout=INFINITE_REQUEST_TIMEOUT)
+        ))
+        await asyncio.sleep(0)
+        req = _sent_request(t.writer)
+        assert req["TimeoutInSeconds"] == -0.001
+        assert json.loads(req["Parameters"][0]) == {"ServiceUrl": None}
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
+        await asyncio.wait_for(task, timeout=1.0)
+
+
+def test_message_payload_and_wire_body_are_mutually_exclusive() -> None:
+    with pytest.raises(ValueError):
+        Message(payload={"a": 1}, wire_body={"b": 2})
 
 
 # --- hooks (before_connect / before_call) ----------------------------------
