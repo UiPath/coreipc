@@ -187,6 +187,58 @@ async def test_message_arg_with_payload_serializes_payload() -> None:
         await asyncio.wait_for(task, timeout=1.0)
 
 
+# --- hooks (before_connect / before_call) ----------------------------------
+
+async def test_before_connect_fires_before_connecting() -> None:
+    events: list[str] = []
+    t = _FakeTransport()
+
+    async def hook() -> None:
+        events.append("connect")
+
+    client = IpcClient(t, before_connect=hook)
+    assert events == []  # not until first call triggers a connect
+    svc = client.get_proxy(IComputingService)
+    task = asyncio.create_task(svc.AddFloats(1.0, 2.0))
+    await asyncio.sleep(0)
+    assert events == ["connect"]
+    t.reader.feed_data(_response_frame(Response(request_id="1", data="3.0")))
+    await asyncio.wait_for(task, timeout=1.0)
+    await client.aclose()
+
+
+async def test_before_call_fires_with_call_info() -> None:
+    seen: list[object] = []
+    t = _FakeTransport()
+
+    async def hook(ci: object) -> None:
+        seen.append(ci)
+
+    async with IpcClient(t, before_call=hook) as client:
+        svc = client.get_proxy(IComputingService)
+        task = asyncio.create_task(svc.AddFloats(1.5, 2.5))
+        await asyncio.sleep(0)
+        assert len(seen) == 1
+        assert seen[0].endpoint == "IComputingService"  # type: ignore[attr-defined]
+        assert seen[0].method_name == "AddFloats"  # type: ignore[attr-defined]
+        assert seen[0].arguments == (1.5, 2.5)  # type: ignore[attr-defined]
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="4.0")))
+        await asyncio.wait_for(task, timeout=1.0)
+
+
+async def test_before_call_raising_aborts_the_call() -> None:
+    t = _FakeTransport()
+
+    async def hook(ci: object) -> None:
+        raise RuntimeError("blocked")
+
+    async with IpcClient(t, before_call=hook) as client:
+        svc = client.get_proxy(IComputingService)
+        with pytest.raises(RuntimeError, match="blocked"):
+            await asyncio.wait_for(svc.AddFloats(1.0, 2.0), timeout=1.0)
+        assert len(t.writer.buffer) == 0  # nothing was sent
+
+
 # --- client lifecycle tests -----------------------------------------------
 
 async def test_client_lazily_connects() -> None:

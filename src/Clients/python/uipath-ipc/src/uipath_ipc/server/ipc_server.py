@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 
 from ..client.connection import IpcConnection
+from ..hooks import BeforeCallHandler
 from ..transport.base import ServerHandle, ServerTransport
 
 
@@ -40,6 +41,7 @@ class IpcServer:
         transport: ServerTransport,
         services: dict[type, object],
         request_timeout: float | None = None,
+        before_call: BeforeCallHandler | None = None,
     ) -> None:
         """Create a server.
 
@@ -53,6 +55,10 @@ class IpcServer:
             request_timeout: Default timeout for reach-back proxies a hosted
                 service builds via ``message.client.get_callback(...)``.
                 ``None`` (default) disables the timeout.
+            before_call: Optional hook awaited before each INCOMING call is
+                dispatched to a service — the analog of .NET's
+                ``BeforeIncomingCall``. Receives a `CallInfo`; raising aborts
+                the call (surfaced to the caller as an error).
         """
         self._transport = transport
         # Translate contract-type keys to endpoint-name keys once; the
@@ -61,6 +67,7 @@ class IpcServer:
             contract.__name__: instance for contract, instance in services.items()
         }
         self._request_timeout = request_timeout
+        self._before_call = before_call
         self._handle: ServerHandle | None = None
         self._connections: set[IpcConnection] = set()
 
@@ -81,6 +88,7 @@ class IpcServer:
             writer,
             callbacks=self._services,
             request_timeout=self._request_timeout,
+            before_incoming_call=self._before_call,
         )
         self._connections.add(conn)
         # Prune from the live set when the peer disconnects or we close it.

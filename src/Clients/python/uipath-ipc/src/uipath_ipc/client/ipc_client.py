@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from typing import TypeVar, cast
 
+from ..hooks import BeforeCallHandler, BeforeConnectHandler
 from ..transport.base import ClientTransport
 from .connection import IpcConnection
 from .proxy import _IpcProxy
@@ -30,6 +32,8 @@ class IpcClient:
         transport: ClientTransport,
         request_timeout: float | None = None,
         callbacks: dict[type, object] | None = None,
+        before_connect: BeforeConnectHandler | None = None,
+        before_call: BeforeCallHandler | None = None,
     ) -> None:
         """Create a new client.
 
@@ -38,18 +42,29 @@ class IpcClient:
             request_timeout: Seconds before an in-flight call gives up.
                 Applies both client-side (raises asyncio.TimeoutError) and
                 server-side (Request.TimeoutInSeconds). ``None`` (default)
-                disables both timeouts.
+                disables both timeouts. A per-call timeout can override this
+                via a ``Message`` argument.
             callbacks: Optional dict mapping contract type → instance for
                 server-to-client callbacks. The instance's method names
                 must match the contract's; each method may be ``async``.
                 The instance's class need NOT inherit from the contract
                 (duck-typed). The contract's ``__name__`` is what's used
                 as the endpoint on the wire.
+            before_connect: Optional hook awaited before each (re)connect —
+                the analog of .NET's ``BeforeConnect``. Sync or async; if it
+                raises, the connect fails.
+            before_call: Optional hook awaited before each OUTGOING call (not
+                for inbound callbacks) — the analog of .NET's
+                ``BeforeOutgoingCall``. Receives a `CallInfo`; raising aborts
+                the call.
         """
         self._transport = transport
         self._connection: IpcConnection | None = None
         self._connect_lock = asyncio.Lock()
         self.request_timeout = request_timeout
+        self._before_connect = before_connect
+        #: Read by `_IpcProxy._invoke` before sending each outgoing request.
+        self.before_call = before_call
         # Translate contract-type keys to endpoint-name keys once at
         # construction; the connection stores by name.
         self._callbacks: dict[str, object] = {}
@@ -67,6 +82,10 @@ class IpcClient:
             # before re-dialing through the transport.
             if self._connection is not None:
                 await self._connection.aclose()
+            if self._before_connect is not None:
+                result = self._before_connect()
+                if inspect.isawaitable(result):
+                    await result
             self._connection = await IpcConnection.open(
                 self._transport,
                 callbacks=self._callbacks,

@@ -2,6 +2,7 @@
 
 from .client import IpcClient, IpcConnection
 from .errors import RemoteException
+from .hooks import BeforeCallHandler, BeforeConnectHandler, CallInfo
 from .message import IClient, Message
 from .server import IpcServer
 from .transport import (
@@ -14,6 +15,9 @@ from .transport import (
 )
 
 __all__ = [
+    "BeforeCallHandler",
+    "BeforeConnectHandler",
+    "CallInfo",
     "ClientTransport",
     "IClient",
     "IpcClient",

@@ -200,6 +200,58 @@ async def test_optional_message_annotation_is_injected() -> None:
         await conn.aclose()
 
 
+# --- server before_incoming_call hook -------------------------------------
+
+async def test_before_incoming_call_fires_before_dispatch() -> None:
+    seen: list[object] = []
+
+    async def hook(ci: object) -> None:
+        seen.append(ci)
+
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    svc = _Service()
+    conn = IpcConnection(
+        reader, writer, callbacks={"ISvc": svc}, before_incoming_call=hook  # type: ignore[arg-type]
+    )
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="ISvc", method_name="NoMessage", parameters=["3", "4"], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) == 7
+        assert len(seen) == 1
+        assert seen[0].endpoint == "ISvc"  # type: ignore[attr-defined]
+        assert seen[0].method_name == "NoMessage"  # type: ignore[attr-defined]
+        assert seen[0].arguments == (3, 4)  # type: ignore[attr-defined]
+    finally:
+        await conn.aclose()
+
+
+async def test_before_incoming_call_raising_aborts_with_error() -> None:
+    async def hook(ci: object) -> None:
+        raise ValueError("denied")
+
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(
+        reader, writer, callbacks={"ISvc": _Service()}, before_incoming_call=hook  # type: ignore[arg-type]
+    )
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="ISvc", method_name="NoMessage", parameters=["3", "4"], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.error is not None
+        assert "denied" in resp.error.message
+    finally:
+        await conn.aclose()
+
+
 async def test_extra_trailing_wire_arg_is_ignored() -> None:
     """A .NET client serializes a trailing CancellationToken as "" — the extra
     wire parameter must be ignored, not bound to a handler parameter."""

@@ -34,6 +34,7 @@ import types
 import weakref
 from typing import Callable, TypeVar, Union, cast, get_args, get_origin, get_type_hints
 
+from ..hooks import BeforeCallHandler, CallInfo
 from ..message import Message
 from ..transport.base import ClientTransport
 from ..wire import (
@@ -140,12 +141,15 @@ class IpcConnection:
         writer: asyncio.StreamWriter,
         callbacks: dict[str, object] | None = None,
         request_timeout: float | None = None,
+        before_incoming_call: BeforeCallHandler | None = None,
     ) -> None:
         self._reader = reader
         self._writer = writer
         self._callbacks: dict[str, object] = dict(callbacks or {})
         #: Default timeout for reach-back proxies built via `get_callback`.
         self.request_timeout = request_timeout
+        #: Awaited before dispatching each incoming request (server side).
+        self._before_incoming_call = before_incoming_call
         self._pending: dict[str, asyncio.Future[Response]] = {}
         self._incoming_handlers: dict[str, asyncio.Task[None]] = {}
         self._id_counter = itertools.count(1)
@@ -424,6 +428,14 @@ class IpcConnection:
                 )
             # Each parameter is an individually JSON-encoded string (wire gotcha).
             args = [json.loads(p) for p in req.parameters]
+            # BeforeIncomingCall hook (server side); raising aborts the call
+            # and is surfaced to the caller as an Error response.
+            if self._before_incoming_call is not None:
+                hook = self._before_incoming_call(
+                    CallInfo(req.endpoint, req.method_name, tuple(args))
+                )
+                if inspect.isawaitable(hook):
+                    await hook
             pos, kwargs = self._bind_handler_args(method, args)
             result = method(*pos, **kwargs)
             if inspect.isawaitable(result):
