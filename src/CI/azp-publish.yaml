@@ -6,14 +6,12 @@
 # behind their approval-gated environments. Builds nothing itself.
 #
 # Parameters:
-#   - buildId      (required) the CI build/run id to publish from.
+#   - buildId       (required) the CI build/run id to publish from.
+#   - ciPipelineId  (required) the CI pipeline's DEFINITION id — find it in the
+#     CI pipeline's URL (…/_build?definitionId=N). Constant per CI pipeline;
+#     the artifact download targets this definition + the buildId run.
 #   - publishNuGet / publishNpm / publishPyPI  (default: all on) — which
 #     packages to publish. At least one must be selected.
-#
-# SETUP (one-time): set the `source:` of the `ci` pipeline resource below to
-# the NAME of your CI pipeline (the one running azp-start.yaml). The resource
-# is used to resolve the CI pipeline's definition id for the artifact download
-# (and to authorize cross-pipeline artifact access on first run).
 # =====================================================================
 
 name: $(Date:yyyyMMdd)$(Rev:-rr)
@@ -24,6 +22,10 @@ pr: none
 parameters:
   - name: buildId
     displayName: 'CI build (run) id to publish artifacts from (required)'
+    type: string
+
+  - name: ciPipelineId
+    displayName: 'CI pipeline definition id — from its URL ?definitionId=N (required)'
     type: string
 
   - name: publishNuGet
@@ -41,15 +43,6 @@ parameters:
     type: boolean
     default: true
 
-resources:
-  pipelines:
-    - pipeline: ci
-      # ⚠️ SET THIS to your CI pipeline's name (the azp-start.yaml pipeline).
-      # Only `$(resources.pipeline.ci.pipelineID)` is used below — to point the
-      # artifact download at the CI definition; the specific run is `buildId`.
-      source: 'coreipc-ci'
-      trigger: none
-
 variables:
   # Defensive: keep the Supply Chain Guard shim disabled here too (see the
   # detailed note in azp-nodejs.yaml). Publish does not run `npm install`, but
@@ -62,9 +55,9 @@ stages:
 # bad/empty invocation surfaces a clear error instead of silently doing
 # nothing. '0' is treated as "not provided" (legacy sentinel).
 # =====================================================================
-- ${{ if in(parameters.buildId, '', '0') }}:
+- ${{ if or(in(parameters.buildId, '', '0'), eq(parameters.ciPipelineId, '')) }}:
   - stage: Invalid_Input
-    displayName: '❌ buildId required'
+    displayName: '❌ buildId / ciPipelineId required'
     jobs:
     - job: error
       pool:
@@ -72,9 +65,9 @@ stages:
       steps:
       - checkout: none
       - script: |
-          echo "##vso[task.logissue type=error]'buildId' is required: enter the CI build (run) id whose artifacts you want to publish."
+          echo "##vso[task.logissue type=error]Both 'buildId' (the CI run id) and 'ciPipelineId' (the CI pipeline definition id, from its URL ?definitionId=N) are required."
           exit 1
-        displayName: 'buildId is required'
+        displayName: 'buildId and ciPipelineId are required'
 
 - ${{ if not(or(eq(parameters.publishNuGet, true), eq(parameters.publishNpm, true), eq(parameters.publishPyPI, true))) }}:
   - stage: Nothing_Selected
@@ -91,15 +84,15 @@ stages:
         displayName: 'At least one package required'
 
 # =====================================================================
-# Publish stages — only emitted when a real buildId was provided. Each runs
-# independently (dependsOn: []) behind its approval-gated environment, and
-# pulls the artifact from the CI build:
+# Publish stages — only emitted when both buildId and ciPipelineId are given.
+# Each runs independently (dependsOn: []) behind its approval-gated
+# environment, and pulls the artifact from the CI build:
 #   reuseArtifactsFromBuildId = the buildId run
-#   sourcePipelineId          = the CI pipeline definition (via the resource)
+#   sourcePipelineId          = the CI pipeline definition (ciPipelineId)
 # `- download: none` suppresses the deployment job's implicit artifact
 # download (the publish step template downloads exactly what it needs).
 # =====================================================================
-- ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishNuGet, true)) }}:
+- ${{ if and(not(in(parameters.buildId, '', '0')), ne(parameters.ciPipelineId, ''), eq(parameters.publishNuGet, true)) }}:
   - stage: Publish_NuGet
     displayName: '🚚 Publish NuGet'
     dependsOn: []
@@ -117,9 +110,9 @@ stages:
               - template: azp-nuget.publish.steps.yaml
                 parameters:
                   reuseArtifactsFromBuildId: ${{ parameters.buildId }}
-                  sourcePipelineId: $(resources.pipeline.ci.pipelineID)
+                  sourcePipelineId: ${{ parameters.ciPipelineId }}
 
-- ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishNpm, true)) }}:
+- ${{ if and(not(in(parameters.buildId, '', '0')), ne(parameters.ciPipelineId, ''), eq(parameters.publishNpm, true)) }}:
   - stage: Publish_NPM
     displayName: '🚚 Publish NPM'
     dependsOn: []
@@ -137,9 +130,9 @@ stages:
               - template: azp-js.publish-npm.steps.yaml
                 parameters:
                   reuseArtifactsFromBuildId: ${{ parameters.buildId }}
-                  sourcePipelineId: $(resources.pipeline.ci.pipelineID)
+                  sourcePipelineId: ${{ parameters.ciPipelineId }}
 
-- ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishPyPI, true)) }}:
+- ${{ if and(not(in(parameters.buildId, '', '0')), ne(parameters.ciPipelineId, ''), eq(parameters.publishPyPI, true)) }}:
   - stage: Publish_PyPI
     displayName: '🚚 Publish PyPI'
     dependsOn: []
@@ -157,4 +150,4 @@ stages:
               - template: azp-python.publish.steps.yaml
                 parameters:
                   reuseArtifactsFromBuildId: ${{ parameters.buildId }}
-                  sourcePipelineId: $(resources.pipeline.ci.pipelineID)
+                  sourcePipelineId: ${{ parameters.ciPipelineId }}
