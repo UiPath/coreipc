@@ -24,6 +24,13 @@ public interface IComputingService
     Task<ComplexNumber> AddComplexNumbers(ComplexNumber a, ComplexNumber b, CancellationToken ct = default);
     Task<bool> DivideByZero(CancellationToken ct = default);
     Task<bool> Wait(TimeSpan duration, CancellationToken ct = default);
+
+    /// <summary>
+    /// Like <see cref="Wait"/>, but with a trailing <see cref="Message"/> so a
+    /// client can attach a per-call timeout (Message.RequestTimeout rides the
+    /// Request envelope as TimeoutInSeconds, overriding the server default).
+    /// </summary>
+    Task<bool> WaitWithMessage(TimeSpan duration, Message m = null!, CancellationToken ct = default);
 }
 
 public interface ISystemService
@@ -95,6 +102,13 @@ public sealed class ComputingService : IComputingService
     public async Task<bool> Wait(TimeSpan duration, CancellationToken ct)
     {
         _logger.LogInformation("Wait({Duration})", duration);
+        await Task.Delay(duration, ct);
+        return true;
+    }
+
+    public async Task<bool> WaitWithMessage(TimeSpan duration, Message m, CancellationToken ct)
+    {
+        _logger.LogInformation("WaitWithMessage({Duration})", duration);
         await Task.Delay(duration, ct);
         return true;
     }

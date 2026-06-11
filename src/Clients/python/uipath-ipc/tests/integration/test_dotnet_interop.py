@@ -11,11 +11,12 @@ request timeout.
 
 from __future__ import annotations
 
+import asyncio
 from abc import ABC, abstractmethod
 
 import pytest
 
-from uipath_ipc import IpcClient, NamedPipeClientTransport, RemoteException
+from uipath_ipc import IpcClient, Message, NamedPipeClientTransport, RemoteException
 
 from .conftest import DOTNET_PIPE_NAME
 
@@ -37,6 +38,12 @@ class IComputingService(ABC):
 
     @abstractmethod
     async def DivideByZero(self) -> bool: ...
+
+    @abstractmethod
+    async def Wait(self, duration: str) -> bool: ...
+
+    @abstractmethod
+    async def WaitWithMessage(self, duration: str, m: object) -> bool: ...
 
 
 class ISystemService(ABC):
@@ -180,3 +187,63 @@ async def test_multiple_server_initiated_callbacks_on_same_client(dotnet_server)
         ]
         assert results == ["echoed: a", "echoed: b", "echoed: c"]
         assert cb.echo_calls == ["a", "b", "c"]
+
+
+# --- per-call timeout (Message argument) -----------------------------------
+# The .NET server's default RequestTimeout is 2 seconds (see conftest /
+# Program.cs). These three tests triangulate the per-call feature end to end:
+# the control proves the 2s default really applies, the override proves a
+# Message-borne timeout beats it on the wire, and the deadline test proves
+# the same Message timeout also enforces a client-side cutoff.
+
+async def test_server_default_timeout_applies_without_message(dotnet_server) -> None:
+    """Control: a 3s operation with NO per-call timeout dies at the server's
+    2s default — proving the override test below succeeds *because of* the
+    Message-borne timeout, not by accident."""
+    async with _new_client() as client:
+        svc = client.get_proxy(IComputingService)
+        with pytest.raises(RemoteException):
+            await svc.Wait("00:00:03")
+
+
+async def test_per_call_timeout_overrides_server_default(dotnet_server) -> None:
+    """A Message(request_timeout=10) rides the Request envelope as
+    TimeoutInSeconds and overrides the server's 2s default: the same 3s
+    operation that the control test saw cancelled now completes."""
+    async with _new_client() as client:
+        svc = client.get_proxy(IComputingService)
+        assert await svc.WaitWithMessage("00:00:03", Message(request_timeout=10.0)) is True
+
+
+async def test_per_call_timeout_enforces_client_deadline(dotnet_server) -> None:
+    """The same Message timeout also bounds the call client-side: a 10s
+    operation with request_timeout=0.5 raises asyncio.TimeoutError promptly
+    instead of waiting out the server."""
+    async with _new_client() as client:
+        svc = client.get_proxy(IComputingService)
+        start = asyncio.get_running_loop().time()
+        with pytest.raises(asyncio.TimeoutError):
+            await svc.WaitWithMessage("00:00:10", Message(request_timeout=0.5))
+        elapsed = asyncio.get_running_loop().time() - start
+        assert elapsed < 2.0, f"client deadline did not bound the call ({elapsed:.2f}s)"
+
+
+# --- before_call hook (outgoing only — .NET parity) -------------------------
+
+async def test_before_call_fires_for_outgoing_calls_not_for_callbacks(dotnet_server) -> None:
+    """Mirrors .NET's BeforeCall_ShouldApplyToCallsButNotToCallbacks: the
+    client's before_call sees its own outgoing TriggerEcho, but NOT the
+    inbound EchoToClient callback the server makes during that same call."""
+    seen: list[tuple[str, str]] = []
+    cb = _EchoCallback()
+    client = IpcClient(
+        NamedPipeClientTransport(pipe_name=DOTNET_PIPE_NAME),
+        callbacks={IClientCallback: cb},
+        before_call=lambda ci: seen.append((ci.endpoint, ci.method_name)),
+    )
+    async with client:
+        tester = client.get_proxy(ICallbackTester)
+        assert await tester.TriggerEcho("hooked") == "echoed: hooked"
+        assert cb.echo_calls == ["hooked"]  # the callback really ran...
+    assert ("ICallbackTester", "TriggerEcho") in seen
+    assert not any(m == "EchoToClient" for _, m in seen)  # ...but unhooked

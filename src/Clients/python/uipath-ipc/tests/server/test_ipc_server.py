@@ -270,6 +270,72 @@ async def test_named_pipe_client_calls_server_hosted_service() -> None:
     assert ("Add", 10.0, 5.0) in calc.calls
 
 
+# --- before_connect: server lifecycle + self-healing ------------------------
+
+async def test_before_connect_launches_and_self_heals_python_server() -> None:
+    """The killer app of `before_connect`: the client owns its server's
+    lifecycle. The hook lazily launches the server before the first connect,
+    stays quiet while the connection is healthy, and — because it runs before
+    every (re)connect — transparently relaunches the server after it
+    disappears: the next ordinary call just succeeds (self-healing)."""
+    _skip_if_no_pipe_support()
+    name = f"uipath-ipc-heal-{uuid.uuid4().hex}"
+    servers: list[IpcServer] = []
+    launches = 0
+
+    async def launch_server() -> None:
+        nonlocal launches
+        if servers and servers[-1].handle is not None:
+            return  # server alive — nothing to do
+        launches += 1
+        srv = IpcServer(NamedPipeServerTransport(name), {ICalculator: Calculator()})
+        await srv.start()
+        servers.append(srv)
+
+    client = IpcClient(NamedPipeClientTransport(name), before_connect=launch_server)
+    try:
+        svc = client.get_proxy(ICalculator)
+
+        # First call: hook launches the server.
+        assert await asyncio.wait_for(svc.Add(1.0, 2.0), timeout=5) == 3.0
+        assert launches == 1
+
+        # Healthy connection: hook does not refire.
+        assert await asyncio.wait_for(svc.Add(2.0, 2.0), timeout=5) == 4.0
+        assert launches == 1
+
+        # The server disappears...
+        await servers[0].aclose()
+        await _wait_until(
+            lambda: client._connection is not None and client._connection.is_closed
+        )
+
+        # ...and the next call self-heals: relaunch + transparent success.
+        assert await asyncio.wait_for(svc.Add(3.0, 4.0), timeout=5) == 7.0
+        assert launches == 2
+    finally:
+        await client.aclose()
+        for srv in servers:
+            await srv.aclose()
+
+
+# --- before_call (incoming) over a real transport ---------------------------
+
+async def test_server_before_call_fires_on_real_transport() -> None:
+    seen: list[tuple[str, str, tuple]] = []
+    server = IpcServer(
+        TcpServerTransport("127.0.0.1", 0),
+        {ICalculator: Calculator()},
+        before_call=lambda ci: seen.append((ci.endpoint, ci.method_name, ci.arguments)),
+    )
+    async with server:
+        host, port = _tcp_endpoint(server)
+        async with IpcClient(TcpClientTransport(host, port)) as client:
+            svc = client.get_proxy(ICalculator)
+            assert await asyncio.wait_for(svc.Add(2.0, 3.0), timeout=5) == 5.0
+    assert ("ICalculator", "Add", (2.0, 3.0)) in seen
+
+
 # --- transport construction -----------------------------------------------
 
 def test_tcp_server_transport_stores_host_and_port() -> None:

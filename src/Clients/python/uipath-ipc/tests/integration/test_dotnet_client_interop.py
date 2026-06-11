@@ -90,7 +90,12 @@ async def test_dotnet_client_calls_python_server() -> None:
     _skip_if_unavailable()
     pipe_name = f"uipath-ipc-pysrv-{uuid.uuid4().hex}"
     svc = PythonService()
-    server = IpcServer(NamedPipeServerTransport(pipe_name), {IPythonService: svc})
+    hooked: list[str] = []  # before_call (incoming) observed from a real .NET client
+    server = IpcServer(
+        NamedPipeServerTransport(pipe_name),
+        {IPythonService: svc},
+        before_call=lambda ci: hooked.append(ci.method_name),
+    )
 
     async with server:
         proc = await asyncio.create_subprocess_exec(
@@ -115,3 +120,8 @@ async def test_dotnet_client_calls_python_server() -> None:
     assert "ALL TESTS PASSED" in output
     # The in-process server observed every direct call plus the reach-back.
     assert {"AddFloats", "EchoString", "MultiplyInts", "GreetVia"} <= set(svc.calls)
+    # The server's before_call (incoming) hook saw every .NET-initiated call —
+    # including FailWith (the hook runs before the handler raises) — but NOT
+    # Decorate, which is the server's own OUTGOING reach-back into the client.
+    assert {"AddFloats", "EchoString", "MultiplyInts", "GreetVia", "FailWith"} <= set(hooked)
+    assert "Decorate" not in hooked
