@@ -10,6 +10,7 @@ and the full client↔server round trip.
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import uuid
 from abc import ABC, abstractmethod
@@ -344,10 +345,11 @@ def test_tcp_server_transport_stores_host_and_port() -> None:
     assert t.port == 0
 
 
-def test_named_pipe_server_transport_addresses() -> None:
+def test_named_pipe_server_transport_addresses(monkeypatch) -> None:
+    monkeypatch.delenv("TMPDIR", raising=False)
     t = NamedPipeServerTransport("calc")
     assert t._windows_address == r"\\.\pipe\calc"
-    assert t._posix_address == "/tmp/CoreFxPipe_calc"
+    assert t._posix_address == os.path.join("/tmp", "CoreFxPipe_calc")
 
 
 def test_server_transports_are_immutable() -> None:

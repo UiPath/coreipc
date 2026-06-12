@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import struct
 
 import pytest
@@ -128,6 +129,76 @@ async def test_next_id_increments() -> None:
         assert conn.next_id() == "3"
     finally:
         await conn.aclose()
+
+
+# --- protocol hardening ----------------------------------------------------
+
+async def test_stream_frame_fails_closed() -> None:
+    """UPLOAD_REQUEST/DOWNLOAD_RESPONSE (streams, out of scope) are followed
+    by raw bytes we can't consume — the connection must fail closed instead
+    of silently desyncing."""
+    conn, reader, _writer = await _make_connection()
+    send_task = asyncio.create_task(
+        conn.send_request(Request(endpoint="X", method_name="Y", parameters=[], id="1"))
+    )
+    await asyncio.sleep(0)
+    reader.feed_data(_frame(MessageType.UPLOAD_REQUEST, b""))
+    with pytest.raises(ValueError, match="unsupported message type"):
+        await asyncio.wait_for(send_task, timeout=1.0)
+    for _ in range(50):
+        if conn.is_closed:
+            break
+        await asyncio.sleep(0)
+    assert conn.is_closed
+
+
+async def test_malformed_payload_logs_and_closes(caplog) -> None:
+    """A frame whose payload isn't valid JSON must not vanish without a trace:
+    the receive loop logs the failure and tears the connection down."""
+    conn, reader, _writer = await _make_connection()
+    try:
+        with caplog.at_level(logging.ERROR):
+            reader.feed_data(_frame(MessageType.REQUEST, b"not json"))
+            for _ in range(50):
+                if conn.is_closed:
+                    break
+                await asyncio.sleep(0)
+        assert conn.is_closed
+        assert any("receive loop failed" in rec.message for rec in caplog.records)
+    finally:
+        await conn.aclose()
+
+
+def test_handler_systemexit_answers_peer_then_propagates() -> None:
+    """SystemExit/KeyboardInterrupt in a handler still answer the peer (its
+    future must not hang) but re-raise — unlike plain exceptions they are not
+    swallowed; asyncio then propagates them out of the event loop itself
+    (which is exactly the 'process-termination signal escapes' semantics).
+    Run the scenario in its own loop so the crash is observable."""
+
+    class _Svc:
+        async def Boom(self) -> None:
+            raise SystemExit(3)
+
+    writer = _BufferWriter()
+
+    async def scenario() -> None:
+        reader = asyncio.StreamReader()
+        conn = IpcConnection(reader, writer, callbacks={"ISvc": _Svc()})  # type: ignore[arg-type]
+        conn.start()
+        req = Request(endpoint="ISvc", method_name="Boom", parameters=[], id="9")
+        reader.feed_data(_frame(MessageType.REQUEST, req.to_json().encode("utf-8")))
+        await asyncio.sleep(5)  # never reached: the handler crashes the loop
+
+    with pytest.raises(SystemExit):
+        asyncio.run(scenario())
+
+    # The peer still received an error RESPONSE before the signal propagated.
+    assert len(writer.buffer) > 5
+    assert writer.buffer[0] == int(MessageType.RESPONSE)
+    resp = Response.from_json(bytes(writer.buffer[5:]).decode("utf-8"))
+    assert resp.request_id == "9"
+    assert resp.error is not None and resp.error.type_name == "SystemExit"
 
 
 # --- close callbacks ------------------------------------------------------

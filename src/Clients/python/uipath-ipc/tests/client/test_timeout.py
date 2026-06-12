@@ -102,7 +102,12 @@ async def test_request_includes_timeout_in_seconds_field() -> None:
     async with IpcClient(t, request_timeout=2.5) as client:
         svc = client.get_proxy(IComputingService)
         task = asyncio.create_task(svc.AddFloats(1.0, 2.0))
-        await asyncio.sleep(0)
+        # Poll: on 3.10/3.11 asyncio.wait_for schedules the wrapped coroutine
+        # a turn later than on 3.12+, so one sleep(0) isn't enough.
+        for _ in range(50):
+            await asyncio.sleep(0)
+            if _split_frames(bytes(t.writer.buffer)):
+                break
 
         frames = _split_frames(bytes(t.writer.buffer))
         req_payload = json.loads(frames[0][1].decode("utf-8"))

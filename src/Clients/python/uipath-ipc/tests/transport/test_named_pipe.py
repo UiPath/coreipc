@@ -7,9 +7,11 @@ the real .NET sample server.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
-from uipath_ipc import NamedPipeClientTransport
+from uipath_ipc import NamedPipeClientTransport, NamedPipeServerTransport
 
 
 def test_defaults_to_local_server() -> None:
@@ -33,9 +35,32 @@ def test_windows_address_with_remote_server() -> None:
     assert t._windows_address == r"\\REMOTE\pipe\test"
 
 
-def test_posix_address_format() -> None:
+def test_posix_address_format(monkeypatch) -> None:
+    monkeypatch.delenv("TMPDIR", raising=False)
     t = NamedPipeClientTransport(pipe_name="test")
-    assert t._posix_address == "/tmp/CoreFxPipe_test"
+    assert t._posix_address == os.path.join("/tmp", "CoreFxPipe_test")
+
+
+def test_posix_address_honors_tmpdir(monkeypatch) -> None:
+    """macOS interop: .NET binds under Path.GetTempPath(), which honors
+    $TMPDIR (always set on macOS) — so must we, client AND server."""
+    monkeypatch.setenv("TMPDIR", "/var/folders/xy")
+    assert NamedPipeClientTransport(pipe_name="test")._posix_address == os.path.join(
+        "/var/folders/xy", "CoreFxPipe_test"
+    )
+    assert NamedPipeServerTransport(pipe_name="test")._posix_address == os.path.join(
+        "/var/folders/xy", "CoreFxPipe_test"
+    )
+
+
+def test_posix_address_empty_tmpdir_falls_back_to_tmp(monkeypatch) -> None:
+    monkeypatch.setenv("TMPDIR", "")
+    assert NamedPipeClientTransport(pipe_name="test")._posix_address == os.path.join(
+        "/tmp", "CoreFxPipe_test"
+    )
+    assert NamedPipeServerTransport(pipe_name="test")._posix_address == os.path.join(
+        "/tmp", "CoreFxPipe_test"
+    )
 
 
 def test_is_immutable() -> None:

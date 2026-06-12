@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import struct
 
 import pytest
 
@@ -12,6 +13,7 @@ from uipath_ipc.wire import (
     read_frame,
     write_frame,
 )
+from uipath_ipc.wire.framing import MAX_PAYLOAD_BYTES
 
 
 class _BufferWriter:
@@ -108,3 +110,25 @@ async def test_read_fails_on_unknown_message_type() -> None:
     reader = _make_reader(b"\xff\x00\x00\x00\x00")  # type=255, empty payload
     with pytest.raises(ValueError):
         await read_frame(reader)
+
+
+async def test_read_fails_on_negative_payload_length() -> None:
+    """A negative int32 length would silently desync the stream."""
+    reader = _make_reader(struct.pack("<Bi", 0, -1))
+    with pytest.raises(ValueError, match="out of bounds"):
+        await read_frame(reader)
+
+
+async def test_read_fails_on_oversized_payload_length() -> None:
+    """A length beyond the 2 MB cap (matching .NET's server default) must be
+    rejected BEFORE allocating — a hostile header could claim ~2 GB."""
+    reader = _make_reader(struct.pack("<Bi", 0, MAX_PAYLOAD_BYTES + 1))
+    with pytest.raises(ValueError, match="out of bounds"):
+        await read_frame(reader)
+
+
+async def test_read_accepts_payload_at_exact_cap_boundary() -> None:
+    payload = b"x" * 16
+    reader = _make_reader(struct.pack("<Bi", 0, len(payload)) + payload)
+    msg_type, got = await read_frame(reader, max_payload=16)  # len == cap
+    assert (msg_type, got) == (MessageType.REQUEST, payload)

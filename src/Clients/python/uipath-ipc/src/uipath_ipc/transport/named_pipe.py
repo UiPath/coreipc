@@ -3,9 +3,9 @@
 Cross-platform:
   - Windows: `\\\\<server>\\pipe\\<name>` via the ProactorEventLoop's
     `create_pipe_connection` (client) / `start_serving_pipe` (server).
-  - POSIX: a Unix Domain Socket at `/tmp/CoreFxPipe_<name>`, which is the
-    location .NET's `NamedPipe{Client,Server}` use on Linux/macOS for
-    cross-platform IPC.
+  - POSIX: a Unix Domain Socket at `$TMPDIR/CoreFxPipe_<name>` (fallback
+    `/tmp`), matching .NET's `Path.Combine(Path.GetTempPath(), "CoreFxPipe_")`
+    — `GetTempPath()` honors `$TMPDIR`, which macOS always sets.
 """
 
 from __future__ import annotations
@@ -43,7 +43,9 @@ class NamedPipeClientTransport(ClientTransport):
 
     @property
     def _posix_address(self) -> str:
-        return f"/tmp/CoreFxPipe_{self.pipe_name}"
+        return os.path.join(
+            os.environ.get("TMPDIR") or "/tmp", f"CoreFxPipe_{self.pipe_name}"
+        )
 
     # Brief retry on FileNotFoundError to ride out two race windows:
     #   - Windows: between accepting one connection and creating the next
@@ -133,7 +135,9 @@ class NamedPipeServerTransport(ServerTransport):
 
     @property
     def _posix_address(self) -> str:
-        return f"/tmp/CoreFxPipe_{self.pipe_name}"
+        return os.path.join(
+            os.environ.get("TMPDIR") or "/tmp", f"CoreFxPipe_{self.pipe_name}"
+        )
 
     async def serve(self, on_connection: ConnectionHandler) -> ServerHandle:
         if sys.platform == "win32":

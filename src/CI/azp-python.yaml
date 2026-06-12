@@ -1,8 +1,16 @@
+parameters:
+  # Python version to build/test with. The Windows job (artifact producer)
+  # stays on the default; the Linux test-only job fans out over a matrix so
+  # the declared floor (requires-python >= 3.10) is actually exercised.
+  - name: pythonVersion
+    type: string
+    default: '3.12'
+
 steps:
   - task: UsePythonVersion@0
-    displayName: 'Use Python 3.12'
+    displayName: 'Use Python ${{ parameters.pythonVersion }}'
     inputs:
-      versionSpec: '3.12'
+      versionSpec: '${{ parameters.pythonVersion }}'
       addToPath: true
       architecture: x64
 
@@ -23,4 +31,4 @@ steps:
       testResultsFormat: JUnit
       testResultsFiles: 'python-test-results.xml'
       searchFolder: '$(Build.SourcesDirectory)'
-      testRunTitle: 'Python tests ($(Agent.OS) $(Agent.OSArchitecture))'
+      testRunTitle: 'Python ${{ parameters.pythonVersion }} tests ($(Agent.OS) $(Agent.OSArchitecture))'

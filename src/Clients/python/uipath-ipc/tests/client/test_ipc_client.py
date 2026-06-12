@@ -67,10 +67,18 @@ class ITimed(ABC):
     async def DoWork(self, m: object) -> None: ...
 
 
-def _sent_request(writer: _BufferWriter) -> dict:
-    buf = bytes(writer.buffer)
-    payload_len = int.from_bytes(buf[1:5], "little", signed=True)
-    return json.loads(buf[5 : 5 + payload_len].decode("utf-8"))
+async def _sent_request(writer: _BufferWriter) -> dict:
+    """Poll for the REQUEST frame instead of assuming one event-loop turn —
+    on 3.10/3.11 asyncio.wait_for schedules the wrapped coroutine a turn
+    later than on 3.12+, so a single sleep(0) is not enough."""
+    for _ in range(50):
+        if len(writer.buffer) >= 5:
+            buf = bytes(writer.buffer)
+            payload_len = int.from_bytes(buf[1:5], "little", signed=True)
+            if len(buf) >= 5 + payload_len:
+                return json.loads(buf[5 : 5 + payload_len].decode("utf-8"))
+        await asyncio.sleep(0)
+    raise AssertionError("no complete REQUEST frame was written")
 
 
 # --- proxy tests ----------------------------------------------------------
@@ -170,7 +178,7 @@ async def test_message_arg_sets_per_call_timeout() -> None:
         svc = client.get_proxy(ITimed)
         task = asyncio.create_task(svc.DoWork(Message(request_timeout=2.0)))
         await asyncio.sleep(0)
-        req = _sent_request(t.writer)
+        req = await _sent_request(t.writer)
         assert req["TimeoutInSeconds"] == 2.0
         assert req["Parameters"] == ["{}"]
         t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
@@ -185,7 +193,7 @@ async def test_message_arg_with_payload_serializes_payload() -> None:
             svc.DoWork(Message(payload={"k": 1}, request_timeout=5.0))
         )
         await asyncio.sleep(0)
-        req = _sent_request(t.writer)
+        req = await _sent_request(t.writer)
         assert req["TimeoutInSeconds"] == 5.0
         assert req["Parameters"] == ['{"Payload": {"k": 1}}']
         t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
@@ -204,7 +212,7 @@ async def test_infinite_request_timeout_disables_client_deadline() -> None:
             svc.DoWork(Message(request_timeout=INFINITE_REQUEST_TIMEOUT))
         )
         await asyncio.sleep(0)
-        req = _sent_request(t.writer)
+        req = await _sent_request(t.writer)
         assert req["TimeoutInSeconds"] == -0.001
         await asyncio.sleep(0.1)  # response arrives later — call must survive
         assert not task.done()
@@ -222,7 +230,7 @@ async def test_message_wire_body_serializes_at_top_level() -> None:
             Message(wire_body={"ServiceUrl": None}, request_timeout=INFINITE_REQUEST_TIMEOUT)
         ))
         await asyncio.sleep(0)
-        req = _sent_request(t.writer)
+        req = await _sent_request(t.writer)
         assert req["TimeoutInSeconds"] == -0.001
         assert json.loads(req["Parameters"][0]) == {"ServiceUrl": None}
         t.reader.feed_data(_response_frame(Response(request_id="1", data="")))

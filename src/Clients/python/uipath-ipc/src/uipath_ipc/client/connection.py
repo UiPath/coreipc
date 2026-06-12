@@ -29,6 +29,7 @@ import asyncio
 import inspect
 import itertools
 import json
+import logging
 import traceback
 import types
 import weakref
@@ -48,6 +49,8 @@ from ..wire import (
 )
 
 T = TypeVar("T")
+
+_logger = logging.getLogger(__name__)
 
 #: Invoked once with the connection when it closes (e.g. to prune it from a
 #: server's live-connection set). Should be synchronous and must not raise.
@@ -329,12 +332,20 @@ class IpcConnection:
                     self._handle_incoming_request(payload)
                 elif msg_type == MessageType.CANCELLATION_REQUEST:
                     self._handle_incoming_cancellation(payload)
-                # UPLOAD_REQUEST / DOWNLOAD_RESPONSE are not yet handled.
+                else:
+                    # UPLOAD_REQUEST / DOWNLOAD_RESPONSE (streams) are out of
+                    # scope; their frame is followed by a length + raw bytes we
+                    # can't consume, so fail closed instead of desyncing.
+                    raise ValueError(f"unsupported message type {msg_type!r}")
         except asyncio.CancelledError:
             raise
         except (asyncio.IncompleteReadError, ConnectionResetError, OSError) as ex:
+            _logger.debug("receive loop ended (transport closed): %r", ex)
             self._fail_pending(ex)
-        except Exception as ex:  # noqa: BLE001 — surface anything unexpected via futures
+        except Exception as ex:  # noqa: BLE001
+            # Unexpected: a protocol/parse error or a genuine bug. The futures
+            # channel only surfaces this when a call is in flight, so log it.
+            _logger.exception("receive loop failed")
             self._fail_pending(ex)
         finally:
             # Mark closed so the owning IpcClient knows to re-dial on next call,
@@ -454,6 +465,13 @@ class IpcConnection:
                 ),
             )
         except BaseException as ex:
+            # Always answer the peer so its pending future never hangs — but
+            # unlike C#'s `catch (Exception)`, BaseException also catches
+            # SystemExit/KeyboardInterrupt; re-raise those after responding so
+            # process-termination signals still propagate.
+            _logger.exception(
+                "callback %s.%s failed", req.endpoint, req.method_name
+            )
             resp = Response(
                 request_id=req.id,
                 error=Error(
@@ -462,7 +480,14 @@ class IpcConnection:
                     stack_trace=traceback.format_exc(),
                 ),
             )
+            if isinstance(ex, (SystemExit, KeyboardInterrupt)):
+                await self._try_send_response(resp)
+                raise
 
+        await self._try_send_response(resp)
+
+    async def _try_send_response(self, resp: Response) -> None:
+        """Best-effort RESPONSE send; no-op if the connection tore down."""
         if self._closed:
             return
         try:

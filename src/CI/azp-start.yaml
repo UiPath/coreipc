@@ -94,6 +94,16 @@ stages:
     displayName: 'Python — Linux (test-only)'
     pool:
       vmImage: 'ubuntu-22.04'
+    # Test the declared floor (requires-python >= 3.10) and the versions in
+    # between — the asyncio.wait_for scheduling changed in 3.12, which a
+    # 3.12-only matrix can't catch.
+    strategy:
+      matrix:
+        py310: { pythonVersion: '3.10' }
+        py311: { pythonVersion: '3.11' }
+        py312: { pythonVersion: '3.12' }
     steps:
       - template: azp-initialization.yaml
       - template: azp-python.yaml
+        parameters:
+          pythonVersion: $(pythonVersion)
