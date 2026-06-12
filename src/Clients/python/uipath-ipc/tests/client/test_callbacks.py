@@ -226,6 +226,9 @@ async def test_unknown_endpoint_returns_error() -> None:
 
         assert resp.error is not None
         assert "INonExistent" in resp.error.message
+        # .NET wire type name, so a .NET caller can match with
+        # RemoteException.Is<EndpointNotFoundException>().
+        assert resp.error.type_name == "UiPath.Ipc.EndpointNotFoundException"
     finally:
         await conn.aclose()
 
@@ -245,6 +248,7 @@ async def test_unknown_method_returns_error() -> None:
 
         assert resp.error is not None
         assert "DoesNotExist" in resp.error.message
+        assert resp.error.type_name == "UiPath.Ipc.MethodNotFoundException"
     finally:
         await conn.aclose()
 

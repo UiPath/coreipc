@@ -36,6 +36,17 @@ public interface IClientCallback
     Task<string> Decorate(string name);
 }
 
+// Decoy with the same Type.Name as IPythonService but a method the Python
+// service doesn't implement — exercises the Python server's
+// MethodNotFoundException wire parity.
+public static class Decoys
+{
+    public interface IPythonService
+    {
+        Task<bool> InexistentMethod(CancellationToken ct = default);
+    }
+}
+
 public sealed class ClientCallback : IClientCallback
 {
     public Task<string> Decorate(string name) => Task.FromResult(name.ToUpperInvariant());
@@ -104,6 +115,19 @@ internal static class Program
             catch (RemoteException ex)
             {
                 Check("FailWith raises", ex.Message.Contains("kaboom"), $"msg='{ex.Message}' type='{ex.Type}'");
+            }
+
+            // 6. unknown method: the Python server answers with the .NET wire
+            //    type, so Is<MethodNotFoundException>() matches cross-language.
+            try
+            {
+                var decoy = ipcClient.GetProxy<Decoys.IPythonService>();
+                await decoy.InexistentMethod();
+                Check("InexistentMethod raises", false, "no exception thrown");
+            }
+            catch (RemoteException ex)
+            {
+                Check("InexistentMethod raises", ex.Is<MethodNotFoundException>(), $"type='{ex.Type}'");
             }
         }
         catch (Exception ex)

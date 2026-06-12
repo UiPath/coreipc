@@ -1,7 +1,7 @@
 """uipath-ipc — Python client and server for UiPath.Ipc."""
 
 from .client import IpcClient, IpcConnection
-from .errors import RemoteException
+from .errors import EndpointNotFoundError, MethodNotFoundError, RemoteException
 from .hooks import BeforeCallHandler, BeforeConnectHandler, CallInfo
 from .message import INFINITE_REQUEST_TIMEOUT, IClient, Message
 from .server import IpcServer
@@ -19,8 +19,10 @@ __all__ = [
     "BeforeConnectHandler",
     "CallInfo",
     "ClientTransport",
+    "EndpointNotFoundError",
     "IClient",
     "INFINITE_REQUEST_TIMEOUT",
+    "MethodNotFoundError",
     "IpcClient",
     "IpcConnection",
     "IpcServer",

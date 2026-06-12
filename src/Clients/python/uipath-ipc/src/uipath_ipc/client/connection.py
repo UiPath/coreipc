@@ -36,6 +36,7 @@ import weakref
 from typing import Callable, TypeVar, Union, cast, get_args, get_origin, get_type_hints
 
 from ..hooks import BeforeCallHandler, CallInfo
+from ..errors import EndpointNotFoundError, MethodNotFoundError
 from ..message import Message
 from ..transport.base import ClientTransport
 from ..wire import (
@@ -428,12 +429,12 @@ class IpcConnection:
         try:
             handler = self._callbacks.get(req.endpoint)
             if handler is None:
-                raise RuntimeError(
+                raise EndpointNotFoundError(
                     f"no callback registered for endpoint {req.endpoint!r}"
                 )
             method = getattr(handler, req.method_name, None)
             if method is None or not callable(method):
-                raise RuntimeError(
+                raise MethodNotFoundError(
                     f"callback {req.endpoint!r} has no method "
                     f"{req.method_name!r}"
                 )
@@ -476,7 +477,10 @@ class IpcConnection:
                 request_id=req.id,
                 error=Error(
                     message=str(ex) or type(ex).__name__,
-                    type_name=type(ex).__name__,
+                    # Dispatch errors carry their .NET wire type name so .NET
+                    # callers can match with RemoteException.Is<T>().
+                    type_name=getattr(ex, "wire_type_name", None)
+                    or type(ex).__name__,
                     stack_trace=traceback.format_exc(),
                 ),
             )

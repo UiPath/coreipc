@@ -83,7 +83,11 @@ internal class Server
                 await OnError(request, new EndpointNotFoundException(nameof(request.Endpoint), DebugName, request.Endpoint));
                 return;
             }
-            var method = GetMethod(route.Service.Type, request.MethodName);
+            if (!TryGetMethod(route.Service.Type, request.MethodName, out var method))
+            {
+                await OnError(request, new MethodNotFoundException(nameof(request.MethodName), DebugName, request.Endpoint, request.MethodName));
+                return;
+            }
             Response? response = null;
             var requestCancellation = Rent();
             _requests[request.Id] = requestCancellation;
@@ -251,8 +255,23 @@ internal class Server
         taskType.GenericTypeArguments[0],
         GetResultMethod.MakeGenericDelegate<GetTaskResultFunc>)(task);
 
-    private static Method GetMethod(Type contract, string methodName)
-    => Methods.GetOrAdd(new(contract, methodName), Method.FromKey);
+    private static bool TryGetMethod(Type contract, string methodName, out Method method)
+    {
+        var key = new MethodKey(contract, methodName);
+        if (Methods.TryGetValue(key, out method))
+        {
+            return true;
+        }
+        // Not-found stays uncached on purpose: a peer probing with garbage
+        // method names must not grow the static cache.
+        if (contract.GetInterfaceMethodOrDefault(methodName) is null)
+        {
+            method = default;
+            return false;
+        }
+        method = Methods.GetOrAdd(key, Method.FromKey);
+        return true;
+    }
 
     private readonly record struct MethodKey(Type Contract, string MethodName);
 

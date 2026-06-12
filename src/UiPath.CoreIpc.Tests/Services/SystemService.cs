@@ -45,6 +45,23 @@ public sealed class SystemService : ISystemService
         }
     }
 
+    public async Task<(string ExceptionType, string ExceptionMessage, string? MarshalledExceptionType)?> CallCallbackWithInexistentMethod(Message message = null!)
+    {
+        try
+        {
+            // Decoys.IArithmeticCallback's Name matches the registered
+            // IArithmeticCallback endpoint, but IncrementInexistent doesn't
+            // exist on the real contract — exercising MethodNotFoundException
+            // on the callback direction.
+            _ = await message.Client.GetCallback<Decoys.IArithmeticCallback>().IncrementInexistent(1);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return (ex.GetType().Name, ex.Message, (ex as RemoteException)?.Type);
+        }
+    }
+
     public Task FireAndForgetThrowSync() => throw new MarkerException();
 
     public sealed class MarkerException : Exception { }

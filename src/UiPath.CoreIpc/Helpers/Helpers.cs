@@ -34,10 +34,12 @@ internal static class Helpers
         Debug.Assert(obj.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(obj) is null);
     internal static TDelegate MakeGenericDelegate<TDelegate>(this MethodInfo genericMethod, Type genericArgument) where TDelegate : Delegate =>
         (TDelegate)genericMethod.MakeGenericMethod(genericArgument).CreateDelegate(typeof(TDelegate));
+    internal static MethodInfo? GetInterfaceMethodOrDefault(this Type type, string name) =>
+        type.GetMethod(name, InstanceFlags) ??
+        type.GetInterfaces().Select(t => t.GetMethod(name, InstanceFlags)).FirstOrDefault(m => m != null);
     internal static MethodInfo GetInterfaceMethod(this Type type, string name)
     {
-        var method = type.GetMethod(name, InstanceFlags) ??
-            type.GetInterfaces().Select(t => t.GetMethod(name, InstanceFlags)).FirstOrDefault(m => m != null) ??
+        var method = type.GetInterfaceMethodOrDefault(name) ??
             throw new ArgumentOutOfRangeException(nameof(name), name, $"Method '{name}' not found in interface '{type}'.");
         if (method.IsGenericMethod)
         {

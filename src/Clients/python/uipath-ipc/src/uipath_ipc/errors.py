@@ -53,4 +53,21 @@ class RemoteException(Exception):
         return self.message
 
 
-__all__ = ["RemoteException"]
+class EndpointNotFoundError(RuntimeError):
+    """Raised by the dispatcher when an incoming request names an endpoint
+    no service/callback is registered for. Crosses the wire as .NET's
+    ``UiPath.Ipc.EndpointNotFoundException`` so a .NET caller can match it
+    with ``RemoteException.Is<EndpointNotFoundException>()``."""
+
+    wire_type_name = "UiPath.Ipc.EndpointNotFoundException"
+
+
+class MethodNotFoundError(RuntimeError):
+    """Raised by the dispatcher when an incoming request resolves an endpoint
+    but names a method the handler doesn't have. Crosses the wire as .NET's
+    ``UiPath.Ipc.MethodNotFoundException``."""
+
+    wire_type_name = "UiPath.Ipc.MethodNotFoundException"
+
+
+__all__ = ["EndpointNotFoundError", "MethodNotFoundError", "RemoteException"]
