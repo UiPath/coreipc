@@ -49,6 +49,7 @@ stages:
   jobs:
   - job: NuGet_DotNet_Windows
     displayName: 'NuGet — .NET on Windows'
+    timeoutInMinutes: 30   # normal run ≈ 5 min; don't let a wedge eat the 60-min default
     pool:
         vmImage: 'windows-2022'
     steps:
