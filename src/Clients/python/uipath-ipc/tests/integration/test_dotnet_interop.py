@@ -12,7 +12,9 @@ request timeout.
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 from abc import ABC, abstractmethod
+from uuid import UUID
 
 import pytest
 
@@ -57,7 +59,13 @@ class ISystemService(ABC):
     async def EchoString(self, value: str) -> str: ...
 
     @abstractmethod
-    async def ReverseBytes(self, bytes_: list[int]) -> list[int]: ...
+    async def ReverseBytes(self, data: bytes) -> bytes: ...
+
+    @abstractmethod
+    async def EchoGuid(self, value: UUID) -> UUID: ...
+
+    @abstractmethod
+    async def EchoDateTime(self, value: dt.datetime) -> dt.datetime: ...
 
 
 # Callback contracts — IClientCallback is the contract the *client* hosts;
@@ -193,6 +201,33 @@ async def test_multiple_server_initiated_callbacks_on_same_client(dotnet_server)
         ]
         assert results == ["echoed: a", "echoed: b", "echoed: c"]
         assert cb.echo_calls == ["a", "b", "c"]
+
+
+# --- value-type round-trips (type-directed (de)serialization) --------------
+# Each fails without the serialization layer: .NET sends byte[] as base64 and
+# Guid/DateTime as strings, which a bare json.loads leaves as a str.
+
+async def test_reverse_bytes_round_trips_as_bytes(dotnet_server) -> None:
+    async with _new_client() as client:
+        svc = client.get_proxy(ISystemService)
+        assert await svc.ReverseBytes(b"\x01\x02\x03\x04") == b"\x04\x03\x02\x01"
+
+
+async def test_guid_round_trips_as_uuid(dotnet_server) -> None:
+    u = UUID("550e8400-e29b-41d4-a716-446655440000")
+    async with _new_client() as client:
+        svc = client.get_proxy(ISystemService)
+        result = await svc.EchoGuid(u)
+        assert result == u and isinstance(result, UUID)
+
+
+async def test_datetime_round_trips_as_datetime(dotnet_server) -> None:
+    d = dt.datetime(2026, 6, 12, 10, 30, 0, tzinfo=dt.timezone.utc)
+    async with _new_client() as client:
+        svc = client.get_proxy(ISystemService)
+        result = await svc.EchoDateTime(d)
+        assert isinstance(result, dt.datetime)
+        assert result == d
 
 
 # --- per-call timeout (Message argument) -----------------------------------

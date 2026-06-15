@@ -8,6 +8,7 @@ from .messages import (
     Request,
     Response,
 )
+from .serialization import from_wire, to_wire
 
 __all__ = [
     "CancellationRequest",
@@ -16,6 +17,8 @@ __all__ = [
     "MessageType",
     "Request",
     "Response",
+    "from_wire",
     "read_frame",
+    "to_wire",
     "write_frame",
 ]

@@ -5,15 +5,39 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
-from typing import TYPE_CHECKING, Any
+import weakref
+from typing import TYPE_CHECKING, Any, get_type_hints
 
 from ..errors import RemoteException
 from ..hooks import CallInfo
 from ..message import Message
-from ..wire import Request
+from ..wire import Request, from_wire, to_wire
 
 if TYPE_CHECKING:
     from .ipc_client import IpcClient
+
+
+# Cache of a contract method's resolved return annotation, keyed weakly by the
+# function so reflection runs once per method. `None` means "no usable hint".
+_return_hint_cache: "weakref.WeakKeyDictionary[Any, Any]" = weakref.WeakKeyDictionary()
+
+
+def _return_hint(contract: type, method_name: str) -> Any:
+    func = inspect.getattr_static(contract, method_name, None)
+    if func is None:
+        return None
+    cached = _return_hint_cache.get(func)
+    if cached is not None:
+        return cached
+    try:
+        hint = get_type_hints(func).get("return")
+    except Exception:
+        hint = None
+    try:
+        _return_hint_cache[func] = hint
+    except TypeError:
+        pass
+    return hint
 
 
 def _message_wire(m: Message) -> dict:
@@ -78,7 +102,10 @@ class _IpcProxy:
                     timeout = a.request_timeout
                 params.append(json.dumps(_message_wire(a)))
             else:
-                params.append(json.dumps(a))
+                # to_wire encodes value types (bytes->base64, UUID/datetime/
+                # Decimal/enum/dataclass/pydantic) and is a no-op for plain
+                # JSON values, so existing primitive/dict args are unchanged.
+                params.append(json.dumps(to_wire(a)))
         conn = await self._client._ensure_connected()
         # BeforeCall hook (client only — a reach-back proxy is bound to a bare
         # connection, which has no `before_call`, so callbacks skip it).
@@ -108,4 +135,15 @@ class _IpcProxy:
         # method. Treat empty (or null) Data as "no return value".
         if not resp.data:
             return None
-        return json.loads(resp.data)
+        parsed = json.loads(resp.data)
+        # Materialize into the contract's declared return type (reflection),
+        # like .NET handing Newtonsoft `typeof(TResult)`. Plain dataclasses and
+        # dict/Any/unannotated returns pass through as raw parsed structures so
+        # consumers that decode results themselves (e.g. via from_wire) are
+        # unaffected; pydantic models, enums, and scalar value types
+        # (bytes/UUID/datetime/Decimal) — and containers of those — are built.
+        return from_wire(
+            parsed,
+            _return_hint(self._contract, method_name),
+            materialize_dataclasses=False,
+        )

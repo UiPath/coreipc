@@ -37,6 +37,20 @@ public interface ISystemService
 {
     Task<string> EchoString(string value, CancellationToken ct = default);
     Task<byte[]> ReverseBytes(byte[] data, CancellationToken ct = default);
+
+    // Value types JSON has no native form for — Newtonsoft sends byte[] as
+    // base64, Guid/DateTime as strings — so the Python client must encode/
+    // decode them by the declared type to round-trip correctly.
+    Task<Guid> EchoGuid(Guid value, CancellationToken ct = default);
+    Task<DateTime> EchoDateTime(DateTime value, CancellationToken ct = default);
+    Task<Person> EchoPerson(Person value, CancellationToken ct = default);
+}
+
+public sealed record Person
+{
+    public string? FirstName { get; init; }
+    public string? LastName { get; init; }
+    public override string ToString() => $"{FirstName} {LastName}";
 }
 
 /// <summary>
@@ -124,6 +138,12 @@ public sealed class SystemService : ISystemService
         _logger.LogInformation("EchoString({Value})", value);
         return Task.FromResult(value);
     }
+
+    public Task<Guid> EchoGuid(Guid value, CancellationToken ct) => Task.FromResult(value);
+
+    public Task<DateTime> EchoDateTime(DateTime value, CancellationToken ct) => Task.FromResult(value);
+
+    public Task<Person> EchoPerson(Person value, CancellationToken ct) => Task.FromResult(value);
 
     public Task<byte[]> ReverseBytes(byte[] data, CancellationToken ct)
     {
