@@ -25,4 +25,4 @@ pub use rpc::{Dispatcher, RemoteError, RpcChannel, RpcError};
 #[doc(no_inline)]
 pub use tokio_util::sync::CancellationToken;
 #[doc(no_inline)]
-pub use transport::{BoxStream, Transport};
+pub use transport::{default_transport, BoxStream, Transport};
