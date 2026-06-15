@@ -13,6 +13,7 @@ from .transport import (
     TcpClientTransport,
     TcpServerTransport,
 )
+from .wire import from_wire, to_wire
 
 __all__ = [
     "BeforeCallHandler",
@@ -33,4 +34,6 @@ __all__ = [
     "ServerTransport",
     "TcpClientTransport",
     "TcpServerTransport",
+    "from_wire",
+    "to_wire",
 ]
