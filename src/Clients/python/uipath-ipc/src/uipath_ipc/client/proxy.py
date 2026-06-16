@@ -30,9 +30,7 @@ def _return_hint(contract: type, method_name: str) -> Any:
     if cached is not None:
         return cached
     try:
-        # include_extras keeps Annotated metadata (e.g. pydantic.Base64Bytes),
-        # which TypeAdapter needs to apply the right converter.
-        hint = get_type_hints(func, include_extras=True).get("return")
+        hint = get_type_hints(func).get("return")
     except Exception:
         hint = None
     try:
@@ -139,7 +137,13 @@ class _IpcProxy:
             return None
         parsed = json.loads(resp.data)
         # Materialize into the contract's declared return type (reflection),
-        # like .NET handing Newtonsoft `typeof(TResult)`. A loosely-typed
-        # return (`Any` / no annotation) passes through as the raw parsed
-        # structure, so consumers that decode results themselves are unaffected.
-        return from_wire(parsed, _return_hint(self._contract, method_name))
+        # like .NET handing Newtonsoft `typeof(TResult)`. Plain dataclasses and
+        # dict/Any/unannotated returns pass through as raw parsed structures so
+        # consumers that decode results themselves (e.g. via from_wire) are
+        # unaffected; pydantic models, enums, and scalar value types
+        # (bytes/UUID/datetime/Decimal) — and containers of those — are built.
+        return from_wire(
+            parsed,
+            _return_hint(self._contract, method_name),
+            materialize_dataclasses=False,
+        )
