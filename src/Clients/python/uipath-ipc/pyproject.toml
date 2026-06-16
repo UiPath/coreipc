@@ -8,6 +8,13 @@ authors = [
     { name = "Eduard Dumitru", email = "eduard.dumitru@uipath.com" },
 ]
 
+dependencies = [
+    # Type-directed (de)serialization (wire/serialization.py). Wide range so a
+    # consumer is free to pin their own 2.x; we only use the stable public
+    # surface (TypeAdapter, to_jsonable_python, Base64Bytes).
+    "pydantic>=2,<3",
+]
+
 [project.optional-dependencies]
 dev = [
     "pytest",

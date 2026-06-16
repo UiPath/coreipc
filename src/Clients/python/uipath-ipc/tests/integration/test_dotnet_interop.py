@@ -18,6 +18,8 @@ from uuid import UUID
 
 import pytest
 
+from pydantic import Base64Bytes
+
 from uipath_ipc import (
     INFINITE_REQUEST_TIMEOUT,
     IpcClient,
@@ -59,7 +61,7 @@ class ISystemService(ABC):
     async def EchoString(self, value: str) -> str: ...
 
     @abstractmethod
-    async def ReverseBytes(self, data: bytes) -> bytes: ...
+    async def ReverseBytes(self, data: bytes) -> Base64Bytes: ...
 
     @abstractmethod
     async def EchoGuid(self, value: UUID) -> UUID: ...

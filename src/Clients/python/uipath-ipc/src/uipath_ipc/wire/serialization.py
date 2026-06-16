@@ -1,174 +1,59 @@
 """Type-directed (de)serialization for contract arguments and results.
 
 Plain JSON only round-trips ``str/int/float/bool/list/dict/None``. A
-.NET/CoreIpc contract, though, uses value types JSON has no notion of —
-``byte[]`` (base64), ``Guid``, ``DateTime``, ``decimal`` — and on .NET those
-round-trip for free because Newtonsoft is handed ``typeof(TResult)``. This
-module is the Python equivalent: encode those types on the way out, and
-materialize a parsed result into the contract's declared return type on the
-way back (the type comes from reflection on the method's return annotation).
+.NET/CoreIpc contract uses value types JSON has no notion of — ``Guid``,
+``DateTime``, ``decimal``, ``byte[]`` — and on .NET those round-trip because
+Newtonsoft is handed ``typeof(TResult)``. This module is the Python
+equivalent, built on **pydantic**: encode arguments to JSON-able values, and
+materialize a parsed result into the contract's declared return type (the
+type comes from reflection on the method's return annotation).
 
-Dispatch is by type and covers, in order: a **pydantic model** (duck-typed
-via ``model_validate`` / ``model_dump`` — uipath-ipc never imports pydantic,
-so the consumer owns that dependency), a **dataclass**, an **enum**, a
-**scalar value type** (``bytes``/``UUID``/``datetime``/``Decimal``), a
-**typing container** (``Optional``/``list``/``tuple``/``set``/``dict``), else
-the value unchanged.
+We depend on pydantic directly (``pydantic>=2,<3`` — a wide range so a
+consumer can pin their own 2.x) rather than hand-rolling the type walk:
+``pydantic.TypeAdapter`` validates/coerces into any declared type — pydantic
+models, stdlib dataclasses, enums, ``Optional``/``list``/``dict``, and the
+scalar value types — and surfaces missing-field / type-mismatch errors.
 
-`to_wire` is always safe to call — for a plain JSON value it's a no-op, so
-existing primitive/dict/list arguments are untouched. `from_wire` only
-transforms when the destination type asks for it; an unknown/``Any``/``dict``
-destination passes through, so a consumer that does its own decoding (or
-returns loose dicts) is never surprised.
+.NET serializes ``byte[]`` as **base64**, whereas pydantic's plain ``bytes``
+is UTF-8. So: outbound, `to_wire` encodes any ``bytes`` as base64; inbound,
+annotate a byte-array field/return as ``pydantic.Base64Bytes`` to decode it.
 """
 
 from __future__ import annotations
 
-import base64
-import dataclasses
-import datetime as _datetime
-import enum
-import types
-from decimal import Decimal
-from typing import Any, Union, get_args, get_origin
-from uuid import UUID
+import json
+from functools import lru_cache
+from typing import Any
 
-_UNION_ORIGINS: tuple[object, ...] = (
-    (Union, types.UnionType) if hasattr(types, "UnionType") else (Union,)
-)
+from pydantic import TypeAdapter
+from pydantic_core import to_json
 
 
-def _is_pydantic_model(t: object) -> bool:
-    """Duck-typed pydantic v2 BaseModel subclass — no import of pydantic."""
-    return (
-        isinstance(t, type)
-        and hasattr(t, "model_validate")
-        and hasattr(t, "model_fields")
-    )
+@lru_cache(maxsize=None)
+def _adapter(hint: Any) -> TypeAdapter:
+    """One cached TypeAdapter per declared type (construction isn't free)."""
+    return TypeAdapter(hint)
 
-
-# --- outbound: argument -> JSON-able structure ----------------------------
 
 def to_wire(value: Any) -> Any:
-    """Encode an outgoing argument to a JSON-serializable structure, matching
-    .NET's wire forms for the value types JSON can't represent."""
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if _is_pydantic_model(type(value)):
-        return value.model_dump(mode="json", by_alias=True)
-    if isinstance(value, enum.Enum):
-        return value.value
-    if isinstance(value, (bytes, bytearray)):
-        return base64.b64encode(bytes(value)).decode("ascii")
-    if isinstance(value, UUID):
-        return str(value)
-    if isinstance(value, _datetime.datetime):
-        return value.isoformat()
-    if isinstance(value, Decimal):
-        return float(value)
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return {
-            f.name: to_wire(getattr(value, f.name))
-            for f in dataclasses.fields(value)
-        }
-    if isinstance(value, (list, tuple, set, frozenset)):
-        return [to_wire(v) for v in value]
-    if isinstance(value, dict):
-        return {k: to_wire(v) for k, v in value.items()}
-    return value
+    """Encode an outgoing argument to a JSON-serializable structure.
 
+    Handles pydantic models, stdlib dataclasses, enums, and value types
+    (``UUID``/``datetime``/``Decimal``, and ``bytes`` → base64 to match .NET
+    ``byte[]``). A plain JSON value passes through unchanged.
 
-# --- inbound: parsed JSON -> declared type --------------------------------
-
-def _parse_datetime(value: Any) -> Any:
-    if not isinstance(value, str):
-        return value
-    text = value
-    if text.endswith("Z"):  # .NET/UTC 'Z' — fromisoformat needs an offset on <3.11
-        text = text[:-1] + "+00:00"
-    try:
-        return _datetime.datetime.fromisoformat(text)
-    except ValueError:
-        # Trim sub-microsecond fractional digits (.NET emits up to 7).
-        if "." in text:
-            head, _, tail = text.partition(".")
-            frac = tail
-            tz = ""
-            for sign in ("+", "-"):
-                if sign in frac:
-                    frac, _, off = frac.partition(sign)
-                    tz = sign + off
-                    break
-            head = f"{head}.{frac[:6]}{tz}"
-            return _datetime.datetime.fromisoformat(head)
-        raise
-
-
-def _from_wire_dataclass(cls: type, data: Any) -> Any:
-    if not isinstance(data, dict):
-        return data
-    hints = _resolve_hints(cls)
-    kwargs = {
-        f.name: from_wire(data[f.name], hints.get(f.name, Any))
-        for f in dataclasses.fields(cls)
-        if f.name in data  # extra keys ignored (forward-compat); missing
-    }                      # required fields make the ctor below raise.
-    return cls(**kwargs)
-
-
-def _resolve_hints(cls: type) -> dict:
-    import typing
-
-    try:
-        return typing.get_type_hints(cls)
-    except Exception:
-        return {}
-
-
-def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -> Any:
-    """Materialize a parsed-JSON value into the declared `hint` type.
-
-    `materialize_dataclasses=False` leaves plain dataclasses (and dicts) as
-    raw parsed structures — the proxy uses this so consumers that decode
-    results themselves keep receiving dicts.
+    Routed through pydantic's JSON serializer (then back to Python objects)
+    so the result is pure JSON primitives the caller can ``json.dumps`` —
+    ``to_jsonable_python`` would leave e.g. ``Decimal`` as a ``Decimal``.
     """
-    if parsed is None or hint is None or hint is Any:
-        return parsed
+    return json.loads(to_json(value, bytes_mode="base64", by_alias=True))
 
-    origin = get_origin(hint)
-    args = get_args(hint)
-    if origin in _UNION_ORIGINS:  # Optional[X] / X | Y
-        non_none = [a for a in args if a is not type(None)]
-        if len(non_none) == 1:
-            return from_wire(
-                parsed, non_none[0], materialize_dataclasses=materialize_dataclasses
-            )
-        return parsed
-    if origin in (list, tuple, set, frozenset) and args:
-        return [
-            from_wire(x, args[0], materialize_dataclasses=materialize_dataclasses)
-            for x in parsed
-        ]
-    if origin is dict and isinstance(parsed, dict):
-        vt = args[1] if len(args) == 2 else Any
-        return {
-            k: from_wire(v, vt, materialize_dataclasses=materialize_dataclasses)
-            for k, v in parsed.items()
-        }
 
-    if isinstance(hint, type):
-        if _is_pydantic_model(hint):
-            return hint.model_validate(parsed)
-        if issubclass(hint, enum.Enum):
-            return hint(parsed)
-        if hint in (bytes, bytearray):
-            return base64.b64decode(parsed)
-        if hint is UUID:
-            return UUID(parsed)
-        if hint is _datetime.datetime:
-            return _parse_datetime(parsed)
-        if hint is Decimal:
-            return Decimal(str(parsed))
-        if materialize_dataclasses and dataclasses.is_dataclass(hint):
-            return _from_wire_dataclass(hint, parsed)
-    return parsed
+def from_wire(parsed: Any, hint: Any) -> Any:
+    """Materialize a parsed-JSON value into the declared `hint` type via
+    pydantic (validation included). ``None`` and ``Any`` / no hint pass
+    through unchanged, so a loosely-typed contract keeps returning raw
+    structures (and the consumer can decode them itself)."""
+    if hint is None or hint is Any:
+        return parsed
+    return _adapter(hint).validate_python(parsed)
