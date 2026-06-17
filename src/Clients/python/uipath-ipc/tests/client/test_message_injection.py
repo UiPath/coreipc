@@ -91,13 +91,25 @@ class _Service:
         self.messages.append(m)
         return f"opt {value}"
 
+    async def Save(self, m: Message) -> bool:
+        # The contract declares the Message, so the wire carries a slot for it
+        # ({} or {"Payload": ...}); the handler must see the Payload.
+        self.messages.append(m)
+        return True
+
+    async def Annotate(self, label: str, m: Message, count: int) -> str:
+        # Non-trailing Message: its wire slot must be consumed so `count` stays
+        # aligned with the parameter after it.
+        self.messages.append(m)
+        return f"{label}:{count}"
+
 
 def _make_connection(
     svc: _Service,
 ) -> tuple[IpcConnection, asyncio.StreamReader, _BufferWriter]:
     reader = asyncio.StreamReader()
     writer = _BufferWriter()
-    conn = IpcConnection(reader, writer, callbacks={"ISvc": svc})  # type: ignore[arg-type]
+    conn = IpcConnection(reader, writer, callbacks={"ISvc": (_Service, svc)})  # type: ignore[arg-type]
     conn.start()
     return conn, reader, writer
 
@@ -142,7 +154,7 @@ async def test_request_timeout_flows_into_injected_message() -> None:
     reader = asyncio.StreamReader()
     writer = _BufferWriter()
     conn = IpcConnection(
-        reader, writer, callbacks={"ISvc": svc}, request_timeout=3.5  # type: ignore[arg-type]
+        reader, writer, callbacks={"ISvc": (_Service, svc)}, request_timeout=3.5  # type: ignore[arg-type]
     )
     conn.start()
     try:
@@ -212,7 +224,7 @@ async def test_before_incoming_call_fires_before_dispatch() -> None:
     writer = _BufferWriter()
     svc = _Service()
     conn = IpcConnection(
-        reader, writer, callbacks={"ISvc": svc}, before_incoming_call=hook  # type: ignore[arg-type]
+        reader, writer, callbacks={"ISvc": (_Service, svc)}, before_incoming_call=hook  # type: ignore[arg-type]
     )
     conn.start()
     try:
@@ -237,7 +249,7 @@ async def test_before_incoming_call_raising_aborts_with_error() -> None:
     reader = asyncio.StreamReader()
     writer = _BufferWriter()
     conn = IpcConnection(
-        reader, writer, callbacks={"ISvc": _Service()}, before_incoming_call=hook  # type: ignore[arg-type]
+        reader, writer, callbacks={"ISvc": (_Service, _Service())}, before_incoming_call=hook  # type: ignore[arg-type]
     )
     conn.start()
     try:
@@ -248,6 +260,48 @@ async def test_before_incoming_call_raising_aborts_with_error() -> None:
         resp = Response.from_json(frames[0][1].decode("utf-8"))
         assert resp.error is not None
         assert "denied" in resp.error.message
+    finally:
+        await conn.aclose()
+
+
+async def test_message_payload_is_read_from_its_wire_slot() -> None:
+    """A contract-declared `Message` rides one wire slot ({} or {"Payload": …});
+    the handler must receive the Payload, not lose it."""
+    svc = _Service()
+    conn, reader, writer = _make_connection(svc)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="ISvc",
+            method_name="Save",
+            parameters=['{"Payload": {"id": 5}}'],
+            id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) is True
+        assert svc.messages[0].payload == {"id": 5}
+        assert svc.messages[0].client is conn
+    finally:
+        await conn.aclose()
+
+
+async def test_non_trailing_message_keeps_later_args_aligned() -> None:
+    """A `Message` between two value params must consume its own wire slot so
+    the parameter after it isn't shifted (regression: payload dropped / arg
+    drift)."""
+    svc = _Service()
+    conn, reader, writer = _make_connection(svc)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="ISvc",
+            method_name="Annotate",
+            parameters=['"label-text"', "{}", "42"],
+            id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) == "label-text:42"
+        assert svc.messages[0].client is conn
     finally:
         await conn.aclose()
 

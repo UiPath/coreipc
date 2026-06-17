@@ -177,14 +177,17 @@ def test_handler_systemexit_answers_peer_then_propagates() -> None:
     Run the scenario in its own loop so the crash is observable."""
 
     class _Svc:
-        async def Boom(self) -> None:
+        # Value-returning (request/response) so the error response + fatal-signal
+        # re-raise path is exercised; a `-> None` method would be one-way (acked
+        # before the handler runs, no error response).
+        async def Boom(self) -> bool:
             raise SystemExit(3)
 
     writer = _BufferWriter()
 
     async def scenario() -> None:
         reader = asyncio.StreamReader()
-        conn = IpcConnection(reader, writer, callbacks={"ISvc": _Svc()})  # type: ignore[arg-type]
+        conn = IpcConnection(reader, writer, callbacks={"ISvc": (_Svc, _Svc())})  # type: ignore[arg-type]
         conn.start()
         req = Request(endpoint="ISvc", method_name="Boom", parameters=[], id="9")
         reader.feed_data(_frame(MessageType.REQUEST, req.to_json().encode("utf-8")))

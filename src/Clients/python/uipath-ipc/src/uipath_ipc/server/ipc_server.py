@@ -52,9 +52,12 @@ class IpcServer:
                 instance's class need NOT inherit from the contract
                 (duck-typed). The contract's ``__name__`` is the endpoint on
                 the wire — matching how `IpcClient.get_proxy` names calls.
-            request_timeout: Default timeout for reach-back proxies a hosted
-                service builds via ``message.client.get_callback(...)``.
-                ``None`` (default) disables the timeout.
+            request_timeout: Server-side default bound for an inbound handler
+                when the caller's Request carries no explicit timeout (the
+                analog of .NET's ``IpcServer.RequestTimeout``); also the default
+                for reach-back proxies a hosted service builds via
+                ``message.client.get_callback(...)``. ``None`` (default)
+                disables both. An explicit per-call wire timeout overrides it.
             before_call: Optional hook awaited before each INCOMING call is
                 dispatched to a service — the analog of .NET's
                 ``BeforeIncomingCall``. Receives a `CallInfo`; raising aborts
@@ -63,8 +66,9 @@ class IpcServer:
         self._transport = transport
         # Translate contract-type keys to endpoint-name keys once; the
         # connection dispatches incoming requests by endpoint name.
-        self._services: dict[str, object] = {
-            contract.__name__: instance for contract, instance in services.items()
+        self._services: dict[str, tuple[type, object]] = {
+            contract.__name__: (contract, instance)
+            for contract, instance in services.items()
         }
         self._request_timeout = request_timeout
         self._before_call = before_call
@@ -89,6 +93,7 @@ class IpcServer:
             callbacks=self._services,
             request_timeout=self._request_timeout,
             before_incoming_call=self._before_call,
+            inbound_request_timeout=self._request_timeout,
         )
         self._connections.add(conn)
         # Prune from the live set when the peer disconnects or we close it.

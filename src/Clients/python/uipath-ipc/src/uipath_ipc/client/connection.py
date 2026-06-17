@@ -33,10 +33,19 @@ import logging
 import traceback
 import types
 import weakref
-from typing import Callable, TypeVar, Union, cast, get_args, get_origin, get_type_hints
+from typing import (
+    Callable,
+    NamedTuple,
+    TypeVar,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from ..hooks import BeforeCallHandler, CallInfo
-from ..errors import EndpointNotFoundError, MethodNotFoundError
+from ..errors import EndpointNotFoundError, MethodNotFoundError, RemoteException
 from ..message import Message
 from ..transport.base import ClientTransport
 from ..wire import (
@@ -45,7 +54,9 @@ from ..wire import (
     MessageType,
     Request,
     Response,
+    from_wire,
     read_frame,
+    to_wire,
     write_frame,
 )
 
@@ -86,16 +97,27 @@ def _is_message_annotation(annotation: object) -> bool:
     return False
 
 
-# A handler's argument-binding plan: one (tag, name) per parameter (self
-# excluded). tag is one of:
-#   "wire"    -> take the next positional wire argument
-#   "message" -> inject a Message by KEYWORD (consumes no wire argument), so it
-#                works whether the Message param is trailing or keyword-only
+# A handler's dispatch plan: one (tag, name, hint) per parameter (self
+# excluded) plus whether the method is one-way. tag is one of:
+#   "wire"    -> take the next positional wire argument, decoded to `hint`
+#   "message" -> consume the next wire slot (if present) and build a Message
+#                from its `Payload`; injected by KEYWORD so it works whether
+#                the Message param is trailing or keyword-only
 #   "varargs" -> *args: absorb all remaining wire arguments
 #   "skip"    -> **kwargs / non-Message keyword-only: not fillable from wire
+# `one_way` mirrors .NET's non-generic `Task`: a method explicitly annotated
+# `-> None` acks immediately and runs detached. A *missing* return annotation
+# is NOT treated as one-way (we can't tell, so it stays request/response).
 # Cached weakly by the underlying function so it's computed once per method.
-_BindingPlan = tuple[tuple[str, str], ...]
-_binding_plan_cache: "weakref.WeakKeyDictionary[object, _BindingPlan]" = (
+_ParamPlan = tuple[str, str, object]
+
+
+class _DispatchPlan(NamedTuple):
+    params: tuple[_ParamPlan, ...]
+    one_way: bool
+
+
+_dispatch_plan_cache: "weakref.WeakKeyDictionary[object, _DispatchPlan]" = (
     weakref.WeakKeyDictionary()
 )
 
@@ -103,10 +125,11 @@ _binding_plan_cache: "weakref.WeakKeyDictionary[object, _BindingPlan]" = (
 _MISSING = object()
 
 
-def _binding_plan(method: Callable[..., object]) -> _BindingPlan:
-    """Compute (and cache) how to map wire args onto a handler's parameters."""
+def _dispatch_plan(method: Callable[..., object]) -> _DispatchPlan:
+    """Compute (and cache) how to bind wire args onto a handler's parameters,
+    and whether it's a one-way (`-> None`) method."""
     func = getattr(method, "__func__", method)
-    cached = _binding_plan_cache.get(func)
+    cached = _dispatch_plan_cache.get(func)
     if cached is not None:
         return cached
 
@@ -114,26 +137,70 @@ def _binding_plan(method: Callable[..., object]) -> _BindingPlan:
         hints = get_type_hints(func)
     except Exception:
         hints = {}
-    plan: list[tuple[str, str]] = []
+    params: list[_ParamPlan] = []
     for name, param in inspect.signature(method).parameters.items():
+        hint = hints.get(name, param.annotation)
+        if hint is inspect.Parameter.empty:
+            hint = None
         if param.kind is inspect.Parameter.VAR_POSITIONAL:
-            plan.append(("varargs", name))
+            params.append(("varargs", name, None))
         elif param.kind is inspect.Parameter.VAR_KEYWORD:
-            plan.append(("skip", name))
+            params.append(("skip", name, None))
         # Check Message BEFORE keyword-only so a keyword-only Message is still
-        # injected (it's passed by keyword anyway).
-        elif _is_message_annotation(hints.get(name, param.annotation)):
-            plan.append(("message", name))
+        # injected. A positional Message rides one wire slot and binds in
+        # position (so a non-trailing Message keeps later args aligned); a
+        # keyword-only Message is a reach-back handle with no wire slot.
+        elif _is_message_annotation(hint):
+            if param.kind is inspect.Parameter.KEYWORD_ONLY:
+                params.append(("message_kw", name, hint))
+            else:
+                params.append(("message", name, hint))
         elif param.kind is inspect.Parameter.KEYWORD_ONLY:
-            plan.append(("skip", name))
+            params.append(("skip", name, None))
         else:
-            plan.append(("wire", name))
-    result = tuple(plan)
+            params.append(("wire", name, hint))
+    one_way = "return" in hints and hints["return"] is type(None)
+    result = _DispatchPlan(tuple(params), one_way)
     try:
-        _binding_plan_cache[func] = result
+        _dispatch_plan_cache[func] = result
     except TypeError:
         pass  # builtins / unweakreferenceable callables: just don't cache
     return result
+
+
+def _format_traceback(exc: BaseException) -> str:
+    return "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+
+
+def _error_from_exception(exc: BaseException) -> Error:
+    """Build a wire `Error` from a handler exception, preserving the cause
+    chain (`__cause__`, else `__context__`) so the peer's `RemoteException`
+    reproduces it — the receive side (`RemoteException.from_error`) already
+    recurses `inner_error`.
+
+    A re-raised `RemoteException` (a handler that let a reach-back failure
+    propagate) is forwarded verbatim — its original type name, message, stack
+    trace, and inner chain — rather than collapsing to ``RemoteException``,
+    mirroring .NET reusing an already-remote exception type.
+    """
+    if isinstance(exc, RemoteException):
+        inner = _error_from_exception(exc.inner) if exc.inner is not None else None
+        return Error(
+            message=exc.message,
+            stack_trace=exc.stack_trace,
+            type_name=exc.type_name,
+            inner_error=inner,
+        )
+    cause = exc.__cause__ or exc.__context__
+    inner = _error_from_exception(cause) if isinstance(cause, BaseException) else None
+    return Error(
+        message=str(exc) or type(exc).__name__,
+        stack_trace=_format_traceback(exc),
+        # Dispatch errors carry their .NET wire type name so .NET callers can
+        # match with RemoteException.Is<T>().
+        type_name=getattr(exc, "wire_type_name", None) or type(exc).__name__,
+        inner_error=inner,
+    )
 
 
 class IpcConnection:
@@ -143,15 +210,22 @@ class IpcConnection:
         self,
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
-        callbacks: dict[str, object] | None = None,
+        callbacks: dict[str, tuple[type, object]] | None = None,
         request_timeout: float | None = None,
         before_incoming_call: BeforeCallHandler | None = None,
+        inbound_request_timeout: float | None = None,
     ) -> None:
         self._reader = reader
         self._writer = writer
-        self._callbacks: dict[str, object] = dict(callbacks or {})
+        #: endpoint name -> (contract type, hosted instance). The contract is
+        #: kept so dispatch can resolve an incoming method against it (and only
+        #: it), mirroring the client proxy's `inspect.getattr_static` guard.
+        self._callbacks: dict[str, tuple[type, object]] = dict(callbacks or {})
         #: Default timeout for reach-back proxies built via `get_callback`.
         self.request_timeout = request_timeout
+        #: Server-side fallback bound for an inbound handler when the wire
+        #: Request carries no explicit timeout (mirrors .NET RequestTimeout).
+        self._inbound_request_timeout = inbound_request_timeout
         #: Awaited before dispatching each incoming request (server side).
         self._before_incoming_call = before_incoming_call
         self._pending: dict[str, asyncio.Future[Response]] = {}
@@ -169,7 +243,7 @@ class IpcConnection:
     async def open(
         cls,
         transport: ClientTransport,
-        callbacks: dict[str, object] | None = None,
+        callbacks: dict[str, tuple[type, object]] | None = None,
         request_timeout: float | None = None,
     ) -> IpcConnection:
         """Connect via the transport, wrap the stream in a new connection."""
@@ -384,60 +458,90 @@ class IpcConnection:
             task.cancel()
 
     def _bind_handler_args(
-        self, method: Callable[..., object], wire_args: list[object]
+        self, params: tuple[_ParamPlan, ...], wire_args: list[object]
     ) -> tuple[list[object], dict[str, object]]:
         """Map wire args onto a handler's parameters; return (positional, kwargs).
 
-        - Non-`Message` parameters are filled positionally from the wire, in
-          order. A handler may declare `*args` to receive every remaining arg.
-        - A `Message` parameter is injected by **keyword** (so it works whether
-          it's trailing or keyword-only) and consumes no wire arg. Inject the
-          caller handle there — conventionally the last parameter.
+        - A non-`Message` parameter takes the next positional wire arg, decoded
+          to its declared type via `from_wire` (so a `bytes`/`datetime`/`UUID`
+          parameter receives the object, not the raw base64/ISO string). A
+          handler may declare `*args` to absorb every remaining wire arg.
+        - A `Message` parameter consumes the next wire slot — a `Message` is one
+          declared argument on the wire (`{}` or `{"Payload": ...}`) — reads its
+          `Payload`, and is injected by **keyword** (so it works whether the
+          Message is trailing or keyword-only). If the wire is already exhausted
+          (a reach-back `Message` the contract doesn't declare), a fresh one is
+          built. Consuming the slot keeps later positional args aligned wherever
+          the Message sits.
         - **Extra trailing wire args are ignored.** An idiomatic .NET client
           serializes one wire param per declared argument including a trailing
           `CancellationToken` (as `""`); ignoring the surplus tolerates that.
-          Note this is positional: if a handler declares more optional params
-          than the caller's contract has real args, a surplus value (e.g. the
-          CT placeholder) can land on an optional param instead of its default.
           Missing args fall back to their defaults.
         """
-        plan = _binding_plan(method)
-        message: Message[object] | None = None
         wire = iter(wire_args)
         pos: list[object] = []
         kwargs: dict[str, object] = {}
-        for tag, name in plan:
+        for tag, name, hint in params:
             if tag == "message":
-                if message is None:
-                    message = Message(
-                        client=self, request_timeout=self.request_timeout
-                    )
-                kwargs[name] = message
+                # Positional Message: consume its wire slot (if present), read
+                # the Payload, and bind IN POSITION so a non-trailing Message
+                # doesn't shift later args. A reach-back Message the contract
+                # doesn't declare is trailing -> wire exhausted -> a fresh one.
+                nxt = next(wire, _MISSING)
+                body = nxt if isinstance(nxt, dict) else None
+                pos.append(Message(
+                    payload=(body or {}).get("Payload"),
+                    client=self,
+                    request_timeout=self.request_timeout,
+                ))
+            elif tag == "message_kw":
+                # Keyword-only Message: a reach-back handle, no wire slot.
+                kwargs[name] = Message(
+                    client=self, request_timeout=self.request_timeout
+                )
             elif tag == "varargs":
                 pos.extend(wire)
             elif tag == "wire":
                 nxt = next(wire, _MISSING)
                 if nxt is not _MISSING:
-                    pos.append(nxt)
+                    pos.append(from_wire(nxt, hint))
                 # else: out of wire args — let this param use its default, but
                 # keep scanning so later Message params are still injected.
             # "skip": **kwargs / non-Message keyword-only — not fillable here.
         return pos, kwargs
 
     async def _invoke_callback(self, req: Request) -> None:
-        """Run the user's callback for an incoming Request, then send the Response."""
+        """Run the user's handler for an incoming Request, then reply.
+
+        Resolution, arg decoding, the before-call hook, and binding all run
+        before we branch: a failure there returns an Error to the caller even
+        for a one-way method (the peer is still awaiting the ack). A one-way
+        (`-> None`) handler is acked immediately and then run detached with its
+        exception only logged — mirroring .NET's non-generic `Task`.
+        """
+        deferred_one_way: tuple[Callable[..., object], list, dict] | None = None
         try:
-            handler = self._callbacks.get(req.endpoint)
-            if handler is None:
+            entry = self._callbacks.get(req.endpoint)
+            if entry is None:
                 raise EndpointNotFoundError(
                     f"no callback registered for endpoint {req.endpoint!r}"
                 )
-            method = getattr(handler, req.method_name, None)
-            if method is None or not callable(method):
+            contract, handler = entry
+            # Resolve the method against the CONTRACT (rejecting private/dunder
+            # names), then bind to the live instance — so a peer can only reach
+            # declared contract methods, never arbitrary instance attributes.
+            cmethod = (
+                None
+                if req.method_name.startswith("_")
+                else inspect.getattr_static(contract, req.method_name, None)
+            )
+            if cmethod is None or not callable(cmethod):
                 raise MethodNotFoundError(
                     f"callback {req.endpoint!r} has no method "
                     f"{req.method_name!r}"
                 )
+            method = getattr(handler, req.method_name)
+            plan = _dispatch_plan(method)
             # Each parameter is an individually JSON-encoded string (wire gotcha).
             args = [json.loads(p) for p in req.parameters]
             # BeforeIncomingCall hook (server side); raising aborts the call
@@ -448,12 +552,16 @@ class IpcConnection:
                 )
                 if inspect.isawaitable(hook):
                     await hook
-            pos, kwargs = self._bind_handler_args(method, args)
-            result = method(*pos, **kwargs)
-            if inspect.isawaitable(result):
-                result = await result
-            data = None if result is None else json.dumps(result)
-            resp = Response(request_id=req.id, data=data)
+            pos, kwargs = self._bind_handler_args(plan.params, args)
+            if plan.one_way:
+                # Ack now (empty Data, like .NET's Response.Success(req, "")),
+                # then run the handler after responding (below).
+                deferred_one_way = (method, pos, kwargs)
+                resp = Response(request_id=req.id, data="")
+            else:
+                result = await self._run_handler(method, pos, kwargs, req)
+                data = None if result is None else json.dumps(to_wire(result))
+                resp = Response(request_id=req.id, data=data)
         except asyncio.CancelledError:
             # Server cancelled us. Send back a cancellation Error so the
             # server's pending future resolves (and matches .NET's
@@ -465,6 +573,16 @@ class IpcConnection:
                     type_name="System.OperationCanceledException",
                 ),
             )
+        except asyncio.TimeoutError:
+            # The handler overran the effective request timeout — answer with
+            # the .NET-typed error so a .NET caller sees a TimeoutException.
+            resp = Response(
+                request_id=req.id,
+                error=Error(
+                    message=f"{req.method_name} timed out.",
+                    type_name="System.TimeoutException",
+                ),
+            )
         except BaseException as ex:
             # Always answer the peer so its pending future never hangs — but
             # unlike C#'s `catch (Exception)`, BaseException also catches
@@ -473,22 +591,50 @@ class IpcConnection:
             _logger.exception(
                 "callback %s.%s failed", req.endpoint, req.method_name
             )
-            resp = Response(
-                request_id=req.id,
-                error=Error(
-                    message=str(ex) or type(ex).__name__,
-                    # Dispatch errors carry their .NET wire type name so .NET
-                    # callers can match with RemoteException.Is<T>().
-                    type_name=getattr(ex, "wire_type_name", None)
-                    or type(ex).__name__,
-                    stack_trace=traceback.format_exc(),
-                ),
-            )
+            resp = Response(request_id=req.id, error=_error_from_exception(ex))
             if isinstance(ex, (SystemExit, KeyboardInterrupt)):
                 await self._try_send_response(resp)
                 raise
 
         await self._try_send_response(resp)
+
+        # One-way: run the handler AFTER the ack, still in this (tracked) task,
+        # with its failure logged rather than returned — .NET's fire-and-forget.
+        if deferred_one_way is not None:
+            method, pos, kwargs = deferred_one_way
+            try:
+                result = method(*pos, **kwargs)
+                if inspect.isawaitable(result):
+                    await result
+            except (asyncio.CancelledError, SystemExit, KeyboardInterrupt):
+                # Cancellation tears the task down; fatal signals must still
+                # propagate (process termination) even for fire-and-forget.
+                raise
+            except BaseException:
+                _logger.exception(
+                    "one-way %s.%s failed", req.endpoint, req.method_name
+                )
+
+    async def _run_handler(
+        self,
+        method: Callable[..., object],
+        pos: list[object],
+        kwargs: dict[str, object],
+        req: Request,
+    ) -> object:
+        """Invoke a request/response handler, bounding an awaited result by the
+        effective timeout: the wire `TimeoutInSeconds` if set, else the server
+        default; ``None``/non-positive means no bound, a negative wire value
+        (`.NET` ``Timeout.InfiniteTimeSpan``) means infinite."""
+        result = method(*pos, **kwargs)
+        if not inspect.isawaitable(result):
+            return result
+        effective = req.timeout_in_seconds
+        if effective is None:
+            effective = self._inbound_request_timeout
+        if effective is not None and effective > 0:
+            return await asyncio.wait_for(result, timeout=effective)
+        return await result
 
     async def _try_send_response(self, resp: Response) -> None:
         """Best-effort RESPONSE send; no-op if the connection tore down."""

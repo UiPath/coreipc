@@ -10,6 +10,7 @@ and the full client↔server round trip.
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import os
 import sys
 import uuid
@@ -42,7 +43,7 @@ class ICalculator(ABC):
     async def Noop(self) -> None: ...
 
     @abstractmethod
-    async def Fail(self) -> None: ...
+    async def Fail(self) -> bool: ...
 
 
 class Calculator:
@@ -62,7 +63,7 @@ class Calculator:
         self.calls.append(("Noop",))
         return None
 
-    async def Fail(self) -> None:
+    async def Fail(self) -> bool:
         raise ValueError("kaboom")
 
 
@@ -103,6 +104,9 @@ async def test_tcp_client_calls_server_hosted_service() -> None:
 
 
 async def test_tcp_void_method_returns_none() -> None:
+    """A `-> None` method is one-way: the client gets an immediate ack (None)
+    and the handler runs detached server-side, so its side effect is observed
+    shortly after the call returns rather than synchronously."""
     calc = Calculator()
     server = IpcServer(TcpServerTransport("127.0.0.1", 0), {ICalculator: calc})
     async with server:
@@ -110,7 +114,7 @@ async def test_tcp_void_method_returns_none() -> None:
         async with IpcClient(TcpClientTransport(host, port)) as client:
             svc = client.get_proxy(ICalculator)
             assert await asyncio.wait_for(svc.Noop(), timeout=5) is None
-    assert ("Noop",) in calc.calls
+            await _wait_until(lambda: ("Noop",) in calc.calls)
 
 
 async def test_tcp_server_handler_exception_propagates_to_client() -> None:
@@ -254,6 +258,85 @@ async def test_server_handler_reaches_back_into_client_callback() -> None:
             result = await asyncio.wait_for(svc.GreetVia("bob"), timeout=5)
             assert result == "hello BOB"
             assert impl.calls == ["bob"]
+
+
+# --- server-side value-type (de)serialization -----------------------------
+
+class IValueTypes(ABC):
+    @abstractmethod
+    async def RoundTripDateTime(self, when: dt.datetime) -> dt.datetime: ...
+
+    @abstractmethod
+    async def ReverseBytes(self, blob: bytes) -> bytes: ...
+
+    @abstractmethod
+    async def EchoGuid(self, value: uuid.UUID) -> uuid.UUID: ...
+
+
+class ValueTypesService:
+    async def RoundTripDateTime(self, when: dt.datetime) -> dt.datetime:
+        assert isinstance(when, dt.datetime)  # decoded, not a raw ISO str
+        return when
+
+    async def ReverseBytes(self, blob: bytes) -> bytes:
+        assert isinstance(blob, (bytes, bytearray))  # decoded, not base64 str
+        return bytes(reversed(blob))
+
+    async def EchoGuid(self, value: uuid.UUID) -> uuid.UUID:
+        assert isinstance(value, uuid.UUID)
+        return value
+
+
+async def test_server_round_trips_value_types() -> None:
+    """A Python *server* must decode value-type args (`from_wire`) and encode
+    value-type returns (`to_wire`) — not just the client. Without it, a `bytes`
+    parameter arrives as base64 str and a `datetime` return raises TypeError."""
+    server = IpcServer(
+        TcpServerTransport("127.0.0.1", 0), {IValueTypes: ValueTypesService()}
+    )
+    async with server:
+        host, port = _tcp_endpoint(server)
+        async with IpcClient(TcpClientTransport(host, port)) as client:
+            svc = client.get_proxy(IValueTypes)
+            when = dt.datetime(2026, 6, 16, 10, 30, tzinfo=dt.timezone.utc)
+            assert await asyncio.wait_for(svc.RoundTripDateTime(when), timeout=5) == when
+            assert (
+                await asyncio.wait_for(svc.ReverseBytes(b"\x01\x02\x03"), timeout=5)
+                == b"\x03\x02\x01"
+            )
+            u = uuid.UUID("550e8400-e29b-41d4-a716-446655440000")
+            assert await asyncio.wait_for(svc.EchoGuid(u), timeout=5) == u
+
+
+# --- server-side request-timeout enforcement -------------------------------
+
+class ISlow(ABC):
+    @abstractmethod
+    async def Slow(self) -> bool: ...
+
+
+class SlowService:
+    async def Slow(self) -> bool:
+        await asyncio.sleep(5)
+        return True
+
+
+async def test_server_enforces_request_timeout() -> None:
+    """A server with a configured request_timeout bounds an inbound handler:
+    a 5s handler against a 0.2s server budget returns a TimeoutException even
+    though the client set no timeout of its own."""
+    server = IpcServer(
+        TcpServerTransport("127.0.0.1", 0),
+        {ISlow: SlowService()},
+        request_timeout=0.2,
+    )
+    async with server:
+        host, port = _tcp_endpoint(server)
+        async with IpcClient(TcpClientTransport(host, port)) as client:
+            svc = client.get_proxy(ISlow)
+            with pytest.raises(RemoteException) as ei:
+                await asyncio.wait_for(svc.Slow(), timeout=5)
+            assert ei.value.type_name == "System.TimeoutException"
 
 
 # --- named pipe loopback --------------------------------------------------

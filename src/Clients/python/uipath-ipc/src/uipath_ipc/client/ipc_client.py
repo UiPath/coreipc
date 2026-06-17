@@ -66,11 +66,12 @@ class IpcClient:
         #: Read by `_IpcProxy._invoke` before sending each outgoing request.
         self.before_call = before_call
         # Translate contract-type keys to endpoint-name keys once at
-        # construction; the connection stores by name.
-        self._callbacks: dict[str, object] = {}
+        # construction; the connection stores by name but keeps the contract
+        # type so dispatch can resolve incoming methods against it.
+        self._callbacks: dict[str, tuple[type, object]] = {}
         if callbacks:
             for contract_type, instance in callbacks.items():
-                self._callbacks[contract_type.__name__] = instance
+                self._callbacks[contract_type.__name__] = (contract_type, instance)
 
     async def _ensure_connected(self) -> IpcConnection:
         if self._connection is not None and not self._connection.is_closed:

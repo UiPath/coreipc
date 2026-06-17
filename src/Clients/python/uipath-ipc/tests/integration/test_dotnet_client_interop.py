@@ -43,7 +43,26 @@ class IClientCallback(ABC):
 
 
 class IPythonService(ABC):
-    """Endpoint contract — only its __name__ matters for keying."""
+    """The endpoint contract. Its ``__name__`` keys the endpoint, and the
+    server resolves incoming methods against it (only declared methods are
+    reachable), so it must declare them — like the .NET interface. The impl's
+    ``GreetVia`` adds a trailing ``Message`` not present here (reach-back), and
+    the .NET client's trailing ``CancellationToken`` is never sent on the wire."""
+
+    @abstractmethod
+    async def AddFloats(self, x: float, y: float) -> float: ...
+
+    @abstractmethod
+    async def EchoString(self, value: str) -> str: ...
+
+    @abstractmethod
+    async def MultiplyInts(self, x: int, y: int) -> int: ...
+
+    @abstractmethod
+    async def GreetVia(self, name: str) -> str: ...
+
+    @abstractmethod
+    async def FailWith(self, message: str) -> bool: ...
 
 
 class PythonService:

@@ -44,8 +44,15 @@
   <ItemGroup>
     <Folder Include="src\" />
     <Folder Include="src\uipath_ipc\" />
+    <Folder Include="src\uipath_ipc\client\" />
+    <Folder Include="src\uipath_ipc\server\" />
+    <Folder Include="src\uipath_ipc\transport\" />
     <Folder Include="src\uipath_ipc\wire\" />
     <Folder Include="tests\" />
+    <Folder Include="tests\client\" />
+    <Folder Include="tests\integration\" />
+    <Folder Include="tests\server\" />
+    <Folder Include="tests\transport\" />
     <Folder Include="tests\wire\" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
