@@ -355,3 +355,42 @@ async def test_ensure_connected_raises_after_close() -> None:
     await client.aclose()
     with pytest.raises(ConnectionError):
         await client._ensure_connected()
+
+
+async def test_before_connect_calling_same_client_raises_not_deadlocks() -> None:
+    """A before_connect hook runs inside the connect lock; if it calls back into
+    the same client it must raise a clear error rather than deadlock silently."""
+    client = IpcClient(_FakeTransport())
+
+    async def hook() -> None:
+        # Re-entrant call on the same client (would deadlock without the guard).
+        await client.get_proxy(IComputingService).AddFloats(1.0, 2.0)
+
+    client._before_connect = hook
+    try:
+        with pytest.raises(RuntimeError, match="before_connect"):
+            await asyncio.wait_for(
+                client.get_proxy(IComputingService).AddFloats(3.0, 4.0), timeout=2
+            )
+    finally:
+        await client.aclose()
+
+
+async def test_del_warns_and_abandons_open_connection() -> None:
+    """A client GC'd without aclose() warns and best-effort closes its
+    connection (so the receive-loop task doesn't leak)."""
+
+    class _FakeConn:
+        def __init__(self) -> None:
+            self.is_closed = False
+            self.abandoned = False
+
+        def _abandon(self) -> None:
+            self.abandoned = True
+            self.is_closed = True
+
+    client = IpcClient(_FakeTransport())
+    client._connection = _FakeConn()  # type: ignore[assignment]
+    with pytest.warns(ResourceWarning):
+        client.__del__()
+    assert client._connection.abandoned  # type: ignore[attr-defined]

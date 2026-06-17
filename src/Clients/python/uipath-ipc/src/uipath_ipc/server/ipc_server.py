@@ -73,15 +73,21 @@ class IpcServer:
         self._request_timeout = request_timeout
         self._before_call = before_call
         self._handle: ServerHandle | None = None
+        self._start_lock = asyncio.Lock()
         self._connections: set[IpcConnection] = set()
 
     # --- lifecycle ---------------------------------------------------------
 
     async def start(self) -> None:
-        """Begin listening. Idempotent."""
+        """Begin listening. Idempotent and safe under concurrent calls."""
         if self._handle is not None:
             return
-        self._handle = await self._transport.serve(self._on_connection)
+        # Lock + re-check so two racing start() calls can't both bind a listener
+        # (the check-then-`await serve` gap would otherwise leak one).
+        async with self._start_lock:
+            if self._handle is not None:
+                return
+            self._handle = await self._transport.serve(self._on_connection)
 
     def _on_connection(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter

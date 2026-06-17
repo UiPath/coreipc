@@ -171,21 +171,44 @@ async def test_stream_frame_fails_closed() -> None:
     assert conn.is_closed
 
 
-async def test_malformed_payload_logs_and_closes(caplog) -> None:
-    """A frame whose payload isn't valid JSON must not vanish without a trace:
-    the receive loop logs the failure and tears the connection down."""
-    conn, reader, _writer = await _make_connection()
+async def test_malformed_payload_is_dropped_not_fatal(caplog) -> None:
+    """A frame with valid framing but bad *content* (invalid JSON) is logged and
+    dropped — the connection stays up and unrelated in-flight calls are NOT
+    collateral-failed (the frame was length-prefixed, so the stream stays
+    aligned). A later valid frame still completes the pending call."""
+    conn, reader, writer = await _make_connection()
     try:
-        with caplog.at_level(logging.ERROR):
-            reader.feed_data(_frame(MessageType.REQUEST, b"not json"))
-            for _ in range(50):
-                if conn.is_closed:
-                    break
+        send_task = asyncio.create_task(conn.send_request(
+            Request(endpoint="X", method_name="Y", parameters=[], id="1")
+        ))
+        for _ in range(10):
+            await asyncio.sleep(0)
+            if "1" in conn._pending:
+                break
+        with caplog.at_level(logging.ERROR, logger="uipath_ipc.client.connection"):
+            reader.feed_data(_frame(MessageType.RESPONSE, b"not json"))
+            for _ in range(10):
                 await asyncio.sleep(0)
-        assert conn.is_closed
-        assert any("receive loop failed" in rec.message for rec in caplog.records)
+        assert not conn.is_closed          # connection survived the bad frame
+        assert not send_task.done()        # the pending call was NOT failed
+        assert any("dropping malformed" in r.message for r in caplog.records)
+        # A subsequent valid response still completes the call.
+        reader.feed_data(_response_frame(Response(request_id="1", data='"ok"')))
+        resp = await asyncio.wait_for(send_task, timeout=1.0)
+        assert resp.data == '"ok"'
     finally:
         await conn.aclose()
+
+
+async def test_abandon_unblocks_receive_loop() -> None:
+    """_abandon() (used by IpcClient.__del__ for a client dropped without
+    aclose()) marks closed and closes the writer so the blocked receive loop
+    ends — preventing the orphaned-task/fd leak."""
+    conn, _reader, writer = await _make_connection()
+    assert not conn.is_closed
+    conn._abandon()
+    assert conn.is_closed
+    assert writer._closed  # writer was closed so readexactly unblocks
 
 
 def test_handler_systemexit_answers_peer_then_propagates() -> None:

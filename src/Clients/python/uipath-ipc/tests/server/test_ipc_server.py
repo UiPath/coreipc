@@ -29,6 +29,7 @@ from uipath_ipc import (
     TcpClientTransport,
     TcpServerTransport,
 )
+from uipath_ipc.transport.base import ServerTransport
 
 
 # --- example contract + service impl --------------------------------------
@@ -166,6 +167,36 @@ async def test_start_is_idempotent() -> None:
         handle = server.handle
         await server.start()
         assert server.handle is handle  # no second listener
+    finally:
+        await server.aclose()
+
+
+class _CountingServerTransport(ServerTransport):
+    """Counts serve() calls and yields once mid-call to widen the start race."""
+
+    def __init__(self) -> None:
+        self.serve_calls = 0
+
+    async def serve(self, on_connection):  # type: ignore[override]
+        self.serve_calls += 1
+        await asyncio.sleep(0)  # yield so a racing start() can interleave
+
+        class _Handle:
+            def close(self) -> None: ...
+            async def wait_closed(self) -> None: ...
+
+        return _Handle()
+
+
+async def test_concurrent_start_binds_one_listener() -> None:
+    """Racing start() calls must bind exactly one listener (the check-then-await
+    gap would otherwise leak extras)."""
+    transport = _CountingServerTransport()
+    server = IpcServer(transport, {})
+    try:
+        await asyncio.gather(*(server.start() for _ in range(5)))
+        assert transport.serve_calls == 1
+        assert server.handle is not None
     finally:
         await server.aclose()
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import warnings
 from typing import TypeVar, cast
 
 from ..hooks import BeforeCallHandler, BeforeConnectHandler
@@ -62,6 +63,10 @@ class IpcClient:
         self._connection: IpcConnection | None = None
         self._connect_lock = asyncio.Lock()
         self._closed = False
+        #: The task currently establishing a connection (holds _connect_lock),
+        #: so a re-entrant _ensure_connected from a before_connect hook is caught
+        #: rather than deadlocking.
+        self._connecting_task: asyncio.Task | None = None
         self.request_timeout = request_timeout
         self._before_connect = before_connect
         #: Read by `_IpcProxy._invoke` before sending each outgoing request.
@@ -77,6 +82,17 @@ class IpcClient:
     async def _ensure_connected(self) -> IpcConnection:
         if self._connection is not None and not self._connection.is_closed:
             return self._connection
+        # Reentrancy guard: a before_connect hook that calls back into this same
+        # client runs in the task already holding _connect_lock, so re-acquiring
+        # it would deadlock silently. Fail loudly with a clear message instead.
+        if (
+            self._connecting_task is not None
+            and self._connecting_task is asyncio.current_task()
+        ):
+            raise RuntimeError(
+                "before_connect must not make calls on the same IpcClient — it "
+                "runs while the connection is being established"
+            )
         async with self._connect_lock:
             # Serialized with aclose(): if the client was closed (possibly while
             # we waited for the lock), don't silently re-dial — the connection a
@@ -89,15 +105,19 @@ class IpcClient:
             # before re-dialing through the transport.
             if self._connection is not None:
                 await self._connection.aclose()
-            if self._before_connect is not None:
-                result = self._before_connect()
-                if inspect.isawaitable(result):
-                    await result
-            self._connection = await IpcConnection.open(
-                self._transport,
-                callbacks=self._callbacks,
-                request_timeout=self.request_timeout,
-            )
+            self._connecting_task = asyncio.current_task()
+            try:
+                if self._before_connect is not None:
+                    result = self._before_connect()
+                    if inspect.isawaitable(result):
+                        await result
+                self._connection = await IpcConnection.open(
+                    self._transport,
+                    callbacks=self._callbacks,
+                    request_timeout=self.request_timeout,
+                )
+            finally:
+                self._connecting_task = None
         return self._connection
 
     def get_proxy(self, contract: type[T]) -> T:
@@ -119,3 +139,23 @@ class IpcClient:
 
     async def __aexit__(self, *exc_info: object) -> None:
         await self.aclose()
+
+    def __del__(self) -> None:
+        # A client dropped without aclose() would otherwise leak: its
+        # connection's receive-loop task keeps the connection (and the socket)
+        # alive forever. Warn and best-effort close the writer so the task
+        # unblocks and ends. 'async with IpcClient(...)' / aclose() is the
+        # supported path; this is just a safety net.
+        conn = getattr(self, "_connection", None)
+        if conn is None or conn.is_closed:
+            return
+        try:
+            warnings.warn(
+                f"{type(self).__name__} was garbage-collected without aclose(); "
+                "use 'async with' or call aclose().",
+                ResourceWarning,
+                stacklevel=2,
+            )
+            conn._abandon()
+        except Exception:
+            pass

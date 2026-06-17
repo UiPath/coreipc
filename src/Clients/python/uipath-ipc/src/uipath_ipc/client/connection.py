@@ -293,6 +293,18 @@ class IpcConnection:
         self._fail_pending(ConnectionError("connection closed"))
         self._notify_closed()
 
+    def _abandon(self) -> None:
+        """Synchronous best-effort cleanup for a connection abandoned without
+        `aclose()` (e.g. its owning `IpcClient` was garbage-collected): mark
+        closed and close the writer so the blocked receive loop unblocks (its
+        `readexactly` raises) and its task can finish — otherwise the running
+        task keeps the connection alive forever (an fd / task leak)."""
+        self._closed = True
+        try:
+            self._writer.close()
+        except Exception:
+            pass
+
     async def _ensure_connected(self) -> IpcConnection:
         """This connection is already open. Lets `_IpcProxy` drive a reach-back
         proxy directly off the connection (see `get_callback`)."""
@@ -438,16 +450,27 @@ class IpcConnection:
             while not self._closed:
                 msg_type, payload = await read_frame(self._reader)
                 if msg_type == MessageType.RESPONSE:
-                    self._handle_response(payload)
+                    handler = self._handle_response
                 elif msg_type == MessageType.REQUEST:
-                    self._handle_incoming_request(payload)
+                    handler = self._handle_incoming_request
                 elif msg_type == MessageType.CANCELLATION_REQUEST:
-                    self._handle_incoming_cancellation(payload)
+                    handler = self._handle_incoming_cancellation
                 else:
                     # UPLOAD_REQUEST / DOWNLOAD_RESPONSE (streams) are out of
                     # scope; their frame is followed by a length + raw bytes we
                     # can't consume, so fail closed instead of desyncing.
                     raise ValueError(f"unsupported message type {msg_type!r}")
+                # Isolate a bad *content* payload (invalid JSON, missing field):
+                # read_frame already consumed the whole length-prefixed frame, so
+                # the stream stays aligned — log and drop this one frame rather
+                # than failing every in-flight call and tearing the connection
+                # down. (Framing/transport errors below still tear it down.)
+                try:
+                    handler(payload)
+                except Exception:
+                    _logger.exception(
+                        "dropping malformed %s frame", msg_type.name
+                    )
         except asyncio.CancelledError:
             raise
         except (asyncio.IncompleteReadError, ConnectionResetError, OSError) as ex:
