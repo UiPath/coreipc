@@ -340,6 +340,37 @@ async def test_server_enforces_request_timeout() -> None:
             assert ei.value.type_name == "System.TimeoutException"
 
 
+# --- POSIX unix-socket lifecycle -------------------------------------------
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX unix-socket lifecycle")
+async def test_posix_server_removes_socket_file_on_close() -> None:
+    """Closing a POSIX named-pipe server unlinks its socket file (like .NET's
+    delete-on-dispose), instead of leaving a stale file behind."""
+    name = f"uipath-ipc-life-{uuid.uuid4().hex}"
+    transport = NamedPipeServerTransport(name)
+    path = transport._posix_address
+    server = IpcServer(transport, {ICalculator: Calculator()})
+    await server.start()
+    assert os.path.exists(path)
+    await server.aclose()
+    assert not os.path.exists(path)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX unix-socket lifecycle")
+async def test_posix_bind_over_live_server_raises() -> None:
+    """A second server on the same name must NOT blindly unlink a LIVE server's
+    socket (silent hijack) — the liveness probe makes it fail loudly instead."""
+    name = f"uipath-ipc-live-{uuid.uuid4().hex}"
+    server1 = IpcServer(NamedPipeServerTransport(name), {ICalculator: Calculator()})
+    await server1.start()
+    try:
+        server2 = IpcServer(NamedPipeServerTransport(name), {ICalculator: Calculator()})
+        with pytest.raises(OSError):
+            await server2.start()
+    finally:
+        await server1.aclose()
+
+
 # --- TCP connect resilience / zero-timeout edge ----------------------------
 
 async def test_tcp_client_rides_out_connection_refused() -> None:

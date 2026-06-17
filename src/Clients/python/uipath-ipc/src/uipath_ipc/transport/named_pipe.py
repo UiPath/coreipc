@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import errno
 import os
 import sys
 from dataclasses import dataclass
@@ -101,6 +102,27 @@ class _PipeServerHandle:
         await self._closed.wait()
 
 
+class _PosixUnixServerHandle:
+    """Wraps the `asyncio.Server` from `start_unix_server` so closing it also
+    removes the socket file. `asyncio.Server.close()` leaves the file behind,
+    whereas .NET deletes its ``CoreFxPipe_<name>`` on dispose — without this,
+    every POSIX shutdown leaves a stale socket for the next bind to trip over."""
+
+    __slots__ = ("_server", "_path")
+
+    def __init__(self, server: asyncio.AbstractServer, path: str) -> None:
+        self._server = server
+        self._path = path
+
+    def close(self) -> None:
+        self._server.close()
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(self._path)
+
+    async def wait_closed(self) -> None:
+        await self._server.wait_closed()
+
+
 @dataclass(frozen=True, slots=True)
 class NamedPipeServerTransport(ServerTransport):
     """Server transport over a named pipe.
@@ -148,9 +170,30 @@ class NamedPipeServerTransport(ServerTransport):
         return _PipeServerHandle(servers)
 
     async def _serve_posix(self, on_connection: ConnectionHandler) -> ServerHandle:
-        # A stale socket file from a previous run blocks bind(); remove it.
+        path = self._posix_address
+        # Probe before unlinking: a successful connect means a LIVE server owns
+        # this name — don't yank its socket out from under it; fail loudly like
+        # .NET's "address in use". A refused/absent socket is stale and safe to
+        # remove so bind() succeeds.
+        if await self._is_live(path):
+            raise OSError(errno.EADDRINUSE, f"address already in use: {path}")
         with contextlib.suppress(FileNotFoundError):
-            os.unlink(self._posix_address)
-        return await asyncio.start_unix_server(
-            lambda r, w: on_connection(r, w), self._posix_address
+            os.unlink(path)
+        server = await asyncio.start_unix_server(
+            lambda r, w: on_connection(r, w), path
         )
+        return _PosixUnixServerHandle(server, path)
+
+    @staticmethod
+    async def _is_live(path: str) -> bool:
+        """True iff something is currently accepting on the Unix socket `path`.
+        A refused connection (stale file, no listener), a missing file, or any
+        other connect error means 'not live'."""
+        try:
+            _, writer = await asyncio.open_unix_connection(path)
+        except OSError:
+            return False
+        writer.close()
+        with contextlib.suppress(Exception):
+            await writer.wait_closed()
+        return True
