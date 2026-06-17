@@ -182,6 +182,13 @@ class NamedPipeServerTransport(ServerTransport):
         server = await asyncio.start_unix_server(
             lambda r, w: on_connection(r, w), path
         )
+        # Restrict the socket to its owner. start_unix_server binds with the
+        # process umask, so under a permissive umask (002/000 — common in
+        # service/container/CI setups) the socket would be group/world-
+        # connectable. .NET pins owner-only perms regardless of umask; match it.
+        # (A tiny bind->chmod TOCTOU window exists; acceptable for a local
+        # per-user socket.)
+        os.chmod(path, 0o600)
         return _PosixUnixServerHandle(server, path)
 
     @staticmethod

@@ -13,6 +13,7 @@ import asyncio
 import datetime as dt
 import os
 import socket
+import stat
 import sys
 import uuid
 from abc import ABC, abstractmethod
@@ -385,6 +386,25 @@ async def test_posix_server_removes_socket_file_on_close() -> None:
     assert os.path.exists(path)
     await server.aclose()
     assert not os.path.exists(path)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX unix-socket lifecycle")
+async def test_posix_socket_is_owner_only_regardless_of_umask() -> None:
+    """The socket is chmod'd to 0o600 after bind, so even a permissive umask
+    can't leave it group/world-connectable (mirrors .NET's owner-only perms)."""
+    name = f"uipath-ipc-perm-{uuid.uuid4().hex}"
+    transport = NamedPipeServerTransport(name)
+    path = transport._posix_address
+    server = IpcServer(transport, {ICalculator: Calculator()})
+    old_umask = os.umask(0o000)  # would otherwise bind the socket world-rw
+    try:
+        await server.start()
+    finally:
+        os.umask(old_umask)
+    try:
+        assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+    finally:
+        await server.aclose()
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX unix-socket lifecycle")
