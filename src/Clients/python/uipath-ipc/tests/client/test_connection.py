@@ -230,6 +230,27 @@ async def test_send_frame_timeout_tears_down_connection() -> None:
         await conn.aclose()
 
 
+# --- malformed frame: fail closed -----------------------------------------
+
+async def test_unsupported_message_type_fails_closed(caplog) -> None:
+    """An unsupported (stream) frame type must tear the connection down rather
+    than silently desync, fail any in-flight request, and log the failure."""
+    conn, reader, writer = await _make_connection()
+    try:
+        send_task = asyncio.create_task(conn.send_request(
+            Request(endpoint="X", method_name="Y", parameters=[], id="1")
+        ))
+        await asyncio.sleep(0)  # let the request register + write
+        with caplog.at_level(logging.ERROR, logger="uipath_ipc.client.connection"):
+            reader.feed_data(_frame(MessageType.UPLOAD_REQUEST, b"\x00"))
+            with pytest.raises(Exception):
+                await asyncio.wait_for(send_task, timeout=1.0)
+        assert conn.is_closed
+        assert any("receive loop failed" in r.message for r in caplog.records)
+    finally:
+        await conn.aclose()
+
+
 # --- close callbacks ------------------------------------------------------
 
 async def test_close_callback_fires_on_aclose() -> None:
