@@ -23,6 +23,9 @@ class CallInfo:
     endpoint: str
     method_name: str
     arguments: tuple[object, ...]
+    #: True when this call established a fresh connection — client side only;
+    #: always False for incoming/server calls. Mirrors .NET CallInfo.NewConnection.
+    new_connection: bool = False
 
 
 #: Runs before each connection attempt (client side). Sync or async.

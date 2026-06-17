@@ -20,6 +20,7 @@ import signal
 import subprocess
 import sys
 import threading
+import uuid
 from pathlib import Path
 from typing import Iterator
 
@@ -31,7 +32,9 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[6]
 _SERVER_PROJECT = _REPO_ROOT / "src" / "IpcSample.PythonClientTestServer"
 
-DOTNET_PIPE_NAME = "uipath-ipc-py-test"
+# Session-unique so a stale server from an interrupted run (or a parallel
+# session) can't collide on the pipe name.
+DOTNET_PIPE_NAME = f"uipath-ipc-py-test-{uuid.uuid4().hex}"
 
 _STARTUP_TIMEOUT_SECONDS = 60.0
 _READY_MARKER = f"READY pipe={DOTNET_PIPE_NAME}"

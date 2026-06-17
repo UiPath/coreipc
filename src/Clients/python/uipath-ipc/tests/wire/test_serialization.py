@@ -25,6 +25,12 @@ def test_bytes_round_trip() -> None:
     assert from_wire("BAMCAQ==", bytes) == b"\x04\x03\x02\x01"
 
 
+def test_bytearray_hint_returns_bytearray() -> None:
+    # b64decode always returns bytes; a `bytearray` hint must be honored.
+    got = from_wire("BAMCAQ==", bytearray)
+    assert got == bytearray(b"\x04\x03\x02\x01") and isinstance(got, bytearray)
+
+
 def test_uuid_round_trip() -> None:
     u = UUID(_GUID)
     assert to_wire(u) == _GUID

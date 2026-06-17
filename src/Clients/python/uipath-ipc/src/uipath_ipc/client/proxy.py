@@ -98,7 +98,10 @@ class _IpcProxy:
         params: list[str] = []
         for a in args:
             if isinstance(a, Message):
-                if a.request_timeout is not None:
+                # 0 is the "use server default" sentinel, not an override —
+                # mirror .NET's `when requestTimeout != TimeSpan.Zero` so a
+                # Message(request_timeout=0) doesn't clobber the client default.
+                if a.request_timeout is not None and a.request_timeout != 0:
                     timeout = a.request_timeout
                 params.append(json.dumps(_message_wire(a)))
             else:
@@ -111,13 +114,16 @@ class _IpcProxy:
             # unreachable host no longer escapes `request_timeout` via an
             # unbounded connect. Mirrors .NET flowing one TimeoutHelper token
             # into connect+send.
-            conn = await self._client._ensure_connected()
+            conn, created = await self._client._ensure_connected()
             # BeforeCall hook (client only — a reach-back proxy is bound to a
             # bare connection, which has no `before_call`, so callbacks skip it).
             before_call = getattr(self._client, "before_call", None)
             if before_call is not None:
                 result = before_call(
-                    CallInfo(self._endpoint_name, method_name, args)
+                    CallInfo(
+                        self._endpoint_name, method_name, args,
+                        new_connection=created,
+                    )
                 )
                 if inspect.isawaitable(result):
                     await result

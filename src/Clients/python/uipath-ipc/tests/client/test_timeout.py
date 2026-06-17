@@ -71,8 +71,12 @@ async def test_request_timeout_raises_timeout_error() -> None:
     t = _FakeTransport()
     async with IpcClient(t, request_timeout=0.05) as client:
         svc = client.get_proxy(IComputingService)
+        start = asyncio.get_running_loop().time()
         with pytest.raises(asyncio.TimeoutError):
             await svc.Wait(10.0)  # response never arrives → times out
+        # Upper bound: the deadline fired promptly (not "eventually" for the
+        # wrong reason on a slow runner). Generous margin to stay non-flaky.
+        assert asyncio.get_running_loop().time() - start < 2.0
 
 
 async def test_timeout_sends_cancellation_to_server() -> None:

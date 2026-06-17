@@ -187,8 +187,18 @@ class NamedPipeServerTransport(ServerTransport):
         # service/container/CI setups) the socket would be group/world-
         # connectable. .NET pins owner-only perms regardless of umask; match it.
         # (A tiny bind->chmod TOCTOU window exists; acceptable for a local
-        # per-user socket.)
-        os.chmod(path, 0o600)
+        # per-user socket.) Fail CLOSED: if chmod can't secure the socket, tear
+        # the listener down rather than serve with open perms, and don't leak
+        # the bound socket.
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            server.close()
+            with contextlib.suppress(Exception):
+                await server.wait_closed()
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(path)
+            raise
         return _PosixUnixServerHandle(server, path)
 
     @staticmethod

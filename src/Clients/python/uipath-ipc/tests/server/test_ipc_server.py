@@ -422,6 +422,25 @@ async def test_posix_bind_over_live_server_raises() -> None:
         await server1.aclose()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX unix-socket lifecycle")
+async def test_posix_chmod_failure_fails_closed(monkeypatch) -> None:
+    """If the socket can't be secured (chmod raises), serve() fails closed:
+    it raises and doesn't leave a bound socket behind with open perms."""
+    name = f"uipath-ipc-chmod-{uuid.uuid4().hex}"
+    transport = NamedPipeServerTransport(name)
+    path = transport._posix_address
+
+    def _boom(*_a, **_k):
+        raise PermissionError("cannot secure socket")
+
+    monkeypatch.setattr(os, "chmod", _boom)
+    server = IpcServer(transport, {ICalculator: Calculator()})
+    with pytest.raises(PermissionError):
+        await server.start()
+    assert not os.path.exists(path)  # the bound socket was cleaned up
+    await server.aclose()
+
+
 # --- TCP connect resilience / zero-timeout edge ----------------------------
 
 async def test_tcp_client_rides_out_connection_refused() -> None:

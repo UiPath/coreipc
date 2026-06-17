@@ -87,6 +87,17 @@ async with asyncio.timeout(1.0):
 
 In both cases the server is notified via a `CancellationRequest`.
 
+For a single call, pass a `Message` argument carrying the timeout — it overrides the client default for that call only:
+
+```python
+from uipath_ipc import Message, INFINITE_REQUEST_TIMEOUT
+
+await svc.Install(pkg, Message(request_timeout=1200))                       # 20-minute call
+await svc.SignIn(creds, Message(request_timeout=INFINITE_REQUEST_TIMEOUT))  # no deadline
+```
+
+`INFINITE_REQUEST_TIMEOUT` is the .NET `Timeout.InfiniteTimeSpan` rendition: no client-side deadline, and the server reads it as "no timeout". A `request_timeout` of `0` means "use the server's default" (it does not override the client default).
+
 ### Exception propagation
 
 Server-side exceptions surface as `RemoteException`:
@@ -101,6 +112,7 @@ except RemoteException as ex:
     print(ex.type_name)     # "System.DivideByZeroException"
     print(ex.stack_trace)   # the .NET stack
     print(ex.inner)         # inner RemoteException (chain), or None
+    ex.is_remote_type("System.DivideByZeroException")   # True — .NET Is<T>() analog
 ```
 
 `__cause__` is set on the exception chain so Python tracebacks display the inner errors naturally.
@@ -129,6 +141,29 @@ async with IpcClient(transport, callbacks={IClientCallback: EchoHandler()}) as c
 ```
 
 Callback methods may be `async def` or plain `def`. Exceptions raised inside the handler are wired back to the server as `RemoteException`. Server-initiated cancellations cancel the in-flight handler task.
+
+### Hooks
+
+Two optional hooks let you observe or gate the client (the analog of .NET's `BeforeConnect` / `BeforeOutgoingCall`). Each may be sync or `async`; **raising in a hook aborts** the connect/call.
+
+```python
+from uipath_ipc import CallInfo
+
+async def launch_server() -> None:
+    ...  # e.g. lazily start the server before the first connect (self-healing)
+
+def log_call(ci: CallInfo) -> None:
+    print(ci.endpoint, ci.method_name, ci.arguments, ci.new_connection)
+
+async with IpcClient(transport, before_connect=launch_server, before_call=log_call) as client:
+    ...
+```
+
+`before_connect` runs before each (re)connect; `before_call` runs before each outgoing call with a `CallInfo` (`endpoint`, `method_name`, `arguments`, and `new_connection` — `True` only on the call that opened the connection).
+
+### Custom serialization (advanced)
+
+The proxy materializes results into a contract's declared return type via reflection — `bytes`, `UUID`, `datetime`, `Decimal`, enums, dataclasses, and pydantic models all round-trip (see [Features](#features) above). If you need to (de)serialize values yourself, the same primitives are exported as `from_wire(value, hint)` / `to_wire(value)`.
 
 ### Auto-reconnect
 

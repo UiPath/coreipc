@@ -399,7 +399,13 @@ async def test_one_way_handler_exception_is_logged_not_returned(caplog) -> None:
             assert resp.data == ""
             # ...but it is logged.
             await asyncio.sleep(0.05)
-        assert any("one-way" in r.message for r in caplog.records)
+        recs = [r for r in caplog.records if "one-way" in r.message]
+        assert recs, "expected a one-way failure log record"
+        # The handler's exception (type + message) must be captured, not just
+        # a bare 'one-way failed' line.
+        exc_info = recs[0].exc_info
+        assert exc_info is not None and exc_info[0] is ValueError
+        assert "one-way failures are logged, not returned" in str(exc_info[1])
     finally:
         await conn.aclose()
 

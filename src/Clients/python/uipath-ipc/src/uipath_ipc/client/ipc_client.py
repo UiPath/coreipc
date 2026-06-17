@@ -79,9 +79,11 @@ class IpcClient:
             for contract_type, instance in callbacks.items():
                 self._callbacks[contract_type.__name__] = (contract_type, instance)
 
-    async def _ensure_connected(self) -> IpcConnection:
+    async def _ensure_connected(self) -> tuple[IpcConnection, bool]:
+        """Return (connection, created); created is True iff this call opened a
+        fresh connection (surfaced to before_call as CallInfo.new_connection)."""
         if self._connection is not None and not self._connection.is_closed:
-            return self._connection
+            return self._connection, False
         # Reentrancy guard: a before_connect hook that calls back into this same
         # client runs in the task already holding _connect_lock, so re-acquiring
         # it would deadlock silently. Fail loudly with a clear message instead.
@@ -100,7 +102,7 @@ class IpcClient:
             if self._closed:
                 raise ConnectionError("client is closed")
             if self._connection is not None and not self._connection.is_closed:
-                return self._connection
+                return self._connection, False
             # Tear down the dead connection (no-op if already cleaned up)
             # before re-dialing through the transport.
             if self._connection is not None:
@@ -118,7 +120,7 @@ class IpcClient:
                 )
             finally:
                 self._connecting_task = None
-        return self._connection
+        return self._connection, True
 
     def get_proxy(self, contract: type[T]) -> T:
         """Return a proxy that looks like an instance of `contract`."""

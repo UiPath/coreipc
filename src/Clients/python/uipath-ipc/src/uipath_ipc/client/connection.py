@@ -305,10 +305,11 @@ class IpcConnection:
         except Exception:
             pass
 
-    async def _ensure_connected(self) -> IpcConnection:
-        """This connection is already open. Lets `_IpcProxy` drive a reach-back
-        proxy directly off the connection (see `get_callback`)."""
-        return self
+    async def _ensure_connected(self) -> tuple[IpcConnection, bool]:
+        """This connection is already open (never a 'new' connection for hook
+        purposes). Lets `_IpcProxy` drive a reach-back proxy directly off the
+        connection (see `get_callback`)."""
+        return self, False
 
     async def __aenter__(self) -> IpcConnection:
         return self
@@ -405,20 +406,26 @@ class IpcConnection:
         payload: bytes,
         *,
         timeout: float | None = None,
+        teardown_on_timeout: bool = True,
     ) -> None:
         """Write one frame atomically under the write lock, optionally bounded
         by a send deadline (the per-call `timeout`, else the connection's
         `_send_timeout`). On a non-reading peer, `drain()` blocks on backpressure
         and would wedge the shared writer for every queued frame; if the bound
-        elapses, tear the connection down rather than wedge forever — mirroring
-        .NET's dispose-on-send-cancel. A non-positive/None bound is unbounded."""
+        elapses we cancel the write (releasing the lock) so other frames aren't
+        wedged. For a request send we then tear the connection down (it can't
+        recover); for a best-effort send (`teardown_on_timeout=False` — RESPONSE
+        / CANCELLATION) we just abandon that one frame and leave the connection
+        up, mirroring .NET writing responses with CancellationToken.None. A
+        non-positive/None bound is unbounded."""
         bound = timeout if timeout is not None else self._send_timeout
         if bound is not None and bound > 0:
             try:
                 await asyncio.wait_for(self._locked_write(msg_type, payload), bound)
             except asyncio.TimeoutError:
-                self._closed = True
-                self._teardown()
+                if teardown_on_timeout:
+                    self._closed = True
+                    self._teardown()
                 raise
         else:
             await self._locked_write(msg_type, payload)
@@ -438,7 +445,7 @@ class IpcConnection:
                 .encode("utf-8")
             )
             await self._send_frame(
-                MessageType.CANCELLATION_REQUEST, payload
+                MessageType.CANCELLATION_REQUEST, payload, teardown_on_timeout=False
             )
         except Exception:
             pass
@@ -701,7 +708,9 @@ class IpcConnection:
             return
         try:
             await self._send_frame(
-                MessageType.RESPONSE, resp.to_json().encode("utf-8")
+                MessageType.RESPONSE,
+                resp.to_json().encode("utf-8"),
+                teardown_on_timeout=False,
             )
         except Exception:
             # Connection probably tore down — nothing to do.

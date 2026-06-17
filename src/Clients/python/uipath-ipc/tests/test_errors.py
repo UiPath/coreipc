@@ -23,6 +23,16 @@ def test_error_with_type_name_renders_in_str() -> None:
     assert str(exc) == "[System.InvalidOperationException] boom"
 
 
+def test_is_remote_type_matches_fully_qualified_name() -> None:
+    exc = RemoteException.from_error(
+        Error(message="boom", type_name="System.IO.IOException")
+    )
+    assert exc.is_remote_type("System.IO.IOException")
+    assert not exc.is_remote_type("System.InvalidOperationException")
+    # A type-less error matches nothing.
+    assert not RemoteException.from_error(Error(message="x")).is_remote_type("X")
+
+
 def test_error_with_stack_trace_preserved() -> None:
     err = Error(message="boom", stack_trace="at Foo.Bar()")
     exc = RemoteException.from_error(err)

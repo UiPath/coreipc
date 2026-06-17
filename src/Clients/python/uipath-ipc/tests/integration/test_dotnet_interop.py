@@ -230,6 +230,18 @@ async def test_datetime_round_trips_as_datetime(dotnet_server) -> None:
         assert result == d
 
 
+async def test_datetime_with_microseconds_round_trips(dotnet_server) -> None:
+    """Non-zero microseconds survive end-to-end through the real .NET server —
+    exercises the 7->6 fractional-digit handling against Newtonsoft, not just in
+    the unit test."""
+    d = dt.datetime(2026, 6, 12, 10, 30, 0, 123456, tzinfo=dt.timezone.utc)
+    async with _new_client() as client:
+        svc = client.get_proxy(ISystemService)
+        result = await svc.EchoDateTime(d)
+        assert isinstance(result, dt.datetime)
+        assert result == d
+
+
 # --- per-call timeout (Message argument) -----------------------------------
 # The .NET server's default RequestTimeout is 2 seconds (see conftest /
 # Program.cs). These three tests triangulate the per-call feature end to end:

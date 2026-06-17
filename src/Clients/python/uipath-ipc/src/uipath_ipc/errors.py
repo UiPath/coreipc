@@ -33,6 +33,13 @@ class RemoteException(Exception):
         self.stack_trace = stack_trace
         self.inner = inner
 
+    def is_remote_type(self, type_name: str) -> bool:
+        """True if the remote error's fully-qualified .NET type name matches
+        ``type_name`` (e.g. ``"System.IO.IOException"``). The Python analog of
+        .NET's ``RemoteException.Is<TException>()`` — compares the top-level
+        type only (use ``.inner`` to inspect the chain)."""
+        return self.type_name == type_name
+
     @classmethod
     def from_error(cls, error: Error) -> RemoteException:
         """Build a `RemoteException` (and its chain) from a wire `Error`."""

@@ -264,6 +264,45 @@ async def test_send_frame_timeout_tears_down_connection() -> None:
         await conn.aclose()
 
 
+async def test_best_effort_send_timeout_does_not_tear_down_connection() -> None:
+    """A best-effort RESPONSE send that hits the send_timeout (non-reading peer)
+    is abandoned gracefully — the connection stays up, unlike a request send.
+    Mirrors .NET writing responses with CancellationToken.None."""
+    reader = asyncio.StreamReader()
+    writer = _BlockingDrainWriter()
+    conn = IpcConnection(reader, writer, send_timeout=0.2)  # type: ignore[arg-type]
+    conn.start()
+    try:
+        await conn._try_send_response(Response(request_id="1", data='"ok"'))
+        assert not conn.is_closed  # the slow response did NOT kill the connection
+    finally:
+        await conn.aclose()
+
+
+async def test_receive_loop_resolves_while_write_lock_is_held() -> None:
+    """The receive loop is independent of the write path: an inbound response
+    resolves a pending request even while a wedged send holds the write lock
+    (backpressure on the outbound direction must not block reads)."""
+    reader = asyncio.StreamReader()
+    writer = _BlockingDrainWriter()
+    conn = IpcConnection(reader, writer)  # type: ignore[arg-type]
+    conn.start()
+    try:
+        # A send that acquires the write lock and blocks on drain() forever.
+        blocked = asyncio.create_task(conn._send_frame(MessageType.REQUEST, b"x"))
+        await asyncio.sleep(0)
+        # Register a pending request as send_request would, then feed its response.
+        fut = asyncio.get_running_loop().create_future()
+        conn._pending["7"] = fut
+        reader.feed_data(_response_frame(Response(request_id="7", data='"ok"')))
+        resp = await asyncio.wait_for(fut, timeout=1.0)
+        assert resp.data == '"ok"'
+        assert not blocked.done()  # send still wedged, yet the read resolved
+    finally:
+        blocked.cancel()
+        await conn.aclose()
+
+
 # --- cancellation racing an arrived response ------------------------------
 
 async def test_response_arriving_at_cancel_is_returned_not_discarded() -> None:

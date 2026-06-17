@@ -194,7 +194,9 @@ def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -
         if issubclass(hint, enum.Enum):
             return hint(parsed)
         if hint in (bytes, bytearray):
-            return base64.b64decode(parsed)
+            decoded = base64.b64decode(parsed)
+            # b64decode always returns bytes; honor a `bytearray` hint.
+            return bytearray(decoded) if hint is bytearray else decoded
         if hint is UUID:
             return UUID(parsed)
         if hint is _datetime.datetime:

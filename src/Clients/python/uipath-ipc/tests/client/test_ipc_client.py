@@ -394,3 +394,36 @@ async def test_del_warns_and_abandons_open_connection() -> None:
     with pytest.warns(ResourceWarning):
         client.__del__()
     assert client._connection.abandoned  # type: ignore[attr-defined]
+
+
+async def test_before_call_reports_new_connection_only_on_first_call() -> None:
+    """CallInfo.new_connection is True for the call that opens the connection,
+    False for subsequent calls reusing it (matches .NET CallInfo.NewConnection)."""
+    seen: list[bool] = []
+    t = _FakeTransport()
+    async with IpcClient(t, before_call=lambda ci: seen.append(ci.new_connection)) as client:
+        svc = client.get_proxy(IComputingService)
+        task = asyncio.create_task(svc.AddFloats(1.0, 2.0))  # opens the connection
+        await asyncio.sleep(0)
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="3.0")))
+        await asyncio.wait_for(task, timeout=1.0)
+        task2 = asyncio.create_task(svc.AddFloats(3.0, 4.0))  # reuses it
+        await asyncio.sleep(0)
+        t.reader.feed_data(_response_frame(Response(request_id="2", data="7.0")))
+        await asyncio.wait_for(task2, timeout=1.0)
+    assert seen == [True, False]
+
+
+async def test_message_request_timeout_zero_keeps_client_default() -> None:
+    """Message(request_timeout=0) is the 'use server default' sentinel, not an
+    override — the client-wide default still rides the wire (matches .NET's
+    `when requestTimeout != TimeSpan.Zero`)."""
+    t = _FakeTransport()
+    async with IpcClient(t, request_timeout=2.0) as client:
+        svc = client.get_proxy(ITimed)
+        task = asyncio.create_task(svc.DoWork(Message(request_timeout=0)))
+        await asyncio.sleep(0)
+        req = await _sent_request(t.writer)
+        assert req["TimeoutInSeconds"] == 2.0  # not 0 — the default was not clobbered
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
+        await asyncio.wait_for(task, timeout=1.0)
