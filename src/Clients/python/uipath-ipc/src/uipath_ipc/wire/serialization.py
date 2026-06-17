@@ -63,9 +63,17 @@ def to_wire(value: Any) -> Any:
     if isinstance(value, UUID):
         return str(value)
     if isinstance(value, _datetime.datetime):
-        return value.isoformat()
+        # Emit a trailing 'Z' for UTC (not '+00:00') so .NET's RoundtripKind
+        # parses it as DateTimeKind.Utc rather than Local. Naive/offset values
+        # are left as isoformat produces them.
+        text = value.isoformat()
+        return text[:-6] + "Z" if text.endswith("+00:00") else text
     if isinstance(value, Decimal):
-        return float(value)
+        # As a string, not float(): float() loses precision and renders large
+        # values in scientific notation, which .NET's decimal parser rejects.
+        # Newtonsoft reads a JSON string into a decimal fine; from_wire decodes
+        # both a JSON string and a JSON number back to Decimal.
+        return str(value)
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return {
             f.name: to_wire(getattr(value, f.name))
@@ -131,6 +139,9 @@ def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -
     `materialize_dataclasses=False` leaves plain dataclasses (and dicts) as
     raw parsed structures — the proxy uses this so consumers that decode
     results themselves keep receiving dicts.
+
+    A multi-member ``Union`` other than ``Optional[X]`` is intentionally left
+    undecoded (it's ambiguous to materialize from one wire value).
     """
     if parsed is None or hint is None or hint is Any:
         return parsed
@@ -140,15 +151,36 @@ def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -
     if origin in _UNION_ORIGINS:  # Optional[X] / X | Y
         non_none = [a for a in args if a is not type(None)]
         if len(non_none) == 1:
-            return from_wire(
+            return from_wire(  # Optional[X] / X | None -> decode as X
                 parsed, non_none[0], materialize_dataclasses=materialize_dataclasses
             )
+        # A genuine multi-member union (e.g. `bytes | str`, `A | B`) is
+        # ambiguous to materialize from one wire value — guessing risks
+        # mis-decoding (a base64 string satisfies both `bytes` and `str`). By
+        # design it passes through undecoded; narrow the contract or decode it
+        # yourself if a concrete type is needed.
         return parsed
     if origin in (list, tuple, set, frozenset) and args:
-        return [
-            from_wire(x, args[0], materialize_dataclasses=materialize_dataclasses)
-            for x in parsed
-        ]
+        if not isinstance(parsed, (list, tuple)):
+            return parsed  # wire value isn't a JSON array — leave it alone
+        if origin is tuple and not (len(args) == 2 and args[1] is Ellipsis):
+            # Fixed-arity tuple[X, Y, ...]: decode each element by its position.
+            # (tuple[X, ...] is the variadic form, handled by the else branch.)
+            items = [
+                from_wire(
+                    x,
+                    args[i] if i < len(args) else Any,
+                    materialize_dataclasses=materialize_dataclasses,
+                )
+                for i, x in enumerate(parsed)
+            ]
+        else:
+            items = [
+                from_wire(x, args[0], materialize_dataclasses=materialize_dataclasses)
+                for x in parsed
+            ]
+        # Rebuild the declared container type (list stays a list).
+        return items if origin is list else origin(items)
     if origin is dict and isinstance(parsed, dict):
         vt = args[1] if len(args) == 2 else Any
         return {

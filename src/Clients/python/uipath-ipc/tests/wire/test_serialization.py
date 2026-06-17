@@ -33,6 +33,9 @@ def test_uuid_round_trip() -> None:
 
 def test_datetime_round_trip_and_z_suffix() -> None:
     d = dt.datetime(2026, 6, 12, 10, 30, 0, tzinfo=dt.timezone.utc)
+    # UTC is emitted with a trailing 'Z' (not '+00:00') so .NET parses it as
+    # DateTimeKind.Utc.
+    assert to_wire(d) == "2026-06-12T10:30:00Z"
     assert from_wire(to_wire(d), dt.datetime) == d
     # .NET/UTC 'Z' suffix (fromisoformat needs an offset before 3.11)
     assert from_wire("2026-06-12T10:30:00Z", dt.datetime) == d
@@ -42,8 +45,17 @@ def test_datetime_round_trip_and_z_suffix() -> None:
 
 
 def test_decimal_round_trip() -> None:
-    assert to_wire(Decimal("1.5")) == 1.5
+    # Encoded as a precision-preserving string (not float), decoded back from a
+    # string or a .NET-sent JSON number.
+    assert to_wire(Decimal("1.5")) == "1.5"
+    assert from_wire("1.5", Decimal) == Decimal("1.5")
     assert from_wire(2.5, Decimal) == Decimal("2.5")
+
+
+def test_large_decimal_keeps_precision_no_scientific_notation() -> None:
+    big = Decimal("79228162514264337593543950335")
+    assert to_wire(big) == "79228162514264337593543950335"  # not 7.92e28
+    assert from_wire(to_wire(big), Decimal) == big
 
 
 class _Color(enum.IntEnum):
@@ -69,6 +81,29 @@ def test_optional_unwraps() -> None:
 
 def test_dict_value_type() -> None:
     assert from_wire({"a": _GUID}, dict[str, UUID]) == {"a": UUID(_GUID)}
+
+
+def test_variadic_tuple_and_set_keep_their_type() -> None:
+    got = from_wire([_GUID, _GUID], tuple[UUID, ...])
+    assert got == (UUID(_GUID), UUID(_GUID)) and isinstance(got, tuple)
+    s = from_wire([1, 2, 2], set[int])
+    assert s == {1, 2} and isinstance(s, set)
+
+
+def test_fixed_arity_tuple_decodes_each_position() -> None:
+    # Heterogeneous tuple[UUID, str]: the str element must NOT be coerced with
+    # the first member's type (the old code applied args[0] to every element).
+    got = from_wire([_GUID, "USD"], tuple[UUID, str])
+    assert got == (UUID(_GUID), "USD") and isinstance(got, tuple)
+
+
+def test_multi_member_union_passes_through_undecoded() -> None:
+    # Optional[X] still decodes; a genuine multi-member union is left raw
+    # (ambiguous to materialize) — documented behavior, not a silent surprise.
+    import typing
+
+    assert from_wire(_GUID, Optional[UUID]) == UUID(_GUID)
+    assert from_wire(_GUID, typing.Union[UUID, int]) == _GUID  # not decoded
 
 
 # --- dataclass (public from_wire) ------------------------------------------
