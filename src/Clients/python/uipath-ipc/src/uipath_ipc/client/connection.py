@@ -214,6 +214,7 @@ class IpcConnection:
         request_timeout: float | None = None,
         before_incoming_call: BeforeCallHandler | None = None,
         inbound_request_timeout: float | None = None,
+        send_timeout: float | None = None,
     ) -> None:
         self._reader = reader
         self._writer = writer
@@ -226,6 +227,10 @@ class IpcConnection:
         #: Server-side fallback bound for an inbound handler when the wire
         #: Request carries no explicit timeout (mirrors .NET RequestTimeout).
         self._inbound_request_timeout = inbound_request_timeout
+        #: Optional bound on a single frame write. A non-reading peer can block
+        #: drain() on backpressure forever and wedge the shared writer for every
+        #: queued frame; on expiry we tear the connection down (None = unbound).
+        self._send_timeout = send_timeout
         #: Awaited before dispatching each incoming request (server side).
         self._before_incoming_call = before_incoming_call
         self._pending: dict[str, asyncio.Future[Response]] = {}
@@ -374,8 +379,31 @@ class IpcConnection:
 
     # --- frame I/O ---------------------------------------------------------
 
-    async def _send_frame(self, msg_type: MessageType, payload: bytes) -> None:
-        """Write one frame atomically under the write lock."""
+    async def _send_frame(
+        self,
+        msg_type: MessageType,
+        payload: bytes,
+        *,
+        timeout: float | None = None,
+    ) -> None:
+        """Write one frame atomically under the write lock, optionally bounded
+        by a send deadline (the per-call `timeout`, else the connection's
+        `_send_timeout`). On a non-reading peer, `drain()` blocks on backpressure
+        and would wedge the shared writer for every queued frame; if the bound
+        elapses, tear the connection down rather than wedge forever — mirroring
+        .NET's dispose-on-send-cancel. A non-positive/None bound is unbounded."""
+        bound = timeout if timeout is not None else self._send_timeout
+        if bound is not None and bound > 0:
+            try:
+                await asyncio.wait_for(self._locked_write(msg_type, payload), bound)
+            except asyncio.TimeoutError:
+                self._closed = True
+                self._teardown()
+                raise
+        else:
+            await self._locked_write(msg_type, payload)
+
+    async def _locked_write(self, msg_type: MessageType, payload: bytes) -> None:
         async with self._write_lock:
             await write_frame(self._writer, msg_type, payload)
 

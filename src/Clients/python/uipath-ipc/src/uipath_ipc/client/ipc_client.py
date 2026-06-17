@@ -61,6 +61,7 @@ class IpcClient:
         self._transport = transport
         self._connection: IpcConnection | None = None
         self._connect_lock = asyncio.Lock()
+        self._closed = False
         self.request_timeout = request_timeout
         self._before_connect = before_connect
         #: Read by `_IpcProxy._invoke` before sending each outgoing request.
@@ -77,6 +78,11 @@ class IpcClient:
         if self._connection is not None and not self._connection.is_closed:
             return self._connection
         async with self._connect_lock:
+            # Serialized with aclose(): if the client was closed (possibly while
+            # we waited for the lock), don't silently re-dial — the connection a
+            # concurrent aclose() expected to be gone would otherwise reappear.
+            if self._closed:
+                raise ConnectionError("client is closed")
             if self._connection is not None and not self._connection.is_closed:
                 return self._connection
             # Tear down the dead connection (no-op if already cleaned up)
@@ -99,9 +105,14 @@ class IpcClient:
         return cast(T, _IpcProxy(self, contract))
 
     async def aclose(self) -> None:
-        if self._connection is not None:
-            await self._connection.aclose()
-            self._connection = None
+        # Take the connect lock so close can't race an in-flight connect (which
+        # would otherwise complete and assign a live connection *after* close
+        # returned — a leak / use-after-close).
+        async with self._connect_lock:
+            self._closed = True
+            if self._connection is not None:
+                await self._connection.aclose()
+                self._connection = None
 
     async def __aenter__(self) -> IpcClient:
         return self

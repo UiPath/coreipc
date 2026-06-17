@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
+from ._retry import retry_connect
 from .base import ClientTransport, ConnectionHandler, ServerHandle, ServerTransport
 
 
@@ -21,7 +22,14 @@ class TcpClientTransport(ClientTransport):
     port: int
 
     async def connect(self) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        return await asyncio.open_connection(self.host, self.port)
+        # Retry ConnectionRefused (the peer's accept loop isn't bound yet) so a
+        # TCP client rides out the startup / reconnect-after-restart races, like
+        # .NET's TcpClientTransport and this port's named-pipe transport. Bounded
+        # by the caller's deadline (the proxy wraps connect+send in wait_for).
+        return await retry_connect(
+            lambda: asyncio.open_connection(self.host, self.port),
+            (ConnectionRefusedError,),
+        )
 
 
 @dataclass(frozen=True, slots=True)

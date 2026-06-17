@@ -32,6 +32,14 @@ class _BufferWriter:
         pass
 
 
+class _BlockingDrainWriter(_BufferWriter):
+    """Accepts bytes but its drain() never completes — a non-reading peer
+    blocking on backpressure."""
+
+    async def drain(self) -> None:
+        await asyncio.Event().wait()
+
+
 def _frame(msg_type: MessageType, payload: bytes) -> bytes:
     return struct.pack("<Bi", int(msg_type), len(payload)) + payload
 
@@ -202,6 +210,24 @@ def test_handler_systemexit_answers_peer_then_propagates() -> None:
     resp = Response.from_json(bytes(writer.buffer[5:]).decode("utf-8"))
     assert resp.request_id == "9"
     assert resp.error is not None and resp.error.type_name == "SystemExit"
+
+
+# --- send deadline --------------------------------------------------------
+
+async def test_send_frame_timeout_tears_down_connection() -> None:
+    """A non-reading peer blocks drain() forever. With a send_timeout the write
+    is bounded; on expiry the connection is torn down (so the shared writer
+    isn't wedged for every queued frame) and the caller sees a TimeoutError."""
+    reader = asyncio.StreamReader()
+    writer = _BlockingDrainWriter()
+    conn = IpcConnection(reader, writer, send_timeout=0.2)  # type: ignore[arg-type]
+    conn.start()
+    try:
+        with pytest.raises(asyncio.TimeoutError):
+            await conn._send_frame(MessageType.REQUEST, b"hello")
+        assert conn.is_closed
+    finally:
+        await conn.aclose()
 
 
 # --- close callbacks ------------------------------------------------------

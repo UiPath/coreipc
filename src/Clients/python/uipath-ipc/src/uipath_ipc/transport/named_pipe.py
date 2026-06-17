@@ -16,6 +16,7 @@ import os
 import sys
 from dataclasses import dataclass
 
+from ._retry import retry_connect
 from .base import ClientTransport, ConnectionHandler, ServerHandle, ServerTransport
 
 
@@ -47,47 +48,33 @@ class NamedPipeClientTransport(ClientTransport):
             os.environ.get("TMPDIR") or "/tmp", f"CoreFxPipe_{self.pipe_name}"
         )
 
-    # Brief retry on FileNotFoundError to ride out two race windows:
-    #   - Windows: between accepting one connection and creating the next
-    #     pipe instance, CreateFile transiently fails with ERROR_FILE_NOT_FOUND.
-    #   - POSIX: the .NET server signals readiness before its accept-loop has
-    #     actually bound the Unix Domain Socket file at /tmp/CoreFxPipe_<name>.
-    _CONNECT_RETRY_DELAYS = (0.0, 0.05, 0.1, 0.2, 0.5, 1.0)
-
     async def _connect_windows(
         self,
     ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         loop = asyncio.get_running_loop()
-        last: BaseException | None = None
-        for delay in self._CONNECT_RETRY_DELAYS:
-            if delay:
-                await asyncio.sleep(delay)
-            try:
-                reader = asyncio.StreamReader()
-                protocol = asyncio.StreamReaderProtocol(reader)
-                transport, _ = await loop.create_pipe_connection(  # type: ignore[attr-defined]
-                    lambda: protocol, self._windows_address
-                )
-                writer = asyncio.StreamWriter(transport, protocol, reader, loop)
-                return reader, writer
-            except FileNotFoundError as ex:
-                last = ex
-        assert last is not None
-        raise last
+
+        async def attempt() -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+            reader = asyncio.StreamReader()
+            protocol = asyncio.StreamReaderProtocol(reader)
+            transport, _ = await loop.create_pipe_connection(  # type: ignore[attr-defined]
+                lambda: protocol, self._windows_address
+            )
+            return reader, asyncio.StreamWriter(transport, protocol, reader, loop)
+
+        # Windows transiently fails CreateFile with ERROR_FILE_NOT_FOUND between
+        # accepting one connection and creating the next pipe instance.
+        return await retry_connect(attempt, (FileNotFoundError,))
 
     async def _connect_posix(
         self,
     ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        last: BaseException | None = None
-        for delay in self._CONNECT_RETRY_DELAYS:
-            if delay:
-                await asyncio.sleep(delay)
-            try:
-                return await asyncio.open_unix_connection(self._posix_address)
-            except FileNotFoundError as ex:
-                last = ex
-        assert last is not None
-        raise last
+        # FileNotFoundError: the server signalled readiness before its accept
+        # loop bound the socket file. ConnectionRefusedError: a stale socket
+        # file lingers with no listener (e.g. just before the server re-binds).
+        return await retry_connect(
+            lambda: asyncio.open_unix_connection(self._posix_address),
+            (FileNotFoundError, ConnectionRefusedError),
+        )
 
 
 class _PipeServerHandle:

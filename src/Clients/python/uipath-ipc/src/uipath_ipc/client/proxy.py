@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, get_type_hints
 from ..errors import RemoteException
 from ..hooks import CallInfo
 from ..message import Message
-from ..wire import Request, from_wire, to_wire
+from ..wire import Request, Response, from_wire, to_wire
 
 if TYPE_CHECKING:
     from .ipc_client import IpcClient
@@ -106,28 +106,39 @@ class _IpcProxy:
                 # Decimal/enum/dataclass/pydantic) and is a no-op for plain
                 # JSON values, so existing primitive/dict args are unchanged.
                 params.append(json.dumps(to_wire(a)))
-        conn = await self._client._ensure_connected()
-        # BeforeCall hook (client only — a reach-back proxy is bound to a bare
-        # connection, which has no `before_call`, so callbacks skip it).
-        before_call = getattr(self._client, "before_call", None)
-        if before_call is not None:
-            result = before_call(CallInfo(self._endpoint_name, method_name, args))
-            if inspect.isawaitable(result):
-                await result
-        req = Request(
-            endpoint=self._endpoint_name,
-            method_name=method_name,
-            parameters=params,
-            id=conn.next_id(),
-            timeout_in_seconds=timeout,
-        )
-        # Negative timeout mirrors .NET's Timeout.InfiniteTimeSpan (-1 ms =
-        # -0.001 s on the wire): no client-side deadline, and the server reads
-        # the negative TimeoutInSeconds as "no timeout" too.
-        if timeout is not None and timeout >= 0:
-            resp = await asyncio.wait_for(conn.send_request(req), timeout=timeout)
+        async def _connect_and_send() -> Response:
+            # The dial shares the call deadline (see below) — a black-holed or
+            # unreachable host no longer escapes `request_timeout` via an
+            # unbounded connect. Mirrors .NET flowing one TimeoutHelper token
+            # into connect+send.
+            conn = await self._client._ensure_connected()
+            # BeforeCall hook (client only — a reach-back proxy is bound to a
+            # bare connection, which has no `before_call`, so callbacks skip it).
+            before_call = getattr(self._client, "before_call", None)
+            if before_call is not None:
+                result = before_call(
+                    CallInfo(self._endpoint_name, method_name, args)
+                )
+                if inspect.isawaitable(result):
+                    await result
+            req = Request(
+                endpoint=self._endpoint_name,
+                method_name=method_name,
+                parameters=params,
+                id=conn.next_id(),
+                timeout_in_seconds=timeout,
+            )
+            return await conn.send_request(req)
+
+        # Bound connect+send by the deadline. A non-positive timeout imposes no
+        # client-side deadline: 0 ("use server default" — never an instant
+        # wait_for(0)) and a negative value (.NET's Timeout.InfiniteTimeSpan,
+        # -0.001 on the wire) both pass through unbounded; the server still
+        # reads the wire value.
+        if timeout is not None and timeout > 0:
+            resp = await asyncio.wait_for(_connect_and_send(), timeout=timeout)
         else:
-            resp = await conn.send_request(req)
+            resp = await _connect_and_send()
         if resp.error is not None:
             raise RemoteException.from_error(resp.error)
         # Void / fire-and-forget operations answer with an empty Data string

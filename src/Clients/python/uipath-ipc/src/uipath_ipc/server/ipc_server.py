@@ -94,6 +94,9 @@ class IpcServer:
             request_timeout=self._request_timeout,
             before_incoming_call=self._before_call,
             inbound_request_timeout=self._request_timeout,
+            # Bound server-side sends (responses / cancellations) by the same
+            # budget so a non-reading client can't wedge the shared writer.
+            send_timeout=self._request_timeout,
         )
         self._connections.add(conn)
         # Prune from the live set when the peer disconnects or we close it.

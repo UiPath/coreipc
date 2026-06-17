@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import os
+import socket
 import sys
 import uuid
 from abc import ABC, abstractmethod
@@ -337,6 +338,59 @@ async def test_server_enforces_request_timeout() -> None:
             with pytest.raises(RemoteException) as ei:
                 await asyncio.wait_for(svc.Slow(), timeout=5)
             assert ei.value.type_name == "System.TimeoutException"
+
+
+# --- TCP connect resilience / zero-timeout edge ----------------------------
+
+async def test_tcp_client_rides_out_connection_refused() -> None:
+    """A client dialing before the server's accept loop binds must retry
+    ConnectionRefused and ride out the startup race, not fail the first call."""
+    # Reserve a free port, then release it so nothing is listening yet.
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.bind(("127.0.0.1", 0))
+    port = probe.getsockname()[1]
+    probe.close()
+
+    calc = Calculator()
+    server = IpcServer(TcpServerTransport("127.0.0.1", port), {ICalculator: calc})
+    client = IpcClient(TcpClientTransport("127.0.0.1", port))
+
+    async def bind_late() -> None:
+        await asyncio.sleep(0.15)  # within the retry ladder's window
+        await server.start()
+
+    starter = asyncio.create_task(bind_late())
+    try:
+        svc = client.get_proxy(ICalculator)
+        assert await asyncio.wait_for(svc.Add(2.0, 3.0), timeout=5) == 5.0
+    finally:
+        await starter
+        await client.aclose()
+        await server.aclose()
+
+
+class IBriefly(ABC):
+    @abstractmethod
+    async def Work(self, seconds: float) -> bool: ...
+
+
+class BrieflyService:
+    async def Work(self, seconds: float) -> bool:
+        await asyncio.sleep(seconds)
+        return True
+
+
+async def test_zero_per_call_timeout_is_not_an_instant_deadline() -> None:
+    """Message(request_timeout=0) means 'use the server default', not an instant
+    client-side wait_for(0): a ~0.2s call completes instead of timing out."""
+    server = IpcServer(TcpServerTransport("127.0.0.1", 0), {IBriefly: BrieflyService()})
+    async with server:
+        host, port = _tcp_endpoint(server)
+        async with IpcClient(TcpClientTransport(host, port)) as client:
+            svc = client.get_proxy(IBriefly)
+            assert await asyncio.wait_for(
+                svc.Work(0.2, Message(request_timeout=0)), timeout=5
+            ) is True
 
 
 # --- named pipe loopback --------------------------------------------------

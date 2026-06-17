@@ -47,6 +47,14 @@ class _FakeTransport(ClientTransport):
         return self.reader, self.writer  # type: ignore[return-value]
 
 
+class _HangingTransport(ClientTransport):
+    """Never completes a connect — stands in for a black-holed/unreachable host."""
+
+    async def connect(self):  # type: ignore[override]
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")  # pragma: no cover
+
+
 def _response_frame(resp: Response) -> bytes:
     payload = resp.to_json().encode("utf-8")
     return struct.pack("<Bi", int(MessageType.RESPONSE), len(payload)) + payload
@@ -323,3 +331,27 @@ async def test_client_async_context_closes_connection() -> None:
         assert client._connection is not None
     # After exit, connection should be cleared
     assert client._connection is None
+
+
+async def test_connect_is_bounded_by_request_timeout() -> None:
+    """The dial runs INSIDE the call deadline: a transport that never connects
+    raises asyncio.TimeoutError at ~request_timeout instead of hanging on the
+    (long) OS connect timeout."""
+    client = IpcClient(_HangingTransport(), request_timeout=0.3)
+    try:
+        svc = client.get_proxy(IComputingService)
+        start = asyncio.get_running_loop().time()
+        with pytest.raises(asyncio.TimeoutError):
+            await svc.AddFloats(1.0, 2.0)
+        assert asyncio.get_running_loop().time() - start < 2.0
+    finally:
+        await client.aclose()
+
+
+async def test_ensure_connected_raises_after_close() -> None:
+    """aclose() sets a closed flag under the connect lock, so a later (or
+    racing) connect can't silently revive the client."""
+    client = IpcClient(_FakeTransport())
+    await client.aclose()
+    with pytest.raises(ConnectionError):
+        await client._ensure_connected()
