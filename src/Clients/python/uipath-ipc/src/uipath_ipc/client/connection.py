@@ -372,6 +372,14 @@ class IpcConnection:
             await self._send_frame(MessageType.REQUEST, payload)
             return await fut
         except asyncio.CancelledError:
+            # If a successful response beat the cancellation, deliver it rather
+            # than discarding it — mirroring .NET, where the response and the
+            # cancellation arbitrate over the same request slot and a result
+            # that arrived first wins (Connection.CancelRequest can't override
+            # an already-completed request). Also skip the now-pointless
+            # CancellationRequest for a call the peer already answered.
+            if fut.done() and not fut.cancelled() and fut.exception() is None:
+                return fut.result()
             asyncio.create_task(self._safe_send_cancellation(req.id))
             raise
         finally:

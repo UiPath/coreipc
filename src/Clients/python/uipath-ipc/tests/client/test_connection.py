@@ -44,6 +44,17 @@ def _frame(msg_type: MessageType, payload: bytes) -> bytes:
     return struct.pack("<Bi", int(msg_type), len(payload)) + payload
 
 
+def _frame_types(buf: bytes) -> list[int]:
+    """The MessageType byte of every complete frame in a buffer."""
+    out: list[int] = []
+    i = 0
+    while i + 5 <= len(buf):
+        length = int.from_bytes(buf[i + 1 : i + 5], "little", signed=True)
+        out.append(buf[i])
+        i += 5 + length
+    return out
+
+
 def _response_frame(resp: Response) -> bytes:
     return _frame(MessageType.RESPONSE, resp.to_json().encode("utf-8"))
 
@@ -226,6 +237,37 @@ async def test_send_frame_timeout_tears_down_connection() -> None:
         with pytest.raises(asyncio.TimeoutError):
             await conn._send_frame(MessageType.REQUEST, b"hello")
         assert conn.is_closed
+    finally:
+        await conn.aclose()
+
+
+# --- cancellation racing an arrived response ------------------------------
+
+async def test_response_arriving_at_cancel_is_returned_not_discarded() -> None:
+    """A successful response landing in the same loop tick as a cancellation
+    must be returned (mirroring .NET's atomic arbitration), not discarded — and
+    no stray CancellationRequest is sent for a call the peer already answered."""
+    conn, reader, writer = await _make_connection()
+    try:
+        task = asyncio.create_task(conn.send_request(
+            Request(endpoint="X", method_name="Y", parameters=[], id="1")
+        ))
+        # Let send_request register its pending future and reach `await fut`.
+        for _ in range(10):
+            await asyncio.sleep(0)
+            if "1" in conn._pending:
+                break
+        fut = conn._pending["1"]
+        # Race: the response is set AND the task is cancelled in the same tick,
+        # before the awaiting coroutine resumes (a pending cancel otherwise wins).
+        fut.set_result(Response(request_id="1", data='"ok"'))
+        task.cancel()
+        resp = await task  # must NOT raise CancelledError
+        assert resp.data == '"ok"'
+        # Give any (erroneously) scheduled cancellation send a chance to run.
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert int(MessageType.CANCELLATION_REQUEST) not in _frame_types(bytes(writer.buffer))
     finally:
         await conn.aclose()
 
