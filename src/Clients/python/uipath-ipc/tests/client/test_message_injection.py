@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import struct
+import uuid
 
 import pytest
 
@@ -102,6 +103,12 @@ class _Service:
         # aligned with the parameter after it.
         self.messages.append(m)
         return f"{label}:{count}"
+
+    async def Stamp(self, value: uuid.UUID, m: Message) -> str:
+        # A value-type arg + a Message: used to prove before_incoming_call sees
+        # the DECODED value and the INJECTED Message, not raw wire shapes.
+        self.messages.append(m)
+        return str(value)
 
 
 def _make_connection(
@@ -260,6 +267,37 @@ async def test_before_incoming_call_raising_aborts_with_error() -> None:
         resp = Response.from_json(frames[0][1].decode("utf-8"))
         assert resp.error is not None
         assert "denied" in resp.error.message
+    finally:
+        await conn.aclose()
+
+
+async def test_before_incoming_call_sees_typed_and_injected_args() -> None:
+    """The hook fires AFTER binding, so it sees the DECODED args and the INJECTED
+    Message — matching .NET (deserialize + inject before BeforeCall), not the raw
+    wire shapes (a UUID would otherwise arrive as a str, a Message absent)."""
+    seen: list[tuple] = []
+
+    async def hook(ci: object) -> None:
+        seen.append(ci.arguments)  # type: ignore[attr-defined]
+
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(
+        reader, writer, callbacks={"ISvc": (_Service, _Service())}, before_incoming_call=hook  # type: ignore[arg-type]
+    )
+    conn.start()
+    try:
+        u = "550e8400-e29b-41d4-a716-446655440000"
+        reader.feed_data(_request_frame(Request(
+            endpoint="ISvc", method_name="Stamp", parameters=[json.dumps(u)], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) == u
+        assert len(seen) == 1
+        arg_value, arg_msg = seen[0]
+        assert isinstance(arg_value, uuid.UUID) and str(arg_value) == u  # decoded, not raw str
+        assert isinstance(arg_msg, Message) and arg_msg.client is conn   # injected Message
     finally:
         await conn.aclose()
 

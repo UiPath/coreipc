@@ -268,17 +268,23 @@ async def test_per_call_timeout_overrides_server_default(dotnet_server) -> None:
         assert await svc.WaitWithMessage("00:00:03", Message(request_timeout=10.0)) is True
 
 
-async def test_per_call_timeout_enforces_client_deadline(dotnet_server) -> None:
-    """The same Message timeout also bounds the call client-side: a 10s
-    operation with request_timeout=0.5 raises asyncio.TimeoutError promptly
-    instead of waiting out the server."""
+async def test_per_call_timeout_bounds_the_call_promptly(dotnet_server) -> None:
+    """A Message(request_timeout=0.5) bounds a 10s operation promptly. The same
+    0.5s rides the wire AND the client's local deadline (.NET parity — one value
+    sets both), so it's a race which fires first: the client's local wait_for
+    (asyncio.TimeoutError) or the server enforcing the wire timeout
+    (System.TimeoutException). Either proves the call was bounded — assert that,
+    not which one won (the previous strict asyncio.TimeoutError check flaked
+    under load when the server's response beat the local deadline)."""
     async with _new_client() as client:
         svc = client.get_proxy(IComputingService)
         start = asyncio.get_running_loop().time()
-        with pytest.raises(asyncio.TimeoutError):
+        with pytest.raises((asyncio.TimeoutError, RemoteException)) as ei:
             await svc.WaitWithMessage("00:00:10", Message(request_timeout=0.5))
         elapsed = asyncio.get_running_loop().time() - start
-        assert elapsed < 2.0, f"client deadline did not bound the call ({elapsed:.2f}s)"
+        assert elapsed < 2.0, f"timeout did not bound the call ({elapsed:.2f}s)"
+        if isinstance(ei.value, RemoteException):
+            assert ei.value.type_name == "System.TimeoutException"
 
 
 async def test_infinite_per_call_timeout_overrides_server_default(dotnet_server) -> None:

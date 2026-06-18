@@ -667,15 +667,20 @@ class IpcConnection:
             plan = _dispatch_plan(cmethod)
             # Each parameter is an individually JSON-encoded string (wire gotcha).
             args = [json.loads(p) for p in req.parameters]
+            # Bind FIRST: decode each arg to its declared type and inject the
+            # Message, THEN fire the hook — so BeforeIncomingCall sees the typed,
+            # Message-injected arguments, matching .NET (GetArguments deserializes
+            # + injects before BeforeCall). A binding failure therefore precedes
+            # the hook, which is also .NET's ordering.
+            pos, kwargs = self._bind_handler_args(plan.params, args)
             # BeforeIncomingCall hook (server side); raising aborts the call
             # and is surfaced to the caller as an Error response.
             if self._before_incoming_call is not None:
                 hook = self._before_incoming_call(
-                    CallInfo(req.endpoint, req.method_name, tuple(args))
+                    CallInfo(req.endpoint, req.method_name, tuple(pos))
                 )
                 if inspect.isawaitable(hook):
                     await hook
-            pos, kwargs = self._bind_handler_args(plan.params, args)
             if plan.one_way:
                 # Ack now (empty Data, like .NET's Response.Success(req, "")),
                 # then run the handler after responding (below).
@@ -787,9 +792,22 @@ class IpcConnection:
         if effective is None or effective <= 0:
             return await result
         task = asyncio.ensure_future(result)
-        done, _pending = await asyncio.wait({task}, timeout=effective)
+        try:
+            done, _pending = await asyncio.wait({task}, timeout=effective)
+        except asyncio.CancelledError:
+            # A peer CancellationRequest cancelled this dispatch. asyncio.wait
+            # does NOT propagate cancellation to the awaited task, so cancel the
+            # inner handler explicitly and await its teardown before re-raising
+            # — otherwise it runs orphaned to completion.
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            raise
         if task not in done:
-            task.cancel()  # best-effort; we do not trust it to propagate
+            # Deadline elapsed — authoritative even if the handler swallows its
+            # CancelledError. gather() awaits the cancelled task's teardown and
+            # retrieves any exception (no "never retrieved" warning).
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
             raise asyncio.TimeoutError()
         return task.result()
 

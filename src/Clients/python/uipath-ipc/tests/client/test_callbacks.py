@@ -620,3 +620,54 @@ async def test_handler_swallowing_cancel_still_times_out() -> None:
         assert resp.data is None  # the swallowed "late success" never leaks out
     finally:
         await conn.aclose()
+
+
+class IBounded(ABC):
+    @abstractmethod
+    async def Work(self) -> str: ...
+
+
+async def test_peer_cancellation_aborts_a_bounded_handler() -> None:
+    """Regression guard: with inbound_request_timeout set (the normal server
+    case → the bounded path in _run_handler), a peer CancellationRequest must
+    still cancel the in-flight async handler — it must NOT run orphaned to
+    completion. The bounded path uses asyncio.wait, which doesn't propagate
+    cancellation on its own, so _run_handler cancels the inner task explicitly."""
+    class _Impl:
+        def __init__(self) -> None:
+            self.observed_cancel = False
+            self.completed = False
+
+        async def Work(self) -> str:
+            try:
+                await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                self.observed_cancel = True
+                raise
+            self.completed = True
+            return "done"
+
+    impl = _Impl()
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(
+        reader, writer,
+        callbacks={"IBounded": (IBounded, impl)},  # type: ignore[arg-type]
+        inbound_request_timeout=5.0,  # bounded path, but the deadline is far off
+    )
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IBounded", method_name="Work", parameters=[], id="7",
+        )))
+        await asyncio.sleep(0.05)  # let the handler start
+        reader.feed_data(_cancellation_frame("7"))
+        frames = await _wait_for_frames(writer, count=1, timeout=1.0)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.error is not None
+        assert resp.error.type_name == "System.OperationCanceledException"
+        await asyncio.sleep(0.05)  # give a (wrongly) orphaned handler time to finish
+        assert impl.observed_cancel is True  # the handler WAS cancelled
+        assert impl.completed is False       # ...and did NOT run orphaned to completion
+    finally:
+        await conn.aclose()
