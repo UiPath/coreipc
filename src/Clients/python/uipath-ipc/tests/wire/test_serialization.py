@@ -162,10 +162,14 @@ def test_dataclass_missing_required_raises() -> None:
         from_wire({"first_name": "Ada"}, _Person)
 
 
-# --- pydantic (duck-typed; no real pydantic dependency) --------------------
+# --- no framework reflection: a pydantic-shaped class is NOT special-cased --
 
-class _FakePydantic:
-    """Stand-in exposing the pydantic v2 surface from_wire/to_wire detect."""
+class _ModelLike:
+    """Exposes the pydantic v2 surface (model_fields/model_validate/model_dump)
+    to prove the IPC layer does NOT sniff for it. Contract DTOs are plain JSON
+    values or dataclasses — nothing else — so the wire layer never reaches into
+    a consumer's modeling framework. Map IPC DTOs to your own validated/domain
+    types at your boundary instead."""
 
     model_fields = {"x": None}
 
@@ -173,17 +177,20 @@ class _FakePydantic:
         self.x = x
 
     @classmethod
-    def model_validate(cls, data: dict) -> "_FakePydantic":
+    def model_validate(cls, data: dict) -> "_ModelLike":
         return cls(data["x"])
 
     def model_dump(self, **_: object) -> dict:
         return {"x": self.x}
 
 
-def test_pydantic_duck_dispatch() -> None:
-    assert to_wire(_FakePydantic(7)) == {"x": 7}
-    out = from_wire({"x": 9}, _FakePydantic)
-    assert isinstance(out, _FakePydantic) and out.x == 9
+def test_pydantic_shaped_class_gets_no_special_handling() -> None:
+    # from_wire to a model-like hint returns the raw parsed value (no
+    # model_validate call); to_wire returns the instance untouched (no
+    # model_dump). A consumer that wants a real model maps it itself.
+    assert from_wire({"x": 9}, _ModelLike) == {"x": 9}
+    inst = _ModelLike(7)
+    assert to_wire(inst) is inst
 
 
 # --- passthrough / proxy gating --------------------------------------------

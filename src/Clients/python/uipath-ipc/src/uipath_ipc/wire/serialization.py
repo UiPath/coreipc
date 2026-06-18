@@ -8,12 +8,12 @@ module is the Python equivalent: encode those types on the way out, and
 materialize a parsed result into the contract's declared return type on the
 way back (the type comes from reflection on the method's return annotation).
 
-Dispatch is by type and covers, in order: a **pydantic model** (duck-typed
-via ``model_validate`` / ``model_dump`` — uipath-ipc never imports pydantic,
-so the consumer owns that dependency), a **dataclass**, an **enum**, a
+Dispatch is by type and covers, in order: a **dataclass**, an **enum**, a
 **scalar value type** (``bytes``/``UUID``/``datetime``/``Decimal``), a
 **typing container** (``Optional``/``list``/``tuple``/``set``/``dict``), else
-the value unchanged.
+the value unchanged. The contract vocabulary is deliberately narrow — plain
+JSON values and dataclasses — so the IPC layer never reaches into a consumer's
+modeling framework (pydantic, ORM entities, …); map those at your own boundary.
 
 `to_wire` is always safe to call — for a plain JSON value it's a no-op, so
 existing primitive/dict/list arguments are untouched. `from_wire` only
@@ -38,15 +38,6 @@ _UNION_ORIGINS: tuple[object, ...] = (
 )
 
 
-def _is_pydantic_model(t: object) -> bool:
-    """Duck-typed pydantic v2 BaseModel subclass — no import of pydantic."""
-    return (
-        isinstance(t, type)
-        and hasattr(t, "model_validate")
-        and hasattr(t, "model_fields")
-    )
-
-
 # --- outbound: argument -> JSON-able structure ----------------------------
 
 def to_wire(value: Any) -> Any:
@@ -54,8 +45,6 @@ def to_wire(value: Any) -> Any:
     .NET's wire forms for the value types JSON can't represent."""
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
-    if _is_pydantic_model(type(value)):
-        return value.model_dump(mode="json", by_alias=True)
     if isinstance(value, enum.Enum):
         return value.value
     if isinstance(value, (bytes, bytearray)):
@@ -206,8 +195,6 @@ def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -
         }
 
     if isinstance(hint, type):
-        if _is_pydantic_model(hint):
-            return hint.model_validate(parsed)
         if issubclass(hint, enum.Enum):
             return hint(parsed)
         if hint in (bytes, bytearray):

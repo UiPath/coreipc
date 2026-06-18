@@ -123,8 +123,8 @@ class _IpcProxy:
                 params.append(json.dumps(_message_wire(a)))
             else:
                 # to_wire encodes value types (bytes->base64, UUID/datetime/
-                # Decimal/enum/dataclass/pydantic) and is a no-op for plain
-                # JSON values, so existing primitive/dict args are unchanged.
+                # Decimal/enum/dataclass) and is a no-op for plain JSON values,
+                # so existing primitive/dict args are unchanged.
                 params.append(json.dumps(to_wire(a)))
         # Normalize a negative per-call timeout to the infinite sentinel: .NET
         # treats only -1ms (INFINITE_REQUEST_TIMEOUT = -0.001) as
@@ -181,8 +181,8 @@ class _IpcProxy:
         # like .NET handing Newtonsoft `typeof(TResult)`. Plain dataclasses and
         # dict/Any/unannotated returns pass through as raw parsed structures so
         # consumers that decode results themselves (e.g. via from_wire) are
-        # unaffected; pydantic models, enums, and scalar value types
-        # (bytes/UUID/datetime/Decimal) — and containers of those — are built.
+        # unaffected; enums and scalar value types (bytes/UUID/datetime/Decimal)
+        # — and containers of those — are built.
         return from_wire(
             parsed,
             _return_hint(self._contract, method_name),

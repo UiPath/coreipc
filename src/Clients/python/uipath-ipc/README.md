@@ -163,7 +163,7 @@ async with IpcClient(transport, before_connect=launch_server, before_call=log_ca
 
 ### Custom serialization (advanced)
 
-The proxy materializes results into a contract's declared return type via reflection — `bytes`, `UUID`, `datetime`, `Decimal`, enums, dataclasses, and pydantic models all round-trip (see [Features](#features) above). If you need to (de)serialize values yourself, the same primitives are exported as `from_wire(value, hint)` / `to_wire(value)`.
+The proxy materializes results into a contract's declared return type via reflection — `bytes`, `UUID`, `datetime`, `Decimal`, enums, and dataclasses all round-trip (see [Features](#features) above). If you need to (de)serialize values yourself, the same primitives are exported as `from_wire(value, hint)` / `to_wire(value)`. The contract vocabulary is intentionally narrow — plain JSON values and dataclasses — so the IPC layer stays decoupled from any modeling framework (pydantic, ORM entities, …); map IPC DTOs to your own validated/domain types at your boundary if you need them.
 
 ### Auto-reconnect
 
