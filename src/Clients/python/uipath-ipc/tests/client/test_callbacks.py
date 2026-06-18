@@ -578,3 +578,45 @@ async def test_one_way_handler_is_bounded_by_inbound_timeout() -> None:
         assert impl.completed is False  # cancelled by the timeout, never finished
     finally:
         await conn.aclose()
+
+
+# --- the request timeout is authoritative even if the handler swallows cancel -
+
+class ISwallow(ABC):
+    @abstractmethod
+    async def Work(self) -> str: ...
+
+
+async def test_handler_swallowing_cancel_still_times_out() -> None:
+    """A request/response handler that catches its CancelledError and returns a
+    value anyway must NOT convert a timeout into a late success — the deadline
+    is enforced regardless (the caller gets a System.TimeoutException, not the
+    handler's value). Mirrors .NET enforcing the deadline whatever the handler
+    does with the token."""
+    class _Impl:
+        async def Work(self) -> str:
+            try:
+                await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                return "late success"  # swallow the cancel and return anyway
+            return "done"
+
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(
+        reader, writer,
+        callbacks={"ISwallow": (ISwallow, _Impl())},  # type: ignore[arg-type]
+        inbound_request_timeout=0.1,
+    )
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="ISwallow", method_name="Work", parameters=[], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1, timeout=2.0)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.error is not None
+        assert resp.error.type_name == "System.TimeoutException"
+        assert resp.data is None  # the swallowed "late success" never leaks out
+    finally:
+        await conn.aclose()

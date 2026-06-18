@@ -48,10 +48,13 @@ class IpcServer:
         Args:
             transport: The listener (named pipe, TCP, ...).
             services: Maps contract type → instance. The instance's method
-                names must match the contract's; each may be ``async``. The
-                instance's class need NOT inherit from the contract
-                (duck-typed). The contract's ``__name__`` is the endpoint on
-                the wire — matching how `IpcClient.get_proxy` names calls.
+                names must match the contract's. The instance's class need NOT
+                inherit from the contract (duck-typed). The contract's
+                ``__name__`` is the endpoint on the wire — matching how
+                `IpcClient.get_proxy` names calls. Handler methods must be
+                ``async def``: a synchronous handler runs inline on the event
+                loop, blocking the whole connection for its duration and
+                escaping the request timeout.
             request_timeout: Server-side default bound for an inbound handler
                 when the caller's Request carries no explicit timeout (the
                 analog of .NET's ``IpcServer.RequestTimeout``); also the default

@@ -767,14 +767,30 @@ class IpcConnection:
         req: Request,
     ) -> object:
         """Invoke a request/response handler, bounding an awaited result by the
-        effective timeout (see `_effective_timeout`)."""
+        effective timeout (see `_effective_timeout`).
+
+        The deadline is enforced authoritatively: a handler that catches its
+        ``CancelledError`` and returns a value can't turn a timeout into a late
+        success (a plain ``wait_for`` would hand that value back). On expiry we
+        cancel and raise ``TimeoutError`` regardless of whether the handler
+        observed the cancellation — matching .NET, which enforces the deadline
+        no matter what the handler does with the token."""
         result = method(*pos, **kwargs)
         if not inspect.isawaitable(result):
+            # Sync handler: it already ran to completion inline on the event
+            # loop. Hosted handlers should be `async def` (see the IpcServer/
+            # IpcClient docs) — a sync one blocks the whole connection and isn't
+            # bounded by the timeout.
             return result
         effective = self._effective_timeout(req)
-        if effective is not None and effective > 0:
-            return await asyncio.wait_for(result, timeout=effective)
-        return await result
+        if effective is None or effective <= 0:
+            return await result
+        task = asyncio.ensure_future(result)
+        done, _pending = await asyncio.wait({task}, timeout=effective)
+        if task not in done:
+            task.cancel()  # best-effort; we do not trust it to propagate
+            raise asyncio.TimeoutError()
+        return task.result()
 
     async def _try_send_response(self, resp: Response) -> None:
         """Best-effort RESPONSE send; no-op if the connection tore down."""

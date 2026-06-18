@@ -17,6 +17,7 @@ import stat
 import sys
 import uuid
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 import pytest
 
@@ -353,6 +354,74 @@ async def test_server_round_trips_value_types() -> None:
             )
             u = uuid.UUID("550e8400-e29b-41d4-a716-446655440000")
             assert await asyncio.wait_for(svc.EchoGuid(u), timeout=5) == u
+
+
+# --- server-side dataclass / container materialization (e2e) ---------------
+
+@dataclass
+class _Point:
+    X: int
+    Y: int
+
+
+class IShapes(ABC):
+    @abstractmethod
+    async def Describe(self, p: _Point, tag: uuid.UUID) -> _Point: ...
+
+    @abstractmethod
+    async def CollectTags(self) -> set[dict]: ...
+
+
+class ShapesService:
+    """Impl is intentionally unannotated (duck-typed) — the dispatch plan comes
+    from the contract."""
+
+    def __init__(self) -> None:
+        self.seen_arg: object = None
+        self.seen_tag: object = None
+
+    async def Describe(self, p, tag):
+        self.seen_arg = p
+        self.seen_tag = tag
+        return _Point(X=p["X"] + 1, Y=p["Y"] + 1)
+
+    async def CollectTags(self):
+        # Python can't even build a set of dicts; return a list — the contract
+        # declares set[dict], so the proxy's return materialization must degrade.
+        return [{"k": 1}, {"k": 2}]
+
+
+async def test_e2e_dataclass_arg_is_raw_dict_while_value_type_is_decoded() -> None:
+    """Inbound materialization symmetry (the R3a fix), proven end-to-end over a
+    real client+server: a dataclass-typed handler arg arrives as a RAW DICT
+    (materialize_dataclasses=False, matching the result path), while a
+    value-type arg in the same call IS decoded; and a dataclass RESULT comes
+    back to the proxy caller as a raw dict (not a materialized instance)."""
+    svc = ShapesService()
+    server = IpcServer(TcpServerTransport("127.0.0.1", 0), {IShapes: svc})
+    async with server:
+        host, port = _tcp_endpoint(server)
+        async with IpcClient(TcpClientTransport(host, port)) as client:
+            proxy = client.get_proxy(IShapes)
+            tag = uuid.UUID("550e8400-e29b-41d4-a716-446655440000")
+            result = await asyncio.wait_for(proxy.Describe(_Point(1, 2), tag), timeout=5)
+            # Inbound: dataclass arg is a raw dict; value-type arg is decoded.
+            assert isinstance(svc.seen_arg, dict) and svc.seen_arg == {"X": 1, "Y": 2}
+            assert isinstance(svc.seen_tag, uuid.UUID) and svc.seen_tag == tag
+            # Outbound: dataclass result returns as a raw dict (symmetric).
+            assert isinstance(result, dict) and result == {"X": 2, "Y": 3}
+
+
+async def test_e2e_set_of_unhashable_result_degrades_to_list() -> None:
+    """A `set[<unhashable>]` return (declared `set[dict]`) can't be rebuilt as a
+    set on the proxy side — it must degrade to a list, not crash the call."""
+    server = IpcServer(TcpServerTransport("127.0.0.1", 0), {IShapes: ShapesService()})
+    async with server:
+        host, port = _tcp_endpoint(server)
+        async with IpcClient(TcpClientTransport(host, port)) as client:
+            proxy = client.get_proxy(IShapes)
+            got = await asyncio.wait_for(proxy.CollectTags(), timeout=5)
+            assert isinstance(got, list) and got == [{"k": 1}, {"k": 2}]
 
 
 # --- server-side request-timeout enforcement -------------------------------

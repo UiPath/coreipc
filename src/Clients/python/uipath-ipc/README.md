@@ -140,7 +140,7 @@ async with IpcClient(transport, callbacks={IClientCallback: EchoHandler()}) as c
     print(await tester.TriggerEcho("hi"))   # "echoed: hi"
 ```
 
-Callback methods may be `async def` or plain `def`. Exceptions raised inside the handler are wired back to the server as `RemoteException`. Server-initiated cancellations cancel the in-flight handler task.
+Callback methods must be `async def` (like service handlers): a synchronous handler runs inline on the event loop, blocking the whole connection for its duration and escaping the request timeout. Exceptions raised inside the handler are wired back to the server as `RemoteException`. Server-initiated cancellations cancel the in-flight handler task.
 
 ### Hooks
 

@@ -52,10 +52,12 @@ class IpcClient:
                 the wire.
             callbacks: Optional dict mapping contract type → instance for
                 server-to-client callbacks. The instance's method names
-                must match the contract's; each method may be ``async``.
-                The instance's class need NOT inherit from the contract
-                (duck-typed). The contract's ``__name__`` is what's used
-                as the endpoint on the wire.
+                must match the contract's. The instance's class need NOT
+                inherit from the contract (duck-typed). The contract's
+                ``__name__`` is what's used as the endpoint on the wire.
+                Handler methods must be ``async def``: a synchronous handler
+                runs inline on the event loop, blocking the whole connection
+                for its duration and escaping the request timeout.
             before_connect: Optional hook awaited before each (re)connect —
                 the analog of .NET's ``BeforeConnect``. Sync or async; if it
                 raises, the connect fails.
