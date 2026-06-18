@@ -185,17 +185,40 @@ async def test_malformed_payload_is_dropped_not_fatal(caplog) -> None:
             await asyncio.sleep(0)
             if "1" in conn._pending:
                 break
-        with caplog.at_level(logging.ERROR, logger="uipath_ipc.client.connection"):
+        with caplog.at_level(logging.WARNING, logger="uipath_ipc.client.connection"):
             reader.feed_data(_frame(MessageType.RESPONSE, b"not json"))
             for _ in range(10):
                 await asyncio.sleep(0)
         assert not conn.is_closed          # connection survived the bad frame
-        assert not send_task.done()        # the pending call was NOT failed
+        assert not send_task.done()        # unparseable id → caller not failed
         assert any("dropping malformed" in r.message for r in caplog.records)
         # A subsequent valid response still completes the call.
         reader.feed_data(_response_frame(Response(request_id="1", data='"ok"')))
         resp = await asyncio.wait_for(send_task, timeout=1.0)
         assert resp.data == '"ok"'
+    finally:
+        await conn.aclose()
+
+
+async def test_malformed_response_with_recoverable_id_fails_that_caller() -> None:
+    """A malformed RESPONSE whose RequestId is still readable fails THAT pending
+    call (so it doesn't hang silently), while the connection stays up."""
+    conn, reader, _writer = await _make_connection()
+    try:
+        send_task = asyncio.create_task(conn.send_request(
+            Request(endpoint="X", method_name="Y", parameters=[], id="1")
+        ))
+        for _ in range(10):
+            await asyncio.sleep(0)
+            if "1" in conn._pending:
+                break
+        # Valid JSON, RequestId recoverable, but a truthy-yet-malformed nested
+        # Error (missing required Message) → from_dict raises a KeyError AFTER
+        # the id is readable, so the handler fails that exact caller.
+        reader.feed_data(_frame(MessageType.RESPONSE, b'{"RequestId":"1","Error":{"X":1}}'))
+        with pytest.raises(Exception):
+            await asyncio.wait_for(send_task, timeout=1.0)
+        assert not conn.is_closed  # one bad frame did NOT kill the connection
     finally:
         await conn.aclose()
 

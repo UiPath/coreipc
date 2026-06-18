@@ -68,11 +68,18 @@ def to_wire(value: Any) -> Any:
         # are left as isoformat produces them.
         text = value.isoformat()
         return text[:-6] + "Z" if text.endswith("+00:00") else text
+    if isinstance(value, (_datetime.date, _datetime.time)):
+        # date -> 'YYYY-MM-DD', time -> 'HH:MM:SS[.ffffff]' (.NET DateOnly /
+        # TimeOnly). datetime already matched above, so this is date/time only.
+        return value.isoformat()
     if isinstance(value, Decimal):
-        # As a string, not float(): float() loses precision and renders large
-        # values in scientific notation, which .NET's decimal parser rejects.
-        # Newtonsoft reads a JSON string into a decimal fine; from_wire decodes
-        # both a JSON string and a JSON number back to Decimal.
+        if not value.is_finite():
+            # NaN/Infinity have no .NET decimal representation — fail fast and
+            # locally rather than emitting "NaN"/"Infinity" the peer rejects.
+            raise ValueError(f"cannot serialize non-finite Decimal {value!r}")
+        # As a string, not float(): preserves full precision. Newtonsoft reads a
+        # JSON string into a decimal (it accepts scientific notation too);
+        # from_wire decodes a JSON string or a number back to Decimal.
         return str(value)
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return {
@@ -82,7 +89,10 @@ def to_wire(value: Any) -> Any:
     if isinstance(value, (list, tuple, set, frozenset)):
         return [to_wire(v) for v in value]
     if isinstance(value, dict):
-        return {k: to_wire(v) for k, v in value.items()}
+        # Recurse keys too — a dict keyed by UUID/datetime/enum would otherwise
+        # TypeError in json.dumps (JSON keys are strings; to_wire stringifies
+        # those value types).
+        return {to_wire(k): to_wire(v) for k, v in value.items()}
     return value
 
 
@@ -179,8 +189,15 @@ def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -
                 from_wire(x, args[0], materialize_dataclasses=materialize_dataclasses)
                 for x in parsed
             ]
-        # Rebuild the declared container type (list stays a list).
-        return items if origin is list else origin(items)
+        # Rebuild the declared container type (list stays a list). A set /
+        # frozenset of unhashable elements (set[dict], set[SomeDataclass])
+        # can't be rebuilt — degrade to a list rather than crash the call.
+        if origin is list:
+            return items
+        try:
+            return origin(items)
+        except TypeError:
+            return items
     if origin is dict and isinstance(parsed, dict):
         vt = args[1] if len(args) == 2 else Any
         return {
@@ -201,6 +218,10 @@ def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -
             return UUID(parsed)
         if hint is _datetime.datetime:
             return _parse_datetime(parsed)
+        if hint is _datetime.date:
+            return _datetime.date.fromisoformat(parsed)
+        if hint is _datetime.time:
+            return _datetime.time.fromisoformat(parsed)
         if hint is Decimal:
             return Decimal(str(parsed))
         if materialize_dataclasses and dataclasses.is_dataclass(hint):

@@ -159,6 +159,17 @@ async def test_tcp_connection_count_tracks_clients() -> None:
         await _wait_until(lambda: server.connection_count == 0)
 
 
+# --- registration validation ----------------------------------------------
+
+def test_duplicate_endpoint_name_raises() -> None:
+    """Two contracts whose ``__name__`` collides would map to the same wire
+    endpoint (last-wins, silently shadowing one). Reject at construction."""
+    c1 = type("IClash", (), {})
+    c2 = type("IClash", (), {})
+    with pytest.raises(ValueError, match="duplicate endpoint name"):
+        IpcServer(TcpServerTransport("127.0.0.1", 0), {c1: object(), c2: object()})
+
+
 # --- lifecycle ------------------------------------------------------------
 
 async def test_start_is_idempotent() -> None:
@@ -248,8 +259,11 @@ async def test_aclose_closes_live_connections() -> None:
 # --- handler-initiated reach-back (Message.client.get_callback) -----------
 
 class IGreeter(ABC):
+    # The Message param is declared on the CONTRACT (as .NET interfaces do): the
+    # dispatch plan is built from the contract, so a reach-back Message must be
+    # part of it (the client simply doesn't pass one).
     @abstractmethod
-    async def GreetVia(self, name: str) -> str: ...
+    async def GreetVia(self, name: str, m: Message) -> str: ...
 
 
 class IClientName(ABC):

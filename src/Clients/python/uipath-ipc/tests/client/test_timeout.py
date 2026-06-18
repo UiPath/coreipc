@@ -157,3 +157,27 @@ async def test_request_timeout_in_seconds_field_is_zero_by_default() -> None:
         # Tidy up
         t.reader.feed_data(_response_frame(Response(request_id="1", data="3.0")))
         await asyncio.wait_for(task, timeout=1.0)
+
+
+async def test_negative_timeout_is_clamped_to_infinite_sentinel() -> None:
+    """A negative request_timeout means 'infinite' (.NET Timeout.InfiniteTimeSpan).
+    Only -1ms (-0.001) is the recognized sentinel; other negatives must be
+    normalized to it on the wire, and the call must NOT be bounded by an instant
+    wait_for(<negative>)."""
+    t = _FakeTransport()
+    async with IpcClient(t, request_timeout=-5.0) as client:
+        svc = client.get_proxy(IComputingService)
+        task = asyncio.create_task(svc.AddFloats(1.0, 2.0))
+        for _ in range(50):
+            await asyncio.sleep(0)
+            if _split_frames(bytes(t.writer.buffer)):
+                break
+
+        frames = _split_frames(bytes(t.writer.buffer))
+        req_payload = json.loads(frames[0][1].decode("utf-8"))
+        assert req_payload["TimeoutInSeconds"] == -0.001  # not -5.0
+        assert not task.done()  # negative = infinite, not an instant timeout
+
+        # Tidy up
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="3.0")))
+        await asyncio.wait_for(task, timeout=1.0)

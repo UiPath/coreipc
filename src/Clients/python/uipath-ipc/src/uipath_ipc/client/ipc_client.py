@@ -77,7 +77,13 @@ class IpcClient:
         self._callbacks: dict[str, tuple[type, object]] = {}
         if callbacks:
             for contract_type, instance in callbacks.items():
-                self._callbacks[contract_type.__name__] = (contract_type, instance)
+                name = contract_type.__name__
+                if name in self._callbacks:
+                    raise ValueError(
+                        f"duplicate callback endpoint name {name!r}: two "
+                        f"contracts share __name__ and would collide"
+                    )
+                self._callbacks[name] = (contract_type, instance)
 
     async def _ensure_connected(self) -> tuple[IpcConnection, bool]:
         """Return (connection, created); created is True iff this call opened a
@@ -127,11 +133,21 @@ class IpcClient:
         return cast(T, _IpcProxy(self, contract))
 
     async def aclose(self) -> None:
-        # Take the connect lock so close can't race an in-flight connect (which
-        # would otherwise complete and assign a live connection *after* close
-        # returned — a leak / use-after-close).
+        # Serialize with an in-flight connect so close can't be undone by a dial
+        # that completes after it returns. Set _closed first (so _ensure_connected
+        # bails under the lock), then cancel the connecting task — otherwise
+        # aclose() would block forever behind a slow/hung connect that holds
+        # _connect_lock with no deadline of its own (request_timeout=None).
+        self._closed = True
+        ct = self._connecting_task
+        if ct is not None and ct is asyncio.current_task():
+            raise RuntimeError(
+                "aclose() must not be called from a before_connect hook on the "
+                "same IpcClient (it runs while the connection is being established)"
+            )
+        if ct is not None:
+            ct.cancel()  # unblock the dial so we can take the lock promptly
         async with self._connect_lock:
-            self._closed = True
             if self._connection is not None:
                 await self._connection.aclose()
                 self._connection = None

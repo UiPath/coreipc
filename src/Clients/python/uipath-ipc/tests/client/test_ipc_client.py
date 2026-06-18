@@ -427,3 +427,13 @@ async def test_message_request_timeout_zero_keeps_client_default() -> None:
         assert req["TimeoutInSeconds"] == 2.0  # not 0 — the default was not clobbered
         t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
         await asyncio.wait_for(task, timeout=1.0)
+
+
+async def test_duplicate_callback_endpoint_name_raises() -> None:
+    """Two callback contracts whose ``__name__`` collides would map to the same
+    wire endpoint (one silently shadowing the other). Reject at construction.
+    (async so _FakeTransport's StreamReader has a running loop.)"""
+    c1 = type("IClash", (), {})
+    c2 = type("IClash", (), {})
+    with pytest.raises(ValueError, match="duplicate callback endpoint name"):
+        IpcClient(_FakeTransport(), callbacks={c1: object(), c2: object()})

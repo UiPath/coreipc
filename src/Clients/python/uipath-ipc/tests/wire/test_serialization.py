@@ -112,6 +112,34 @@ def test_multi_member_union_passes_through_undecoded() -> None:
     assert from_wire(_GUID, typing.Union[UUID, int]) == _GUID  # not decoded
 
 
+def test_set_of_unhashable_degrades_to_list_not_crash() -> None:
+    # set[<unhashable>] can't be rebuilt; degrade to a list rather than raise.
+    got = from_wire([{"a": 1}, {"a": 2}], set[dict])
+    assert isinstance(got, list) and got == [{"a": 1}, {"a": 2}]
+
+
+def test_date_and_time_round_trip() -> None:
+    d = dt.date(2026, 6, 18)
+    assert to_wire(d) == "2026-06-18"
+    assert from_wire("2026-06-18", dt.date) == d
+    t = dt.time(10, 30, 0)
+    assert to_wire(t) == "10:30:00"
+    assert from_wire("10:30:00", dt.time) == t
+
+
+def test_non_finite_decimal_rejected() -> None:
+    with pytest.raises(ValueError):
+        to_wire(Decimal("NaN"))
+    with pytest.raises(ValueError):
+        to_wire(Decimal("Infinity"))
+
+
+def test_dict_with_value_type_keys_stringifies() -> None:
+    # A dict keyed by UUID/datetime would TypeError in json.dumps without
+    # recursing keys; to_wire stringifies them (JSON keys are strings).
+    assert to_wire({UUID(_GUID): 1}) == {_GUID: 1}
+
+
 # --- dataclass (public from_wire) ------------------------------------------
 
 @dataclasses.dataclass

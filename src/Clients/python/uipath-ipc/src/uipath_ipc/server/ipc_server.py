@@ -66,10 +66,15 @@ class IpcServer:
         self._transport = transport
         # Translate contract-type keys to endpoint-name keys once; the
         # connection dispatches incoming requests by endpoint name.
-        self._services: dict[str, tuple[type, object]] = {
-            contract.__name__: (contract, instance)
-            for contract, instance in services.items()
-        }
+        self._services: dict[str, tuple[type, object]] = {}
+        for contract, instance in services.items():
+            name = contract.__name__
+            if name in self._services:
+                raise ValueError(
+                    f"duplicate endpoint name {name!r}: two contracts share "
+                    f"__name__ (the wire endpoint) and would collide"
+                )
+            self._services[name] = (contract, instance)
         self._request_timeout = request_timeout
         self._before_call = before_call
         self._handle: ServerHandle | None = None

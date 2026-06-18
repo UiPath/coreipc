@@ -1,7 +1,7 @@
 [project]
 name = "uipath-ipc"
 version = "0.2.0"
-description = "Python client for UiPath.Ipc — an interface-based RPC framework over Named Pipes, TCP, and WebSockets."
+description = "Python client and server for UiPath.Ipc — an interface-based RPC framework over Named Pipes and TCP."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [

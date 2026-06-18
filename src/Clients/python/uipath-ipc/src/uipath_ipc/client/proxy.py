@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, get_type_hints
 
 from ..errors import RemoteException
 from ..hooks import CallInfo
-from ..message import Message
+from ..message import INFINITE_REQUEST_TIMEOUT, Message
 from ..wire import Request, Response, from_wire, to_wire
 
 if TYPE_CHECKING:
@@ -18,16 +18,19 @@ if TYPE_CHECKING:
 
 
 # Cache of a contract method's resolved return annotation, keyed weakly by the
-# function so reflection runs once per method. `None` means "no usable hint".
+# function so reflection runs once per method.
 _return_hint_cache: "weakref.WeakKeyDictionary[Any, Any]" = weakref.WeakKeyDictionary()
+#: Distinct cache-miss sentinel so a genuinely-cached `None` (a method with no
+#: return annotation) is a hit, not re-resolved via get_type_hints every call.
+_NO_HINT = object()
 
 
 def _return_hint(contract: type, method_name: str) -> Any:
     func = inspect.getattr_static(contract, method_name, None)
     if func is None:
         return None
-    cached = _return_hint_cache.get(func)
-    if cached is not None:
+    cached = _return_hint_cache.get(func, _NO_HINT)
+    if cached is not _NO_HINT:
         return cached
     try:
         hint = get_type_hints(func).get("return")
@@ -109,6 +112,11 @@ class _IpcProxy:
                 # Decimal/enum/dataclass/pydantic) and is a no-op for plain
                 # JSON values, so existing primitive/dict args are unchanged.
                 params.append(json.dumps(to_wire(a)))
+        # Normalize any negative timeout to the infinite sentinel: .NET treats
+        # only -1ms (INFINITE_REQUEST_TIMEOUT = -0.001) as Timeout.InfiniteTimeSpan
+        # and throws on other negatives (CancelAfter(FromSeconds(-5))).
+        if timeout is not None and timeout < 0:
+            timeout = INFINITE_REQUEST_TIMEOUT
         async def _connect_and_send() -> Response:
             # The dial shares the call deadline (see below) — a black-holed or
             # unreachable host no longer escapes `request_timeout` via an

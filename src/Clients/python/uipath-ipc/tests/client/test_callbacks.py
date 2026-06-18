@@ -12,6 +12,7 @@ import pytest
 
 from uipath_ipc.client import IpcConnection
 from uipath_ipc.errors import RemoteException
+from uipath_ipc.message import Message
 from uipath_ipc.wire import (
     CancellationRequest,
     MessageType,
@@ -500,5 +501,80 @@ async def test_server_cancellation_aborts_in_flight_callback() -> None:
 
         assert resp.error is not None
         assert resp.error.type_name == "System.OperationCanceledException"
+    finally:
+        await conn.aclose()
+
+
+# --- dispatch plan derives from the contract, not the impl (R1) ------------
+
+class IAnnotatedContract(ABC):
+    @abstractmethod
+    async def Greet(self, name: str, m: Message) -> str: ...
+
+
+class _UnannotatedImpl:
+    """Legal duck-typed impl that omits the contract's annotations entirely."""
+
+    async def Greet(self, name, m):  # no type hints, no Message annotation
+        return f"hi {name} m={m.client is not None}"
+
+
+async def test_plan_from_contract_handles_unannotated_impl() -> None:
+    """The dispatch plan (Message injection, decode types, one-way) must come
+    from the CONTRACT — an unannotated impl would otherwise lose Message
+    injection (m would bind to the raw wire dict and m.client would blow up)."""
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(reader, writer, callbacks={"IAnnotatedContract": (IAnnotatedContract, _UnannotatedImpl())})  # type: ignore[arg-type]
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IAnnotatedContract", method_name="Greet", parameters=['"bob"'], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) == "hi bob m=True"  # Message injected
+    finally:
+        await conn.aclose()
+
+
+# --- one-way handlers are bounded by the request timeout (R7) ---------------
+
+class IOneWaySlow(ABC):
+    @abstractmethod
+    async def Slow(self) -> None: ...
+
+
+async def test_one_way_handler_is_bounded_by_inbound_timeout() -> None:
+    """A one-way handler runs detached after the ack but is still bounded by the
+    effective timeout (it can't run unbounded while a value-returning one is)."""
+    class _Impl:
+        def __init__(self) -> None:
+            self.started = asyncio.Event()
+            self.completed = False
+
+        async def Slow(self) -> None:
+            self.started.set()
+            await asyncio.sleep(5)
+            self.completed = True
+
+    impl = _Impl()
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(
+        reader, writer,
+        callbacks={"IOneWaySlow": (IOneWaySlow, impl)},  # type: ignore[arg-type]
+        inbound_request_timeout=0.1,
+    )
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IOneWaySlow", method_name="Slow", parameters=[], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        assert Response.from_json(frames[0][1].decode("utf-8")).data == ""  # immediate ack
+        await asyncio.wait_for(impl.started.wait(), timeout=1.0)
+        await asyncio.sleep(0.3)  # past the 0.1s bound
+        assert impl.completed is False  # cancelled by the timeout, never finished
     finally:
         await conn.aclose()

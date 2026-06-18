@@ -127,7 +127,13 @@ _MISSING = object()
 
 def _dispatch_plan(method: Callable[..., object]) -> _DispatchPlan:
     """Compute (and cache) how to bind wire args onto a handler's parameters,
-    and whether it's a one-way (`-> None`) method."""
+    and whether it's a one-way (`-> None`) method.
+
+    Pass the CONTRACT method (an unbound function, `self` included): the impl is
+    duck-typed and may omit annotations, so the plan — Message injection,
+    one-way, and per-arg decode types — must come from the contract, not the
+    bound instance method. A leading ``self``/``cls`` is skipped.
+    """
     func = getattr(method, "__func__", method)
     cached = _dispatch_plan_cache.get(func)
     if cached is not None:
@@ -138,7 +144,9 @@ def _dispatch_plan(method: Callable[..., object]) -> _DispatchPlan:
     except Exception:
         hints = {}
     params: list[_ParamPlan] = []
-    for name, param in inspect.signature(method).parameters.items():
+    for i, (name, param) in enumerate(inspect.signature(method).parameters.items()):
+        if i == 0 and name in ("self", "cls"):
+            continue  # unbound contract function carries the receiver param
         hint = hints.get(name, param.annotation)
         if hint is inspect.Parameter.empty:
             hint = None
@@ -166,6 +174,19 @@ def _dispatch_plan(method: Callable[..., object]) -> _DispatchPlan:
     except TypeError:
         pass  # builtins / unweakreferenceable callables: just don't cache
     return result
+
+
+def _peek_wire_id(payload: bytes, key: str) -> str | None:
+    """Best-effort recovery of a correlation id (``RequestId`` for a Response,
+    ``Id`` for a Request) from a frame whose full DTO failed to parse — so the
+    correlated call can be failed (not left hanging) or the sender answered.
+    Returns None if the payload isn't even parseable JSON with that key."""
+    try:
+        obj = json.loads(payload.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    rid = obj.get(key) if isinstance(obj, dict) else None
+    return rid if isinstance(rid, str) else None
 
 
 def _format_traceback(exc: BaseException) -> str:
@@ -447,8 +468,9 @@ class IpcConnection:
             await self._send_frame(
                 MessageType.CANCELLATION_REQUEST, payload, teardown_on_timeout=False
             )
-        except Exception:
-            pass
+        except Exception as ex:
+            # Best-effort, but don't vanish silently — .NET logs this too.
+            _logger.debug("cancellation send for %s failed: %r", request_id, ex)
 
     # --- receive loop ------------------------------------------------------
 
@@ -457,27 +479,23 @@ class IpcConnection:
             while not self._closed:
                 msg_type, payload = await read_frame(self._reader)
                 if msg_type == MessageType.RESPONSE:
-                    handler = self._handle_response
+                    self._handle_response(payload)
                 elif msg_type == MessageType.REQUEST:
-                    handler = self._handle_incoming_request
+                    self._handle_incoming_request(payload)
                 elif msg_type == MessageType.CANCELLATION_REQUEST:
-                    handler = self._handle_incoming_cancellation
+                    self._handle_incoming_cancellation(payload)
                 else:
                     # UPLOAD_REQUEST / DOWNLOAD_RESPONSE (streams) are out of
                     # scope; their frame is followed by a length + raw bytes we
                     # can't consume, so fail closed instead of desyncing.
                     raise ValueError(f"unsupported message type {msg_type!r}")
-                # Isolate a bad *content* payload (invalid JSON, missing field):
-                # read_frame already consumed the whole length-prefixed frame, so
-                # the stream stays aligned — log and drop this one frame rather
-                # than failing every in-flight call and tearing the connection
-                # down. (Framing/transport errors below still tear it down.)
-                try:
-                    handler(payload)
-                except Exception:
-                    _logger.exception(
-                        "dropping malformed %s frame", msg_type.name
-                    )
+                # NB: each handler isolates a malformed *content* payload itself
+                # — read_frame already consumed the whole length-prefixed frame,
+                # so the stream stays aligned; the handler logs it, fails just
+                # the correlated call (RESPONSE) or answers the sender (REQUEST),
+                # and the connection survives. An *internal* bug escaping a
+                # handler instead propagates here and tears the connection down,
+                # surfacing it rather than masking it as a "malformed frame".
         except asyncio.CancelledError:
             raise
         except (asyncio.IncompleteReadError, ConnectionResetError, OSError) as ex:
@@ -498,7 +516,19 @@ class IpcConnection:
             self._teardown()
 
     def _handle_response(self, payload: bytes) -> None:
-        resp = Response.from_json(payload.decode("utf-8"))
+        try:
+            resp = Response.from_json(payload.decode("utf-8"))
+        except (ValueError, KeyError, UnicodeDecodeError) as ex:
+            # Malformed body: recover the id so the correlated waiter fails
+            # fast instead of hanging silently until its timeout (the
+            # connection stays up). If the id can't be recovered, the call
+            # must rely on its own deadline.
+            rid = _peek_wire_id(payload, "RequestId")
+            _logger.warning("dropping malformed RESPONSE frame (id=%s): %r", rid, ex)
+            fut = self._pending.get(rid) if rid is not None else None
+            if fut is not None and not fut.done():
+                fut.set_exception(ex)
+            return
         fut = self._pending.get(resp.request_id)
         if fut is not None and not fut.done():
             fut.set_result(resp)
@@ -509,7 +539,22 @@ class IpcConnection:
         Runs in a background task so the receive loop stays free for the
         next frame.
         """
-        req = Request.from_json(payload.decode("utf-8"))
+        try:
+            req = Request.from_json(payload.decode("utf-8"))
+        except (ValueError, KeyError, UnicodeDecodeError) as ex:
+            # Malformed body: recover the id and answer the sender with an Error
+            # so it doesn't hang; otherwise drop the frame (connection stays up).
+            rid = _peek_wire_id(payload, "Id")
+            _logger.warning("dropping malformed REQUEST frame (id=%s): %r", rid, ex)
+            if rid is not None:
+                asyncio.create_task(self._try_send_response(Response(
+                    request_id=rid,
+                    error=Error(
+                        message=f"malformed request: {ex}",
+                        type_name="System.IO.InvalidDataException",
+                    ),
+                )))
+            return
         task = asyncio.create_task(self._invoke_callback(req))
         self._incoming_handlers[req.id] = task
         task.add_done_callback(
@@ -518,7 +563,11 @@ class IpcConnection:
 
     def _handle_incoming_cancellation(self, payload: bytes) -> None:
         """Cancel an in-flight incoming-request handler by id."""
-        cancel = CancellationRequest.from_json(payload.decode("utf-8"))
+        try:
+            cancel = CancellationRequest.from_json(payload.decode("utf-8"))
+        except (ValueError, KeyError, UnicodeDecodeError) as ex:
+            _logger.warning("dropping malformed CANCELLATION frame: %r", ex)
+            return
         task = self._incoming_handlers.get(cancel.request_id)
         if task is not None and not task.done():
             task.cancel()
@@ -570,7 +619,11 @@ class IpcConnection:
             elif tag == "wire":
                 nxt = next(wire, _MISSING)
                 if nxt is not _MISSING:
-                    pos.append(from_wire(nxt, hint))
+                    # materialize_dataclasses=False to stay consistent with the
+                    # result path (proxy decodes dataclasses to dicts both ways);
+                    # value types still materialize. Avoids a dataclass arg being
+                    # a loud missing-field crash here yet silent on a result.
+                    pos.append(from_wire(nxt, hint, materialize_dataclasses=False))
                 # else: out of wire args — let this param use its default, but
                 # keep scanning so later Message params are still injected.
             # "skip": **kwargs / non-Message keyword-only — not fillable here.
@@ -607,7 +660,10 @@ class IpcConnection:
                     f"{req.method_name!r}"
                 )
             method = getattr(handler, req.method_name)
-            plan = _dispatch_plan(method)
+            # Plan from the CONTRACT method (cmethod), not the duck-typed impl:
+            # an unannotated impl would otherwise lose Message injection,
+            # one-way detection, and per-arg decode types.
+            plan = _dispatch_plan(cmethod)
             # Each parameter is an individually JSON-encoded string (wire gotcha).
             args = [json.loads(p) for p in req.parameters]
             # BeforeIncomingCall hook (server side); raising aborts the call
@@ -671,15 +727,37 @@ class IpcConnection:
             try:
                 result = method(*pos, **kwargs)
                 if inspect.isawaitable(result):
-                    await result
+                    # Bound by the same effective timeout as request/response
+                    # handlers (the ack already went out, so on expiry we just
+                    # log rather than reply) — so a one-way handler can't run
+                    # unbounded while a value-returning one would be cut off.
+                    effective = self._effective_timeout(req)
+                    if effective is not None and effective > 0:
+                        await asyncio.wait_for(result, timeout=effective)
+                    else:
+                        await result
             except (asyncio.CancelledError, SystemExit, KeyboardInterrupt):
                 # Cancellation tears the task down; fatal signals must still
                 # propagate (process termination) even for fire-and-forget.
                 raise
             except BaseException:
                 _logger.exception(
-                    "one-way %s.%s failed", req.endpoint, req.method_name
+                    "one-way %s.%s failed (or timed out)", req.endpoint, req.method_name
                 )
+
+    def _effective_timeout(self, req: Request) -> float | None:
+        """The handler deadline: the wire `TimeoutInSeconds` if set, else the
+        server default. ``None``/non-positive means no bound; a negative wire
+        value (`.NET` ``Timeout.InfiniteTimeSpan``) means infinite.
+
+        NOTE: only bounds *awaitable* (``async def``) handlers — a plain `def`
+        handler runs to completion inline (and blocks the event loop); hosted
+        handlers should be ``async`` (mirrors .NET requiring a `Task` return)."""
+        return (
+            req.timeout_in_seconds
+            if req.timeout_in_seconds is not None
+            else self._inbound_request_timeout
+        )
 
     async def _run_handler(
         self,
@@ -689,15 +767,11 @@ class IpcConnection:
         req: Request,
     ) -> object:
         """Invoke a request/response handler, bounding an awaited result by the
-        effective timeout: the wire `TimeoutInSeconds` if set, else the server
-        default; ``None``/non-positive means no bound, a negative wire value
-        (`.NET` ``Timeout.InfiniteTimeSpan``) means infinite."""
+        effective timeout (see `_effective_timeout`)."""
         result = method(*pos, **kwargs)
         if not inspect.isawaitable(result):
             return result
-        effective = req.timeout_in_seconds
-        if effective is None:
-            effective = self._inbound_request_timeout
+        effective = self._effective_timeout(req)
         if effective is not None and effective > 0:
             return await asyncio.wait_for(result, timeout=effective)
         return await result

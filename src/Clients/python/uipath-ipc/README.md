@@ -1,12 +1,12 @@
 # uipath-ipc
 
-Python **client** for [UiPath.Ipc](https://github.com/UiPath/coreipc) — an interface-based RPC framework with .NET server and client, TypeScript client, and now Python client.
+Python **client and server** for [UiPath.Ipc](https://github.com/UiPath/coreipc) — an interface-based RPC framework with .NET server and client, TypeScript client, and now a Python client and server.
 
-This package speaks the same wire protocol as the .NET package, so a Python client can talk to any UiPath.Ipc server.
+This package speaks the same wire protocol as the .NET package, so a Python client can talk to any UiPath.Ipc server (and a Python `IpcServer` can host services for any client).
 
 ## Status
 
-- **Scope**: client only. Bidirectional callbacks are supported; a server side and stream uploads/downloads are not.
+- **Scope**: client (`IpcClient`) and server (`IpcServer`), with bidirectional callbacks. Stream uploads/downloads are not implemented.
 - **Transports**: Named Pipe, TCP. (WebSocket is on the roadmap.)
 - **Python**: 3.10+.
 
@@ -183,11 +183,11 @@ TcpClientTransport(host="127.0.0.1", port=5050)
 
 Custom transports are easy: subclass `ClientTransport` and implement `connect()`.
 
-## What's NOT in this client (yet)
+## What's NOT implemented (yet)
 
-- **Server side** — a Python server isn't planned for the initial port.
 - **Streams** (UploadRequest / DownloadResponse message types). Add on demand.
 - **WebSocket transport**. Pending; will be an optional extra.
+- **Configurable max message size** — the 2 MB cap (matching .NET's default) is fixed; .NET's `MaxReceivedMessageSizeInMegabytes` knob isn't exposed yet.
 
 ## Development
 
