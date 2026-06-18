@@ -87,6 +87,29 @@ def to_wire(value: Any) -> Any:
 
 # --- inbound: parsed JSON -> declared type --------------------------------
 
+def _normalize_dt_fraction(text: str) -> str:
+    """Rewrite a datetime string's fractional seconds to EXACTLY 6 digits.
+
+    .NET (Newtonsoft, ``FFFFFFF``) trims trailing zeros, so the wire carries a
+    variable-length fraction (1–7 digits). Python 3.10's ``fromisoformat`` is
+    strict — it accepts only a 3- or 6-digit fraction — so any other length
+    (1/2/4/5/7) must be normalized: over-precision is truncated, short fractions
+    are zero-padded, both to 6 digits (which 3.10 accepts). No-op if there's no
+    fraction. The offset (``+hh:mm`` / ``-hh:mm``, already de-``Z``'d) is
+    preserved. On 3.11+ this is only reached for 7-digit fractions; on 3.10 it
+    handles every non-3/6 length."""
+    head, dot, tail = text.partition(".")
+    if not dot:
+        return text
+    frac, tz = tail, ""
+    for sign in ("+", "-"):
+        if sign in frac:
+            frac, _, off = frac.partition(sign)
+            tz = sign + off
+            break
+    return f"{head}.{(frac + '000000')[:6]}{tz}"
+
+
 def _parse_datetime(value: Any) -> Any:
     if not isinstance(value, str):
         return value
@@ -96,19 +119,9 @@ def _parse_datetime(value: Any) -> Any:
     try:
         return _datetime.datetime.fromisoformat(text)
     except ValueError:
-        # Trim sub-microsecond fractional digits (.NET emits up to 7).
-        if "." in text:
-            head, _, tail = text.partition(".")
-            frac = tail
-            tz = ""
-            for sign in ("+", "-"):
-                if sign in frac:
-                    frac, _, off = frac.partition(sign)
-                    tz = sign + off
-                    break
-            head = f"{head}.{frac[:6]}{tz}"
-            return _datetime.datetime.fromisoformat(head)
-        raise
+        if "." not in text:
+            raise  # not a fractional-seconds problem — a genuinely bad value
+        return _datetime.datetime.fromisoformat(_normalize_dt_fraction(text))
 
 
 def _from_wire_dataclass(cls: type, data: Any) -> Any:

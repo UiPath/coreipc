@@ -110,6 +110,11 @@ class _Service:
         self.messages.append(m)
         return str(value)
 
+    async def Variadic(self, first: int, *rest: int) -> list:
+        # *args must absorb ALL remaining wire arguments (the VAR_POSITIONAL
+        # "varargs" dispatch branch — pos.extend(wire)).
+        return [first, *rest]
+
 
 def _make_connection(
     svc: _Service,
@@ -356,6 +361,22 @@ async def test_extra_trailing_wire_arg_is_ignored() -> None:
         frames = await _wait_for_frames(writer, count=1)
         resp = Response.from_json(frames[0][1].decode("utf-8"))
         assert json.loads(resp.data) == 7
+    finally:
+        await conn.aclose()
+
+
+async def test_varargs_handler_consumes_remaining_wire_args() -> None:
+    """A `*args` handler captures ALL trailing wire arguments (the complement of
+    the ignore path above) — the VAR_POSITIONAL "varargs" dispatch branch."""
+    svc = _Service()
+    conn, reader, writer = _make_connection(svc)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="ISvc", method_name="Variadic", parameters=["1", "2", "3", "4"], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) == [1, 2, 3, 4]  # first=1, *rest=(2,3,4)
     finally:
         await conn.aclose()
 

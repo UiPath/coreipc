@@ -13,6 +13,7 @@ from uuid import UUID
 import pytest
 
 from uipath_ipc.wire import from_wire, to_wire
+from uipath_ipc.wire.serialization import _normalize_dt_fraction
 
 
 # --- scalar value types ----------------------------------------------------
@@ -48,6 +49,57 @@ def test_datetime_round_trip_and_z_suffix() -> None:
     # .NET emits up to 7 fractional digits; we trim to microseconds
     got = from_wire("2026-06-12T10:30:00.1234567+00:00", dt.datetime)
     assert got.microsecond == 123456
+
+
+@pytest.mark.parametrize("frac,expected_us", [
+    ("5", 500000),        # 1 digit  — Newtonsoft trims trailing zeros
+    ("12", 120000),       # 2 digits
+    ("123", 123000),      # 3 digits (3.10 accepts natively)
+    ("1234", 123400),     # 4 digits
+    ("12345", 123450),    # 5 digits
+    ("123456", 123456),   # 6 digits (3.10 accepts natively)
+    ("1234567", 123456),  # 7 digits — over-precision, truncated
+])
+def test_datetime_variable_fraction_lengths(frac: str, expected_us: int) -> None:
+    """Every .NET fractional length must parse to the right microsecond — incl.
+    the 1/2/4/5-digit lengths that Python 3.10's strict fromisoformat rejects."""
+    got = from_wire(f"2026-06-12T10:30:00.{frac}Z", dt.datetime)
+    assert got.microsecond == expected_us
+    assert got.tzinfo == dt.timezone.utc
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("2026-06-12T10:30:00.5+00:00",       "2026-06-12T10:30:00.500000+00:00"),  # pad 1->6
+    ("2026-06-12T10:30:00.12-05:00",      "2026-06-12T10:30:00.120000-05:00"),  # pad + neg offset
+    ("2026-06-12T10:30:00.1234567+00:00", "2026-06-12T10:30:00.123456+00:00"),  # truncate 7->6
+    ("2026-06-12T10:30:00.5",             "2026-06-12T10:30:00.500000"),        # naive (no offset)
+    ("2026-06-12T10:30:00+00:00",         "2026-06-12T10:30:00+00:00"),         # no fraction -> no-op
+])
+def test_normalize_dt_fraction_pads_and_truncates_to_six(text: str, expected: str) -> None:
+    """Version-independent guard for the pad/truncate logic: on 3.11+ the parser
+    is lenient, so the fallback isn't exercised for short fractions otherwise."""
+    assert _normalize_dt_fraction(text) == expected
+
+
+def test_naive_datetime_has_no_tzinfo() -> None:
+    # .NET DateTimeKind.Unspecified -> no 'Z'/offset on the wire -> a naive
+    # datetime (no tzinfo), not a coerced-to-UTC one.
+    got = from_wire("2026-06-12T10:30:00", dt.datetime)
+    assert got == dt.datetime(2026, 6, 12, 10, 30, 0)
+    assert got.tzinfo is None
+
+
+@pytest.mark.parametrize("bad", [
+    "invalid-date",
+    "2026-13-45T99:99:99",       # out-of-range, no fraction -> re-raised directly
+    "2026-13-45T99:99:99.5",     # out-of-range WITH a fraction -> raised via the fallback
+    "T10:30:00",                 # not a datetime at all
+])
+def test_datetime_invalid_format_raises(bad: str) -> None:
+    # A genuinely malformed value must surface ValueError, not be swallowed —
+    # covers both the no-fraction re-raise and the fraction-fallback path.
+    with pytest.raises(ValueError):
+        from_wire(bad, dt.datetime)
 
 
 def test_decimal_round_trip() -> None:
@@ -160,6 +212,31 @@ def test_dataclass_missing_required_raises() -> None:
     # so the silent-loss footgun becomes a loud error (for required fields).
     with pytest.raises(TypeError):
         from_wire({"first_name": "Ada"}, _Person)
+
+
+@dataclasses.dataclass
+class _InnerReq:
+    Required: str
+
+
+@dataclasses.dataclass
+class _OuterNested:
+    Name: str
+    Inner: _InnerReq
+
+
+def test_nested_dataclass_missing_required_field_raises() -> None:
+    # The loud-on-drift behavior must hold RECURSIVELY: a missing required field
+    # in a NESTED dataclass still raises (the inner ctor does), not silently None.
+    with pytest.raises(TypeError):
+        from_wire({"Name": "x", "Inner": {}}, _OuterNested)
+
+
+def test_dataclass_hint_non_dict_input_returns_unchanged() -> None:
+    # from_wire(<non-dict>, SomeDataclass) can't materialize — it returns the
+    # value unchanged rather than crashing (documented passthrough).
+    assert from_wire("not-a-dict", _Person) == "not-a-dict"
+    assert from_wire(123, _Person) == 123
 
 
 # --- no framework reflection: a pydantic-shaped class is NOT special-cased --

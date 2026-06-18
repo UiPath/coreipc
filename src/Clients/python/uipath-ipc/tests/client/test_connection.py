@@ -223,6 +223,49 @@ async def test_malformed_response_with_recoverable_id_fails_that_caller() -> Non
         await conn.aclose()
 
 
+async def test_malformed_request_with_recoverable_id_answers_with_error() -> None:
+    """A malformed inbound REQUEST whose Id is still readable is answered with an
+    Error (so the sender doesn't hang); the connection stays up. (The RESPONSE
+    twin is covered above; this is the REQUEST side.)"""
+    conn, reader, writer = await _make_connection()
+    try:
+        # Valid JSON, Id recoverable, but missing "Endpoint" → Request.from_dict
+        # raises KeyError after the id is readable.
+        reader.feed_data(_frame(
+            MessageType.REQUEST, b'{"Id":"9","MethodName":"M","Parameters":[]}'
+        ))
+        for _ in range(50):
+            await asyncio.sleep(0)
+            if _frame_types(bytes(writer.buffer)):
+                break
+        buf = bytes(writer.buffer)
+        assert _frame_types(buf) == [int(MessageType.RESPONSE)]
+        length = int.from_bytes(buf[1:5], "little", signed=True)
+        resp = Response.from_json(buf[5:5 + length].decode("utf-8"))
+        assert resp.request_id == "9"
+        assert resp.error is not None
+        assert resp.error.type_name == "System.IO.InvalidDataException"
+        assert not conn.is_closed
+    finally:
+        await conn.aclose()
+
+
+async def test_malformed_cancellation_frame_is_dropped(caplog) -> None:
+    """A malformed CANCELLATION frame is logged and dropped — it can't be
+    correlated to a pending handler, so there's nothing to answer; the
+    connection must survive (symmetric with the request/response branches)."""
+    conn, reader, _writer = await _make_connection()
+    try:
+        with caplog.at_level(logging.WARNING, logger="uipath_ipc.client.connection"):
+            reader.feed_data(_frame(MessageType.CANCELLATION_REQUEST, b"not json"))
+            for _ in range(10):
+                await asyncio.sleep(0)
+        assert not conn.is_closed
+        assert any("malformed CANCELLATION" in r.message for r in caplog.records)
+    finally:
+        await conn.aclose()
+
+
 async def test_abandon_unblocks_receive_loop() -> None:
     """_abandon() (used by IpcClient.__del__ for a client dropped without
     aclose()) marks closed and closes the writer so the blocked receive loop
