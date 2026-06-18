@@ -245,6 +245,31 @@ async def test_message_wire_body_serializes_at_top_level() -> None:
         await asyncio.wait_for(task, timeout=1.0)
 
 
+async def test_message_wire_body_accepts_a_dataclass_directly() -> None:
+    """wire_body runs through to_wire, so a timeout-carrying DTO can be handed
+    in as a dataclass instance (no explicit .to_wire()) and still serializes to
+    top-level fields — the way a per-call timeout is attached to a typed arg."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class _SignIn:
+        ServiceUrl: str | None = None
+
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(ITimed)
+        task = asyncio.create_task(svc.DoWork(
+            Message(wire_body=_SignIn(ServiceUrl="https://x"),
+                    request_timeout=INFINITE_REQUEST_TIMEOUT)
+        ))
+        await asyncio.sleep(0)
+        req = await _sent_request(t.writer)
+        assert req["TimeoutInSeconds"] == -0.001
+        assert json.loads(req["Parameters"][0]) == {"ServiceUrl": "https://x"}
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
+        await asyncio.wait_for(task, timeout=1.0)
+
+
 def test_message_payload_and_wire_body_are_mutually_exclusive() -> None:
     with pytest.raises(ValueError):
         Message(payload={"a": 1}, wire_body={"b": 2})

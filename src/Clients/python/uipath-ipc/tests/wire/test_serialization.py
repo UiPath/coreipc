@@ -193,16 +193,18 @@ def test_pydantic_shaped_class_gets_no_special_handling() -> None:
     assert to_wire(inst) is inst
 
 
-# --- passthrough / proxy gating --------------------------------------------
+# --- passthrough vs materialization ----------------------------------------
 
 def test_dict_and_unannotated_pass_through() -> None:
+    # A `dict`/`Any`/None hint passes the raw structure through — that's how a
+    # contract opts OUT of materialization (declare `dict`, not a dataclass).
     assert from_wire({"I": 1.0}, dict) == {"I": 1.0}
     assert from_wire({"I": 1.0}, None) == {"I": 1.0}
 
 
-def test_proxy_gate_leaves_dataclasses_raw() -> None:
-    """The proxy calls with materialize_dataclasses=False, so a dataclass
-    return stays a raw dict (consumers decode it themselves)."""
-    assert from_wire(
-        {"FirstName": "Ada"}, _Person, materialize_dataclasses=False
-    ) == {"FirstName": "Ada"}
+def test_dataclass_hint_materializes_to_instance() -> None:
+    """A dataclass-typed hint yields an INSTANCE (not a raw dict): the proxy and
+    inbound dispatch rely on this so a typed contract round-trips typed objects
+    with no explicit decode step."""
+    got = from_wire({"FirstName": "Ada", "LastName": "Lovelace"}, _Person)
+    assert isinstance(got, _Person) and got == _Person("Ada", "Lovelace")

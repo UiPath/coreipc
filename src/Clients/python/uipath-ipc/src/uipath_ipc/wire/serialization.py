@@ -132,12 +132,15 @@ def _resolve_hints(cls: type) -> dict:
         return {}
 
 
-def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -> Any:
+def from_wire(parsed: Any, hint: Any) -> Any:
     """Materialize a parsed-JSON value into the declared `hint` type.
 
-    `materialize_dataclasses=False` leaves plain dataclasses (and dicts) as
-    raw parsed structures — the proxy uses this so consumers that decode
-    results themselves keep receiving dicts.
+    A dataclass-typed `hint` is materialized into an instance — recursively, so
+    nested dataclasses / ``list[Dataclass]`` / ``Optional[Dataclass]`` are built
+    too. A missing required field makes the dataclass constructor raise
+    (loud-on-drift, by design); give optional fields a default. A
+    ``dict``/``Any``/unannotated `hint` passes the value through unchanged, so a
+    contract that genuinely wants raw structures just declares ``dict``.
 
     A multi-member ``Union`` other than ``Optional[X]`` is intentionally left
     undecoded (it's ambiguous to materialize from one wire value).
@@ -150,9 +153,7 @@ def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -
     if origin in _UNION_ORIGINS:  # Optional[X] / X | Y
         non_none = [a for a in args if a is not type(None)]
         if len(non_none) == 1:
-            return from_wire(  # Optional[X] / X | None -> decode as X
-                parsed, non_none[0], materialize_dataclasses=materialize_dataclasses
-            )
+            return from_wire(parsed, non_none[0])  # Optional[X] / X | None -> X
         # A genuine multi-member union (e.g. `bytes | str`, `A | B`) is
         # ambiguous to materialize from one wire value — guessing risks
         # mis-decoding (a base64 string satisfies both `bytes` and `str`). By
@@ -166,18 +167,11 @@ def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -
             # Fixed-arity tuple[X, Y, ...]: decode each element by its position.
             # (tuple[X, ...] is the variadic form, handled by the else branch.)
             items = [
-                from_wire(
-                    x,
-                    args[i] if i < len(args) else Any,
-                    materialize_dataclasses=materialize_dataclasses,
-                )
+                from_wire(x, args[i] if i < len(args) else Any)
                 for i, x in enumerate(parsed)
             ]
         else:
-            items = [
-                from_wire(x, args[0], materialize_dataclasses=materialize_dataclasses)
-                for x in parsed
-            ]
+            items = [from_wire(x, args[0]) for x in parsed]
         # Rebuild the declared container type (list stays a list). A set /
         # frozenset of unhashable elements (set[dict], set[SomeDataclass])
         # can't be rebuilt — degrade to a list rather than crash the call.
@@ -189,10 +183,7 @@ def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -
             return items
     if origin is dict and isinstance(parsed, dict):
         vt = args[1] if len(args) == 2 else Any
-        return {
-            k: from_wire(v, vt, materialize_dataclasses=materialize_dataclasses)
-            for k, v in parsed.items()
-        }
+        return {k: from_wire(v, vt) for k, v in parsed.items()}
 
     if isinstance(hint, type):
         if issubclass(hint, enum.Enum):
@@ -211,6 +202,6 @@ def from_wire(parsed: Any, hint: Any, *, materialize_dataclasses: bool = True) -
             return _datetime.time.fromisoformat(parsed)
         if hint is Decimal:
             return Decimal(str(parsed))
-        if materialize_dataclasses and dataclasses.is_dataclass(hint):
+        if dataclasses.is_dataclass(hint):
             return _from_wire_dataclass(hint, parsed)
     return parsed

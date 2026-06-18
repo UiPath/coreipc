@@ -46,11 +46,13 @@ def _return_hint(contract: type, method_name: str) -> Any:
 def _message_wire(m: Message) -> dict:
     """The wire form of a `Message` argument, matching .NET: a payload-less
     `Message` serializes to `{}`; `Message[T]` to `{"Payload": <payload>}`;
-    `wire_body` stands in for a .NET `Message` *subclass* and serializes
-    as-is. `client`/`request_timeout` are transport-only (never serialized)."""
+    `wire_body` stands in for a .NET `Message` *subclass* (its fields ARE the
+    arg, at top level). `wire_body`/`payload` are run through `to_wire`, so a
+    dataclass — or any value type — can be handed in directly with no explicit
+    serialization. `client`/`request_timeout` are transport-only (never sent)."""
     if m.wire_body is not None:
-        return m.wire_body
-    return {} if m.payload is None else {"Payload": m.payload}
+        return to_wire(m.wire_body)
+    return {} if m.payload is None else {"Payload": to_wire(m.payload)}
 
 
 class _IpcProxy:
@@ -178,13 +180,9 @@ class _IpcProxy:
             return None
         parsed = json.loads(resp.data)
         # Materialize into the contract's declared return type (reflection),
-        # like .NET handing Newtonsoft `typeof(TResult)`. Plain dataclasses and
-        # dict/Any/unannotated returns pass through as raw parsed structures so
-        # consumers that decode results themselves (e.g. via from_wire) are
-        # unaffected; enums and scalar value types (bytes/UUID/datetime/Decimal)
-        # — and containers of those — are built.
-        return from_wire(
-            parsed,
-            _return_hint(self._contract, method_name),
-            materialize_dataclasses=False,
-        )
+        # like .NET handing Newtonsoft `typeof(TResult)`: dataclasses, enums,
+        # and scalar value types (bytes/UUID/datetime/Decimal) — and containers
+        # of those — are built into instances, so a typed contract yields typed
+        # results with no explicit decode step. A `dict`/`Any`/unannotated
+        # return passes through as the raw parsed structure.
+        return from_wire(parsed, _return_hint(self._contract, method_name))

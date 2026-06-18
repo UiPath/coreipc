@@ -373,8 +373,8 @@ class IShapes(ABC):
 
 
 class ShapesService:
-    """Impl is intentionally unannotated (duck-typed) — the dispatch plan comes
-    from the contract."""
+    """Impl is intentionally unannotated (duck-typed) — the dispatch plan, and
+    thus arg materialization, comes from the contract."""
 
     def __init__(self) -> None:
         self.seen_arg: object = None
@@ -383,7 +383,7 @@ class ShapesService:
     async def Describe(self, p, tag):
         self.seen_arg = p
         self.seen_tag = tag
-        return _Point(X=p["X"] + 1, Y=p["Y"] + 1)
+        return _Point(X=p.X + 1, Y=p.Y + 1)
 
     async def CollectTags(self):
         # Python can't even build a set of dicts; return a list — the contract
@@ -391,12 +391,11 @@ class ShapesService:
         return [{"k": 1}, {"k": 2}]
 
 
-async def test_e2e_dataclass_arg_is_raw_dict_while_value_type_is_decoded() -> None:
-    """Inbound materialization symmetry (the R3a fix), proven end-to-end over a
-    real client+server: a dataclass-typed handler arg arrives as a RAW DICT
-    (materialize_dataclasses=False, matching the result path), while a
-    value-type arg in the same call IS decoded; and a dataclass RESULT comes
-    back to the proxy caller as a raw dict (not a materialized instance)."""
+async def test_e2e_dataclass_materializes_both_ways_value_type_decoded() -> None:
+    """Strong typing end-to-end over a real client+server: a dataclass-typed
+    handler arg is materialized into an INSTANCE (and a value-type arg in the
+    same call is decoded), and a dataclass RESULT comes back to the proxy caller
+    as an instance too — no explicit from_wire on either side."""
     svc = ShapesService()
     server = IpcServer(TcpServerTransport("127.0.0.1", 0), {IShapes: svc})
     async with server:
@@ -405,11 +404,11 @@ async def test_e2e_dataclass_arg_is_raw_dict_while_value_type_is_decoded() -> No
             proxy = client.get_proxy(IShapes)
             tag = uuid.UUID("550e8400-e29b-41d4-a716-446655440000")
             result = await asyncio.wait_for(proxy.Describe(_Point(1, 2), tag), timeout=5)
-            # Inbound: dataclass arg is a raw dict; value-type arg is decoded.
-            assert isinstance(svc.seen_arg, dict) and svc.seen_arg == {"X": 1, "Y": 2}
+            # Inbound: dataclass arg materialized to an instance; value-type decoded.
+            assert isinstance(svc.seen_arg, _Point) and svc.seen_arg == _Point(1, 2)
             assert isinstance(svc.seen_tag, uuid.UUID) and svc.seen_tag == tag
-            # Outbound: dataclass result returns as a raw dict (symmetric).
-            assert isinstance(result, dict) and result == {"X": 2, "Y": 3}
+            # Outbound: dataclass result comes back as an instance (symmetric).
+            assert isinstance(result, _Point) and result == _Point(2, 3)
 
 
 async def test_e2e_set_of_unhashable_result_degrades_to_list() -> None:

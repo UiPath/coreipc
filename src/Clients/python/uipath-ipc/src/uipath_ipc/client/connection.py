@@ -619,11 +619,12 @@ class IpcConnection:
             elif tag == "wire":
                 nxt = next(wire, _MISSING)
                 if nxt is not _MISSING:
-                    # materialize_dataclasses=False to stay consistent with the
-                    # result path (proxy decodes dataclasses to dicts both ways);
-                    # value types still materialize. Avoids a dataclass arg being
-                    # a loud missing-field crash here yet silent on a result.
-                    pos.append(from_wire(nxt, hint, materialize_dataclasses=False))
+                    # Materialize into the contract's declared param type so a
+                    # handler with a dataclass param receives an instance (and
+                    # value types decode) — symmetric with the result path. A
+                    # missing required field raises, aborting dispatch with an
+                    # error (loud-on-drift); give optional fields a default.
+                    pos.append(from_wire(nxt, hint))
                 # else: out of wire args — let this param use its default, but
                 # keep scanning so later Message params are still injected.
             # "skip": **kwargs / non-Message keyword-only — not fillable here.
