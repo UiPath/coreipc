@@ -414,17 +414,33 @@ async def test_before_call_reports_new_connection_only_on_first_call() -> None:
     assert seen == [True, False]
 
 
-async def test_message_request_timeout_zero_keeps_client_default() -> None:
-    """Message(request_timeout=0) is the 'use server default' sentinel, not an
-    override — the client-wide default still rides the wire (matches .NET's
-    `when requestTimeout != TimeSpan.Zero`)."""
+async def test_message_request_timeout_zero_is_no_override() -> None:
+    """Message(request_timeout=0) is the 'no override' sentinel (.NET's `when
+    requestTimeout != TimeSpan.Zero`): it leaves the wire TimeoutInSeconds at 0
+    (use the server's default). The client-wide request_timeout is a LOCAL
+    deadline and never rides the wire, so it does NOT surface here either."""
     t = _FakeTransport()
     async with IpcClient(t, request_timeout=2.0) as client:
         svc = client.get_proxy(ITimed)
         task = asyncio.create_task(svc.DoWork(Message(request_timeout=0)))
         await asyncio.sleep(0)
         req = await _sent_request(t.writer)
-        assert req["TimeoutInSeconds"] == 2.0  # not 0 — the default was not clobbered
+        assert req["TimeoutInSeconds"] == 0  # no per-call override; 2.0 stays local
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
+        await asyncio.wait_for(task, timeout=1.0)
+
+
+async def test_negative_per_call_timeout_is_clamped_to_infinite_sentinel() -> None:
+    """A negative per-call Message timeout other than -0.001 is normalized to
+    the infinite sentinel (-0.001) on the wire: .NET treats only -1ms as
+    Timeout.InfiniteTimeSpan and rejects other negatives."""
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(ITimed)
+        task = asyncio.create_task(svc.DoWork(Message(request_timeout=-5.0)))
+        await asyncio.sleep(0)
+        req = await _sent_request(t.writer)
+        assert req["TimeoutInSeconds"] == -0.001  # clamped, not -5.0
         t.reader.feed_data(_response_frame(Response(request_id="1", data="")))
         await asyncio.wait_for(task, timeout=1.0)
 

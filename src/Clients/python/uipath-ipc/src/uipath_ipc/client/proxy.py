@@ -94,29 +94,45 @@ class _IpcProxy:
         return call
 
     async def _invoke(self, method_name: str, args: tuple[Any, ...]) -> Any:
-        # A `Message` argument may carry a per-call timeout (the .NET/TS
-        # mechanism): it overrides the client-wide default for this call only,
-        # and is serialized to its wire form rather than dumped as a plain arg.
-        timeout = self._client.request_timeout
+        # Two DISTINCT timeouts, mirroring .NET ServiceClient.Invoke exactly:
+        #
+        #   * client_timeout — the LOCAL await deadline (.NET `clientTimeout =
+        #     Config.RequestTimeout.OrInfinite()`). Bounds only this client's
+        #     own wait; it is NEVER serialized.
+        #   * wire_timeout   — what rides the Request envelope as
+        #     `TimeoutInSeconds` (.NET `messageTimeout`, which defaults to
+        #     TimeSpan.Zero == "use the server's default"). It is set ONLY by
+        #     an explicit per-call `Message` timeout.
+        #
+        # The client-wide `request_timeout` must NOT leak onto the wire: in
+        # .NET it dictates how long THIS client waits, not how long the SERVER
+        # spends processing. Sending it as TimeoutInSeconds would silently
+        # impose the caller's local SLA as the server's cancellation deadline.
+        client_timeout = self._client.request_timeout
+        wire_timeout: float | None = None
         params: list[str] = []
         for a in args:
             if isinstance(a, Message):
-                # 0 is the "use server default" sentinel, not an override —
-                # mirror .NET's `when requestTimeout != TimeSpan.Zero` so a
-                # Message(request_timeout=0) doesn't clobber the client default.
+                # .NET: `case Message { RequestTimeout: var rt } when rt !=
+                # TimeSpan.Zero`. An explicit per-call timeout sets BOTH the
+                # wire value AND the local deadline (the two coincide); rt == 0
+                # is the "no override" sentinel, not a real timeout.
                 if a.request_timeout is not None and a.request_timeout != 0:
-                    timeout = a.request_timeout
+                    wire_timeout = a.request_timeout
+                    client_timeout = a.request_timeout
                 params.append(json.dumps(_message_wire(a)))
             else:
                 # to_wire encodes value types (bytes->base64, UUID/datetime/
                 # Decimal/enum/dataclass/pydantic) and is a no-op for plain
                 # JSON values, so existing primitive/dict args are unchanged.
                 params.append(json.dumps(to_wire(a)))
-        # Normalize any negative timeout to the infinite sentinel: .NET treats
-        # only -1ms (INFINITE_REQUEST_TIMEOUT = -0.001) as Timeout.InfiniteTimeSpan
-        # and throws on other negatives (CancelAfter(FromSeconds(-5))).
-        if timeout is not None and timeout < 0:
-            timeout = INFINITE_REQUEST_TIMEOUT
+        # Normalize a negative per-call timeout to the infinite sentinel: .NET
+        # treats only -1ms (INFINITE_REQUEST_TIMEOUT = -0.001) as
+        # Timeout.InfiniteTimeSpan and rejects other negatives. This applies to
+        # the WIRE value only; the local deadline below treats any non-positive
+        # value as unbounded.
+        if wire_timeout is not None and wire_timeout < 0:
+            wire_timeout = INFINITE_REQUEST_TIMEOUT
         async def _connect_and_send() -> Response:
             # The dial shares the call deadline (see below) — a black-holed or
             # unreachable host no longer escapes `request_timeout` via an
@@ -140,17 +156,17 @@ class _IpcProxy:
                 method_name=method_name,
                 parameters=params,
                 id=conn.next_id(),
-                timeout_in_seconds=timeout,
+                timeout_in_seconds=wire_timeout,
             )
             return await conn.send_request(req)
 
-        # Bound connect+send by the deadline. A non-positive timeout imposes no
-        # client-side deadline: 0 ("use server default" — never an instant
-        # wait_for(0)) and a negative value (.NET's Timeout.InfiniteTimeSpan,
-        # -0.001 on the wire) both pass through unbounded; the server still
-        # reads the wire value.
-        if timeout is not None and timeout > 0:
-            resp = await asyncio.wait_for(_connect_and_send(), timeout=timeout)
+        # Bound connect+send by the LOCAL deadline (client_timeout). A
+        # non-positive value imposes no client-side deadline: 0 ("use server
+        # default" — never an instant wait_for(0)) and a negative value (.NET's
+        # Timeout.InfiniteTimeSpan) both pass through unbounded. This is the
+        # client's own SLA and is independent of what rode the wire.
+        if client_timeout is not None and client_timeout > 0:
+            resp = await asyncio.wait_for(_connect_and_send(), timeout=client_timeout)
         else:
             resp = await _connect_and_send()
         if resp.error is not None:

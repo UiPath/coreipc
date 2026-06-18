@@ -101,7 +101,14 @@ async def test_timeout_sends_cancellation_to_server() -> None:
         assert cancel.request_id == "1"
 
 
-async def test_request_includes_timeout_in_seconds_field() -> None:
+async def test_client_wide_timeout_does_not_ride_the_wire() -> None:
+    """The client-wide request_timeout is a LOCAL await deadline only; it must
+    NOT be serialized as Request.TimeoutInSeconds. Mirrors .NET
+    ServiceClient.Invoke, where the wire carries `messageTimeout` (0 == "use
+    the server default") and the client-wide `clientTimeout` stays local —
+    only an explicit per-call Message timeout rides the wire. Sending the
+    client's SLA on the wire would silently impose it as the server's
+    processing/cancellation deadline."""
     t = _FakeTransport()
     async with IpcClient(t, request_timeout=2.5) as client:
         svc = client.get_proxy(IComputingService)
@@ -115,7 +122,7 @@ async def test_request_includes_timeout_in_seconds_field() -> None:
 
         frames = _split_frames(bytes(t.writer.buffer))
         req_payload = json.loads(frames[0][1].decode("utf-8"))
-        assert req_payload["TimeoutInSeconds"] == 2.5
+        assert req_payload["TimeoutInSeconds"] == 0  # server default, NOT 2.5
 
         # Tidy up
         t.reader.feed_data(_response_frame(Response(request_id="1", data="3.0")))
@@ -159,11 +166,12 @@ async def test_request_timeout_in_seconds_field_is_zero_by_default() -> None:
         await asyncio.wait_for(task, timeout=1.0)
 
 
-async def test_negative_timeout_is_clamped_to_infinite_sentinel() -> None:
-    """A negative request_timeout means 'infinite' (.NET Timeout.InfiniteTimeSpan).
-    Only -1ms (-0.001) is the recognized sentinel; other negatives must be
-    normalized to it on the wire, and the call must NOT be bounded by an instant
-    wait_for(<negative>)."""
+async def test_negative_client_wide_timeout_is_local_and_unbounded() -> None:
+    """A negative client-wide request_timeout is a LOCAL deadline that imposes
+    no instant cutoff (non-positive => unbounded, never wait_for(<negative>))
+    and — like any client-wide timeout — does NOT ride the wire. (A per-call
+    negative Message timeout, which DOES ride the wire, is clamped to the
+    -0.001 infinite sentinel; see test_ipc_client.)"""
     t = _FakeTransport()
     async with IpcClient(t, request_timeout=-5.0) as client:
         svc = client.get_proxy(IComputingService)
@@ -175,8 +183,8 @@ async def test_negative_timeout_is_clamped_to_infinite_sentinel() -> None:
 
         frames = _split_frames(bytes(t.writer.buffer))
         req_payload = json.loads(frames[0][1].decode("utf-8"))
-        assert req_payload["TimeoutInSeconds"] == -0.001  # not -5.0
-        assert not task.done()  # negative = infinite, not an instant timeout
+        assert req_payload["TimeoutInSeconds"] == 0  # client-wide never on the wire
+        assert not task.done()  # negative => unbounded local, not an instant timeout
 
         # Tidy up
         t.reader.feed_data(_response_frame(Response(request_id="1", data="3.0")))

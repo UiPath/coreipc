@@ -40,11 +40,16 @@ class IpcClient:
 
         Args:
             transport: The transport that opens the underlying stream.
-            request_timeout: Seconds before an in-flight call gives up.
-                Applies both client-side (raises asyncio.TimeoutError) and
-                server-side (Request.TimeoutInSeconds). ``None`` (default)
-                disables both timeouts. A per-call timeout can override this
-                via a ``Message`` argument.
+            request_timeout: Seconds before an in-flight call gives up. This is
+                a LOCAL deadline only — it bounds how long this client waits
+                (raising asyncio.TimeoutError) and is NEVER serialized onto the
+                wire, mirroring .NET's `clientTimeout`. It does not dictate the
+                server's processing deadline. ``None`` (default) imposes no
+                local deadline. To set the wire ``Request.TimeoutInSeconds``
+                (the server-side deadline) for a single call, pass a per-call
+                ``Message`` with ``request_timeout`` — that value overrides the
+                local deadline for that call and is the only thing that rides
+                the wire.
             callbacks: Optional dict mapping contract type → instance for
                 server-to-client callbacks. The instance's method names
                 must match the contract's; each method may be ``async``.
