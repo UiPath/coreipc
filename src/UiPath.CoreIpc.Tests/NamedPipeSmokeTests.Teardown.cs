@@ -29,15 +29,14 @@ public sealed partial class NamedPipeSmokeTests
             // churning the accept slots, then tear the server down underneath them.
             for (int i = 0; i < 5; i++)
             {
-                var raw = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+                // `using` (not an explicit Dispose) is exception-safe; the
+                // scope-end dispose is still an abrupt OS handle close.
+                using var raw = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
                 await raw.ConnectAsync(5_000);
-                raw.Dispose(); // abrupt
             }
 
-            await Task.Delay(500); // let slots re-park in WaitForConnectionAsync
-        } // DisposeAsync cancels the accept loop while slots are parked
-
-        await Task.Delay(1000); // let teardown settle
+            await Task.Delay(Timeouts.Short); // let the accept slots re-park before teardown
+        } // DisposeAsync awaits the accept-loop teardown, so any OnError has fired by here
 
         capture.AcceptErrors.ShouldBeEmpty();
     }
