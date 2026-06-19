@@ -134,7 +134,8 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
         /// <summary>
         /// This method returns when a new connection is accepted, or when cancellation or another error occurs.
         /// In case of cancellation or error, it will dispose of the underlying resources and will suppress the exception.
-        /// In case of an error (not a cancellation), it will notify the observer about the error.
+        /// In case of a genuine error it will notify the observer; an error that surfaces while cancellation is already
+        /// requested (a shutdown-race, e.g. a broken/disposed pipe) is treated as expected teardown and NOT reported.
         /// </summary>
         private async Task TryAccept(CancellationToken ct)
         {
@@ -153,7 +154,15 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
             catch (Exception ex)
             {
                 await slot.DisposeAsync();
-                _newConnection.OnError(ex);
+                // During shutdown the slot's pipe can break or be disposed and
+                // surface as a non-OCE exception (e.g. IOException "Pipe is
+                // broken") instead of an OperationCanceledException. That's
+                // expected teardown, not a failed accept — only report genuine
+                // (non-cancelled) errors to the observer.
+                if (!ct.IsCancellationRequested)
+                {
+                    _newConnection.OnError(ex);
+                }
             }
         }
 
