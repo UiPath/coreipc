@@ -12,6 +12,7 @@ import pytest
 
 from uipath_ipc.client import IpcConnection
 from uipath_ipc.errors import RemoteException
+from uipath_ipc.markers import ipc_cancellable
 from uipath_ipc.message import Message
 from uipath_ipc.wire import (
     CancellationRequest,
@@ -89,6 +90,7 @@ class IClientCallback(ABC):
     @abstractmethod
     async def RaiseOnClient(self) -> bool: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def WaitOnClient(self, seconds: float) -> bool: ...
 
@@ -623,6 +625,7 @@ async def test_handler_swallowing_cancel_still_times_out() -> None:
 
 
 class IBounded(ABC):
+    @ipc_cancellable
     @abstractmethod
     async def Work(self) -> str: ...
 
@@ -669,5 +672,53 @@ async def test_peer_cancellation_aborts_a_bounded_handler() -> None:
         await asyncio.sleep(0.05)  # give a (wrongly) orphaned handler time to finish
         assert impl.observed_cancel is True  # the handler WAS cancelled
         assert impl.completed is False       # ...and did NOT run orphaned to completion
+    finally:
+        await conn.aclose()
+
+
+class IUnmarked(ABC):
+    # No @ipc_cancellable — a peer cancel must NOT abort this handler.
+    @abstractmethod
+    async def Work(self) -> str: ...
+
+
+async def test_peer_cancellation_ignored_for_unmarked_method() -> None:
+    """The callee honors a peer CancellationRequest only for @ipc_cancellable
+    methods. An UNMARKED handler keeps running to completion despite the cancel
+    (symmetric with the client, which won't even send one for an unmarked call)."""
+    class _Impl:
+        def __init__(self) -> None:
+            self.observed_cancel = False
+            self.completed = False
+
+        async def Work(self) -> str:
+            try:
+                await asyncio.sleep(0.2)
+            except asyncio.CancelledError:
+                self.observed_cancel = True
+                raise
+            self.completed = True
+            return "done"
+
+    impl = _Impl()
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(
+        reader, writer,
+        callbacks={"IUnmarked": (IUnmarked, impl)},  # type: ignore[arg-type]
+    )
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IUnmarked", method_name="Work", parameters=[], id="9",
+        )))
+        await asyncio.sleep(0.05)  # let the handler start
+        reader.feed_data(_cancellation_frame("9"))  # must be IGNORED
+        frames = await _wait_for_frames(writer, count=1, timeout=1.0)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.error is None                 # not cancelled -> normal reply
+        assert json.loads(resp.data) == "done"
+        assert impl.observed_cancel is False      # the handler never saw a cancel
+        assert impl.completed is True             # ...and ran to completion
     finally:
         await conn.aclose()

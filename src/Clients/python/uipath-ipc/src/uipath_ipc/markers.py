@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Callable, TypeVar
+import inspect
+import weakref
+from typing import Any, Callable, TypeVar
 
 _F = TypeVar("_F", bound=Callable[..., object])
 
@@ -43,3 +45,35 @@ def ipc_cancellable(method: _F) -> _F:
     """
     setattr(method, IPC_CANCELLABLE_ATTR, True)
     return method
+
+
+#: Cache of a contract method's cancellable flag, keyed weakly by the function.
+_cancellable_cache: "weakref.WeakKeyDictionary[Any, bool]" = weakref.WeakKeyDictionary()
+
+
+def is_ipc_cancellable(contract: type, method_name: str) -> bool:
+    """True if ``contract``'s ``method_name`` is marked :func:`ipc_cancellable`.
+
+    Used on both sides of the connection: the caller consults it to decide
+    whether to emit a ``CancellationRequest``, and the callee to decide whether
+    to honor one. Resolves against the contract (where the marker lives), not a
+    duck-typed impl, and caches per method."""
+    # Private/dunder names are never reachable contract methods (and may resolve
+    # to non-weak-referenceable descriptors, e.g. __class__), so never cancellable.
+    if method_name.startswith("_"):
+        return False
+    func = inspect.getattr_static(contract, method_name, None)
+    if func is None:
+        return False
+    try:
+        cached = _cancellable_cache.get(func)
+    except TypeError:
+        cached = None  # func isn't weak-referenceable — skip the cache
+    if cached is not None:
+        return cached
+    result = bool(getattr(func, IPC_CANCELLABLE_ATTR, False))
+    try:
+        _cancellable_cache[func] = result
+    except TypeError:
+        pass
+    return result

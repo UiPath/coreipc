@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, get_type_hints
 
 from ..errors import RemoteException
 from ..hooks import CallInfo
-from ..markers import IPC_CANCELLABLE_ATTR
+from ..markers import is_ipc_cancellable
 from ..message import INFINITE_REQUEST_TIMEOUT, Message
 from ..wire import Request, Response, from_wire, to_wire
 
@@ -42,29 +42,6 @@ def _return_hint(contract: type, method_name: str) -> Any:
     except TypeError:
         pass
     return hint
-
-
-#: Cache of whether a contract method is @ipc_cancellable, keyed weakly by the
-#: function (like _return_hint) so the lookup runs once per method.
-_cancellable_cache: "weakref.WeakKeyDictionary[Any, bool]" = weakref.WeakKeyDictionary()
-
-
-def _is_cancellable(contract: type, method_name: str) -> bool:
-    """True if the method is marked `@ipc_cancellable` — i.e. its .NET
-    counterpart observes cancellation, so a local cancel should be forwarded to
-    the peer as a CancellationRequest. Unmarked methods cancel locally only."""
-    func = inspect.getattr_static(contract, method_name, None)
-    if func is None:
-        return False
-    cached = _cancellable_cache.get(func)
-    if cached is not None:
-        return cached
-    result = bool(getattr(func, IPC_CANCELLABLE_ATTR, False))
-    try:
-        _cancellable_cache[func] = result
-    except TypeError:
-        pass
-    return result
 
 
 def _message_wire(m: Message) -> dict:
@@ -138,7 +115,7 @@ class _IpcProxy:
         # Only forward a local cancel/timeout to the peer when the contract
         # method is @ipc_cancellable (its .NET counterpart has a CancellationToken
         # to observe it). Otherwise cancellation stays local.
-        cancellable = _is_cancellable(self._contract, method_name)
+        cancellable = is_ipc_cancellable(self._contract, method_name)
         wire_timeout: float | None = None
         params: list[str] = []
         for a in args:

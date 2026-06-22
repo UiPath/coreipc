@@ -46,6 +46,7 @@ from typing import (
 
 from ..hooks import BeforeCallHandler, CallInfo
 from ..errors import EndpointNotFoundError, MethodNotFoundError, RemoteException
+from ..markers import is_ipc_cancellable
 from ..message import Message
 from ..transport.base import ClientTransport
 from ..wire import (
@@ -255,7 +256,10 @@ class IpcConnection:
         #: Awaited before dispatching each incoming request (server side).
         self._before_incoming_call = before_incoming_call
         self._pending: dict[str, asyncio.Future[Response]] = {}
-        self._incoming_handlers: dict[str, asyncio.Task[None]] = {}
+        # request id -> (handler task, whether the contract method is
+        # @ipc_cancellable). The flag gates whether a peer CancellationRequest
+        # may cancel the handler (symmetric with the client's send gate).
+        self._incoming_handlers: dict[str, tuple[asyncio.Task[None], bool]] = {}
         self._id_counter = itertools.count(1)
         self._receive_task: asyncio.Task[None] | None = None
         self._write_lock = asyncio.Lock()
@@ -304,7 +308,9 @@ class IpcConnection:
         cancel in-flight incoming handlers, close the writer, fail pending
         outgoing requests, and fire close callbacks. Does NOT touch the
         receive task (the loop calls this from its own `finally`)."""
-        for task in list(self._incoming_handlers.values()):
+        # Teardown cancels EVERY handler regardless of @ipc_cancellable — the
+        # connection is going away, so in-flight work can't continue anyway.
+        for task, _ in list(self._incoming_handlers.values()):
             task.cancel()
         self._incoming_handlers.clear()
         try:
@@ -564,8 +570,18 @@ class IpcConnection:
                     ),
                 )))
             return
+        # A peer may cancel this handler only if the hosted contract method is
+        # @ipc_cancellable. Resolve it now (synchronously) so the flag is ready
+        # the instant a CancellationRequest arrives — even before the handler
+        # task has resolved its own method. Unknown endpoint/method -> not
+        # cancellable (the handler will fail fast with its own error anyway).
+        cancellable = False
+        entry = self._callbacks.get(req.endpoint)
+        if entry is not None:
+            contract, _instance = entry
+            cancellable = is_ipc_cancellable(contract, req.method_name)
         task = asyncio.create_task(self._invoke_callback(req))
-        self._incoming_handlers[req.id] = task
+        self._incoming_handlers[req.id] = (task, cancellable)
         task.add_done_callback(
             lambda _t, rid=req.id: self._incoming_handlers.pop(rid, None)
         )
@@ -577,11 +593,15 @@ class IpcConnection:
         except (ValueError, KeyError, UnicodeDecodeError) as ex:
             _logger.warning("dropping malformed CANCELLATION frame: %r", ex)
             return
-        task = self._incoming_handlers.get(cancel.request_id)
-        if task is not None:
-            # cancel() no-ops on an already-done task and is safe to repeat, and
-            # there's no await between here and now for the state to race — so no
-            # done() check is needed.
+        entry = self._incoming_handlers.get(cancel.request_id)
+        if entry is None:
+            return
+        task, cancellable = entry
+        # Honor the peer's cancel ONLY for @ipc_cancellable methods; an unmarked
+        # method can't be cancelled remotely (symmetric with the client, which
+        # won't even send a CancellationRequest for one). cancel() is a safe
+        # no-op on an already-done task, so no done() check is needed.
+        if cancellable:
             task.cancel()
 
     def _bind_handler_args(
