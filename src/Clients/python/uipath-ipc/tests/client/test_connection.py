@@ -40,6 +40,26 @@ class _BlockingDrainWriter(_BufferWriter):
         await asyncio.Event().wait()
 
 
+class _AbortableTransport:
+    def __init__(self) -> None:
+        self.aborted = False
+
+    def abort(self) -> None:
+        self.aborted = True
+
+
+class _StalledCloseWriter(_BufferWriter):
+    """Models a non-reading peer on the ProactorEventLoop: wait_closed() never
+    completes (the graceful flush can't drain); transport.abort() forces it."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.transport = _AbortableTransport()
+
+    async def wait_closed(self) -> None:
+        await asyncio.Event().wait()  # never set — graceful close hangs forever
+
+
 def _frame(msg_type: MessageType, payload: bytes) -> bytes:
     return struct.pack("<Bi", int(msg_type), len(payload)) + payload
 
@@ -485,3 +505,20 @@ async def test_wire_format_is_request_frame() -> None:
         await asyncio.wait_for(send_task, timeout=1.0)
     finally:
         await conn.aclose()
+
+
+# --- aclose teardown ------------------------------------------------------
+
+async def test_aclose_aborts_instead_of_hanging_on_non_reading_peer() -> None:
+    """aclose() must not block on a graceful flush a non-reading peer can stall
+    forever (the ProactorEventLoop defers connection_lost until the write buffer
+    drains). It aborts the transport instead of awaiting wait_closed() — matching
+    .NET's synchronous Connection.Dispose() and the TS client's socket.destroy()."""
+    reader = asyncio.StreamReader()
+    writer = _StalledCloseWriter()
+    conn = IpcConnection(reader, writer)  # type: ignore[arg-type]
+    conn.start()
+    # Without the fix, aclose() awaits the never-completing wait_closed() and
+    # hangs (so wait_for would time out). With the fix it aborts and returns.
+    await asyncio.wait_for(conn.aclose(), timeout=2.0)
+    assert writer.transport.aborted  # forced closed rather than waiting on flush

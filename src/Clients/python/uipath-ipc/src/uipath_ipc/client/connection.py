@@ -298,10 +298,20 @@ class IpcConnection:
         if self._receive_task is not None:
             self._receive_task.cancel()
         self._teardown()
-        try:
-            await self._writer.wait_closed()
-        except Exception:
-            pass
+        # Abortive close, matching .NET (Connection.Dispose -> Network.Dispose())
+        # and the TS client (socket.destroy()): force the transport down instead
+        # of awaiting a graceful flush a non-reading peer could stall forever. On
+        # the Windows ProactorEventLoop, close()+wait_closed() defers
+        # connection_lost until the write buffer drains — which never happens for
+        # a deaf peer, hanging aclose() (and, in series, the whole server's
+        # shutdown). abort() discards the buffer and returns immediately.
+        transport = getattr(self._writer, "transport", None)
+        abort = getattr(transport, "abort", None)
+        if abort is not None:
+            try:
+                abort()
+            except Exception:
+                pass
 
     def _teardown(self) -> None:
         """Idempotent local cleanup shared by `aclose` and the receive loop:
