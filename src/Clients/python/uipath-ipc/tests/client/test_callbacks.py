@@ -7,6 +7,8 @@ import json
 import logging
 import struct
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+from uuid import UUID
 
 import pytest
 
@@ -722,3 +724,26 @@ async def test_peer_cancellation_ignored_for_unmarked_method() -> None:
         assert impl.completed is True             # ...and ran to completion
     finally:
         await conn.aclose()
+
+
+# --- resilient hint resolution: one unresolvable param degrades alone --------
+
+if TYPE_CHECKING:
+    class _GhostParam: ...  # defined only for type-checkers; absent at runtime
+
+
+class _IPartlyResolvable(ABC):
+    @abstractmethod
+    async def Notify(self, value: UUID, ghost: "_GhostParam") -> None: ...
+
+
+def test_dispatch_plan_degrades_only_unresolvable_param() -> None:
+    # get_type_hints() raises on `ghost` (NameError); all-or-nothing it would
+    # drop `value`'s decode type AND mis-detect one-way. The best-effort resolver
+    # degrades only `ghost`, so `value` stays typed and `-> None` is detected.
+    from uipath_ipc.client.connection import _dispatch_plan
+
+    plan = _dispatch_plan(_IPartlyResolvable.Notify)
+    assert plan.one_way is True
+    by_name = {name: hint for (_tag, name, hint) in plan.params}
+    assert by_name["value"] is UUID  # the resolvable param, not its raw string

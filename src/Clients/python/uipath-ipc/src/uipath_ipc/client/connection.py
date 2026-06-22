@@ -41,7 +41,6 @@ from typing import (
     cast,
     get_args,
     get_origin,
-    get_type_hints,
 )
 
 from ..hooks import BeforeCallHandler, CallInfo
@@ -60,6 +59,7 @@ from ..wire import (
     to_wire,
     write_frame,
 )
+from ..wire.serialization import resolve_hints
 
 T = TypeVar("T")
 
@@ -140,10 +140,10 @@ def _dispatch_plan(method: Callable[..., object]) -> _DispatchPlan:
     if cached is not None:
         return cached
 
-    try:
-        hints = get_type_hints(func)
-    except Exception:
-        hints = {}
+    # Best-effort hint resolution: one unresolvable annotation (e.g. a
+    # TYPE_CHECKING-only param type) degrades just that name, not every hint —
+    # so the other params still decode and one-way (`-> None`) is still detected.
+    hints = resolve_hints(func)
     params: list[_ParamPlan] = []
     for i, (name, param) in enumerate(inspect.signature(method).parameters.items()):
         if i == 0 and name in ("self", "cls"):

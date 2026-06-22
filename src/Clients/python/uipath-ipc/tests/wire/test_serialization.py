@@ -7,7 +7,7 @@ import dataclasses
 import datetime as dt
 import enum
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 import pytest
@@ -285,3 +285,23 @@ def test_dataclass_hint_materializes_to_instance() -> None:
     with no explicit decode step."""
     got = from_wire({"FirstName": "Ada", "LastName": "Lovelace"}, _Person)
     assert isinstance(got, _Person) and got == _Person("Ada", "Lovelace")
+
+
+# --- resilient hint resolution (one unresolvable annotation degrades alone) --
+
+if TYPE_CHECKING:
+    class _GhostType: ...  # defined only for type-checkers; absent at runtime
+
+
+@dataclasses.dataclass
+class _PartlyUnresolvable:
+    id: UUID
+    ghost: "_GhostType | None" = None  # annotation can't be resolved at runtime
+
+
+def test_dataclass_decodes_resolvable_fields_despite_unresolvable_one() -> None:
+    # get_type_hints() would raise on `ghost` (NameError) and, all-or-nothing,
+    # drop `id`'s type too -> id would arrive as a raw string. The best-effort
+    # resolver degrades only `ghost`, so `id` still materializes as a UUID.
+    got = from_wire({"id": _GUID}, _PartlyUnresolvable)
+    assert got.id == UUID(_GUID) and isinstance(got.id, UUID)

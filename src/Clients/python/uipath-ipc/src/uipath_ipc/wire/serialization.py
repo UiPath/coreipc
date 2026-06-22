@@ -28,9 +28,10 @@ import base64
 import dataclasses
 import datetime as _datetime
 import enum
+import sys
 import types
 from decimal import Decimal
-from typing import Any, Union, get_args, get_origin
+from typing import Any, Union, get_args, get_origin, get_type_hints
 from uuid import UUID
 
 _UNION_ORIGINS: tuple[object, ...] = (
@@ -129,7 +130,7 @@ def _parse_datetime(value: Any) -> Any:
 def _from_wire_dataclass(cls: type, data: Any) -> Any:
     if not isinstance(data, dict):
         return data
-    hints = _resolve_hints(cls)
+    hints = resolve_hints(cls)
     kwargs = {
         f.name: from_wire(data[f.name], hints.get(f.name, Any))
         for f in dataclasses.fields(cls)
@@ -138,13 +139,39 @@ def _from_wire_dataclass(cls: type, data: Any) -> Any:
     return cls(**kwargs)
 
 
-def _resolve_hints(cls: type) -> dict:
-    import typing
-
+def resolve_hints(obj: Any) -> dict:
+    """``get_type_hints(obj)``, but resilient: if a single annotation can't be
+    resolved at runtime (classically a name imported only under ``TYPE_CHECKING``),
+    degrade ONLY that one to ``Any`` instead of dropping every hint. Stdlib
+    ``get_type_hints`` is all-or-nothing — one unresolvable annotation would
+    otherwise de-type a whole method (its params + one-way detection) or a whole
+    dataclass. Shared by inbound dispatch and dataclass decoding."""
     try:
-        return typing.get_type_hints(cls)
+        return get_type_hints(obj)
     except Exception:
-        return {}
+        pass
+    # Per-name fallback: resolve each annotation in isolation.
+    if isinstance(obj, type):
+        raw: dict = {}
+        for base in reversed(obj.__mro__):  # base-first so a subclass override wins
+            raw.update(getattr(base, "__annotations__", {}))
+        globalns = getattr(sys.modules.get(obj.__module__), "__dict__", {})
+        localns: "dict | None" = dict(vars(obj))
+    else:
+        raw = getattr(obj, "__annotations__", {})
+        globalns = getattr(obj, "__globals__", {})
+        localns = None
+    return {name: _resolve_one(ann, globalns, localns) for name, ann in raw.items()}
+
+
+def _resolve_one(ann: Any, globalns: dict, localns: "dict | None") -> Any:
+    try:
+        value = eval(ann, globalns, localns) if isinstance(ann, str) else ann
+    except Exception:
+        return Any  # unresolvable (e.g. a TYPE_CHECKING-only name) — degrade just this one
+    # get_type_hints maps a `None` annotation to NoneType; match it so one-way
+    # (`-> None`) detection still works in the degraded path.
+    return type(None) if value is None else value
 
 
 def from_wire(parsed: Any, hint: Any) -> Any:
