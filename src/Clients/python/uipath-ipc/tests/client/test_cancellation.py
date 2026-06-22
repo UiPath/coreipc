@@ -125,3 +125,34 @@ async def test_cancellation_on_closed_connection_is_silent() -> None:
     # The send_request future has already been failed by aclose
     with pytest.raises((ConnectionError, asyncio.CancelledError)):
         await task
+
+
+async def test_cancellation_unwinding_through_aclose_is_delivered() -> None:
+    """A cancellation that unwinds THROUGH the connection's teardown — the common
+    case of a timeout / parent-cancel propagating up through `async with` — must
+    still reach the peer. The cancel-send runs inline at cancel time (before the
+    unwind hits aclose()), so the frame is written even though close follows
+    immediately. (Old behaviour: a detached, self-suppressing task lost the race
+    to aclose() and silently dropped it.)"""
+    conn, _reader, writer = await _make_connection()
+
+    async def use() -> None:
+        try:
+            await conn.send_request(
+                Request(endpoint="X", method_name="Slow", parameters=[], id="1"),
+                propagate_cancellation=True,  # an @ipc_cancellable method
+            )
+        finally:
+            await conn.aclose()  # cleanup runs as part of the cancellation unwind
+
+    task = asyncio.create_task(use())
+    for _ in range(10):  # let the request go out and send_request reach `await fut`
+        await asyncio.sleep(0)
+        if writer.buffer:
+            break
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    frames = _split_frames(bytes(writer.buffer))
+    assert any(t == int(MessageType.CANCELLATION_REQUEST) for t, _ in frames)

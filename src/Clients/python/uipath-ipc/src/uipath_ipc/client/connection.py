@@ -125,6 +125,12 @@ _dispatch_plan_cache: "weakref.WeakKeyDictionary[object, _DispatchPlan]" = (
 #: Sentinel for "no more wire args" (avoids allocating one per request).
 _MISSING = object()
 
+#: Upper bound a caller's cancellation waits for the best-effort
+#: CancellationRequest to flush before giving up. A non-reading peer can't be
+#: delivered to (and wouldn't act on the cancel anyway); local IPC flushes this
+#: tiny frame far faster, so the bound only bites on a stalled peer.
+_CANCEL_SEND_TIMEOUT = 2.0
+
 
 def _dispatch_plan(method: Callable[..., object]) -> _DispatchPlan:
     """Compute (and cache) how to bind wire args onto a handler's parameters,
@@ -439,7 +445,19 @@ class IpcConnection:
             # Forward the cancel to the peer only for @ipc_cancellable methods;
             # otherwise the peer has no CancellationToken to act on it.
             if propagate_cancellation:
-                asyncio.create_task(self._safe_send_cancellation(req.id))
+                # Send INLINE before re-raising — matching .NET, which initiates
+                # the cancel-send at cancel time, before any subsequent dispose.
+                # A detached task would lose the race to aclose() when the cancel
+                # unwinds through `async with` (timeout / parent-cancel) and get
+                # dropped. Bounded + best-effort so a non-reading peer can't wedge
+                # the cancellation.
+                try:
+                    await asyncio.wait_for(
+                        self._safe_send_cancellation(req.id),
+                        timeout=_CANCEL_SEND_TIMEOUT,
+                    )
+                except Exception:
+                    pass
             raise
         finally:
             self._pending.pop(req.id, None)
@@ -481,9 +499,9 @@ class IpcConnection:
             await write_frame(self._writer, msg_type, payload)
 
     async def _safe_send_cancellation(self, request_id: str) -> None:
-        """Best-effort: send a CancellationRequest, swallow any errors."""
-        if self._closed:
-            return
+        """Best-effort: send a CancellationRequest, swallow any errors. No
+        closed-check — the caller sends this inline at cancel time (before
+        aclose), and attempting it regardless mirrors .NET's fire-and-forget."""
         try:
             payload = (
                 CancellationRequest(request_id=request_id)
