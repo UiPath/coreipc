@@ -186,10 +186,10 @@ def test_non_finite_decimal_rejected() -> None:
         to_wire(Decimal("Infinity"))
 
 
-def test_dict_with_value_type_keys_stringifies() -> None:
-    # A dict keyed by UUID/datetime would TypeError in json.dumps without
-    # recursing keys; to_wire stringifies them (JSON keys are strings).
-    assert to_wire({UUID(_GUID): 1}) == {_GUID: 1}
+def test_dict_string_keys_only_values_encoded() -> None:
+    # Only string-keyed dicts are supported (JSON keys are strings, matching the
+    # .NET contracts). Keys pass through untouched; values are encoded.
+    assert to_wire({"id": UUID(_GUID)}) == {"id": _GUID}
 
 
 # --- dataclass (public from_wire) ------------------------------------------

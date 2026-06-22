@@ -78,10 +78,12 @@ def to_wire(value: Any) -> Any:
     if isinstance(value, (list, tuple, set, frozenset)):
         return [to_wire(v) for v in value]
     if isinstance(value, dict):
-        # Recurse keys too — a dict keyed by UUID/datetime/enum would otherwise
-        # TypeError in json.dumps (JSON keys are strings; to_wire stringifies
-        # those value types).
-        return {to_wire(k): to_wire(v) for k, v in value.items()}
+        # Values are encoded; keys are passed through. Only string keys are
+        # supported (JSON keys are strings) — matching the .NET contracts, which
+        # never use non-string-keyed dictionaries. A value-type key (UUID, etc.)
+        # is left as-is and fails fast in json.dumps rather than being silently
+        # transformed into a string we couldn't symmetrically decode.
+        return {k: to_wire(v) for k, v in value.items()}
     return value
 
 
