@@ -83,11 +83,19 @@ class IpcServer:
         self._handle: ServerHandle | None = None
         self._start_lock = asyncio.Lock()
         self._connections: set[IpcConnection] = set()
+        self._disposed = False
 
     # --- lifecycle ---------------------------------------------------------
 
     async def start(self) -> None:
-        """Begin listening. Idempotent and safe under concurrent calls."""
+        """Begin listening. Idempotent and safe under concurrent calls.
+
+        Single-use: once `aclose()` has run, the server cannot be restarted —
+        `start()` raises (matching .NET's `ObjectDisposedException`). Create a
+        new instance to listen again.
+        """
+        if self._disposed:
+            raise RuntimeError("IpcServer has been closed and cannot be restarted")
         if self._handle is not None:
             return
         # Lock + re-check so two racing start() calls can't both bind a listener
@@ -124,7 +132,9 @@ class IpcServer:
         await self._handle.wait_closed()
 
     async def aclose(self) -> None:
-        """Stop listening and close every live connection."""
+        """Stop listening and close every live connection. The server is
+        single-use afterward: a subsequent `start()` raises."""
+        self._disposed = True
         handle, self._handle = self._handle, None
         if handle is not None:
             handle.close()

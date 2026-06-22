@@ -214,6 +214,17 @@ async def test_concurrent_start_binds_one_listener() -> None:
         await server.aclose()
 
 
+async def test_start_after_aclose_raises() -> None:
+    # Single-use, matching .NET: a closed server must not silently re-bind a
+    # fresh listener on a later start() — it raises instead.
+    server = IpcServer(TcpServerTransport("127.0.0.1", 0), {})
+    await server.start()
+    await server.aclose()
+    with pytest.raises(RuntimeError):
+        await server.start()
+    assert server.handle is None  # no resurrected listener
+
+
 async def test_serve_forever_returns_after_aclose() -> None:
     server = IpcServer(TcpServerTransport("127.0.0.1", 0), {})
     await server.start()
