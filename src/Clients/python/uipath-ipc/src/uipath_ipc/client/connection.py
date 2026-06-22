@@ -675,6 +675,10 @@ class IpcConnection:
                     client=self, request_timeout=self.request_timeout
                 )
             elif tag == "varargs":
+                # *args elements pass through UNDECODED — materializing them to a
+                # declared element type (`*args: T`) is unsupported (no .NET/TS use
+                # case). Use explicit, individually-typed params. (README: Not
+                # supported / undefined behaviour.)
                 pos.extend(wire)
             elif tag == "wire":
                 nxt = next(wire, _MISSING)
