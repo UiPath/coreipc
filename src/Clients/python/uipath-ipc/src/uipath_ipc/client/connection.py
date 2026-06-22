@@ -578,7 +578,10 @@ class IpcConnection:
             _logger.warning("dropping malformed CANCELLATION frame: %r", ex)
             return
         task = self._incoming_handlers.get(cancel.request_id)
-        if task is not None and not task.done():
+        if task is not None:
+            # cancel() no-ops on an already-done task and is safe to repeat, and
+            # there's no await between here and now for the state to race — so no
+            # done() check is needed.
             task.cancel()
 
     def _bind_handler_args(
