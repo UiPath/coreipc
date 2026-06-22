@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 
 import pytest
 
-from uipath_ipc import IpcClient
+from uipath_ipc import IpcClient, ipc_cancellable
 from uipath_ipc.transport.base import ClientTransport
 from uipath_ipc.wire import CancellationRequest, MessageType, Response
 
@@ -58,6 +58,9 @@ def _split_frames(buf: bytes) -> list[tuple[int, bytes]]:
 
 
 class IComputingService(ABC):
+    # @ipc_cancellable so a client-side timeout forwards a CancellationRequest
+    # (the cancellation tests below rely on it); AddFloats is left unmarked.
+    @ipc_cancellable
     @abstractmethod
     async def Wait(self, duration: float) -> bool: ...
 

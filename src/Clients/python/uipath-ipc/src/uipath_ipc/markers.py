@@ -12,27 +12,26 @@ IPC_CANCELLABLE_ATTR = "__ipc_cancellable__"
 
 
 def ipc_cancellable(method: _F) -> _F:
-    """Mark a contract method whose .NET counterpart ends with a
-    ``CancellationToken``.
+    """Mark a contract method whose .NET counterpart observes cancellation (its
+    signature ends with a ``CancellationToken``).
 
-    **Documentation-only — zero wire effect.** The Python signature omits the
-    ``CancellationToken`` entirely: Python uses asyncio cancellation, delivered
-    out-of-band as a ``CancellationRequest`` frame, never as a parameter. This
-    marker simply records that the .NET method has a trailing ``CancellationToken``
-    so the contract is self-describing — it explains why the Python signature has
-    one fewer parameter than the C# one.
+    The marker gates **cancellation propagation**. When the local task awaiting
+    such a call is cancelled — or its local deadline elapses — the client sends a
+    ``CancellationRequest`` frame to the peer so it can cancel its in-flight
+    handler. **Without the marker, a local cancellation stays local: no
+    ``CancellationRequest`` is sent** — signalling a peer that has no
+    ``CancellationToken`` to observe it would be pointless.
 
-    Nothing reads this at call time. A Python *client* sends only the declared
-    arguments; the .NET *server* fills the missing trailing ``CancellationToken``
-    slot with a default and injects the real token by type (see
-    ``Server.cs.GetArguments``). Symmetrically, a Python *server* hosting such a
-    method ignores the trailing empty-string slot a .NET client sends for its
-    ``CancellationToken``.
+    It does NOT change the request itself. The Python signature omits the
+    ``CancellationToken`` (cancellation rides out-of-band as its own frame, never
+    as a parameter), and the request's ``Parameters`` are unaffected — no token
+    slot is added. The .NET *server* fills the missing trailing token slot with a
+    default and injects the real token by type; a Python *server* ignores the
+    empty-string slot a .NET client sends for its token.
 
-    The token MUST be the **last** .NET parameter. .NET itself accepts a
-    ``CancellationToken`` at any position (detected by type), but a method-level
-    marker can't carry position, so in a .NET↔Python pairing it is constrained to
-    last — a non-last token would misalign the trailing arguments on the wire.
+    The token must be the **last** .NET parameter. .NET matches it by type at any
+    position, but the Python signature omits it, so a non-last token would
+    misalign the trailing arguments on the wire.
 
     Example::
 

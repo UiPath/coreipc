@@ -55,7 +55,10 @@ async def test_cancelling_a_request_sends_cancellation_frame() -> None:
     conn, _reader, writer = await _make_connection()
     try:
         req = Request(endpoint="X", method_name="Slow", parameters=[], id="1")
-        task = asyncio.create_task(conn.send_request(req))
+        # propagate_cancellation=True == an @ipc_cancellable method.
+        task = asyncio.create_task(
+            conn.send_request(req, propagate_cancellation=True)
+        )
         await asyncio.sleep(0)  # let the request go out
 
         # Should now have one frame on the wire — the original request.
@@ -81,6 +84,31 @@ async def test_cancelling_a_request_sends_cancellation_frame() -> None:
         assert cancel_type == int(MessageType.CANCELLATION_REQUEST)
         cancel_msg = CancellationRequest.from_json(cancel_payload.decode("utf-8"))
         assert cancel_msg.request_id == "1"
+    finally:
+        await conn.aclose()
+
+
+async def test_cancellation_not_forwarded_without_propagate_flag() -> None:
+    """Default (an unmarked / not-@ipc_cancellable method): cancelling the
+    awaiting task does NOT send a CancellationRequest — the cancel stays local."""
+    conn, _reader, writer = await _make_connection()
+    try:
+        req = Request(endpoint="X", method_name="Slow", parameters=[], id="1")
+        task = asyncio.create_task(conn.send_request(req))  # propagate defaults False
+        await asyncio.sleep(0)
+        assert len(_split_frames(bytes(writer.buffer))) == 1  # just the request
+
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        # Give any (erroneous) fire-and-forget cancellation a chance to appear.
+        for _ in range(20):
+            await asyncio.sleep(0)
+
+        frames = _split_frames(bytes(writer.buffer))
+        assert len(frames) == 1  # still ONLY the request — no cancellation frame
+        assert frames[0][0] == int(MessageType.REQUEST)
     finally:
         await conn.aclose()
 

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, get_type_hints
 
 from ..errors import RemoteException
 from ..hooks import CallInfo
+from ..markers import IPC_CANCELLABLE_ATTR
 from ..message import INFINITE_REQUEST_TIMEOUT, Message
 from ..wire import Request, Response, from_wire, to_wire
 
@@ -41,6 +42,29 @@ def _return_hint(contract: type, method_name: str) -> Any:
     except TypeError:
         pass
     return hint
+
+
+#: Cache of whether a contract method is @ipc_cancellable, keyed weakly by the
+#: function (like _return_hint) so the lookup runs once per method.
+_cancellable_cache: "weakref.WeakKeyDictionary[Any, bool]" = weakref.WeakKeyDictionary()
+
+
+def _is_cancellable(contract: type, method_name: str) -> bool:
+    """True if the method is marked `@ipc_cancellable` — i.e. its .NET
+    counterpart observes cancellation, so a local cancel should be forwarded to
+    the peer as a CancellationRequest. Unmarked methods cancel locally only."""
+    func = inspect.getattr_static(contract, method_name, None)
+    if func is None:
+        return False
+    cached = _cancellable_cache.get(func)
+    if cached is not None:
+        return cached
+    result = bool(getattr(func, IPC_CANCELLABLE_ATTR, False))
+    try:
+        _cancellable_cache[func] = result
+    except TypeError:
+        pass
+    return result
 
 
 def _message_wire(m: Message) -> dict:
@@ -111,6 +135,10 @@ class _IpcProxy:
         # spends processing. Sending it as TimeoutInSeconds would silently
         # impose the caller's local SLA as the server's cancellation deadline.
         client_timeout = self._client.request_timeout
+        # Only forward a local cancel/timeout to the peer when the contract
+        # method is @ipc_cancellable (its .NET counterpart has a CancellationToken
+        # to observe it). Otherwise cancellation stays local.
+        cancellable = _is_cancellable(self._contract, method_name)
         wire_timeout: float | None = None
         params: list[str] = []
         for a in args:
@@ -160,7 +188,7 @@ class _IpcProxy:
                 id=conn.next_id(),
                 timeout_in_seconds=wire_timeout,
             )
-            return await conn.send_request(req)
+            return await conn.send_request(req, propagate_cancellation=cancellable)
 
         # Bound connect+send by the LOCAL deadline (client_timeout). A
         # non-positive value imposes no client-side deadline: 0 ("use server

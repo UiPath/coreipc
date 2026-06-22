@@ -388,12 +388,18 @@ class IpcConnection:
         # (`_ensure_connected` + `request_timeout`), so no adapter is required.
         return cast(T, _IpcProxy(self, contract))
 
-    async def send_request(self, req: Request) -> Response:
+    async def send_request(
+        self, req: Request, *, propagate_cancellation: bool = False
+    ) -> Response:
         """Send a request and await the matching response.
 
-        If the awaiting task is cancelled, a best-effort
-        `CancellationRequest` is sent to the server with the matching id,
-        and `CancelledError` is re-raised so the cancellation propagates.
+        If the awaiting task is cancelled, a best-effort `CancellationRequest`
+        is sent to the peer with the matching id — but ONLY when
+        `propagate_cancellation` is True (the call's contract method is
+        `@ipc_cancellable`). Otherwise the cancel stays local: the peer isn't
+        told to cancel, since without a `CancellationToken` it has nothing to
+        honor it with. `CancelledError` is re-raised either way so cancellation
+        still propagates locally.
         """
         if self._closed:
             raise ConnectionError("connection is closed")
@@ -414,7 +420,10 @@ class IpcConnection:
             # CancellationRequest for a call the peer already answered.
             if fut.done() and not fut.cancelled() and fut.exception() is None:
                 return fut.result()
-            asyncio.create_task(self._safe_send_cancellation(req.id))
+            # Forward the cancel to the peer only for @ipc_cancellable methods;
+            # otherwise the peer has no CancellationToken to act on it.
+            if propagate_cancellation:
+                asyncio.create_task(self._safe_send_cancellation(req.id))
             raise
         finally:
             self._pending.pop(req.id, None)

@@ -1,9 +1,10 @@
 """Unit tests for the @ipc_cancellable contract marker (markers.py).
 
-The marker is documentation-only: it records that a method's .NET counterpart
-ends with a CancellationToken. The load-bearing property is that it has ZERO
-wire effect — in particular it must NOT append an empty-string slot (that would
-corrupt optional-param alignment; see the design notes on the PR)."""
+The marker gates cancellation propagation: a cancelled call to a marked method
+forwards a CancellationRequest to the peer; an unmarked one cancels locally
+only. It must NOT, however, change the request itself — in particular it must
+never append an empty-string CancellationToken slot to Request.Parameters (that
+would corrupt optional-param alignment; see the design notes on the PR)."""
 
 from __future__ import annotations
 
@@ -11,6 +12,8 @@ import asyncio
 import json
 import struct
 from abc import ABC, abstractmethod
+
+import pytest
 
 from uipath_ipc import IpcClient, ipc_cancellable
 from uipath_ipc.markers import IPC_CANCELLABLE_ATTR
@@ -105,10 +108,57 @@ async def _params_for(method_name: str) -> list[str]:
     return params
 
 
-async def test_ipc_cancellable_adds_nothing_to_the_wire() -> None:
-    # The annotated method serializes exactly its one declared arg — no extra
-    # CancellationToken "" slot appended — identical to the unannotated method.
+async def test_ipc_cancellable_does_not_change_request_parameters() -> None:
+    # The marker affects cancellation frames, NOT the request: the annotated
+    # method serializes exactly its one declared arg — no extra CancellationToken
+    # "" slot — identical to the unannotated method.
     cancellable_params = await _params_for("Cancellable")
     plain_params = await _params_for("Plain")
     assert cancellable_params == plain_params
     assert cancellable_params == [json.dumps(7)]  # just the one declared arg
+
+
+# --- cancellation gating ---------------------------------------------------
+
+def _split_frames(buf: bytes) -> list[tuple[int, bytes]]:
+    out: list[tuple[int, bytes]] = []
+    i = 0
+    while i + 5 <= len(buf):
+        msg_type = buf[i]
+        length = int.from_bytes(buf[i + 1 : i + 5], "little", signed=True)
+        i += 5
+        out.append((msg_type, bytes(buf[i : i + length])))
+        i += length
+    return out
+
+
+async def _frame_types_after_cancel(method_name: str) -> list[int]:
+    """Drive a proxy call, cancel the awaiting task, and return the message
+    types of every frame the client sent (the request, and maybe a cancel)."""
+    transport = _FakeTransport()
+    async with IpcClient(transport) as client:
+        svc = client.get_proxy(_IService)
+        task = asyncio.create_task(getattr(svc, method_name)(7))
+        for _ in range(50):
+            await asyncio.sleep(0)
+            if transport.writer.buffer:
+                break
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        # Flush any fire-and-forget cancellation BEFORE the context manager
+        # closes the connection.
+        for _ in range(20):
+            await asyncio.sleep(0)
+        return [t for (t, _) in _split_frames(bytes(transport.writer.buffer))]
+
+
+async def test_annotated_method_forwards_cancellation() -> None:
+    types = await _frame_types_after_cancel("Cancellable")
+    assert int(MessageType.REQUEST) in types
+    assert int(MessageType.CANCELLATION_REQUEST) in types
+
+
+async def test_unannotated_method_does_not_forward_cancellation() -> None:
+    types = await _frame_types_after_cancel("Plain")
+    assert types == [int(MessageType.REQUEST)]  # request only — no cancellation
