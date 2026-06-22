@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from uipath_ipc import IpcServer, Message, NamedPipeServerTransport
+from uipath_ipc import IpcServer, Message, NamedPipeServerTransport, ipc_cancellable
 
 pytestmark = pytest.mark.integration
 
@@ -49,18 +49,23 @@ class IPythonService(ABC):
     ``GreetVia`` adds a trailing ``Message`` not present here (reach-back), and
     the .NET client's trailing ``CancellationToken`` is never sent on the wire."""
 
+    @ipc_cancellable
     @abstractmethod
     async def AddFloats(self, x: float, y: float) -> float: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def EchoString(self, value: str) -> str: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def MultiplyInts(self, x: int, y: int) -> int: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def GreetVia(self, name: str, m: Message) -> str: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def FailWith(self, message: str) -> bool: ...
 

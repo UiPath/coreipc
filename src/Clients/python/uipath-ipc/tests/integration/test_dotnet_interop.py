@@ -24,6 +24,7 @@ from uipath_ipc import (
     Message,
     NamedPipeClientTransport,
     RemoteException,
+    ipc_cancellable,
 )
 
 from .conftest import DOTNET_PIPE_NAME
@@ -34,36 +35,50 @@ pytestmark = pytest.mark.integration
 
 # --- contracts (matching the .NET interfaces by name) --------------------
 
+# Every .NET method here ends with `CancellationToken ct = default`, so the
+# Python signatures omit it and carry @ipc_cancellable to say so — exercising
+# the marker end-to-end against the real server (it must stay a wire no-op).
+
 class IComputingService(ABC):
+    @ipc_cancellable
     @abstractmethod
     async def AddFloats(self, x: float, y: float) -> float: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def AddComplexNumbers(self, a: dict, b: dict) -> dict: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def MultiplyInts(self, x: int, y: int) -> int: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def DivideByZero(self) -> bool: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def Wait(self, duration: str) -> bool: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def WaitWithMessage(self, duration: str, m: object) -> bool: ...
 
 
 class ISystemService(ABC):
+    @ipc_cancellable
     @abstractmethod
     async def EchoString(self, value: str) -> str: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def ReverseBytes(self, data: bytes) -> bytes: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def EchoGuid(self, value: UUID) -> UUID: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def EchoDateTime(self, value: dt.datetime) -> dt.datetime: ...
 
@@ -71,6 +86,10 @@ class ISystemService(ABC):
 # Callback contracts — IClientCallback is the contract the *client* hosts;
 # ICallbackTester is the server endpoint that invokes IClientCallback back.
 
+# IClientCallback is deliberately NOT @ipc_cancellable: the .NET callback
+# interfaces declare no CancellationToken (so the server never sends a ct slot
+# when calling back) — verifying the unannotated path still works alongside the
+# annotated one.
 class IClientCallback(ABC):
     @abstractmethod
     async def EchoToClient(self, value: str) -> str: ...
@@ -80,9 +99,11 @@ class IClientCallback(ABC):
 
 
 class ICallbackTester(ABC):
+    @ipc_cancellable
     @abstractmethod
     async def TriggerEcho(self, value: str) -> str: ...
 
+    @ipc_cancellable
     @abstractmethod
     async def TriggerAdd(self, x: int, y: int) -> int: ...
 
@@ -296,6 +317,32 @@ async def test_infinite_per_call_timeout_overrides_server_default(dotnet_server)
         assert await svc.WaitWithMessage(
             "00:00:03", Message(request_timeout=INFINITE_REQUEST_TIMEOUT)
         ) is True
+
+
+# --- cancellation through an @ipc_cancellable method ------------------------
+
+async def test_cancellation_propagates_through_cancellable_method(dotnet_server) -> None:
+    """Cancelling an in-flight call to an @ipc_cancellable .NET method (whose
+    handler awaits Task.Delay(duration, ct)) unblocks promptly: the asyncio
+    cancellation is delivered to the server out-of-band as a CancellationRequest
+    frame, which fires the .NET CancellationToken. Proves the marker is just
+    documentation — cancellation never rides as a parameter."""
+    async with _new_client() as client:
+        svc = client.get_proxy(IComputingService)
+        task = asyncio.create_task(svc.Wait("00:00:10"))
+        # Let the request reach the server and start its Task.Delay.
+        await asyncio.sleep(0.3)
+        assert not task.done()
+
+        task.cancel()
+        start = asyncio.get_running_loop().time()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert asyncio.get_running_loop().time() - start < 2.0, "cancel was not prompt"
+
+        # Let the fire-and-forget CancellationRequest flush to the server before
+        # the context manager closes the connection.
+        await asyncio.sleep(0.2)
 
 
 # --- before_call hook (outgoing only — .NET parity) -------------------------

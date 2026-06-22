@@ -69,6 +69,24 @@ task.cancel()              # CancelledError propagates up through await
 
 When the proxy observes `CancelledError`, it sends a `CancellationRequest` frame to the server (matching the in-flight request id) before re-raising.
 
+#### `@ipc_cancellable` and .NET `CancellationToken`
+
+Because cancellation is task-based, a Python contract **never declares** a `CancellationToken` parameter — it's delivered out-of-band, not as an argument. When a method's .NET counterpart ends with a `CancellationToken`, mark it with `@ipc_cancellable` so the contract is self-describing:
+
+```python
+from uipath_ipc import ipc_cancellable
+
+class IRobotService(ABC):
+    @ipc_cancellable
+    @abstractmethod
+    async def LongRunning(self, count: int) -> int: ...
+    # .NET: Task<int> LongRunning(int count, CancellationToken ct = default)
+```
+
+The decorator is **documentation-only — it has no wire effect**. A client sends only the declared arguments; the .NET server fills the missing trailing `CancellationToken` slot with a default and injects the real token by type. A Python server symmetrically ignores the empty-string slot a .NET client sends for its token.
+
+One constraint: .NET accepts a `CancellationToken` at any position (matched by type), but a method-level marker can't express position, so in a .NET↔Python pairing the token **must be the last .NET parameter** — otherwise the trailing arguments misalign on the wire.
+
 ### Timeouts
 
 Configure a per-client default:
