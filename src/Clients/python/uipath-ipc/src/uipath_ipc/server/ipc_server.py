@@ -81,7 +81,9 @@ class IpcServer:
         self._request_timeout = request_timeout
         self._before_call = before_call
         self._handle: ServerHandle | None = None
-        self._start_lock = asyncio.Lock()
+        # Serializes ALL lifecycle state changes (`_disposed`, `_handle`) so
+        # start()/aclose() can't race; held across serve() in start().
+        self._lifecycle_lock = asyncio.Lock()
         self._connections: set[IpcConnection] = set()
         self._disposed = False
 
@@ -94,13 +96,14 @@ class IpcServer:
         `start()` raises (matching .NET's `ObjectDisposedException`). Create a
         new instance to listen again.
         """
-        if self._disposed:
-            raise RuntimeError("IpcServer has been closed and cannot be restarted")
-        if self._handle is not None:
-            return
-        # Lock + re-check so two racing start() calls can't both bind a listener
-        # (the check-then-`await serve` gap would otherwise leak one).
-        async with self._start_lock:
+        # Read AND mutate lifecycle state under the lock — and hold it across
+        # serve() — so a concurrent aclose() (same lock) can neither slip a
+        # listener past the disposed check nor leave one un-closed.
+        async with self._lifecycle_lock:
+            if self._disposed:
+                raise RuntimeError(
+                    "IpcServer has been closed and cannot be restarted"
+                )
             if self._handle is not None:
                 return
             self._handle = await self._transport.serve(self._on_connection)
@@ -134,15 +137,18 @@ class IpcServer:
     async def aclose(self) -> None:
         """Stop listening and close every live connection. The server is
         single-use afterward: a subsequent `start()` raises."""
-        self._disposed = True
-        handle, self._handle = self._handle, None
+        # Flip lifecycle state under the lock (serialized with start()), then do
+        # the slow teardown outside it so the lock isn't held across awaits.
+        async with self._lifecycle_lock:
+            self._disposed = True
+            handle, self._handle = self._handle, None
+            connections = list(self._connections)
+            self._connections.clear()
         if handle is not None:
             handle.close()
         # Close connections BEFORE awaiting the listener's wait_closed():
         # asyncio.Server.wait_closed() (Python 3.12+) blocks until every
         # active connection has finished, so it would hang otherwise.
-        connections = list(self._connections)
-        self._connections.clear()
         for conn in connections:
             await conn.aclose()
         if handle is not None:
