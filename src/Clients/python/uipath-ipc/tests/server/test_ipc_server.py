@@ -225,6 +225,68 @@ async def test_start_after_aclose_raises() -> None:
     assert server.handle is None  # no resurrected listener
 
 
+class _GatedServerTransport(ServerTransport):
+    """Captures the on_connection callback and gates wait_closed(), so a test can
+    fire a late accept while aclose() is suspended waiting for the listener."""
+
+    def __init__(self) -> None:
+        self.on_connection = None
+        self.release = asyncio.Event()
+
+    async def serve(self, on_connection):  # type: ignore[override]
+        self.on_connection = on_connection
+        release = self.release
+
+        class _Handle:
+            def close(self) -> None: ...
+            async def wait_closed(self) -> None:
+                await release.wait()
+
+        return _Handle()
+
+
+class _RecordingWriter:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def write(self, data: bytes) -> None: ...
+    async def drain(self) -> None: ...
+    def close(self) -> None:
+        self.closed = True
+    async def wait_closed(self) -> None: ...
+
+
+async def test_aclose_does_not_leak_connection_accepted_during_shutdown() -> None:
+    """A client accepted during aclose()'s teardown (its connection_made fires
+    while aclose is awaiting the listener) must NOT be served — it would
+    otherwise miss the shutdown snapshot and leak as a live connection."""
+    transport = _GatedServerTransport()
+    server = IpcServer(transport, {})
+    await server.start()
+    assert transport.on_connection is not None
+
+    # Start shutdown; it suspends at the gated wait_closed() with _disposed set
+    # and _connections already snapshotted + cleared.
+    closing = asyncio.create_task(server.aclose())
+    for _ in range(5):
+        await asyncio.sleep(0)
+    assert server._disposed  # past the snapshot, now awaiting the listener
+
+    # Fire late accepts DURING the shutdown await — as if their connection_made
+    # was queued before the listener closed.
+    late = []
+    for _ in range(5):
+        w = _RecordingWriter()
+        late.append(w)
+        transport.on_connection(asyncio.StreamReader(), w)  # type: ignore[arg-type]
+
+    transport.release.set()  # let aclose() finish
+    await asyncio.wait_for(closing, timeout=5)
+
+    assert server.connection_count == 0, "a connection leaked past aclose()"
+    assert all(w.closed for w in late), "late connections were not closed"
+
+
 async def test_serve_forever_returns_after_aclose() -> None:
     server = IpcServer(TcpServerTransport("127.0.0.1", 0), {})
     await server.start()

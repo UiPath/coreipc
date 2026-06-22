@@ -112,6 +112,17 @@ class IpcServer:
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         """Accept one client: wrap its stream in a service-hosting connection."""
+        # A connect accepted during/after aclose() (its connection_made fires
+        # while aclose is awaiting the listener) must NOT be served: the shutdown
+        # snapshot has already been taken, so adding it would leak a live
+        # connection past close. _disposed is flipped atomically under the lock,
+        # and this callback is synchronous, so the read can't race the snapshot.
+        if self._disposed:
+            try:
+                writer.close()
+            except Exception:
+                pass
+            return
         conn = IpcConnection(
             reader,
             writer,
