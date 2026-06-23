@@ -44,29 +44,6 @@ steps:
     cleanDestinationFolder: true
 
 # ---------------------------------------------------------------------
-# Primary target: project-scoped Azure Artifacts feed `uipath-ipc-deps`.
-# ---------------------------------------------------------------------
-# Authenticated via the pipeline's built-in identity (already an
-# administrator on the feed — see CoreIpc/_artifacts/feed/uipath-ipc-deps).
-# No PAT, no service connection, no rotation policy to fight with.
-# ---------------------------------------------------------------------
-- task: Npm@1
-  displayName: 'Publish to Azure Artifacts (uipath-ipc-deps) — NodeJS'
-  inputs:
-    command: 'publish'
-    workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/node'
-    publishRegistry: 'useFeed'
-    publishFeed: 'CoreIpc/9a5bdfb1-0ab4-40b9-b9d2-de4cf6c011eb'
-
-- task: Npm@1
-  displayName: 'Publish to Azure Artifacts (uipath-ipc-deps) — Web'
-  inputs:
-    command: 'publish'
-    workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/web'
-    publishRegistry: 'useFeed'
-    publishFeed: 'CoreIpc/9a5bdfb1-0ab4-40b9-b9d2-de4cf6c011eb'
-
-# ---------------------------------------------------------------------
 # Secondary target: GitHub Packages (best-effort, currently expected to fail)
 # ---------------------------------------------------------------------
 # Following the May 11–12, 2026 npm supply-chain incident (Mini Shai-Hulud
