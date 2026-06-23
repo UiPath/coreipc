@@ -29,7 +29,7 @@ Contracts are a **shared agreement** between both peers, and every client *trust
 
 ## Cancellation
 
-- **Never a wire parameter.** Cancellation rides a separate `CancellationRequest` frame (or is local-only). A C# `CancellationToken` is the trigger; it is stripped from the wire.
+- **The cancellation _signal_ is out-of-band, not a parameter value.** Cancellation rides a separate `CancellationRequest` frame keyed by request id (or is local-only) — the token's value never travels. A `CancellationToken` parameter does still occupy its positional **slot** on the wire, but only as an **inert placeholder**: .NET serializes it as an empty string, TypeScript as `{}`, and Python omits the slot entirely. The receiver ignores the slot's content (the server injects the live token by type), so the placeholder has no effect on behaviour.
 - **Keep the `CancellationToken` last _only_ when a Python client is in the mix.** .NET and TypeScript accept it at **any** position — it's matched **by type** (the client blanks whatever wire slot holds it; the .NET server injects the live token by type, ignoring the slot value), so e.g. a `Funky(CancellationToken, int, int)` contract round-trips .NET↔.NET. (The would-be validator `Validator.CheckCancellationToken` exists but is **not wired into registration**, so it doesn't enforce a position.) **Python** is the exception: it omits the token from the signature entirely, so a non-last token misaligns the remaining arguments on the wire — so when a Python peer is involved, the token must be the **last** parameter.
 - **Propagation to the peer differs:**
   - **.NET** — a fired token sends a `CancellationRequest`.
