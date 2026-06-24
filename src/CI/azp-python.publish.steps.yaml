@@ -42,11 +42,17 @@ steps:
 
 # TwineAuthenticate writes a .pypirc with the Azure Artifacts feed's auth
 # and exports PYPIRC_PATH for the next step to consume.
+# Target the project-scoped feed in the Public.Feeds project — the same feed
+# the NuGet package publishes to (see azp-nuget.publish.steps.yaml).
 - task: TwineAuthenticate@1
-  displayName: 'Authenticate twine with uipath-ipc-deps'
+  displayName: 'Authenticate twine with UiPath-Internal'
   inputs:
-    artifactFeed: 'CoreIpc/uipath-ipc-deps'
+    artifactFeed: 'Public.Feeds/UiPath-Internal'
 
 - script: |
-    python -m twine upload -r uipath-ipc-deps --config-file $(PYPIRC_PATH) "$(Pipeline.Workspace)/Python package/"*
-  displayName: 'Upload wheel + sdist to uipath-ipc-deps'
+    # TwineAuthenticate writes a [<bare-feed-name>] section into .pypirc — the
+    # 'Public.Feeds/' project prefix is dropped and the case is preserved — so
+    # `-r` must be the bare, case-exact feed name 'UiPath-Internal'.
+    grep '^\[' "$(PYPIRC_PATH)" || true   # diagnostic (no secrets): confirm the .pypirc section header
+    python -m twine upload -r UiPath-Internal --config-file $(PYPIRC_PATH) "$(Pipeline.Workspace)/Python package/"*
+  displayName: 'Upload wheel + sdist to UiPath-Internal'

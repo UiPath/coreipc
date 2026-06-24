@@ -37,7 +37,7 @@ parameters:
     default: true
 
   - name: publishPyPI
-    displayName: 'Publish Python (wheel + sdist) → uipath-ipc-deps'
+    displayName: 'Publish Python (wheel + sdist) → UiPath-Internal'
     type: boolean
     default: true
 
@@ -142,7 +142,7 @@ stages:
     dependsOn: []
     jobs:
     - deployment: Publish_PyPI_Package
-      displayName: '📦 Publish Python wheel + sdist to uipath-ipc-deps'
+      displayName: '📦 Publish Python wheel + sdist to UiPath-Internal'
       environment: 'PyPI-Packages'
       pool:
         vmImage: 'ubuntu-latest'
