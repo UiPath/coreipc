@@ -1,6 +1,7 @@
 name: $(Date:yyyyMMdd)$(Rev:-rr)
 
 variables:
+  SCG_KILL_SWITCH: 'true' # Because our integration with the Aikido Safe Chain pipeline decorator (SGC rollout) is still buggy: https://uipath-product.slack.com/archives/CMCKWF5TR/p1780002214456709
   Label_Initialization: 'Initialization:'
   Label_DotNet: '.NET:'
   Label_NodeJS: 'node.js:'
