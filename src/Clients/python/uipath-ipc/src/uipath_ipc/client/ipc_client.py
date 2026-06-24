@@ -9,6 +9,7 @@ from typing import TypeVar, cast
 
 from ..hooks import BeforeCallHandler, BeforeConnectHandler
 from ..transport.base import ClientTransport
+from ..wire import MAX_PAYLOAD_BYTES
 from .connection import IpcConnection
 from .proxy import _IpcProxy
 
@@ -35,6 +36,7 @@ class IpcClient:
         callbacks: dict[type, object] | None = None,
         before_connect: BeforeConnectHandler | None = None,
         before_call: BeforeCallHandler | None = None,
+        max_message_size: int = MAX_PAYLOAD_BYTES,
     ) -> None:
         """Create a new client.
 
@@ -65,6 +67,11 @@ class IpcClient:
                 for inbound callbacks) — the analog of .NET's
                 ``BeforeOutgoingCall``. Receives a `CallInfo`; raising aborts
                 the call.
+            max_message_size: Upper bound, in bytes, on an INBOUND frame's
+                payload (the analog of .NET's ``MaxReceivedMessageSize``). A
+                larger frame is rejected before allocation, failing the
+                connection rather than letting a corrupt/hostile header demand a
+                huge buffer. Defaults to 2 MB.
         """
         self._transport = transport
         self._connection: IpcConnection | None = None
@@ -78,6 +85,7 @@ class IpcClient:
         self._before_connect = before_connect
         #: Read by `_IpcProxy._invoke` before sending each outgoing request.
         self.before_call = before_call
+        self._max_message_size = max_message_size
         # Translate contract-type keys to endpoint-name keys once at
         # construction; the connection stores by name but keeps the contract
         # type so dispatch can resolve incoming methods against it.
@@ -130,6 +138,7 @@ class IpcClient:
                     self._transport,
                     callbacks=self._callbacks,
                     request_timeout=self.request_timeout,
+                    max_message_size=self._max_message_size,
                 )
             finally:
                 self._connecting_task = None

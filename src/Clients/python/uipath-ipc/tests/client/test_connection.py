@@ -8,6 +8,7 @@ import struct
 
 import pytest
 
+from uipath_ipc import IpcClient, IpcServer
 from uipath_ipc.client import IpcConnection
 from uipath_ipc.wire import MessageType, Request, Response
 
@@ -60,6 +61,16 @@ class _StalledCloseWriter(_BufferWriter):
         await asyncio.Event().wait()  # never set — graceful close hangs forever
 
 
+class _BlockingDrainAbortableWriter(_BlockingDrainWriter):
+    """Non-reading peer whose drain() never completes (backpressure) AND that
+    exposes an abortable transport — so a send-timeout teardown's abort() is
+    observable."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.transport = _AbortableTransport()
+
+
 def _frame(msg_type: MessageType, payload: bytes) -> bytes:
     return struct.pack("<Bi", int(msg_type), len(payload)) + payload
 
@@ -79,12 +90,15 @@ def _response_frame(resp: Response) -> bytes:
     return _frame(MessageType.RESPONSE, resp.to_json().encode("utf-8"))
 
 
-async def _make_connection(*, prefeed: bytes = b"") -> tuple[IpcConnection, asyncio.StreamReader, _BufferWriter]:
+async def _make_connection(
+    *, prefeed: bytes = b"", max_message_size: int | None = None
+) -> tuple[IpcConnection, asyncio.StreamReader, _BufferWriter]:
     reader = asyncio.StreamReader()
     if prefeed:
         reader.feed_data(prefeed)
     writer = _BufferWriter()
-    conn = IpcConnection(reader, writer)  # type: ignore[arg-type]
+    extra = {} if max_message_size is None else {"max_message_size": max_message_size}
+    conn = IpcConnection(reader, writer, **extra)  # type: ignore[arg-type]
     conn.start()
     return conn, reader, writer
 
@@ -350,6 +364,29 @@ async def test_send_frame_timeout_tears_down_connection() -> None:
         await conn.aclose()
 
 
+async def test_send_timeout_aborts_transport_not_just_graceful_close() -> None:
+    """Regression: a request-send timeout against a non-reading peer must ABORT
+    the transport — the same forceful teardown aclose() does — not merely call
+    writer.close(). On the Windows ProactorEventLoop a graceful close defers
+    connection_lost until the (full) write buffer drains, which never happens
+    for a deaf peer, so without the abort the fd / buffered bytes / receive task
+    all leak. A later aclose() must also still be safe (the timeout path
+    pre-set _closed)."""
+    reader = asyncio.StreamReader()
+    writer = _BlockingDrainAbortableWriter()
+    conn = IpcConnection(reader, writer, send_timeout=0.05)  # type: ignore[arg-type]
+    conn.start()
+    try:
+        with pytest.raises(asyncio.TimeoutError):
+            await conn.send_request(
+                Request(endpoint="X", method_name="Y", parameters=[], id="1")
+            )
+        assert writer.transport.aborted  # forced down, not left to a deaf graceful close
+        assert conn.is_closed
+    finally:
+        await conn.aclose()  # idempotent; still safe though _closed was pre-set
+
+
 async def test_best_effort_send_timeout_does_not_tear_down_connection() -> None:
     """A best-effort RESPONSE send that hits the send_timeout (non-reading peer)
     is abandoned gracefully — the connection stays up, unlike a request send.
@@ -522,3 +559,45 @@ async def test_aclose_aborts_instead_of_hanging_on_non_reading_peer() -> None:
     # hangs (so wait_for would time out). With the fix it aborts and returns.
     await asyncio.wait_for(conn.aclose(), timeout=2.0)
     assert writer.transport.aborted  # forced closed rather than waiting on flush
+
+
+# --- configurable max message size ----------------------------------------
+
+async def test_max_message_size_rejects_oversized_inbound_frame() -> None:
+    """A configured max_message_size bounds INBOUND frames: a payload over the
+    cap is rejected by the receive loop (before allocation), tearing the
+    connection down. 65 bytes would pass under the 2 MB default — so the close
+    proves the custom cap is the one in force (mirrors .NET MaxReceivedMessageSize)."""
+    cap = 64
+    oversized = _frame(MessageType.RESPONSE, b"x" * (cap + 1))
+    conn, _reader, _writer = await _make_connection(
+        prefeed=oversized, max_message_size=cap
+    )
+    assert conn._receive_task is not None
+    await asyncio.wait_for(conn._receive_task, timeout=1.0)
+    assert conn.is_closed
+
+
+async def test_max_message_size_within_cap_round_trips() -> None:
+    """A frame within a custom (non-default) cap is processed normally."""
+    conn, reader, _writer = await _make_connection(max_message_size=4096)
+    try:
+        send_task = asyncio.create_task(
+            conn.send_request(
+                Request(endpoint="X", method_name="Y", parameters=[], id="1")
+            )
+        )
+        await asyncio.sleep(0)
+        reader.feed_data(_response_frame(Response(request_id="1", data="42")))
+        resp = await asyncio.wait_for(send_task, timeout=1.0)
+        assert resp == Response(request_id="1", data="42")
+    finally:
+        await conn.aclose()
+
+
+async def test_ipc_client_and_server_accept_max_message_size() -> None:
+    """max_message_size is configurable on the public IpcClient / IpcServer."""
+    client = IpcClient(transport=object(), max_message_size=123)  # type: ignore[arg-type]
+    assert client._max_message_size == 123
+    server = IpcServer(transport=object(), services={}, max_message_size=456)  # type: ignore[arg-type]
+    assert server._max_message_size == 456

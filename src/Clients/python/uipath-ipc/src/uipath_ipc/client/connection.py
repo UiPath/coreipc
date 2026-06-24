@@ -49,6 +49,7 @@ from ..markers import is_ipc_cancellable
 from ..message import Message
 from ..transport.base import ClientTransport
 from ..wire import (
+    MAX_PAYLOAD_BYTES,
     CancellationRequest,
     Error,
     MessageType,
@@ -243,6 +244,7 @@ class IpcConnection:
         before_incoming_call: BeforeCallHandler | None = None,
         inbound_request_timeout: float | None = None,
         send_timeout: float | None = None,
+        max_message_size: int = MAX_PAYLOAD_BYTES,
     ) -> None:
         self._reader = reader
         self._writer = writer
@@ -259,6 +261,10 @@ class IpcConnection:
         #: drain() on backpressure forever and wedge the shared writer for every
         #: queued frame; on expiry we tear the connection down (None = unbound).
         self._send_timeout = send_timeout
+        #: Upper bound (bytes) on an INBOUND frame's payload, rejected by
+        #: read_frame before allocation. Defaults to 2 MB (matching .NET's
+        #: MaxReceivedMessageSize); configurable per client/server.
+        self._max_message_size = max_message_size
         #: Awaited before dispatching each incoming request (server side).
         self._before_incoming_call = before_incoming_call
         self._pending: dict[str, asyncio.Future[Response]] = {}
@@ -281,11 +287,16 @@ class IpcConnection:
         transport: ClientTransport,
         callbacks: dict[str, tuple[type, object]] | None = None,
         request_timeout: float | None = None,
+        max_message_size: int = MAX_PAYLOAD_BYTES,
     ) -> IpcConnection:
         """Connect via the transport, wrap the stream in a new connection."""
         reader, writer = await transport.connect()
         conn = cls(
-            reader, writer, callbacks=callbacks, request_timeout=request_timeout
+            reader,
+            writer,
+            callbacks=callbacks,
+            request_timeout=request_timeout,
+            max_message_size=max_message_size,
         )
         conn.start()
         return conn
@@ -297,20 +308,29 @@ class IpcConnection:
         self._receive_task = asyncio.create_task(self._receive_loop())
 
     async def aclose(self) -> None:
-        """Close the connection and fail/cancel any in-flight work."""
-        if self._closed:
-            return
+        """Close the connection and fail/cancel any in-flight work. Idempotent,
+        and still aborts the transport even if a prior send-timeout teardown
+        already set `_closed` (that path closes the writer but does NOT abort)."""
+        self._force_close()
+
+    def _force_close(self) -> None:
+        """Forceful, idempotent teardown shared by `aclose()` and the
+        send-timeout path: mark closed, cancel the receive loop, run the local
+        teardown, and ABORT the transport.
+
+        The abort (vs a graceful `writer.close()`) is the crucial part on a
+        non-reading peer: matching .NET (`Connection.Dispose` ->
+        `Network.Dispose()`) and the TS client (`socket.destroy()`), it forces
+        the transport down instead of awaiting a flush the deaf peer could stall
+        forever. On the Windows ProactorEventLoop, `close()`+`wait_closed()`
+        defers `connection_lost` until the write buffer drains — which never
+        happens for a deaf peer — so without the abort the fd, the buffered
+        bytes, and the still-blocked receive task all leak. `abort()` discards
+        the buffer and returns immediately."""
         self._closed = True
         if self._receive_task is not None:
             self._receive_task.cancel()
         self._teardown()
-        # Abortive close, matching .NET (Connection.Dispose -> Network.Dispose())
-        # and the TS client (socket.destroy()): force the transport down instead
-        # of awaiting a graceful flush a non-reading peer could stall forever. On
-        # the Windows ProactorEventLoop, close()+wait_closed() defers
-        # connection_lost until the write buffer drains — which never happens for
-        # a deaf peer, hanging aclose() (and, in series, the whole server's
-        # shutdown). abort() discards the buffer and returns immediately.
         transport = getattr(self._writer, "transport", None)
         abort = getattr(transport, "abort", None)
         if abort is not None:
@@ -488,8 +508,13 @@ class IpcConnection:
                 await asyncio.wait_for(self._locked_write(msg_type, payload), bound)
             except asyncio.TimeoutError:
                 if teardown_on_timeout:
-                    self._closed = True
-                    self._teardown()
+                    # A request send times out because the peer isn't reading, so
+                    # the write buffer is full — a graceful writer.close() would
+                    # defer connection_lost forever (Windows ProactorEventLoop).
+                    # Force the connection down (abort the transport + cancel the
+                    # receive loop), the same teardown aclose() does, so the fd /
+                    # buffered bytes / receive task don't leak.
+                    self._force_close()
                 raise
         else:
             await self._locked_write(msg_type, payload)
@@ -520,7 +545,9 @@ class IpcConnection:
     async def _receive_loop(self) -> None:
         try:
             while not self._closed:
-                msg_type, payload = await read_frame(self._reader)
+                msg_type, payload = await read_frame(
+                    self._reader, self._max_message_size
+                )
                 if msg_type == MessageType.RESPONSE:
                     self._handle_response(payload)
                 elif msg_type == MessageType.REQUEST:

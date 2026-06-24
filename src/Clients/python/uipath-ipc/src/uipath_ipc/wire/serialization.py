@@ -44,10 +44,15 @@ _UNION_ORIGINS: tuple[object, ...] = (
 def to_wire(value: Any) -> Any:
     """Encode an outgoing argument to a JSON-serializable structure, matching
     .NET's wire forms for the value types JSON can't represent."""
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
+    # Enum BEFORE the primitive short-circuit: IntEnum / IntFlag and
+    # `class E(str, Enum)` members are also str/int instances, so checking
+    # primitives first would return the member itself and let the wire value
+    # depend on json.dumps' incidental handling of mixin enums. Emit `.value`
+    # explicitly (matching "enum -> numeric value" in LIMITATIONS.md).
     if isinstance(value, enum.Enum):
         return value.value
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
     if isinstance(value, (bytes, bytearray)):
         return base64.b64encode(bytes(value)).decode("ascii")
     if isinstance(value, UUID):

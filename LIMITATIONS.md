@@ -47,7 +47,7 @@ Contracts are a **shared agreement** between both peers, and every client *trust
 | Streams (Upload/Download) | ✅ | ❌ (frame fails closed) | ❌ |
 | Custom transport | ✅ | ✅ (subclass `ClientTransport`) | — |
 
-**Max message size:** the .NET *server* caps inbound at **2 MB** (configurable) but the .NET *client* inbound is effectively **uncapped** (`int.MaxValue`); Python is a fixed **2 MB** both directions (oversized/negative length rejected); **TypeScript has no cap** (plus a signed-int32 length-header issue for ≥ 2 GB frames). Treat large inbound payloads as a memory-DoS risk on the .NET/TS clients.
+**Max message size:** the .NET *server* caps inbound at **2 MB** (configurable) but the .NET *client* inbound is effectively **uncapped** (`int.MaxValue`); Python defaults to a **2 MB** inbound cap — configurable per `IpcClient`/`IpcServer` via `max_message_size` (oversized/negative length rejected before allocation); **TypeScript has no cap** (plus a signed-int32 length-header issue for ≥ 2 GB frames). Treat large inbound payloads as a memory-DoS risk on the .NET/TS clients.
 
 ## Arguments & methods
 

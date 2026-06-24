@@ -31,6 +31,7 @@ import asyncio
 from ..client.connection import IpcConnection
 from ..hooks import BeforeCallHandler
 from ..transport.base import ServerHandle, ServerTransport
+from ..wire import MAX_PAYLOAD_BYTES
 
 
 class IpcServer:
@@ -42,6 +43,7 @@ class IpcServer:
         services: dict[type, object],
         request_timeout: float | None = None,
         before_call: BeforeCallHandler | None = None,
+        max_message_size: int = MAX_PAYLOAD_BYTES,
     ) -> None:
         """Create a server.
 
@@ -65,6 +67,10 @@ class IpcServer:
                 dispatched to a service — the analog of .NET's
                 ``BeforeIncomingCall``. Receives a `CallInfo`; raising aborts
                 the call (surfaced to the caller as an error).
+            max_message_size: Upper bound, in bytes, on an INBOUND frame's
+                payload, applied to every accepted connection (the analog of
+                .NET's ``MaxReceivedMessageSize``). A larger frame is rejected
+                before allocation. Defaults to 2 MB.
         """
         self._transport = transport
         # Translate contract-type keys to endpoint-name keys once; the
@@ -80,6 +86,7 @@ class IpcServer:
             self._services[name] = (contract, instance)
         self._request_timeout = request_timeout
         self._before_call = before_call
+        self._max_message_size = max_message_size
         self._handle: ServerHandle | None = None
         # Serializes ALL lifecycle state changes (`_disposed`, `_handle`) so
         # start()/aclose() can't race; held across serve() in start().
@@ -133,6 +140,7 @@ class IpcServer:
             # Bound server-side sends (responses / cancellations) by the same
             # budget so a non-reading client can't wedge the shared writer.
             send_timeout=self._request_timeout,
+            max_message_size=self._max_message_size,
         )
         self._connections.add(conn)
         # Prune from the live set when the peer disconnects or we close it.

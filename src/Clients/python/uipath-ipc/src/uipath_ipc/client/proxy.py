@@ -6,13 +6,14 @@ import asyncio
 import inspect
 import json
 import weakref
-from typing import TYPE_CHECKING, Any, get_type_hints
+from typing import TYPE_CHECKING, Any
 
 from ..errors import RemoteException
 from ..hooks import CallInfo
 from ..markers import is_ipc_cancellable
 from ..message import INFINITE_REQUEST_TIMEOUT, Message
 from ..wire import Request, Response, from_wire, to_wire
+from ..wire.serialization import resolve_hints
 
 if TYPE_CHECKING:
     from .ipc_client import IpcClient
@@ -33,10 +34,12 @@ def _return_hint(contract: type, method_name: str) -> Any:
     cached = _return_hint_cache.get(func, _NO_HINT)
     if cached is not _NO_HINT:
         return cached
-    try:
-        hint = get_type_hints(func).get("return")
-    except Exception:
-        hint = None
+    # Best-effort, per-name resolution (NOT all-or-nothing get_type_hints): one
+    # unresolvable sibling annotation (e.g. a TYPE_CHECKING-only param) must not
+    # de-type the return, or the proxy would hand back a raw dict where the
+    # inbound dispatch path (which also uses resolve_hints) materializes the
+    # declared type. Keeps the two halves of the API symmetric.
+    hint = resolve_hints(func).get("return")
     try:
         _return_hint_cache[func] = hint
     except TypeError:

@@ -67,7 +67,7 @@ await asyncio.sleep(0.1)
 task.cancel()              # CancelledError propagates up through await
 ```
 
-When the proxy observes `CancelledError`, it sends a `CancellationRequest` frame to the server (matching the in-flight request id) before re-raising.
+When the proxy observes `CancelledError` it re-raises it locally. Whether the *server* is also told to cancel depends on the method: an `@ipc_cancellable` method (see below) sends a `CancellationRequest` frame matching the in-flight request id; an unmarked method like `Wait` above cancels **locally only** (the server keeps running).
 
 #### `@ipc_cancellable` and .NET `CancellationToken`
 
@@ -105,7 +105,7 @@ async with asyncio.timeout(1.0):
     await svc.Wait(10.0)   # raises TimeoutError after 1s
 ```
 
-In both cases the server is notified via a `CancellationRequest`.
+In both cases the call raises locally. The server is notified via a `CancellationRequest` **only for an `@ipc_cancellable` method**; for an unmarked method like `Wait` the timeout is local-only and the server runs to completion.
 
 For a single call, pass a `Message` argument carrying the timeout — it overrides the client default for that call only:
 
