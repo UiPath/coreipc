@@ -1,0 +1,34 @@
+parameters:
+  # Python version to build/test with. The Windows job (artifact producer)
+  # stays on the default; the Linux test-only job fans out over a matrix so
+  # the declared floor (requires-python >= 3.10) is actually exercised.
+  - name: pythonVersion
+    type: string
+    default: '3.12'
+
+steps:
+  - task: UsePythonVersion@0
+    displayName: 'Use Python ${{ parameters.pythonVersion }}'
+    inputs:
+      versionSpec: '${{ parameters.pythonVersion }}'
+      addToPath: true
+      architecture: x64
+
+  - script: |
+      python -m pip install --upgrade pip
+      python -m pip install -e ".[dev]" build
+    displayName: 'Python: install package + dev extras + build'
+    workingDirectory: '$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc'
+
+  - script: python -m pytest -v --junitxml=$(Build.SourcesDirectory)/python-test-results.xml
+    displayName: 'Python: run tests (unit + integration)'
+    workingDirectory: '$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc'
+
+  - task: PublishTestResults@2
+    displayName: 'Python: publish test results'
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: 'python-test-results.xml'
+      searchFolder: '$(Build.SourcesDirectory)'
+      testRunTitle: 'Python ${{ parameters.pythonVersion }} tests ($(Agent.OS) $(Agent.OSArchitecture))'

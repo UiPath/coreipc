@@ -288,3 +288,7 @@ var settings4 = new ContractSettings(typeof(IComputingService))
     }
 };
 ```
+
+## ⚠️ Limitations & cross-client interop
+
+By-design boundaries and cross-client behaviour differences — value-type fidelity (incl. the `decimal`/`Int64` precision caveats; note **TypeScript has no `decimal` or 64-bit integer type**), cancellation propagation, the transport / feature / message-size matrix, and argument rules — are documented in **[LIMITATIONS.md](LIMITATIONS.md)** for mixing the .NET, Python, and TypeScript clients.

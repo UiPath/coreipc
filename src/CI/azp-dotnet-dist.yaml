@@ -14,13 +14,10 @@ steps:
       PathtoPublish: '$(Build.ArtifactStagingDirectory)'
       ArtifactType: 'Container'
 
-  - task: DotNetCoreCLI@2
-    displayName: 'dotnet push to UiPath-Internal'
-    condition: succeeded()
-    inputs:
-      command: push
-      packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg'
-      publishVstsFeed: 'Public.Feeds/UiPath-Internal'
+  # The `dotnet nuget push` step previously lived here and fired on every
+  # build (condition: succeeded). It now lives in
+  # `azp-nuget.publish.steps.yaml` under the Publish_NuGet stage, gated on
+  # the `publishNuGet` pipeline parameter so publishing is opt-in.
 
   - task: PublishSymbols@2
     displayName: 'Publish Symbols to UiPath Azure Artifacts Symbol Server'

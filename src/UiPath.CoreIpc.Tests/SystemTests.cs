@@ -153,6 +153,30 @@ public abstract class SystemTests : TestBase
     public async Task ServerCallingMultipleCallbackTypes_ShouldWork()
     => await Proxy.AddIncrement(1, 2).ShouldBeAsync(1 + 2 + 1);
 
+    [Fact]
+    public async Task ClientCallingInexistentEndpoint_ShouldThrow()
+    => await GetProxy<IInexistentEndpoint>()!.Foo().ShouldThrowAsync<RemoteException>()
+        .ShouldSatisfyAllConditionsAsync([
+            ex => ex.Is<EndpointNotFoundException>().ShouldBeTrue()
+        ]);
+
+    [Fact]
+    public async Task ClientCallingInexistentMethod_ShouldThrow()
+    // Decoys.ISystemService routes to the real ISystemService endpoint (same
+    // Type.Name) but declares a method the real contract lacks.
+    => await GetProxy<Decoys.ISystemService>()!.InexistentMethod().ShouldThrowAsync<RemoteException>()
+        .ShouldSatisfyAllConditionsAsync([
+            ex => ex.Is<MethodNotFoundException>().ShouldBeTrue()
+        ]);
+
+    [Fact, OverrideConfig(typeof(RegisterCallbacks))]
+    public async Task ServerCallingInexistentCallbackMethod_ShouldThrow()
+    {
+        var (exceptionType, _, marshalledExceptionType) = (await Proxy.CallCallbackWithInexistentMethod()).ShouldNotBeNull();
+        exceptionType.ShouldBe(nameof(RemoteException));
+        marshalledExceptionType.ShouldBe(typeof(MethodNotFoundException).FullName);
+    }
+
     private sealed class RegisterCallbacks : OverrideConfig
     {
         public override IpcClient? Override(Func<IpcClient> client)

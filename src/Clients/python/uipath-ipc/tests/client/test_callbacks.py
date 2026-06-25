@@ -1,0 +1,749 @@
+"""Unit tests for incoming-request dispatch (callbacks)."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import struct
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+from uuid import UUID
+
+import pytest
+
+from uipath_ipc.client import IpcConnection
+from uipath_ipc.errors import RemoteException
+from uipath_ipc.markers import ipc_cancellable
+from uipath_ipc.message import Message
+from uipath_ipc.wire import (
+    CancellationRequest,
+    MessageType,
+    Request,
+    Response,
+)
+
+
+class _BufferWriter:
+    def __init__(self) -> None:
+        self.buffer = bytearray()
+
+    def write(self, data: bytes) -> None:
+        self.buffer.extend(data)
+
+    async def drain(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+    async def wait_closed(self) -> None:
+        pass
+
+
+def _request_frame(req: Request) -> bytes:
+    payload = req.to_json().encode("utf-8")
+    return struct.pack("<Bi", int(MessageType.REQUEST), len(payload)) + payload
+
+
+def _cancellation_frame(request_id: str) -> bytes:
+    payload = (
+        CancellationRequest(request_id=request_id).to_json().encode("utf-8")
+    )
+    return (
+        struct.pack("<Bi", int(MessageType.CANCELLATION_REQUEST), len(payload))
+        + payload
+    )
+
+
+def _split_frames(buf: bytes) -> list[tuple[int, bytes]]:
+    out = []
+    i = 0
+    while i + 5 <= len(buf):
+        msg_type = buf[i]
+        length = int.from_bytes(buf[i + 1 : i + 5], "little", signed=True)
+        i += 5
+        out.append((msg_type, bytes(buf[i : i + length])))
+        i += length
+    return out
+
+
+async def _wait_for_frames(writer: _BufferWriter, count: int, timeout: float = 1.0) -> list[tuple[int, bytes]]:
+    """Poll the buffer until `count` frames are present or `timeout` elapses."""
+    deadline = asyncio.get_running_loop().time() + timeout
+    while True:
+        frames = _split_frames(bytes(writer.buffer))
+        if len(frames) >= count:
+            return frames
+        if asyncio.get_running_loop().time() > deadline:
+            pytest.fail(f"only saw {len(frames)} frames after {timeout}s; expected {count}")
+        await asyncio.sleep(0.01)
+
+
+# --- a sample callback contract and impl ---------------------------------
+
+class IClientCallback(ABC):
+    @abstractmethod
+    async def EchoToClient(self, value: str) -> str: ...
+
+    @abstractmethod
+    async def AddOnClient(self, x: int, y: int) -> int: ...
+
+    @abstractmethod
+    async def RaiseOnClient(self) -> bool: ...
+
+    @ipc_cancellable
+    @abstractmethod
+    async def WaitOnClient(self, seconds: float) -> bool: ...
+
+
+class _DummyCallback(IClientCallback):
+    def __init__(self) -> None:
+        self.echo_calls: list[str] = []
+
+    async def EchoToClient(self, value: str) -> str:
+        self.echo_calls.append(value)
+        return f"echoed: {value}"
+
+    async def AddOnClient(self, x: int, y: int) -> int:
+        return x + y
+
+    async def RaiseOnClient(self) -> bool:
+        raise ValueError("boom from client callback")
+
+    async def WaitOnClient(self, seconds: float) -> bool:
+        await asyncio.sleep(seconds)
+        return True
+
+
+def _make_connection(
+    callback: _DummyCallback | None = None,
+) -> tuple[IpcConnection, asyncio.StreamReader, _BufferWriter]:
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    callbacks = (
+        {"IClientCallback": (IClientCallback, callback)} if callback else None
+    )
+    conn = IpcConnection(reader, writer, callbacks=callbacks)  # type: ignore[arg-type]
+    conn.start()
+    return conn, reader, writer
+
+
+# --- happy path ----------------------------------------------------------
+
+async def test_incoming_request_dispatched_to_callback_method() -> None:
+    cb = _DummyCallback()
+    conn, reader, writer = _make_connection(cb)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IClientCallback",
+            method_name="EchoToClient",
+            parameters=['"hi"'],
+            id="42",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+
+        assert frames[0][0] == int(MessageType.RESPONSE)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.request_id == "42"
+        assert json.loads(resp.data) == "echoed: hi"
+        assert resp.error is None
+        assert cb.echo_calls == ["hi"]
+    finally:
+        await conn.aclose()
+
+
+async def test_callback_with_multiple_args() -> None:
+    cb = _DummyCallback()
+    conn, reader, writer = _make_connection(cb)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IClientCallback",
+            method_name="AddOnClient",
+            parameters=["3", "4"],
+            id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) == 7
+    finally:
+        await conn.aclose()
+
+
+async def test_concurrent_incoming_requests() -> None:
+    cb = _DummyCallback()
+    conn, reader, writer = _make_connection(cb)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IClientCallback",
+            method_name="EchoToClient",
+            parameters=['"a"'],
+            id="1",
+        )))
+        reader.feed_data(_request_frame(Request(
+            endpoint="IClientCallback",
+            method_name="EchoToClient",
+            parameters=['"b"'],
+            id="2",
+        )))
+        frames = await _wait_for_frames(writer, count=2)
+
+        ids = sorted(
+            Response.from_json(f[1].decode("utf-8")).request_id for f in frames
+        )
+        assert ids == ["1", "2"]
+        assert sorted(cb.echo_calls) == ["a", "b"]
+    finally:
+        await conn.aclose()
+
+
+# --- error paths ---------------------------------------------------------
+
+async def test_callback_exception_returns_error_response() -> None:
+    cb = _DummyCallback()
+    conn, reader, writer = _make_connection(cb)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IClientCallback",
+            method_name="RaiseOnClient",
+            parameters=[],
+            id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+
+        assert resp.error is not None
+        assert resp.error.message == "boom from client callback"
+        assert resp.error.type_name == "ValueError"
+        assert resp.error.stack_trace is not None
+        assert resp.data is None
+    finally:
+        await conn.aclose()
+
+
+async def test_unknown_endpoint_returns_error() -> None:
+    conn, reader, writer = _make_connection(None)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="INonExistent",
+            method_name="Foo",
+            parameters=[],
+            id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+
+        assert resp.error is not None
+        assert "INonExistent" in resp.error.message
+        # .NET wire type name, so a .NET caller can match with
+        # RemoteException.Is<EndpointNotFoundException>().
+        assert resp.error.type_name == "UiPath.Ipc.EndpointNotFoundException"
+    finally:
+        await conn.aclose()
+
+
+async def test_unknown_method_returns_error() -> None:
+    cb = _DummyCallback()
+    conn, reader, writer = _make_connection(cb)
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IClientCallback",
+            method_name="DoesNotExist",
+            parameters=[],
+            id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+
+        assert resp.error is not None
+        assert "DoesNotExist" in resp.error.message
+        assert resp.error.type_name == "UiPath.Ipc.MethodNotFoundException"
+    finally:
+        await conn.aclose()
+
+
+# --- server cancellation -------------------------------------------------
+
+# --- contract-membership dispatch guard (security) ------------------------
+
+class IGuarded(ABC):
+    @abstractmethod
+    async def Add(self, a: int, b: int) -> int: ...
+
+
+class _GuardedImpl:
+    """Hosts the contract method `Add`, plus off-contract attributes a
+    non-conforming wire peer must NOT be able to reach."""
+
+    def __init__(self) -> None:
+        self.stolen: str | None = None
+        self.wiped = False
+
+    async def Add(self, a: int, b: int) -> int:
+        return a + b
+
+    async def Steal(self) -> str:  # public, but NOT on the contract
+        self.stolen = "api-key-1234"
+        return f"exfiltrated: {self.stolen}"
+
+    async def _wipe(self) -> str:  # private helper
+        self.wiped = True
+        return "wiped"
+
+
+def _make_guarded() -> tuple[IpcConnection, asyncio.StreamReader, _BufferWriter, _GuardedImpl]:
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    impl = _GuardedImpl()
+    conn = IpcConnection(reader, writer, callbacks={"IGuarded": (IGuarded, impl)})  # type: ignore[arg-type]
+    conn.start()
+    return conn, reader, writer, impl
+
+
+async def test_contract_method_dispatches() -> None:
+    conn, reader, writer, _impl = _make_guarded()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IGuarded", method_name="Add", parameters=["2", "3"], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) == 5
+    finally:
+        await conn.aclose()
+
+
+@pytest.mark.parametrize("method_name", ["Steal", "_wipe", "__init__", "__class__"])
+async def test_off_contract_method_is_rejected(method_name: str) -> None:
+    """A peer not using the guarded proxy can name any attribute. The server
+    must reject everything not declared on the contract — public off-contract
+    methods, private helpers, and dunders — with MethodNotFoundException,
+    matching .NET's interface-only resolution. (Repro of the review finding.)"""
+    conn, reader, writer, impl = _make_guarded()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IGuarded", method_name=method_name, parameters=[], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.error is not None
+        assert resp.error.type_name == "UiPath.Ipc.MethodNotFoundException"
+        # The off-contract attribute was never invoked.
+        assert impl.stolen is None and impl.wiped is False
+    finally:
+        await conn.aclose()
+
+
+# --- one-way (-> None) fire-and-forget ------------------------------------
+
+class IOneWay(ABC):
+    @abstractmethod
+    async def FireAndForget(self, tag: str) -> None: ...
+
+    @abstractmethod
+    async def Explode(self) -> None: ...
+
+
+class _OneWayImpl:
+    def __init__(self) -> None:
+        self.seen: list[str] = []
+        self.release = asyncio.Event()
+
+    async def FireAndForget(self, tag: str) -> None:
+        await self.release.wait()  # stay blocked so we can prove the early ack
+        self.seen.append(tag)
+
+    async def Explode(self) -> None:
+        raise ValueError("one-way failures are logged, not returned")
+
+
+def _make_one_way() -> tuple[IpcConnection, asyncio.StreamReader, _BufferWriter, _OneWayImpl]:
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    impl = _OneWayImpl()
+    conn = IpcConnection(reader, writer, callbacks={"IOneWay": (IOneWay, impl)})  # type: ignore[arg-type]
+    conn.start()
+    return conn, reader, writer, impl
+
+
+async def test_one_way_acks_immediately_then_runs_detached() -> None:
+    conn, reader, writer, impl = _make_one_way()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IOneWay", method_name="FireAndForget", parameters=['"x"'], id="7",
+        )))
+        # The ack comes back even though the handler is still blocked.
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.request_id == "7"
+        assert resp.error is None
+        assert resp.data == ""  # empty ack, like .NET Response.Success(req, "")
+        assert impl.seen == []  # handler hasn't finished yet
+        # Let the detached handler complete; its side effect appears after.
+        impl.release.set()
+        for _ in range(100):
+            await asyncio.sleep(0.01)
+            if impl.seen:
+                break
+        assert impl.seen == ["x"]
+    finally:
+        await conn.aclose()
+
+
+async def test_one_way_handler_exception_is_logged_not_returned(caplog) -> None:
+    conn, reader, writer, _impl = _make_one_way()
+    try:
+        with caplog.at_level(logging.ERROR, logger="uipath_ipc.client.connection"):
+            reader.feed_data(_request_frame(Request(
+                endpoint="IOneWay", method_name="Explode", parameters=[], id="1",
+            )))
+            frames = await _wait_for_frames(writer, count=1)
+            resp = Response.from_json(frames[0][1].decode("utf-8"))
+            # Success ack — the failure is NOT sent back to the caller.
+            assert resp.error is None
+            assert resp.data == ""
+            # ...but it is logged.
+            await asyncio.sleep(0.05)
+        recs = [r for r in caplog.records if "one-way" in r.message]
+        assert recs, "expected a one-way failure log record"
+        # The handler's exception (type + message) must be captured, not just
+        # a bare 'one-way failed' line.
+        exc_info = recs[0].exc_info
+        assert exc_info is not None and exc_info[0] is ValueError
+        assert "one-way failures are logged, not returned" in str(exc_info[1])
+    finally:
+        await conn.aclose()
+
+
+# --- outbound exception-chain fidelity ------------------------------------
+
+class IChainer(ABC):
+    @abstractmethod
+    async def Chain(self) -> bool: ...
+
+    @abstractmethod
+    async def Forward(self) -> bool: ...
+
+
+class _ChainerImpl:
+    async def Chain(self) -> bool:
+        raise ValueError("outer") from KeyError("root cause")
+
+    async def Forward(self) -> bool:
+        # A handler that let a reach-back RemoteException propagate.
+        raise RemoteException(
+            "upstream failed",
+            type_name="System.IO.IOException",
+            stack_trace="<remote stack>",
+        )
+
+
+def _make_chainer() -> tuple[IpcConnection, asyncio.StreamReader, _BufferWriter]:
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(reader, writer, callbacks={"IChainer": (IChainer, _ChainerImpl())})  # type: ignore[arg-type]
+    conn.start()
+    return conn, reader, writer
+
+
+async def test_inner_exception_chain_is_sent() -> None:
+    """`raise ValueError from KeyError` must cross the wire with the KeyError as
+    the Error's inner_error, so the caller's RemoteException reproduces it."""
+    conn, reader, writer = _make_chainer()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IChainer", method_name="Chain", parameters=[], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.error is not None
+        assert resp.error.type_name == "ValueError"
+        assert "outer" in resp.error.message
+        assert resp.error.inner_error is not None
+        assert resp.error.inner_error.type_name == "KeyError"
+        assert "root cause" in resp.error.inner_error.message
+    finally:
+        await conn.aclose()
+
+
+async def test_reraised_remote_exception_preserves_original_type() -> None:
+    """A handler that re-raises a RemoteException must forward its original
+    type/message/stack verbatim, not collapse to type_name='RemoteException'."""
+    conn, reader, writer = _make_chainer()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IChainer", method_name="Forward", parameters=[], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.error is not None
+        assert resp.error.type_name == "System.IO.IOException"
+        assert resp.error.message == "upstream failed"
+        assert resp.error.stack_trace == "<remote stack>"
+    finally:
+        await conn.aclose()
+
+
+async def test_server_cancellation_aborts_in_flight_callback() -> None:
+    cb = _DummyCallback()
+    conn, reader, writer = _make_connection(cb)
+    try:
+        # Slow callback: 5 seconds
+        reader.feed_data(_request_frame(Request(
+            endpoint="IClientCallback",
+            method_name="WaitOnClient",
+            parameters=["5"],
+            id="42",
+        )))
+        await asyncio.sleep(0.05)  # let it start
+
+        # Server cancels mid-flight
+        reader.feed_data(_cancellation_frame("42"))
+
+        frames = await _wait_for_frames(writer, count=1, timeout=1.0)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+
+        assert resp.error is not None
+        assert resp.error.type_name == "System.OperationCanceledException"
+    finally:
+        await conn.aclose()
+
+
+# --- dispatch plan derives from the contract, not the impl (R1) ------------
+
+class IAnnotatedContract(ABC):
+    @abstractmethod
+    async def Greet(self, name: str, m: Message) -> str: ...
+
+
+class _UnannotatedImpl:
+    """Legal duck-typed impl that omits the contract's annotations entirely."""
+
+    async def Greet(self, name, m):  # no type hints, no Message annotation
+        return f"hi {name} m={m.client is not None}"
+
+
+async def test_plan_from_contract_handles_unannotated_impl() -> None:
+    """The dispatch plan (Message injection, decode types, one-way) must come
+    from the CONTRACT — an unannotated impl would otherwise lose Message
+    injection (m would bind to the raw wire dict and m.client would blow up)."""
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(reader, writer, callbacks={"IAnnotatedContract": (IAnnotatedContract, _UnannotatedImpl())})  # type: ignore[arg-type]
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IAnnotatedContract", method_name="Greet", parameters=['"bob"'], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert json.loads(resp.data) == "hi bob m=True"  # Message injected
+    finally:
+        await conn.aclose()
+
+
+# --- one-way handlers are bounded by the request timeout (R7) ---------------
+
+class IOneWaySlow(ABC):
+    @abstractmethod
+    async def Slow(self) -> None: ...
+
+
+async def test_one_way_handler_is_bounded_by_inbound_timeout() -> None:
+    """A one-way handler runs detached after the ack but is still bounded by the
+    effective timeout (it can't run unbounded while a value-returning one is)."""
+    class _Impl:
+        def __init__(self) -> None:
+            self.started = asyncio.Event()
+            self.completed = False
+
+        async def Slow(self) -> None:
+            self.started.set()
+            await asyncio.sleep(5)
+            self.completed = True
+
+    impl = _Impl()
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(
+        reader, writer,
+        callbacks={"IOneWaySlow": (IOneWaySlow, impl)},  # type: ignore[arg-type]
+        inbound_request_timeout=0.1,
+    )
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IOneWaySlow", method_name="Slow", parameters=[], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1)
+        assert Response.from_json(frames[0][1].decode("utf-8")).data == ""  # immediate ack
+        await asyncio.wait_for(impl.started.wait(), timeout=1.0)
+        await asyncio.sleep(0.3)  # past the 0.1s bound
+        assert impl.completed is False  # cancelled by the timeout, never finished
+    finally:
+        await conn.aclose()
+
+
+# --- the request timeout is authoritative even if the handler swallows cancel -
+
+class ISwallow(ABC):
+    @abstractmethod
+    async def Work(self) -> str: ...
+
+
+async def test_handler_swallowing_cancel_still_times_out() -> None:
+    """A request/response handler that catches its CancelledError and returns a
+    value anyway must NOT convert a timeout into a late success — the deadline
+    is enforced regardless (the caller gets a System.TimeoutException, not the
+    handler's value). Mirrors .NET enforcing the deadline whatever the handler
+    does with the token."""
+    class _Impl:
+        async def Work(self) -> str:
+            try:
+                await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                return "late success"  # swallow the cancel and return anyway
+            return "done"
+
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(
+        reader, writer,
+        callbacks={"ISwallow": (ISwallow, _Impl())},  # type: ignore[arg-type]
+        inbound_request_timeout=0.1,
+    )
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="ISwallow", method_name="Work", parameters=[], id="1",
+        )))
+        frames = await _wait_for_frames(writer, count=1, timeout=2.0)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.error is not None
+        assert resp.error.type_name == "System.TimeoutException"
+        assert resp.data is None  # the swallowed "late success" never leaks out
+    finally:
+        await conn.aclose()
+
+
+class IBounded(ABC):
+    @ipc_cancellable
+    @abstractmethod
+    async def Work(self) -> str: ...
+
+
+async def test_peer_cancellation_aborts_a_bounded_handler() -> None:
+    """Regression guard: with inbound_request_timeout set (the normal server
+    case → the bounded path in _run_handler), a peer CancellationRequest must
+    still cancel the in-flight async handler — it must NOT run orphaned to
+    completion. The bounded path uses asyncio.wait, which doesn't propagate
+    cancellation on its own, so _run_handler cancels the inner task explicitly."""
+    class _Impl:
+        def __init__(self) -> None:
+            self.observed_cancel = False
+            self.completed = False
+
+        async def Work(self) -> str:
+            try:
+                await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                self.observed_cancel = True
+                raise
+            self.completed = True
+            return "done"
+
+    impl = _Impl()
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(
+        reader, writer,
+        callbacks={"IBounded": (IBounded, impl)},  # type: ignore[arg-type]
+        inbound_request_timeout=5.0,  # bounded path, but the deadline is far off
+    )
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IBounded", method_name="Work", parameters=[], id="7",
+        )))
+        await asyncio.sleep(0.05)  # let the handler start
+        reader.feed_data(_cancellation_frame("7"))
+        frames = await _wait_for_frames(writer, count=1, timeout=1.0)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.error is not None
+        assert resp.error.type_name == "System.OperationCanceledException"
+        await asyncio.sleep(0.05)  # give a (wrongly) orphaned handler time to finish
+        assert impl.observed_cancel is True  # the handler WAS cancelled
+        assert impl.completed is False       # ...and did NOT run orphaned to completion
+    finally:
+        await conn.aclose()
+
+
+class IUnmarked(ABC):
+    # No @ipc_cancellable — a peer cancel must NOT abort this handler.
+    @abstractmethod
+    async def Work(self) -> str: ...
+
+
+async def test_peer_cancellation_ignored_for_unmarked_method() -> None:
+    """The callee honors a peer CancellationRequest only for @ipc_cancellable
+    methods. An UNMARKED handler keeps running to completion despite the cancel
+    (symmetric with the client, which won't even send one for an unmarked call)."""
+    class _Impl:
+        def __init__(self) -> None:
+            self.observed_cancel = False
+            self.completed = False
+
+        async def Work(self) -> str:
+            try:
+                await asyncio.sleep(0.2)
+            except asyncio.CancelledError:
+                self.observed_cancel = True
+                raise
+            self.completed = True
+            return "done"
+
+    impl = _Impl()
+    reader = asyncio.StreamReader()
+    writer = _BufferWriter()
+    conn = IpcConnection(
+        reader, writer,
+        callbacks={"IUnmarked": (IUnmarked, impl)},  # type: ignore[arg-type]
+    )
+    conn.start()
+    try:
+        reader.feed_data(_request_frame(Request(
+            endpoint="IUnmarked", method_name="Work", parameters=[], id="9",
+        )))
+        await asyncio.sleep(0.05)  # let the handler start
+        reader.feed_data(_cancellation_frame("9"))  # must be IGNORED
+        frames = await _wait_for_frames(writer, count=1, timeout=1.0)
+        resp = Response.from_json(frames[0][1].decode("utf-8"))
+        assert resp.error is None                 # not cancelled -> normal reply
+        assert json.loads(resp.data) == "done"
+        assert impl.observed_cancel is False      # the handler never saw a cancel
+        assert impl.completed is True             # ...and ran to completion
+    finally:
+        await conn.aclose()
+
+
+# --- resilient hint resolution: one unresolvable param degrades alone --------
+
+if TYPE_CHECKING:
+    class _GhostParam: ...  # defined only for type-checkers; absent at runtime
+
+
+class _IPartlyResolvable(ABC):
+    @abstractmethod
+    async def Notify(self, value: UUID, ghost: "_GhostParam") -> None: ...
+
+
+def test_dispatch_plan_degrades_only_unresolvable_param() -> None:
+    # get_type_hints() raises on `ghost` (NameError); all-or-nothing it would
+    # drop `value`'s decode type AND mis-detect one-way. The best-effort resolver
+    # degrades only `ghost`, so `value` stays typed and `-> None` is detected.
+    from uipath_ipc.client.connection import _dispatch_plan
+
+    plan = _dispatch_plan(_IPartlyResolvable.Notify)
+    assert plan.one_way is True
+    by_name = {name: hint for (_tag, name, hint) in plan.params}
+    assert by_name["value"] is UUID  # the resolvable param, not its raw string

@@ -1,3 +1,24 @@
+# =====================================================================
+# CI pipeline — always builds & tests everything, no parameters.
+# =====================================================================
+# Kept at this path (azp-start.yaml) on purpose: the existing CI pipeline
+# definition already points here, and the path resolves on EVERY branch, so
+# CI transitions cleanly as branches merge — no repointing, no "YAML file not
+# found". The file's *content* is what changes (the old combined build+publish
+# pipeline is retired): build/test only, publishing moved to azp-publish.yaml.
+#
+# Builds NuGet (.NET), NPM (Node + Web) and Python in parallel, runs their
+# tests, and publishes each as a pipeline artifact:
+#   'NuGet package' / 'NPM package' / 'Python package'.
+#
+# Pushes to NO feed. Publishing is the separate, manual Publish pipeline
+# (azp-publish.yaml): it takes a CI build id and pushes that build's artifacts
+# to the feeds behind approval-gated environments.
+#
+# Triggers: configure in Azure DevOps (CI on push). The Publish pipeline is
+# manual-only.
+# =====================================================================
+
 name: $(Date:yyyyMMdd)$(Rev:-rr)
 
 variables:
@@ -11,7 +32,7 @@ variables:
   DotNet_MainProjectName: 'UiPath.CoreIpc'
   DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
-  
+
   NodeJS_DotNet_BuildConfiguration: 'Debug'
   NodeJS_ProjectPath: './src/Clients/js'
   NodeJS_ArchivePath: './src/Clients/js/dist/pack/nodejs.zip'
@@ -21,12 +42,14 @@ variables:
   NodeJS_DotNetNodeInteropSolution: './src/Clients/js/dotnet/UiPath.CoreIpc.NodeInterop.sln'
 
 stages:
-- stage: Build
-  displayName: '🏭 Build' 
+# Build stages — one per technology, all run in parallel (`dependsOn: []`).
+- stage: Build_NuGet
+  displayName: '🏭 Build NuGet'
+  dependsOn: []
   jobs:
-  # The following 3 jobs will run in parallel:            
-  - job:
-    displayName: '.NET on Windows'
+  - job: NuGet_DotNet_Windows
+    displayName: 'NuGet — .NET on Windows'
+    timeoutInMinutes: 30   # normal run ≈ 5 min; don't let a wedge eat the 60-min default
     pool:
         vmImage: 'windows-2022'
     steps:
@@ -34,8 +57,12 @@ stages:
       - template: azp-dotnet.yaml
       - template: azp-dotnet-dist.yaml
 
-  - job:
-    displayName: 'node.js on Windows'
+- stage: Build_NPM
+  displayName: '🏭 Build NPM'
+  dependsOn: []
+  jobs:
+  - job: NPM_Node_Web_Windows
+    displayName: 'NPM — Node + Web on Windows'
     pool:
         vmImage: 'windows-2022'
     steps:
@@ -43,25 +70,41 @@ stages:
       - template: azp-nodejs.yaml
       - template: azp-nodejs-dist.yaml
 
-  - job:
-    displayName: 'node.js on Ubuntu'
+  - job: NPM_Node_Web_Linux
+    displayName: 'NPM — Node + Web on Linux (test-only)'
     pool:
       vmImage: 'ubuntu-22.04'
     steps:
       - template: azp-initialization.yaml
       - template: azp-nodejs.yaml
 
-- stage: Publish
-  displayName: 🚚 Publish
-  dependsOn: Build
+- stage: Build_Python
+  displayName: '🏭 Build Python'
+  dependsOn: []
   jobs:
-  - deployment: Publish_NPM_Packages
-    displayName: '📦 Publish NPM Packages'
-    environment: 'NPM-Packages'
+  - job: Python_Windows
+    displayName: 'Python — Windows'
     pool:
-      vmImage: ubuntu-latest
+        vmImage: 'windows-2022'
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-python.yaml
+      - template: azp-python-dist.yaml
+
+  - job: Python_Linux
+    displayName: 'Python — Linux (test-only)'
+    pool:
+      vmImage: 'ubuntu-22.04'
+    # Test the declared floor (requires-python >= 3.10) and the versions in
+    # between — the asyncio.wait_for scheduling changed in 3.12, which a
+    # 3.12-only matrix can't catch.
     strategy:
-      runOnce:
-        deploy:
-          steps:
-            - template: azp-js.publish-npm.steps.yaml
+      matrix:
+        py310: { pythonVersion: '3.10' }
+        py311: { pythonVersion: '3.11' }
+        py312: { pythonVersion: '3.12' }
+    steps:
+      - template: azp-initialization.yaml
+      - template: azp-python.yaml
+        parameters:
+          pythonVersion: $(pythonVersion)

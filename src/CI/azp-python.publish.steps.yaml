@@ -1,0 +1,58 @@
+parameters:
+  - name: reuseArtifactsFromBuildId
+    type: string
+    default: ''
+  # Pipeline DEFINITION id that produced the artifact. Defaults to the current
+  # pipeline (single-pipeline reuse). The separate Publish pipeline passes the
+  # CI pipeline's id (e.g. $(resources.pipeline.ci.pipelineID)) so it can pull a
+  # CI build's artifact by id.
+  - name: sourcePipelineId
+    type: string
+    default: '$(System.DefinitionId)'
+
+steps:
+- checkout: none
+
+# Pull the Python artifact: from the current run by default, or from a
+# previously-completed build if `reuseArtifactsFromBuildId` is a real id.
+# '0' (default) and '' both mean "no reuse — pull from current run".
+- ${{ if in(parameters.reuseArtifactsFromBuildId, '0', '') }}:
+  - download: current
+    artifact: 'Python package'
+- ${{ if not(in(parameters.reuseArtifactsFromBuildId, '0', '')) }}:
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download Python package from build ${{ parameters.reuseArtifactsFromBuildId }}'
+    inputs:
+      buildType: specific
+      project: $(System.TeamProject)
+      pipeline: ${{ parameters.sourcePipelineId }}
+      buildVersionToDownload: specific
+      buildId: ${{ parameters.reuseArtifactsFromBuildId }}
+      artifactName: 'Python package'
+      targetPath: '$(Pipeline.Workspace)/Python package'
+
+- task: UsePythonVersion@0
+  displayName: 'Use Python 3.12'
+  inputs:
+    versionSpec: '3.12'
+    addToPath: true
+
+- script: python -m pip install --upgrade twine
+  displayName: 'Install twine'
+
+# TwineAuthenticate writes a .pypirc with the Azure Artifacts feed's auth
+# and exports PYPIRC_PATH for the next step to consume.
+# Target the project-scoped feed in the Public.Feeds project — the same feed
+# the NuGet package publishes to (see azp-nuget.publish.steps.yaml).
+- task: TwineAuthenticate@1
+  displayName: 'Authenticate twine with UiPath-Internal'
+  inputs:
+    artifactFeed: 'Public.Feeds/UiPath-Internal'
+
+- script: |
+    # TwineAuthenticate writes a [<bare-feed-name>] section into .pypirc — the
+    # 'Public.Feeds/' project prefix is dropped and the case is preserved — so
+    # `-r` must be the bare, case-exact feed name 'UiPath-Internal'.
+    grep '^\[' "$(PYPIRC_PATH)" || true   # diagnostic (no secrets): confirm the .pypirc section header
+    python -m twine upload -r UiPath-Internal --config-file $(PYPIRC_PATH) "$(Pipeline.Workspace)/Python package/"*
+  displayName: 'Upload wheel + sdist to UiPath-Internal'

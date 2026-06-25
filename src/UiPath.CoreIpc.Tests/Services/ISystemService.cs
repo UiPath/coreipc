@@ -33,6 +33,8 @@ public interface ISystemService
 
     Task<(string ExceptionType, string ExceptionMessage, string? MarshalledExceptionType)?> CallUnregisteredCallback(Message message = null!);
 
+    Task<(string ExceptionType, string ExceptionMessage, string? MarshalledExceptionType)?> CallCallbackWithInexistentMethod(Message message = null!);
+
     Task FireAndForgetThrowSync();
 
     Task<string?> GetThreadName();
@@ -52,4 +54,33 @@ public interface ISystemService
 public interface IUnregisteredCallback
 {
     Task<string> SomeMethod();
+}
+
+/// <summary>
+/// An endpoint that no server registers — for testing that a REGULAR call
+/// (not just a callback) to an unknown endpoint fails with
+/// <see cref="EndpointNotFoundException"/>.
+/// </summary>
+public interface IInexistentEndpoint
+{
+    Task<Guid> Foo();
+}
+
+/// <summary>
+/// Decoy contracts whose <see cref="Type.Name"/> collides with real,
+/// registered contracts (routing keys on the simple name) but which declare
+/// methods the real contracts lack — for testing
+/// <see cref="MethodNotFoundException"/> on both directions.
+/// </summary>
+public static class Decoys
+{
+    public interface ISystemService
+    {
+        Task<Guid> InexistentMethod(CancellationToken ct = default);
+    }
+
+    public interface IArithmeticCallback
+    {
+        Task<int> IncrementInexistent(int x);
+    }
 }

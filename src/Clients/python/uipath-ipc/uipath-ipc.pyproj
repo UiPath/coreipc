@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{81e13ef5-2d0e-4e47-a9b3-f4a48abc8ad9}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile />
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId>MSBuild|.venv|$(MSBuildProjectFullPath)</InterpreterId>
+    <TestFramework>pytest</TestFramework>
+    <UnitTestRootDirectory>tests</UnitTestRootDirectory>
+    <UnitTestPattern>test*.py</UnitTestPattern>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Glob over all Python files; PTVS will rewrite this if you Add/Remove via Solution Explorer.
+         Manage files via filesystem / external editor to keep the glob intact. -->
+    <Compile Include="**\*.py" Exclude=".venv\**;**\__pycache__\**;build\**;dist\**;*.egg-info\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <Interpreter Include=".venv\">
+      <Id>.venv</Id>
+      <Version>3.14</Version>
+      <Description>my .venv</Description>
+      <InterpreterPath>scripts\python.exe</InterpreterPath>
+      <WindowsInterpreterPath>scripts\pythonw.exe</WindowsInterpreterPath>
+      <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
+      <Architecture>X64</Architecture>
+    </Interpreter>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="pyproject.toml" />
+    <Content Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="src\" />
+    <Folder Include="src\uipath_ipc\" />
+    <Folder Include="src\uipath_ipc\client\" />
+    <Folder Include="src\uipath_ipc\server\" />
+    <Folder Include="src\uipath_ipc\transport\" />
+    <Folder Include="src\uipath_ipc\wire\" />
+    <Folder Include="tests\" />
+    <Folder Include="tests\client\" />
+    <Folder Include="tests\integration\" />
+    <Folder Include="tests\server\" />
+    <Folder Include="tests\transport\" />
+    <Folder Include="tests\wire\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>
