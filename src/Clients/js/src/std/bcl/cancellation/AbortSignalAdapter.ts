@@ -62,4 +62,25 @@ export class AbortSignalAdapter {
         }
         return cts.token;
     }
+
+    /**
+     * The reverse of {@link toCancellationToken}: returns an `AbortSignal` that
+     * aborts when `token` is cancelled — immediately if it already is. Used on
+     * the callee side to hand a callback handler an `AbortSignal` in place of a
+     * `CancellationToken`. Throws if the runtime has no `AbortController`.
+     */
+    public static toAbortSignal(token: CancellationToken): AbortSignal {
+        if (typeof AbortController === 'undefined') {
+            throw new Error(
+                'Cannot adapt a CancellationToken to an AbortSignal: this runtime has no AbortController.',
+            );
+        }
+        const controller = new AbortController();
+        if (token.isCancellationRequested) {
+            controller.abort();
+        } else {
+            token.register(() => controller.abort());
+        }
+        return controller.signal;
+    }
 }

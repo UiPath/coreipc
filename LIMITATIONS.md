@@ -34,7 +34,7 @@ Contracts are a **shared agreement** between both peers, and every client *trust
 - **Propagation to the peer differs:**
   - **.NET** — a fired token sends a `CancellationRequest`.
   - **Python** — sends one **only for methods marked `@ipc_cancellable`** (otherwise the cancel is local-only); a hosted handler honors an inbound cancel only when its contract method is `@ipc_cancellable`.
-  - **TypeScript** — **does not send a cancel frame at all** (local-only; the remote keeps running) and throws on an inbound one. Known parity gap.
+  - **TypeScript** — as a **caller**, still **does not send a cancel frame** for its own outbound calls (local-only; the remote keeps running) — the remaining parity gap. As a **callee** (a hosted callback), it now **honors an inbound cancel**: the running handler's per-call token fires, and — when the callback contract declares a trailing `CancellationToken`/`AbortSignal` — the live token (or a bridged `AbortSignal`) is injected so the handler can observe it. A callback registered by bare endpoint name carries no parameter-type metadata, so its arguments are left untouched (the cancel still fires the token, but nothing is injected into the handler).
 - A successful response that arrives before the cancel is delivered — the result wins.
 
 ## Transports & features

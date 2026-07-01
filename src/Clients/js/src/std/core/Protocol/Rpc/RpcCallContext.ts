@@ -11,6 +11,12 @@ export module RpcCallContext {
         constructor(
             public readonly request: RpcMessage.Request,
             public readonly respond: (response: RpcMessage.Response) => Promise<void>,
+            /**
+             * Cancelled when the peer sends a `CancellationRequest` for this
+             * call (or the channel tears it down). Defaults to a token that
+             * never cancels, so pre-existing construction sites are unaffected.
+             */
+            public readonly ct: CancellationToken = CancellationToken.none,
         ) {}
     }
 

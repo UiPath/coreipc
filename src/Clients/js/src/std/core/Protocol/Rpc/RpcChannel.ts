@@ -11,7 +11,7 @@ import {
 
 import { ConnectHelper, Address } from '../..';
 import { MessageStream, IMessageStream, Network } from '..';
-import { IRpcChannel, RpcCallContext, RpcMessage } from '.';
+import { IRpcChannel, RpcCallContext, RpcMessage, IncomingCallTable } from '.';
 
 /* @internal */
 export class RpcChannel implements IRpcChannel {
@@ -88,6 +88,7 @@ export class RpcChannel implements IRpcChannel {
     public async disposeAsync(): Promise<void> {
         if (!this._isDisposed) {
             this._isDisposed = true;
+            this._incomingCalls.clear();
             try {
                 const messageStream = await this._$messageStream;
                 await messageStream.disposeAsync();
@@ -137,6 +138,7 @@ export class RpcChannel implements IRpcChannel {
 
     private readonly _$messageStream: Promise<IMessageStream>;
     private readonly _outgoingCalls = new RpcChannel.OutgoingCallTable();
+    private readonly _incomingCalls = new IncomingCallTable();
 
     private readonly _networkObserver = new (class implements Observer<Network.Message> {
         constructor(private readonly _owner: RpcChannel) {}
@@ -189,20 +191,31 @@ export class RpcChannel implements IRpcChannel {
 
     private processIncommingRequest(message: Network.Message): void {
         const request = RpcMessage.Request.fromNetwork(message);
-        const context = new RpcCallContext.Incomming(request, async (response) => {
-            response.RequestId = request.Id;
-            await (
-                await this._$messageStream
-            ).writeMessageAsync(response.toNetwork(), CancellationToken.none);
-        });
+        const ct = this._incomingCalls.register(request.Id);
+        const context = new RpcCallContext.Incomming(
+            request,
+            async (response) => {
+                try {
+                    response.RequestId = request.Id;
+                    await (
+                        await this._$messageStream
+                    ).writeMessageAsync(response.toNetwork(), CancellationToken.none);
+                } finally {
+                    this._incomingCalls.complete(request.Id);
+                }
+            },
+            ct,
+        );
         try {
             this._observer.next(context);
         } catch (err) {
+            this._incomingCalls.complete(request.Id);
             Trace.log(UnknownError.ensureError(err));
         }
     }
 
     private processIncommingCancellationRequest(message: Network.Message): void {
-        throw new Error('Method not implemented.');
+        const cancellationRequest = RpcMessage.CancellationRequest.fromNetwork(message);
+        this._incomingCalls.tryCancel(cancellationRequest.RequestId);
     }
 }
