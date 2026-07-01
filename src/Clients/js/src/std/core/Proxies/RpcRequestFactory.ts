@@ -1,4 +1,5 @@
 import {
+    AbortSignalAdapter,
     CancellationToken,
     Primitive,
     PublicCtor,
@@ -41,13 +42,24 @@ export class RpcRequestFactory {
 
         let message: Message | undefined;
         let ct: CancellationToken | undefined;
+        // Copy so an AbortSignal can be substituted in-place (below).
+        const args = [...params.args];
 
-        for (const arg of params.args) {
+        for (let i = 0; i < args.length; i++) {
+            const arg = args[i];
             if (arg instanceof Message) {
                 message = arg;
+                continue;
             }
-            if (arg instanceof CancellationToken) {
-                ct = arg;
+            // Accept a CancellationToken OR (bridged) an AbortSignal wherever a
+            // cancellation argument is expected, and substitute it in-place so
+            // the wire form AND the ending-CancellationToken handling below are
+            // identical for both. For a real CancellationToken this is a no-op
+            // substitution. Additive — CancellationToken still works unchanged.
+            const token = AbortSignalAdapter.ensureCancellationToken(arg);
+            if (token) {
+                ct = token;
+                args[i] = token;
             }
         }
 
@@ -61,17 +73,12 @@ export class RpcRequestFactory {
             ) ??
             Timeout.infiniteTimeSpan;
 
-        let args = params.args;
-
         if (
             hasEndingCt &&
-            (params.args.length === 0 ||
-                !(
-                    params.args[params.args.length - 1] instanceof
-                    CancellationToken
-                ))
+            (args.length === 0 ||
+                !(args[args.length - 1] instanceof CancellationToken))
         ) {
-            args = [...args, CancellationToken.none];
+            args.push(CancellationToken.none);
         }
 
         const rpcRequest = Converter.toRpcRequest(
