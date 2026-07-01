@@ -21,6 +21,11 @@ internal static class Contracts
         Task<bool> Timeout();
         Task<int> Echo(int x);
         Task<bool> TestMessage(Message<int> message);
+        // Blocks until its (injected) CancellationToken fires, then throws — used
+        // to prove a client actually transmits a cancellation to the server.
+        Task<bool> WaitForCancellation(CancellationToken ct = default);
+        // How many times WaitForCancellation has observed a cancellation so far.
+        Task<int> CancellationCount();
     }
 
     public interface ICalculus

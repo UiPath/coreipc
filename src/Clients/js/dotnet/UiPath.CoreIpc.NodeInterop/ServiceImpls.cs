@@ -45,6 +45,25 @@ internal static class ServiceImpls
         public Task<bool> Timeout() => Task.FromException<bool>(new TimeoutException());
 
         public Task<int> Echo(int x) => Task.FromResult(x);
+
+        private int _cancellationObservationCount;
+
+        public async Task<bool> WaitForCancellation(CancellationToken ct = default)
+        {
+            try
+            {
+                await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, ct);
+                return false; // unreachable: only completes by cancellation
+            }
+            catch (OperationCanceledException)
+            {
+                Interlocked.Increment(ref _cancellationObservationCount);
+                throw;
+            }
+        }
+
+        public Task<int> CancellationCount() =>
+            Task.FromResult(Volatile.Read(ref _cancellationObservationCount));
     }
 
     public class Calculus : ICalculus
