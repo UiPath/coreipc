@@ -52,14 +52,17 @@ export class RpcRequestFactory {
                 continue;
             }
             // Accept a CancellationToken OR (bridged) an AbortSignal wherever a
-            // cancellation argument is expected, and substitute it in-place so
-            // the wire form AND the ending-CancellationToken handling below are
-            // identical for both. For a real CancellationToken this is a no-op
-            // substitution. Additive — CancellationToken still works unchanged.
+            // cancellation argument is expected. Capture the live token for
+            // cancellation (local binding + the CancellationRequest frame), but
+            // put an INERT placeholder in the wire slot: the cancellation signal
+            // is out-of-band, and the receiver ignores the slot's content for a
+            // CancellationToken parameter. A live CancellationTokenSource token is
+            // a circular object graph (token -> source -> token) that JSON cannot
+            // serialize, so the raw token must never reach Converter.
             const token = AbortSignalAdapter.ensureCancellationToken(arg);
             if (token) {
                 ct = token;
-                args[i] = token;
+                args[i] = CancellationToken.none;
             }
         }
 
