@@ -35,5 +35,10 @@ export module RpcCallContext {
         public complete(response: RpcMessage.Response): void {
             const _ = this._pcs.trySetResult(response);
         }
+
+        /** Faults the pending call — used when the channel is torn down. */
+        public fail(error: Error): void {
+            const _ = this._pcs.trySetFaulted(error);
+        }
     }
 }

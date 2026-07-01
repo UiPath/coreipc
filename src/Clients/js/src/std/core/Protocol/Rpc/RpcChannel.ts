@@ -1,9 +1,11 @@
 import { Observer } from 'rxjs';
 import {
     CancellationToken,
+    CancellationTokenRegistration,
     TimeSpan,
     Trace,
     ArgumentOutOfRangeError,
+    ObjectDisposedError,
     SocketStream,
     UnknownError,
     PromisePal,
@@ -38,6 +40,18 @@ export class RpcChannel implements IRpcChannel {
 
         public tryComplete(response: RpcMessage.Response) {
             this._map.get(response.RequestId)?.complete(response);
+        }
+
+        // Faults every in-flight call (mirroring .NET's Connection.CompleteRequests)
+        // so a call parked at `await promise` unblocks when the channel dies —
+        // rather than hanging forever under an infinite request timeout — which in
+        // turn lets RpcChannel.call's finally dispose its cancellation registration.
+        // Snapshot first: failing a call rejects its promise, whose own finally
+        // deletes the map entry.
+        public completeAll(error: Error): void {
+            for (const context of [...this._map.values()]) {
+                context.fail(error);
+            }
         }
 
         private generateId(): string {
@@ -89,6 +103,9 @@ export class RpcChannel implements IRpcChannel {
         if (!this._isDisposed) {
             this._isDisposed = true;
             this._incomingCalls.clear();
+            this._outgoingCalls.completeAll(
+                new ObjectDisposedError('RpcChannel', 'The RPC channel was disposed.'),
+            );
             try {
                 const messageStream = await this._$messageStream;
                 await messageStream.disposeAsync();
@@ -102,8 +119,56 @@ export class RpcChannel implements IRpcChannel {
         ct: CancellationToken,
     ): Promise<RpcMessage.Response> {
         const promise = this._outgoingCalls.register(request, timeout, ct);
-        await (await this._$messageStream).writeMessageAsync(request.toNetwork(), ct);
-        return await promise;
+        // `promise` is awaited below, but the send can park (e.g. on the initial
+        // connect) while the token fires or the channel is disposed — faulting it
+        // before it is awaited. Attach a no-throw handler now so that is never an
+        // unhandled rejection; the awaits below still observe the real outcome.
+        Trace.traceErrorNoThrow(promise);
+        // A token already cancelled at call time has synchronously rejected
+        // `promise` (via ct.bind in RpcCallContext.Outgoing). Mirror .NET and do
+        // NOT put the request on the wire: the peer must never run a call the
+        // caller has already abandoned. (This also avoids arming the outgoing
+        // cancellation, whose synchronous fire would otherwise race a cancel
+        // frame ahead of the request frame.)
+        if (ct.isCancellationRequested) {
+            return await promise;
+        }
+        // Arm before sending — mirroring .NET's Connection.RemoteCall — so a
+        // fired token propagates a CancellationRequest to the peer, not just a
+        // local rejection. Because the token is not yet cancelled here, register()
+        // only stores the callback (no synchronous fire), so any later cancel
+        // frame is necessarily enqueued after the request frame. Disposed once the
+        // call settles so it can't fire for a completed request or retain the token.
+        const cancellationRegistration = this.registerOutgoingCancellation(request.Id, ct);
+        try {
+            await (await this._$messageStream).writeMessageAsync(request.toNetwork(), ct);
+            return await promise;
+        } finally {
+            cancellationRegistration?.dispose();
+        }
+    }
+
+    private registerOutgoingCancellation(
+        requestId: string,
+        ct: CancellationToken,
+    ): CancellationTokenRegistration | undefined {
+        if (!ct.canBeCanceled) {
+            return undefined;
+        }
+        return ct.register(() => this.sendCancellationRequest(requestId));
+    }
+
+    private sendCancellationRequest(requestId: string): void {
+        const frame = new RpcMessage.CancellationRequest(requestId).toNetwork();
+        // Fire-and-forget: the callback that triggers this is synchronous, and the
+        // peer treats a cancel for an unknown/finished request as a no-op. Errors
+        // (e.g. a torn-down connection) are traced, never thrown.
+        Trace.traceErrorNoThrow(
+            (async () => {
+                const messageStream = await this._$messageStream;
+                await messageStream.writeMessageAsync(frame, CancellationToken.none);
+            })(),
+        );
     }
 
     public get isDisposed(): boolean {
