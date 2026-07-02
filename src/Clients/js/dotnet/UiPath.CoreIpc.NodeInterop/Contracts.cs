@@ -12,6 +12,14 @@ internal static class Contracts
         Task<bool> SendMessage(Message<int> message);
     }
 
+    // A callback the server invokes on the client; the client handler is expected
+    // to observe the cancellation the server triggers (the TypeScript side may
+    // receive it as a CancellationToken or, interchangeably, an AbortSignal).
+    public interface ICancellationCallback
+    {
+        Task<bool> Wait(CancellationToken ct = default);
+    }
+
     public interface IAlgebra
     {
         Task<string> Ping();
@@ -26,6 +34,10 @@ internal static class Contracts
         Task<bool> WaitForCancellation(CancellationToken ct = default);
         // How many times WaitForCancellation has observed a cancellation so far.
         Task<int> CancellationCount();
+        // Invokes ICancellationCallback.Wait on the client, then cancels it — used
+        // to prove a client-hosted callback observes a server-initiated cancel.
+        // Returns what the callback returned (true once it observed the cancel).
+        Task<bool> CancelCallback(Message message = default!);
     }
 
     public interface ICalculus

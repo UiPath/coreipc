@@ -13,11 +13,19 @@ export class IAlgebra {
         throw void 0;
     }
 
-    public WaitForCancellation(ct: CancellationToken): Promise<boolean> {
+    // Accepts a CancellationToken OR an AbortSignal interchangeably; the .NET
+    // counterpart is a plain CancellationToken.
+    public WaitForCancellation(cancellation: CancellationToken | AbortSignal): Promise<boolean> {
         throw void 0;
     }
 
     public CancellationCount(): Promise<number> {
+        throw void 0;
+    }
+
+    // Asks the .NET server to invoke ICancellationCallback.Wait on us and then
+    // cancel it. Resolves true once the server sees the callback observe the cancel.
+    public CancelCallback(): Promise<boolean> {
         throw void 0;
     }
 }
