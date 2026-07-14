@@ -92,7 +92,11 @@ internal static class Helpers
 public static class IOHelpers
 {
     const int MaxBytes = 100 * 1024 * 1024;
-    private static readonly RecyclableMemoryStreamManager Pool = new(MaxBytes, MaxBytes);
+    private static readonly RecyclableMemoryStreamManager Pool = new(options: new()
+    {
+        MaximumLargePoolFreeBytes = MaxBytes,
+        MaximumSmallPoolFreeBytes = MaxBytes
+    });
     internal static MemoryStream GetStream(int size = 0) => Pool.GetStream("IpcMessage", size);
     internal const int HeaderLength = sizeof(int) + 1;
     internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity?> pipeSecurity)
