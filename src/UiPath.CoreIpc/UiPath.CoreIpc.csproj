@@ -6,7 +6,7 @@
     <GeneratePackageOnBuild Condition="$(Configuration)=='Release'">true</GeneratePackageOnBuild>
     <GeneratePackageOnBuild Condition="$(Configuration)=='Debug'">true</GeneratePackageOnBuild>
     <Authors>UiPath</Authors>
-    <Version>2.5.1</Version>
+    <Version>2.5.2</Version>
     <PackageProjectUrl>https://github.com/UiPath/CoreIpc/</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>json-rpc rpc ipc netcore wcf</PackageTags>
