@@ -155,3 +155,81 @@ stages:
                 parameters:
                   reuseArtifactsFromBuildId: ${{ parameters.buildId }}
                   sourcePipelineId: $(resources.pipeline.ci.pipelineID)
+
+# Whisper to GitHub to publish the same release to public PyPI. dependsOn every
+# emitted publish stage with condition: succeeded(), so it fires only if all of them
+# succeeded — no PyPI publish on any ADO failure. It resolves the published buildId's
+# exact commit (ADO REST) and gates upstream — only a genuine NEW MASTER release
+# whispers (branch builds and already-published versions are skipped), so the GitHub
+# Action is never triggered just to refuse. Needs var group `github-dispatch`.
+- ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishPyPI, true)) }}:
+  - stage: Notify_GitHub
+    displayName: '📣 Notify GitHub → PyPI (master, new version only)'
+    dependsOn:
+      - ${{ if eq(parameters.publishNuGet, true) }}:
+        - Publish_NuGet
+      - ${{ if eq(parameters.publishNpm, true) }}:
+        - Publish_NPM
+      - Publish_PyPI
+    condition: succeeded()
+    variables:
+      - group: github-dispatch          # supplies secret GITHUB_DISPATCH_TOKEN
+    jobs:
+    - job: dispatch
+      displayName: 'repository_dispatch → UiPath/coreipc'
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+        - checkout: none
+        - script: |
+            set -euo pipefail
+            # 1. Resolve the published build's branch + commit (ADO REST).
+            build=$(curl -sSf -H "Authorization: Bearer $SYSTEM_ACCESSTOKEN" \
+              "${SYSTEM_COLLECTIONURI}${SYSTEM_TEAMPROJECT}/_apis/build/builds/${BUILD_ID}?api-version=7.1")
+            SHA=$(printf '%s' "$build" | jq -r '.sourceVersion')
+            BRANCH=$(printf '%s' "$build" | jq -r '.sourceBranch')
+            echo "buildId ${BUILD_ID}: branch=${BRANCH} commit=${SHA}"
+
+            # 2. GATE — public PyPI gets MASTER releases only. For anything else,
+            #    skip the whisper entirely so the GitHub Action is never triggered
+            #    just to refuse (saves a wasted runner).
+            if [ "$BRANCH" != "refs/heads/master" ]; then
+              echo "Not a master build (${BRANCH}) — skipping public PyPI dispatch."
+              exit 0
+            fi
+            if ! printf '%s' "$SHA" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+              echo "##vso[task.logissue type=error]No valid commit SHA for buildId ${BUILD_ID} (got '${SHA}')."
+              exit 1
+            fi
+
+            # 3. GATE — skip if this version is already on PyPI, so we never fire a
+            #    no-op run. Version = <Version> from the csproj AT that commit
+            #    (public repo → unauthenticated raw read).
+            VERSION=$(curl -sSf -H "Accept: application/vnd.github.raw" \
+              "https://api.github.com/repos/UiPath/coreipc/contents/src/UiPath.CoreIpc/UiPath.CoreIpc.csproj?ref=${SHA}" \
+              | grep -oPm1 '(?<=<Version>)[^<]+' | tr -d '[:space:]')
+            if [ -z "$VERSION" ]; then
+              echo "##vso[task.logissue type=error]Could not read <Version> from csproj at ${SHA}."
+              exit 1
+            fi
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/uipath-ipc/${VERSION}/json")
+            if [ "$code" = "200" ]; then
+              echo "uipath-ipc ${VERSION} already on PyPI — nothing to publish, skipping dispatch."
+              exit 0
+            fi
+
+            # 4. New master release → whisper to GitHub to publish it.
+            echo "Dispatching publish-pypi for uipath-ipc ${VERSION} (${SHA})"
+            curl -sSf -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GITHUB_DISPATCH_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/UiPath/coreipc/dispatches \
+              -d "{\"event_type\":\"publish-pypi\",\"client_payload\":{\"sha\":\"${SHA}\"}}"
+          displayName: 'Gate on master + unpublished version, then dispatch'
+          env:
+            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+            SYSTEM_COLLECTIONURI: $(System.CollectionUri)
+            SYSTEM_TEAMPROJECT: $(System.TeamProject)
+            BUILD_ID: ${{ parameters.buildId }}
+            GITHUB_DISPATCH_TOKEN: $(GITHUB_DISPATCH_TOKEN)

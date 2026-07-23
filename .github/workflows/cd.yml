@@ -1,0 +1,163 @@
+name: Publish uipath-ipc to PyPI
+
+# Publishes uipath-ipc to public PyPI via Trusted Publishing (OIDC) — no tokens.
+# ADO stays primary; on a green publish it POSTs a repository_dispatch (publish-pypi)
+# with the released commit SHA, and this builds & publishes that commit. Only master
+# publishes (dispatch runs the default-branch file; the build refuses non-master
+# commits) and there is no workflow_dispatch, so it can't fire by accident. Prereqs:
+# a PyPI Trusted Publisher (UiPath/coreipc, workflow cd.yml, env pypi) + protected `pypi` env.
+
+on:
+  repository_dispatch:
+    types: [publish-pypi]
+
+permissions:
+  contents: read
+
+# Never let two publish runs race for the same package.
+concurrency:
+  group: publish-pypi-uipath-ipc
+  cancel-in-progress: false
+
+env:
+  PACKAGE_DIR: src/Clients/python/uipath-ipc
+  CSPROJ: src/UiPath.CoreIpc/UiPath.CoreIpc.csproj
+
+jobs:
+  build:
+    name: Build wheel + sdist
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      # Untrusted input (client_payload.sha) is read via env, never inlined into
+      # a run: script, and validated as a 40-char hex commit — script-injection
+      # hardening + rejects tags/branch-names (we require an exact commit).
+      - name: Resolve & validate commit SHA
+        id: ref
+        env:
+          DISPATCH_SHA: ${{ github.event.client_payload.sha }}
+        run: |
+          set -euo pipefail
+          REF="$DISPATCH_SHA"
+          if [ -z "$REF" ]; then echo "::error::No client_payload.sha provided."; exit 1; fi
+          if ! printf '%s' "$REF" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+            echo "::error::client_payload.sha '$REF' is not a 40-char commit hash — refusing."; exit 1
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact commit (full history)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+          fetch-depth: 0        # full graph — needed to prove the commit is on master
+
+      # Enforce "only master publishes" at the source level: refuse any commit
+      # that is not merged into master. Combined with repository_dispatch always
+      # running the default-branch copy of this file, unmerged/branch code can
+      # never reach public PyPI.
+      - name: Refuse commits that are not on master
+        env:
+          SHA: ${{ steps.ref.outputs.ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin master
+          if ! git merge-base --is-ancestor "$SHA" FETCH_HEAD; then
+            echo "::error::Commit $SHA is not an ancestor of origin/master — only master-merged code may be published to PyPI."
+            exit 1
+          fi
+          echo "$SHA is on master — OK"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Version comes from the SAME commit we build (single source of truth) and
+      # is validated as a clean PEP 440 RELEASE version. A CI/dev build (local
+      # +segment) or a non-PEP-440 string (e.g. .NET-style '2.5.2-rc1') is
+      # REJECTED rather than silently mangled into the wrong release.
+      - name: Resolve & validate version (PEP 440, no local segment)
+        id: resolve
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet --upgrade packaging
+          python - "$CSPROJ" <<'PY'
+          import os, sys, xml.etree.ElementTree as ET
+          from packaging.version import Version, InvalidVersion
+
+          root = ET.parse(sys.argv[1]).getroot()
+          vals = [e.text.strip() for e in root.iter()
+                  if e.tag.split('}')[-1] == 'Version' and (e.text or '').strip()]
+          if not vals:
+              sys.exit(f"::error::No <Version> found in {sys.argv[1]}")
+          raw = vals[0]
+
+          if "+" in raw:
+              sys.exit(f"::error::Version '{raw}' has a PEP 440 local segment (+...); "
+                       "that is a CI/dev build, not a release — refusing to publish.")
+          try:
+              v = Version(raw)          # rejects .NET-style '2.5.2-rc1'
+          except InvalidVersion:
+              sys.exit(f"::error::Version '{raw}' is not a valid PEP 440 release version. "
+                       "Set a clean version (e.g. 2.5.2 or 2.5.2rc1) before publishing.")
+          if v.local:
+              sys.exit(f"::error::Version '{raw}' has a local segment — refusing.")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write(f"version={raw}\n")
+          print(f"Publishing version: {raw}")
+          PY
+
+      - name: Stamp version into pyproject.toml
+        # Reuse the repo's own stamper (single source of truth). With a clean
+        # dash-free version its to_pep440() is the identity.
+        run: |
+          set -euo pipefail
+          python src/CI/stamp-python-version.py \
+            "${{ steps.resolve.outputs.version }}" \
+            "$PACKAGE_DIR/pyproject.toml"
+
+      - name: Build wheel + sdist
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet --upgrade build
+          python -m build
+
+      - name: Verify distributions are PyPI-legal
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet --upgrade twine
+          python -m twine check dist/*
+          if ls dist/ | grep -q '+'; then
+            echo "::error::A local version segment (+) leaked into a dist filename — refusing to publish."
+            exit 1
+          fi
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dists-uipath-ipc
+          path: ${{ env.PACKAGE_DIR }}/dist/
+
+  publish:
+    name: Publish to PyPI (Trusted Publishing)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi          # MANDATORY protection (required reviewers + default-branch only)
+    permissions:
+      contents: read
+      id-token: write          # OIDC Trusted Publishing — no long-lived token
+    steps:
+      - name: Retrieve distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: release-dists-uipath-ipc
+          path: dist/
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+          skip-existing: true
