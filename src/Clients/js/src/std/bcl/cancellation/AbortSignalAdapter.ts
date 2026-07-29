@@ -2,10 +2,8 @@ import { CancellationToken } from './CancellationToken';
 import { CancellationTokenSource } from './CancellationTokenSource';
 
 /**
- * Bridges a Web/Node `AbortSignal` to a UiPath.Ipc `CancellationToken`, so a
- * contract method may accept an `AbortSignal` anywhere a `CancellationToken` is
- * accepted. Purely additive: `CancellationToken` / `CancellationTokenSource`
- * are unchanged and remain fully supported.
+ * Bridges a Web/Node `AbortSignal` to a `CancellationToken`, so a contract method may
+ * accept an `AbortSignal` anywhere a `CancellationToken` is accepted.
  */
 export class AbortSignalAdapter {
     /** Whether `arg` is an `AbortSignal` (guarded for runtimes without it). */
@@ -14,10 +12,8 @@ export class AbortSignalAdapter {
     }
 
     /**
-     * Check-and-adapt in one gulp: returns `candidate` unchanged if it is
-     * already a `CancellationToken`, the bridged token if it is an
-     * `AbortSignal`, or `undefined` if it is neither (i.e. not a cancellation
-     * argument). Lets callers treat both cancellation shapes uniformly.
+     * `candidate` unchanged if it is a `CancellationToken`, the bridged token if it is
+     * an `AbortSignal`, or `undefined` if it is neither cancellation shape.
      */
     public static ensureCancellationToken(
         candidate: unknown,
@@ -32,15 +28,8 @@ export class AbortSignalAdapter {
     }
 
     /**
-     * Returns a `CancellationToken` that is cancelled when `signal` aborts —
-     * immediately if it is already aborted.
-     *
-     * The backing `CancellationTokenSource` is created with no `cancelAfter`
-     * delay, so its only disposable resource (the delay timer) is never
-     * allocated; we still `dispose()` it right after it fires — for hygiene and
-     * to stay correct if the source ever gains resources. A never-aborting
-     * signal's source holds nothing and is collected together with the signal
-     * (the `abort` listener is registered `once`, so it self-removes).
+     * A `CancellationToken` cancelled when `signal` aborts — immediately if already
+     * aborted. The `once` listener self-removes, so a never-aborting signal leaks nothing.
      */
     public static toCancellationToken(signal: AbortSignal): CancellationToken {
         const cts = new CancellationTokenSource();
@@ -64,10 +53,8 @@ export class AbortSignalAdapter {
     }
 
     /**
-     * The reverse of {@link toCancellationToken}: returns an `AbortSignal` that
-     * aborts when `token` is cancelled — immediately if it already is. Used on
-     * the callee side to hand a callback handler an `AbortSignal` in place of a
-     * `CancellationToken`. Throws if the runtime has no `AbortController`.
+     * The reverse of {@link toCancellationToken}, for handing a callback handler an
+     * `AbortSignal`. Throws if the runtime has no `AbortController`.
      */
     public static toAbortSignal(token: CancellationToken): AbortSignal {
         if (typeof AbortController === 'undefined') {

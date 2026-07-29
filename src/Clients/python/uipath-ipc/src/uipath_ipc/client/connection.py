@@ -732,11 +732,8 @@ class IpcConnection:
         exception only logged — mirroring .NET's non-generic `Task`.
         """
         deferred_one_way: tuple[Callable[..., object], list, dict] | None = None
-        # Publish the ambient IpcContext for this dispatch so a POCO handler can
-        # reach the peer via IpcContext.Current.get_callback(...) without a
-        # Message parameter. No reset needed: _invoke_callback runs in its own
-        # asyncio task (see _handle_incoming_request), whose contextvars copy is
-        # task-local, so the value never leaks and is dropped when the task ends.
+        # So a POCO handler can reach the peer without a Message parameter. No reset
+        # needed: this runs in its own asyncio task, which owns its contextvars copy.
         IpcContext._activate(self)
         try:
             entry = self._callbacks.get(req.endpoint)

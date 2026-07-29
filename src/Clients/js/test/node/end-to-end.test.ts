@@ -26,11 +26,8 @@ async function waitFor(
     return false;
 }
 
-// A callback contract the .NET server invokes on this client. We register it in
-// the contract store and stamp its parameter metadata (mirroring what a contract
-// compiled with emitDecoratorMetadata would emit) so the callee can inject the
-// per-call cancellation into the handler — as a CancellationToken or, for the
-// same C# CancellationToken counterpart, an AbortSignal.
+// A callback contract the .NET server invokes on this client. Its parameter metadata is
+// stamped below (as emitDecoratorMetadata would) so the callee can inject the cancellation.
 class ICancellationCallback {
     Wait(_cancellation: CancellationToken | AbortSignal): Promise<boolean> {
         throw void 0;
@@ -129,9 +126,8 @@ describe('node:end-to-end', () => {
             });
 
             it('propagates caller-side cancellation to the .NET callee', async () => {
-                // The .NET Algebra server is a shared singleton across the
-                // WebSocket/NamedPipe runs, so assert a delta rather than an
-                // absolute count.
+                // The .NET Algebra server is a singleton shared across the WebSocket and
+                // NamedPipe runs, so assert a delta rather than an absolute count.
                 const before = await algebraProxy.CancellationCount();
 
                 const cts = new CancellationTokenSource();
@@ -148,9 +144,8 @@ describe('node:end-to-end', () => {
                 const outcome = await local;
                 expect(outcome).to.be.instanceOf(OperationCanceledError);
 
-                // ...and the .NET handler's injected CancellationToken fires — which
-                // can only happen if the TS client actually transmitted a
-                // CancellationRequest frame to the server.
+                // ...and the .NET handler's token fires, which can only happen if the TS
+                // client actually transmitted a CancellationRequest frame.
                 const serverObserved = await waitFor(
                     async () => (await algebraProxy.CancellationCount()) === before + 1,
                     10_000,
@@ -165,9 +160,8 @@ describe('node:end-to-end', () => {
                 const before = await algebraProxy.CancellationCount();
 
                 const controller = new AbortController();
-                // Same contract method as the CancellationToken case above — here we
-                // hand it an AbortSignal instead, which the client bridges to a
-                // CancellationToken on the wire.
+                // Same contract method as above, handed an AbortSignal instead — which the
+                // client bridges to a CancellationToken.
                 const local = algebraProxy
                     .WaitForCancellation(controller.signal)
                     .then(() => 'resolved' as const, (err: unknown) => err);

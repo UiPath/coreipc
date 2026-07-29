@@ -1,21 +1,14 @@
 import { CancellationToken, CancellationTokenSource } from '../../../bcl';
 
 /**
- * Tracks in-flight *incoming* calls (callbacks the peer invokes on us) by their
- * request id, each backed by a {@link CancellationTokenSource}. It is the callee
- * mirror of the outgoing-call table: it lets an inbound `CancellationRequest`
- * frame cancel the matching running handler.
- *
- * @internal
+ * The callee mirror of the outgoing-call table: tracks in-flight incoming calls by
+ * request id so an inbound `CancellationRequest` can cancel the running handler.
  */
 /* @internal */
 export class IncomingCallTable {
     private readonly _map = new Map<string, CancellationTokenSource>();
 
-    /**
-     * Starts tracking `requestId` and returns the token that fires when a
-     * cancellation for it arrives (or the call is torn down).
-     */
+    /** Tracks `requestId`; the returned token fires when a cancellation for it arrives. */
     public register(requestId: string): CancellationToken {
         const cts = new CancellationTokenSource();
         this._map.set(requestId, cts);

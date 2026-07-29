@@ -16,9 +16,7 @@ from uipath_ipc import (
 PONG = "pong-from-callback"
 
 
-# A POCO service contract: it declares NO `Message` parameter, yet its handler
-# reaches the caller's callback purely through `IpcContext.Current` — the whole
-# point of IpcContext (a contract module need not import anything from uipath_ipc).
+# A POCO contract: no `Message` parameter, yet callback-capable via `IpcContext.Current`.
 class IContextProbe(ABC):
     @abstractmethod
     async def ReachCallbackViaContext(self) -> str: ...

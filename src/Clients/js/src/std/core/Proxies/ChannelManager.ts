@@ -118,17 +118,8 @@ export class ChannelManager implements IAsyncDisposable {
     }
 
     /**
-     * If the callback contract declares a trailing cancellation parameter,
-     * replaces the (blanked) trailing wire argument with the per-call token —
-     * or a bridged `AbortSignal` when the contract asks for one — so the handler
-     * observes cancellation exactly like a .NET service handler would.
-     *
-     * This is deliberately metadata-driven: it fires only for a registered
-     * (decorated) callback contract. Callbacks registered by bare endpoint name
-     * carry no parameter-type metadata, and the empty-string wire form of a
-     * cancellation slot is indistinguishable from a legitimate empty string, so
-     * guessing would risk clobbering a real argument. Absent metadata we leave
-     * the arguments untouched — fully backward compatible.
+     * Replaces the blanked trailing wire argument with the per-call token (or a bridged
+     * `AbortSignal`). Metadata-driven: guessing could clobber a real empty-string argument.
      */
     private injectCancellation(
         request: RpcMessage.Request,

@@ -7,10 +7,6 @@ export interface IContractStore {
 
     maybeGet<TService = unknown>($class: PublicCtor<TService>): ServiceDescriptor<TService> | undefined;
 
-    /**
-     * Looks up a registered contract by its endpoint name (defaults to the
-     * contract class name). Used on the callee side, where an incoming call
-     * identifies its contract by endpoint name rather than by class.
-     */
+    /** For the callee side, where an incoming call identifies its contract by name. */
     maybeGetByEndpoint(endpoint: string): ServiceDescriptor<unknown> | undefined;
 }
