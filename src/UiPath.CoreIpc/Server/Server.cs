@@ -167,21 +167,23 @@ internal class Server
             Task<object?> ScheduleMethodCall() => defaultScheduler ? MethodCall() : RunOnScheduler();
             async Task<object?> MethodCall()
             {
-                await (route.BeforeCall?.Invoke(
-                    new CallInfo(newConnection: false, method.MethodInfo, arguments),
-                    cancellationToken) ?? Task.CompletedTask);
-
-                Task invocationTask = null!;
-
-                invocationTask = method.Invoke(service, arguments, cancellationToken);
-                await invocationTask;
-
-                if (!returnTaskType.IsGenericType)
+                // So a POCO contract can reach the peer without a Message parameter.
+                using (IpcContext.Push(new IpcContext(_client, cancellationToken)))
                 {
-                    return null;
-                }
+                    await (route.BeforeCall?.Invoke(
+                        new CallInfo(newConnection: false, method.MethodInfo, arguments),
+                        cancellationToken) ?? Task.CompletedTask);
 
-                return GetTaskResult(returnTaskType, invocationTask);
+                    Task invocationTask = method.Invoke(service, arguments, cancellationToken);
+                    await invocationTask;
+
+                    if (!returnTaskType.IsGenericType)
+                    {
+                        return null;
+                    }
+
+                    return GetTaskResult(returnTaskType, invocationTask);
+                }
             }
 
             Task<object?> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler).Unwrap();
