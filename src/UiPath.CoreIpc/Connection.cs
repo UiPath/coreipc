@@ -259,7 +259,7 @@ internal sealed class Connection : IDisposable
                 Debug.Assert(SynchronizationContext.Current is null);
                 if (length > _maxMessageSize)
                 {
-                    throw new InvalidDataException($"Message too large. The maximum message size is {_maxMessageSize / (1024 * 1024)} megabytes.");
+                    throw new InvalidDataException($"Message too large ({length >> 20} MB). The maximum message size is {_maxMessageSize >> 20} MB.");
                 }
                 _nestedStream.Reset(length);
                 await HandleMessage();
