@@ -1,6 +1,7 @@
 export * from './IRpcChannel';
 export * from './RpcChannel';
 export * from './RpcCallContext';
+export * from './IncomingCallTable';
 export * from './RpcMessageBase';
 export * from './RpcMessage';
 export * from './IncommingInitiatingRpcMessage';

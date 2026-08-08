@@ -1,4 +1,4 @@
-import { CancellationToken, IAsyncDisposable, PublicCtor, Timeout, TimeSpan } from '../..';
+import { AbortSignalAdapter, CancellationToken, IAsyncDisposable, PublicCtor, Timeout, TimeSpan } from '../..';
 
 import {
     IServiceProvider,
@@ -80,6 +80,7 @@ export class ChannelManager implements IAsyncDisposable {
 
     private async invokeCallback(
         request: RpcMessage.Request,
+        ct: CancellationToken,
     ): Promise<RpcMessage.Response> {
         const callback = this._sp.callbackStore.get(
             request.Endpoint,
@@ -102,6 +103,7 @@ export class ChannelManager implements IAsyncDisposable {
         }
 
         const args = request.Parameters.map(jsonArg => JSON.parse(jsonArg));
+        this.injectCancellation(request, args, ct);
         let data: string | null = null;
         let error: IpcError | null = null;
 
@@ -114,6 +116,34 @@ export class ChannelManager implements IAsyncDisposable {
 
         return new RpcMessage.Response(request.Id, data, error);
     }
+
+    /**
+     * Replaces the blanked trailing wire argument with the per-call token (or a bridged
+     * `AbortSignal`). Metadata-driven: guessing could clobber a real empty-string argument.
+     */
+    private injectCancellation(
+        request: RpcMessage.Request,
+        args: unknown[],
+        ct: CancellationToken,
+    ): void {
+        if (args.length === 0) {
+            return;
+        }
+
+        const operation = this._sp.contractStore
+            .maybeGetByEndpoint(request.Endpoint)
+            ?.operations.maybeGet(request.MethodName as never);
+        if (!operation) {
+            return;
+        }
+
+        if (operation.hasEndingAbortSignal) {
+            args[args.length - 1] = AbortSignalAdapter.toAbortSignal(ct);
+        } else if (operation.hasEndingCancellationToken) {
+            args[args.length - 1] = ct;
+        }
+    }
+
     private readonly _incommingCallObserver = new (class
         implements Observer<RpcCallContext.Incomming>
     {
@@ -125,6 +155,7 @@ export class ChannelManager implements IAsyncDisposable {
             incommingContext.respond(
                 await this._channelManager.invokeCallback(
                     incommingContext.request,
+                    incommingContext.ct,
                 ),
             );
         }
