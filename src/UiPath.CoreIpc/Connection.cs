@@ -61,9 +61,9 @@ internal sealed class Connection : IDisposable
         var tokenRegistration = token.UnsafeRegister(_cancelRequest, requestId);
         try
         {
-            Logger?.LogInformation("Sending the request");
+            Logger?.LogTrace("Sending the request");
             await Send(request, token);
-            Logger?.LogInformation("Sent the request");
+            Logger?.LogTrace("Sent the request");
         }
         catch (Exception ex)
         {
@@ -77,16 +77,16 @@ internal sealed class Connection : IDisposable
         }
         try
         {
-            Logger?.LogInformation("Waiting for the completion source to complete.");
+            Logger?.LogTrace("Waiting for the completion source to complete.");
             Response response;
             try
             {
                 response = await requestCompletion.ValueTask();
-                Logger?.LogInformation("The completion source completed successfully.");
+                Logger?.LogTrace("The completion source completed successfully.");
             }
             catch (Exception ex)
             {
-                Logger?.LogInformation($"The completion source failed. Ex: {ex}");
+                Logger?.LogTrace($"The completion source failed. Ex: {ex}");
                 throw;
             }
             return response;
@@ -100,7 +100,7 @@ internal sealed class Connection : IDisposable
     }
     public ValueTask Send(Request request, CancellationToken token)
     {
-        Logger?.LogInformation("Connection.Send...");
+        Logger?.LogTrace("Connection.Send...");
         var uploadStream = request.UploadStream;
         var requestBytes = SerializeToStream(request);
         return uploadStream == null ?
@@ -161,18 +161,18 @@ internal sealed class Connection : IDisposable
 #endif
     private async ValueTask SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken)
     {
-        Logger?.LogInformation("Connection.SendMessage: Awaiting the acquiring of the sendLock");
+        Logger?.LogTrace("Connection.SendMessage: Awaiting the acquiring of the sendLock");
         await _sendLock.WaitAsync(cancellationToken);
 
         try
         {
-            Logger?.LogInformation($"Connection.SendMessage: sendLock was successfully aquired. Pushing the bytes onto the network. ByteCount: {data.Length}");
+            Logger?.LogTrace($"Connection.SendMessage: sendLock was successfully aquired. Pushing the bytes onto the network. ByteCount: {data.Length}");
             await Network.WriteMessage(messageType, data, CancellationToken.None);
-            Logger?.LogInformation("Connection.SendMessage: Successfully pushed the bytes.");
+            Logger?.LogTrace("Connection.SendMessage: Successfully pushed the bytes.");
         }
         finally
         {
-            Logger?.LogInformation("Connection.SendMessage: Releasing the sendLock.");
+            Logger?.LogTrace("Connection.SendMessage: Releasing the sendLock.");
             _sendLock.Release();
         }
     }
@@ -298,10 +298,7 @@ internal sealed class Connection : IDisposable
                     await OnDownloadResponse();
                     return;
                 default:
-                    if (LogEnabled)
-                    {
-                        Log("Unknown message type " + messageType);
-                    }
+                    Logger?.LogError("Unknown message type " + messageType);
                     break;
             };
         }
@@ -415,6 +412,6 @@ internal sealed class Connection : IDisposable
             throw new InvalidOperationException();
         }
 
-        Logger.LogInformation(message);
+        Logger.LogTrace(message);
     }
 }
