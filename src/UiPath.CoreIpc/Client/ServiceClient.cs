@@ -54,6 +54,14 @@ internal abstract class ServiceClient : IDisposable
             CancellationToken cancellationToken = default;
             TimeSpan messageTimeout = default;
             TimeSpan clientTimeout = Config.RequestTimeout.OrInfinite();
+            // Ambient options sit between the client default and an explicit Message argument,
+            // which SerializeArguments below still lets win.
+            if (IpcCallOptions.Current is { RequestTimeout: var ambientTimeout } &&
+                ambientTimeout != TimeSpan.Zero)
+            {
+                messageTimeout = ambientTimeout;
+                clientTimeout = ambientTimeout;
+            }
             Stream? uploadStream = null;
             var methodName = method.Name;
 

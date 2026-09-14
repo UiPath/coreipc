@@ -4,6 +4,7 @@ from .client import IpcClient, IpcConnection
 from .errors import EndpointNotFoundError, MethodNotFoundError, RemoteException
 from .hooks import BeforeCallHandler, BeforeConnectHandler, CallInfo
 from .markers import ipc_cancellable
+from .call_options import IpcCallOptions, call_options, current_call_options
 from .message import INFINITE_REQUEST_TIMEOUT, IClient, Message
 from .server import IpcServer
 from .transport import (
@@ -28,7 +29,10 @@ __all__ = [
     "IpcClient",
     "IpcConnection",
     "IpcServer",
+    "IpcCallOptions",
     "Message",
+    "call_options",
+    "current_call_options",
     "NamedPipeClientTransport",
     "NamedPipeServerTransport",
     "RemoteException",

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 from ..errors import RemoteException
 from ..hooks import CallInfo
 from ..markers import is_ipc_cancellable
+from ..call_options import current_call_options
 from ..message import INFINITE_REQUEST_TIMEOUT, Message
 from ..wire import Request, Response, from_wire, to_wire
 from ..wire.serialization import resolve_hints
@@ -114,12 +115,18 @@ class _IpcProxy:
         # .NET it dictates how long THIS client waits, not how long the SERVER
         # spends processing. Sending it as TimeoutInSeconds would silently
         # impose the caller's local SLA as the server's cancellation deadline.
+        wire_timeout: float | None = None
         client_timeout = self._client.request_timeout
+        # Ambient options sit between the client default and an explicit Message argument,
+        # which the arg scan below still lets win.
+        ambient = current_call_options()
+        if ambient is not None and ambient.request_timeout != 0:
+            wire_timeout = ambient.request_timeout
+            client_timeout = ambient.request_timeout
         # Only forward a local cancel/timeout to the peer when the contract
         # method is @ipc_cancellable (its .NET counterpart has a CancellationToken
         # to observe it). Otherwise cancellation stays local.
         cancellable = is_ipc_cancellable(self._contract, method_name)
-        wire_timeout: float | None = None
         params: list[str] = []
         for a in args:
             if isinstance(a, Message):

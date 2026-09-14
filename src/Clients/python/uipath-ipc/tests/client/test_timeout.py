@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 
 import pytest
 
-from uipath_ipc import IpcClient, ipc_cancellable
+from uipath_ipc import IpcClient, Message, call_options, ipc_cancellable
 from uipath_ipc.transport.base import ClientTransport
 from uipath_ipc.wire import CancellationRequest, MessageType, Response
 
@@ -69,6 +69,11 @@ class IComputingService(ABC):
 
 
 # --- happy path ----------------------------------------------------------
+
+class IMessageService(ABC):
+    @abstractmethod
+    async def Ping(self, message: Message) -> str: ...
+
 
 async def test_request_timeout_raises_timeout_error() -> None:
     t = _FakeTransport()
@@ -191,4 +196,37 @@ async def test_negative_client_wide_timeout_is_local_and_unbounded() -> None:
 
         # Tidy up
         t.reader.feed_data(_response_frame(Response(request_id="1", data="3.0")))
+        await asyncio.wait_for(task, timeout=1.0)
+
+
+async def test_ambient_call_options_ride_the_wire_on_a_poco_contract() -> None:
+    """A contract with no Message parameter still gets a per-call deadline."""
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(IComputingService)
+        with call_options(request_timeout=12.5):
+            task = asyncio.create_task(svc.AddFloats(1.0, 2.0))
+            await asyncio.sleep(0)
+
+        frames = _split_frames(bytes(t.writer.buffer))
+        req_payload = json.loads(frames[0][1].decode("utf-8"))
+        assert req_payload["TimeoutInSeconds"] == 12.5
+
+        t.reader.feed_data(_response_frame(Response(request_id="1", data="3.0")))
+        await asyncio.wait_for(task, timeout=1.0)
+
+
+async def test_an_explicit_message_still_beats_the_ambient() -> None:
+    t = _FakeTransport()
+    async with IpcClient(t) as client:
+        svc = client.get_proxy(IMessageService)
+        with call_options(request_timeout=12.5):
+            task = asyncio.create_task(svc.Ping(Message(request_timeout=3.0)))
+            await asyncio.sleep(0)
+
+        frames = _split_frames(bytes(t.writer.buffer))
+        req_payload = json.loads(frames[0][1].decode("utf-8"))
+        assert req_payload["TimeoutInSeconds"] == 3.0
+
+        t.reader.feed_data(_response_frame(Response(request_id="1", data='"pong"')))
         await asyncio.wait_for(task, timeout=1.0)
