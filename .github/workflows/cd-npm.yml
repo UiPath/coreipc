@@ -12,16 +12,23 @@ name: Publish @uipath/coreipc to GitHub Packages and npmjs
 # so it can't fire by accident, and dispatch always runs the default-branch copy
 # of this file.
 #
-# Two registries, two trust models:
+# NOTHING off master is ever published, to either registry, in either channel. The
+# repo is public, so a fork pull-request head is fetchable by SHA from refs/pull/* —
+# the ancestor-of-master check in `pack` is what keeps such a commit out.
+#
+# Two registries, two credentials, neither of them long-lived:
 #   - GitHub Packages gets every build, prerelease included, authenticated with the
-#     built-in GITHUB_TOKEN (`packages: write`). No PAT, no service connection —
-#     this is what replaces the classic-PAT `PublishNPM` connection that UiPath
-#     revoked org-wide after the May 2026 npm supply-chain incident.
-#   - Public npmjs gets STABLE versions only, from master only, via Trusted
-#     Publishing (OIDC) — no tokens. Prereqs: an npmjs Trusted Publisher on
-#     @uipath/coreipc (UiPath/coreipc, workflow cd-npm.yml, env npm) + protected
-#     `npm` environment. @uipath/coreipc-web is not on npmjs yet, so it is
-#     GitHub-Packages-only until someone bootstraps that name manually.
+#     job-scoped GITHUB_TOKEN (`packages: write`). No PAT, no ADO service connection;
+#     both `coreipc` and `coreipc-web` are already linked to this repo.
+#   - Public npmjs gets STABLE versions only, via Trusted Publishing (OIDC) — no
+#     token at all. Prereq: an npmjs Trusted Publisher on @uipath/coreipc
+#     (UiPath/coreipc, workflow cd-npm.yml, env npm). @uipath/coreipc-web is not on
+#     npmjs yet, so it is GitHub-Packages-only until someone bootstraps that name.
+#
+# Both publish jobs sit behind protected environments (`github-packages`, `npm`).
+# Configure required reviewers and "Protected branches only" on each — referencing an
+# environment that does not exist auto-creates it UNPROTECTED, so until that is done
+# the gate is decorative.
 
 on:
   repository_dispatch:
@@ -43,7 +50,7 @@ env:
 jobs:
   pack:
     name: Pack tarballs
-    runs-on: uipath-ubuntu-latest
+    runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.resolve.outputs.version }}
       stable: ${{ steps.resolve.outputs.stable }}
@@ -105,20 +112,20 @@ jobs:
           echo "stable=$STABLE" >> "$GITHUB_OUTPUT"
           echo "Publishing $DISPATCHED (stable=$STABLE)"
 
-      # Enforce "only master reaches public npmjs" at the source level. CI builds
-      # (prerelease versions) may come from any branch — they only go to GitHub
-      # Packages — but a stable version that is not merged into master can never
-      # reach npmjs. Combined with repository_dispatch always running the
-      # default-branch copy of this file, unmerged code can't be released.
-      - name: Refuse stable releases that are not on master
-        if: steps.resolve.outputs.stable == 'true'
+      # Enforce "only master publishes" at the source level, for BOTH registries and
+      # both channels. A commit becomes an ancestor of master only by being merged, so
+      # this also rejects fork pull-request heads — those are fetchable by SHA from
+      # refs/pull/* on a public repo, but are never on master. Combined with the
+      # trigger always running the default-branch copy of this file, unmerged code
+      # cannot be published anywhere.
+      - name: Refuse commits that are not on master
         env:
           SHA: ${{ steps.ref.outputs.ref }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin master
           if ! git merge-base --is-ancestor "$SHA" FETCH_HEAD; then
-            echo "::error::Commit $SHA is not an ancestor of origin/master — only master-merged code may be published to npmjs."
+            echo "::error::Commit $SHA is not an ancestor of origin/master — only master-merged code may be published."
             exit 1
           fi
           echo "$SHA is on master — OK"
@@ -183,7 +190,8 @@ jobs:
   publish-github-packages:
     name: Publish to GitHub Packages
     needs: pack
-    runs-on: uipath-ubuntu-latest
+    runs-on: ubuntu-latest
+    environment: github-packages # restores the approval gate ADO's NPM-Packages had
     permissions:
       contents: read
       packages: write # the whole auth story — GITHUB_TOKEN, no PAT
@@ -218,7 +226,7 @@ jobs:
     needs: [pack, publish-github-packages]
     # Stable releases only. CI builds stop at GitHub Packages.
     if: needs.pack.outputs.stable == 'true'
-    runs-on: uipath-ubuntu-latest
+    runs-on: ubuntu-latest
     environment: npm # MANDATORY protection (required reviewers + default-branch only)
     permissions:
       contents: read
