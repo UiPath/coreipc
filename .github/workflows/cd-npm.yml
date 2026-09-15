@@ -1,35 +1,5 @@
 name: Publish @uipath/coreipc to GitHub Packages and npmjs
 
-# Publishes the two JS client packages — @uipath/coreipc (NodeJS) and
-# @uipath/coreipc-web — in two steps: a `pack` job that builds and produces the
-# exact .tgz files, and publish jobs that push those same tarballs. Nothing is
-# ever built twice, so what lands on npmjs is byte-identical to what lands on
-# GitHub Packages.
-#
-# ADO stays primary: on a green NPM publish stage it POSTs a repository_dispatch
-# (publish-npm) with the released commit SHA and the version that stage published,
-# and this workflow builds & publishes that commit. There is no workflow_dispatch,
-# so it can't fire by accident, and dispatch always runs the default-branch copy
-# of this file.
-#
-# NOTHING off master is ever published, to either registry, in either channel. The
-# repo is public, so a fork pull-request head is fetchable by SHA from refs/pull/* —
-# the ancestor-of-master check in `pack` is what keeps such a commit out.
-#
-# Two registries, two credentials, neither of them long-lived:
-#   - GitHub Packages gets every build, prerelease included, authenticated with the
-#     job-scoped GITHUB_TOKEN (`packages: write`). No PAT, no ADO service connection;
-#     both `coreipc` and `coreipc-web` are already linked to this repo.
-#   - Public npmjs gets STABLE versions only, via Trusted Publishing (OIDC) — no
-#     token at all. Prereq: an npmjs Trusted Publisher on @uipath/coreipc
-#     (UiPath/coreipc, workflow cd-npm.yml, env npm). @uipath/coreipc-web is not on
-#     npmjs yet, so it is GitHub-Packages-only until someone bootstraps that name.
-#
-# Both publish jobs sit behind protected environments (`github-packages`, `npm`).
-# Configure required reviewers and "Protected branches only" on each — referencing an
-# environment that does not exist auto-creates it UNPROTECTED, so until that is done
-# the gate is decorative.
-
 on:
   repository_dispatch:
     types: [publish-npm]
@@ -37,7 +7,6 @@ on:
 permissions:
   contents: read
 
-# Never let two publish runs race for the same packages.
 concurrency:
   group: publish-npm-coreipc
   cancel-in-progress: false
@@ -45,7 +14,7 @@ concurrency:
 env:
   JS_DIR: src/Clients/js
   CSPROJ: src/UiPath.CoreIpc/UiPath.CoreIpc.csproj
-  NODE_VERSION: '20.11.0' # same Node the ADO build uses (azp-nodejs.yaml)
+  NODE_VERSION: '20.11.0'
 
 jobs:
   pack:
@@ -55,10 +24,8 @@ jobs:
       version: ${{ steps.resolve.outputs.version }}
       stable: ${{ steps.resolve.outputs.stable }}
     steps:
-      # Untrusted input (client_payload.*) is read via env, never inlined into a
-      # run: script, and validated — script-injection hardening. The SHA must be
-      # an exact 40-char commit (rejects tags/branch names); the version must be
-      # plain semver.
+      # client_payload is attacker-controlled if the dispatch token leaks: read it
+      # through env, never inline it into a run: script.
       - name: Resolve & validate dispatch payload
         id: ref
         env:
@@ -79,17 +46,14 @@ jobs:
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
           echo "version=$VER" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout exact commit (full history)
+      - name: Checkout exact commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ steps.ref.outputs.ref }}
-          fetch-depth: 0 # full graph — needed to prove the commit is on master
+          fetch-depth: 0 # the ancestry check below needs the full graph
 
-      # The csproj <Version> is the single source of truth for every package in this
-      # repo (.NET, Python, JS alike). A dispatched version is legal only if it is
-      # that version (a stable release) or that version plus an ADO build-number
-      # suffix (a CI build) — anything else means the payload and the commit
-      # disagree, and we refuse rather than publish a surprise version.
+      # A build-number suffix is the ADO CI convention (2.5.3-20260724-02); anything
+      # else means the payload and the commit disagree.
       - name: Resolve & validate version against the commit
         id: resolve
         env:
@@ -112,12 +76,8 @@ jobs:
           echo "stable=$STABLE" >> "$GITHUB_OUTPUT"
           echo "Publishing $DISPATCHED (stable=$STABLE)"
 
-      # Enforce "only master publishes" at the source level, for BOTH registries and
-      # both channels. A commit becomes an ancestor of master only by being merged, so
-      # this also rejects fork pull-request heads — those are fetchable by SHA from
-      # refs/pull/* on a public repo, but are never on master. Combined with the
-      # trigger always running the default-branch copy of this file, unmerged code
-      # cannot be published anywhere.
+      # The repo is public, so fork PR heads are fetchable by SHA from refs/pull/*.
+      # Ancestry of master is what keeps one out.
       - name: Refuse commits that are not on master
         env:
           SHA: ${{ steps.ref.outputs.ref }}
@@ -141,8 +101,8 @@ jobs:
         working-directory: ${{ env.JS_DIR }}
         run: npm ci
 
-      # Same stamping the ADO build does before `npm run build`: webpack copies the
-      # version out of package.json into both generated packages.
+      # Must precede the build: webpack copies this version into both generated
+      # packages.
       - name: Stamp version into package.json
         working-directory: ${{ env.JS_DIR }}
         run: npm version "${{ steps.resolve.outputs.version }}" --allow-same-version --no-git-tag-version
@@ -151,10 +111,7 @@ jobs:
         working-directory: ${{ env.JS_DIR }}
         run: npm run build
 
-      # Step one of two: produce the tarballs. `npm pack` on the generated package
-      # directories, explicitly, rather than relying on the webpack shell plugin's
-      # side-effect pack into dist-packages/ — the artifact is what gets published,
-      # so it should be built by a step you can see.
+      # Deliberately not reusing the webpack shell plugin's pack into dist-packages/.
       - name: Pack
         working-directory: ${{ env.JS_DIR }}
         run: |
@@ -164,8 +121,6 @@ jobs:
           npm pack ./dist/prepack/web --pack-destination "$RUNNER_TEMP/tarballs"
           ls -l "$RUNNER_TEMP/tarballs"
 
-      # Guard against a silently wrong artifact: exactly two tarballs, named for the
-      # two packages at the version we resolved.
       - name: Verify tarballs
         env:
           VERSION: ${{ steps.resolve.outputs.version }}
@@ -191,10 +146,10 @@ jobs:
     name: Publish to GitHub Packages
     needs: pack
     runs-on: ubuntu-latest
-    environment: github-packages # restores the approval gate ADO's NPM-Packages had
+    environment: github-packages
     permissions:
       contents: read
-      packages: write # the whole auth story — GITHUB_TOKEN, no PAT
+      packages: write
     steps:
       - name: Retrieve tarballs
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -209,9 +164,6 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: '@uipath'
 
-      # Step two of two: publish the tarballs the pack job produced, untouched.
-      # `packages/npm/coreipc` and `packages/npm/coreipc-web` are both already
-      # linked to UiPath/coreipc, so GITHUB_TOKEN is authorized for both.
       - name: Publish both packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -224,13 +176,12 @@ jobs:
   publish-npmjs:
     name: Publish to npmjs (Trusted Publishing)
     needs: [pack, publish-github-packages]
-    # Stable releases only. CI builds stop at GitHub Packages.
     if: needs.pack.outputs.stable == 'true'
     runs-on: ubuntu-latest
-    environment: npm # MANDATORY protection (required reviewers + default-branch only)
+    environment: npm
     permissions:
       contents: read
-      id-token: write # OIDC Trusted Publishing — no long-lived token
+      id-token: write
     steps:
       - name: Retrieve tarballs
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -252,11 +203,9 @@ jobs:
           npm install -g npm@^11.5.1
           npm --version
 
-      # No NODE_AUTH_TOKEN: npm exchanges the job's OIDC token for a short-lived
-      # publish credential and attaches a provenance attestation automatically.
-      # Only the NodeJS package goes to npmjs — @uipath/coreipc-web has never been
-      # published there, and a Trusted Publisher can only be configured on a name
-      # that already exists.
+      # No NODE_AUTH_TOKEN by design — npm trades the job's OIDC token for a
+      # short-lived credential. @uipath/coreipc-web is absent because a Trusted
+      # Publisher can only be configured on a name that already exists on npmjs.
       - name: Publish @uipath/coreipc
         env:
           VERSION: ${{ needs.pack.outputs.version }}
