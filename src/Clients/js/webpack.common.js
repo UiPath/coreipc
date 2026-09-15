@@ -96,6 +96,13 @@ function createConfig(params) {
                 from: `./assets/${params.name}/`,
                 to: './',
             },
+            {
+                // npm only auto-includes a LICENSE that is already in the package
+                // root, and the generated packages are built from scratch here.
+                from: 'LICENSE',
+                context: path.resolve(__dirname, '../../..'),
+                to: './',
+            },
         ]
     });
 
