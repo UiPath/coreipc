@@ -39,14 +39,14 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/UiPath/coreipc.git"
+        "url": "git+https://github.com/eduard-dumitru/js-multitargeting.git"
     },
     "author": "Eduard Dumitru",
     "license": "MIT",
     "bugs": {
-        "url": "https://github.com/UiPath/coreipc/issues"
+        "url": "https://github.com/eduard-dumitru/js-multitargeting/issues"
     },
-    "homepage": "https://github.com/UiPath/coreipc#readme",
+    "homepage": "https://github.com/eduard-dumitru/js-multitargeting#readme",
     "devDependencies": {
         "@babel/core": "^7.20.2",
         "@babel/preset-env": "^7.20.2",
