@@ -31,11 +31,6 @@ steps:
       artifactName: 'NPM package'
       targetPath: '$(Pipeline.Workspace)/NPM package'
 
-- task: NodeTool@0
-  displayName: 'Use Node.js 20.11.0'
-  inputs:
-    versionSpec: '20.11.0'
-
 - task: ExtractFiles@1
   displayName: 'Extract Files'
   inputs:
@@ -43,39 +38,68 @@ steps:
     destinationFolder: '$(System.DefaultWorkingDirectory)/unzipped'
     cleanDestinationFolder: true
 
-# ---------------------------------------------------------------------
-# Secondary target: GitHub Packages (best-effort, currently expected to fail)
-# ---------------------------------------------------------------------
-# Following the May 11–12, 2026 npm supply-chain incident (Mini Shai-Hulud
-# / TanStack), UiPath revoked classic GitHub PATs org-wide and is migrating
-# everyone to fine-grained PATs. Fine-grained PATs don't have the Packages
-# permission available at org level for UiPath — so the existing
-# `PublishNPM` service connection can no longer authenticate.
+# ---------------------------------------------------------------------------
+# Publishing itself lives in GitHub Actions (.github/workflows/cd-npm.yml).
+# ---------------------------------------------------------------------------
+# ADO used to `npm publish` the two generated package directories straight to
+# GitHub Packages through the `PublishNPM` service connection. That connection is
+# a classic GitHub PAT, and UiPath revoked classic PATs org-wide after the
+# May 11-12, 2026 npm supply-chain incident (Mini Shai-Hulud / TanStack); the
+# fine-grained replacements don't expose the Packages permission at org level, so
+# there is no ADO-side auth story left.
 #
-# Per Liviu Bud's #dev announcement on 2026-05-25, a sanctioned pipeline-
-# auth replacement is being worked on but not yet available:
-#   https://uipath.enterprise.slack.com/archives/CMDRA3VFH/p1779699547818419
+# GitHub Actions has one for free: a workflow in UiPath/coreipc gets a GITHUB_TOKEN
+# with `packages: write`, and both `coreipc` and `coreipc-web` are already linked to
+# this repo. The same workflow additionally publishes STABLE releases to public
+# npmjs via Trusted Publishing (OIDC), which ADO cannot do at all — npm only trusts
+# GitHub Actions identities.
 #
-# We leave the GitHub Packages publish wired up with continueOnError so
-# (a) the run doesn't fail when the publish fails on policy, and
-# (b) the publish resumes automatically the moment the service connection
-#     is updated with whatever the platform team ships.
-#
-# Each Publish_NPM run will be marked "Succeeded with issues" until then.
-# Revert continueOnError when the publish path is healthy again.
-# ---------------------------------------------------------------------
-- task: Npm@1
-  displayName: 'Publish to GitHub Packages — NodeJS (best-effort)'
-  continueOnError: true
-  inputs:
-    command: 'publish'
-    workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/node'
-    publishEndpoint: PublishNPM
+# So this stage no longer publishes. It resolves what the CI build actually produced
+# and whispers to GitHub to publish exactly that commit at exactly that version.
+# The version is read out of the packed package.json rather than recomputed, so
+# there is one source of truth for it.
+# ---------------------------------------------------------------------------
+- script: |
+    set -euo pipefail
 
-- task: Npm@1
-  displayName: 'Publish to GitHub Packages — Web (best-effort)'
-  continueOnError: true
-  inputs:
-    command: 'publish'
-    workingDir: '$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/web'
-    publishEndpoint: PublishNPM
+    # 1. The version the CI build stamped into the generated NodeJS package.
+    PKG="$(System.DefaultWorkingDirectory)/unzipped/dist/prepack/node/package.json"
+    if [ ! -f "$PKG" ]; then
+      echo "##vso[task.logissue type=error]No packed package.json at $PKG — did the CI build produce the 'NPM package' artifact?"
+      exit 1
+    fi
+    VERSION=$(jq -r '.version' "$PKG")
+    if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+      echo "##vso[task.logissue type=error]Could not read .version from $PKG."
+      exit 1
+    fi
+
+    # 2. Resolve the published build's commit (ADO REST).
+    build=$(curl -sSf -H "Authorization: Bearer $SYSTEM_ACCESSTOKEN" \
+      "${SYSTEM_COLLECTIONURI}${SYSTEM_TEAMPROJECT}/_apis/build/builds/${BUILD_ID}?api-version=7.1")
+    SHA=$(printf '%s' "$build" | jq -r '.sourceVersion')
+    BRANCH=$(printf '%s' "$build" | jq -r '.sourceBranch')
+    echo "buildId ${BUILD_ID}: branch=${BRANCH} commit=${SHA} version=${VERSION}"
+
+    if ! printf '%s' "$SHA" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+      echo "##vso[task.logissue type=error]No valid commit SHA for buildId ${BUILD_ID} (got '${SHA}')."
+      exit 1
+    fi
+
+    # 3. Whisper. The workflow re-validates everything it is told (the SHA is a real
+    #    commit, the version matches the csproj at that commit, stable releases are
+    #    on master) — this side is convenience, not a trust boundary.
+    echo "Dispatching publish-npm for ${VERSION} (${SHA})"
+    curl -sSf -X POST \
+      -H "Accept: application/vnd.github+json" \
+      -H "Authorization: Bearer $GITHUB_DISPATCH_TOKEN" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      https://api.github.com/repos/UiPath/coreipc/dispatches \
+      -d "{\"event_type\":\"publish-npm\",\"client_payload\":{\"sha\":\"${SHA}\",\"version\":\"${VERSION}\"}}"
+  displayName: 'Dispatch publish-npm → GitHub Actions'
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    SYSTEM_COLLECTIONURI: $(System.CollectionUri)
+    SYSTEM_TEAMPROJECT: $(System.TeamProject)
+    BUILD_ID: ${{ parameters.reuseArtifactsFromBuildId }}
+    GITHUB_DISPATCH_TOKEN: $(GITHUB_DISPATCH_TOKEN)

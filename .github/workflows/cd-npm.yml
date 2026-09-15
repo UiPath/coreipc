@@ -1,0 +1,255 @@
+name: Publish @uipath/coreipc to GitHub Packages and npmjs
+
+# Publishes the two JS client packages — @uipath/coreipc (NodeJS) and
+# @uipath/coreipc-web — in two steps: a `pack` job that builds and produces the
+# exact .tgz files, and publish jobs that push those same tarballs. Nothing is
+# ever built twice, so what lands on npmjs is byte-identical to what lands on
+# GitHub Packages.
+#
+# ADO stays primary: on a green NPM publish stage it POSTs a repository_dispatch
+# (publish-npm) with the released commit SHA and the version that stage published,
+# and this workflow builds & publishes that commit. There is no workflow_dispatch,
+# so it can't fire by accident, and dispatch always runs the default-branch copy
+# of this file.
+#
+# Two registries, two trust models:
+#   - GitHub Packages gets every build, prerelease included, authenticated with the
+#     built-in GITHUB_TOKEN (`packages: write`). No PAT, no service connection —
+#     this is what replaces the classic-PAT `PublishNPM` connection that UiPath
+#     revoked org-wide after the May 2026 npm supply-chain incident.
+#   - Public npmjs gets STABLE versions only, from master only, via Trusted
+#     Publishing (OIDC) — no tokens. Prereqs: an npmjs Trusted Publisher on
+#     @uipath/coreipc (UiPath/coreipc, workflow cd-npm.yml, env npm) + protected
+#     `npm` environment. @uipath/coreipc-web is not on npmjs yet, so it is
+#     GitHub-Packages-only until someone bootstraps that name manually.
+
+on:
+  repository_dispatch:
+    types: [publish-npm]
+
+permissions:
+  contents: read
+
+# Never let two publish runs race for the same packages.
+concurrency:
+  group: publish-npm-coreipc
+  cancel-in-progress: false
+
+env:
+  JS_DIR: src/Clients/js
+  CSPROJ: src/UiPath.CoreIpc/UiPath.CoreIpc.csproj
+  NODE_VERSION: '20.11.0' # same Node the ADO build uses (azp-nodejs.yaml)
+
+jobs:
+  pack:
+    name: Pack tarballs
+    runs-on: uipath-ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      stable: ${{ steps.resolve.outputs.stable }}
+    steps:
+      # Untrusted input (client_payload.*) is read via env, never inlined into a
+      # run: script, and validated — script-injection hardening. The SHA must be
+      # an exact 40-char commit (rejects tags/branch names); the version must be
+      # plain semver.
+      - name: Resolve & validate dispatch payload
+        id: ref
+        env:
+          DISPATCH_SHA: ${{ github.event.client_payload.sha }}
+          DISPATCH_VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          set -euo pipefail
+          REF="$DISPATCH_SHA"
+          if [ -z "$REF" ]; then echo "::error::No client_payload.sha provided."; exit 1; fi
+          if ! printf '%s' "$REF" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+            echo "::error::client_payload.sha '$REF' is not a 40-char commit hash — refusing."; exit 1
+          fi
+          VER="$DISPATCH_VERSION"
+          if [ -z "$VER" ]; then echo "::error::No client_payload.version provided."; exit 1; fi
+          if ! printf '%s' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::client_payload.version '$VER' is not a plain semver version — refusing."; exit 1
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact commit (full history)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+          fetch-depth: 0 # full graph — needed to prove the commit is on master
+
+      # The csproj <Version> is the single source of truth for every package in this
+      # repo (.NET, Python, JS alike). A dispatched version is legal only if it is
+      # that version (a stable release) or that version plus an ADO build-number
+      # suffix (a CI build) — anything else means the payload and the commit
+      # disagree, and we refuse rather than publish a surprise version.
+      - name: Resolve & validate version against the commit
+        id: resolve
+        env:
+          DISPATCHED: ${{ steps.ref.outputs.version }}
+        run: |
+          set -euo pipefail
+          BASE=$(grep -oPm1 '(?<=<Version>)[^<]+' "$CSPROJ" | tr -d '[:space:]')
+          if [ -z "$BASE" ]; then
+            echo "::error::No <Version> found in $CSPROJ."; exit 1
+          fi
+          if [ "$DISPATCHED" = "$BASE" ]; then
+            STABLE=true
+          elif [ "${DISPATCHED#"$BASE"-}" != "$DISPATCHED" ]; then
+            STABLE=false
+          else
+            echo "::error::Dispatched version '$DISPATCHED' does not match the csproj <Version> '$BASE' at this commit."
+            exit 1
+          fi
+          echo "version=$DISPATCHED" >> "$GITHUB_OUTPUT"
+          echo "stable=$STABLE" >> "$GITHUB_OUTPUT"
+          echo "Publishing $DISPATCHED (stable=$STABLE)"
+
+      # Enforce "only master reaches public npmjs" at the source level. CI builds
+      # (prerelease versions) may come from any branch — they only go to GitHub
+      # Packages — but a stable version that is not merged into master can never
+      # reach npmjs. Combined with repository_dispatch always running the
+      # default-branch copy of this file, unmerged code can't be released.
+      - name: Refuse stable releases that are not on master
+        if: steps.resolve.outputs.stable == 'true'
+        env:
+          SHA: ${{ steps.ref.outputs.ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin master
+          if ! git merge-base --is-ancestor "$SHA" FETCH_HEAD; then
+            echo "::error::Commit $SHA is not an ancestor of origin/master — only master-merged code may be published to npmjs."
+            exit 1
+          fi
+          echo "$SHA is on master — OK"
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ env.JS_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.JS_DIR }}
+        run: npm ci
+
+      # Same stamping the ADO build does before `npm run build`: webpack copies the
+      # version out of package.json into both generated packages.
+      - name: Stamp version into package.json
+        working-directory: ${{ env.JS_DIR }}
+        run: npm version "${{ steps.resolve.outputs.version }}" --allow-same-version --no-git-tag-version
+
+      - name: Build
+        working-directory: ${{ env.JS_DIR }}
+        run: npm run build
+
+      # Step one of two: produce the tarballs. `npm pack` on the generated package
+      # directories, explicitly, rather than relying on the webpack shell plugin's
+      # side-effect pack into dist-packages/ — the artifact is what gets published,
+      # so it should be built by a step you can see.
+      - name: Pack
+        working-directory: ${{ env.JS_DIR }}
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/tarballs"
+          npm pack ./dist/prepack/node --pack-destination "$RUNNER_TEMP/tarballs"
+          npm pack ./dist/prepack/web --pack-destination "$RUNNER_TEMP/tarballs"
+          ls -l "$RUNNER_TEMP/tarballs"
+
+      # Guard against a silently wrong artifact: exactly two tarballs, named for the
+      # two packages at the version we resolved.
+      - name: Verify tarballs
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/tarballs"
+          for expected in "uipath-coreipc-$VERSION.tgz" "uipath-coreipc-web-$VERSION.tgz"; do
+            if [ ! -f "$expected" ]; then
+              echo "::error::Expected tarball '$expected' was not produced. Got: $(ls)"; exit 1
+            fi
+          done
+          if [ "$(ls -1 ./*.tgz | wc -l)" -ne 2 ]; then
+            echo "::error::Expected exactly 2 tarballs, got: $(ls)"; exit 1
+          fi
+
+      - name: Upload tarballs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: npm-tarballs
+          path: ${{ runner.temp }}/tarballs/*.tgz
+
+  publish-github-packages:
+    name: Publish to GitHub Packages
+    needs: pack
+    runs-on: uipath-ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # the whole auth story — GITHUB_TOKEN, no PAT
+    steps:
+      - name: Retrieve tarballs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: npm-tarballs
+          path: tarballs/
+
+      - name: Setup Node for GitHub Packages
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://npm.pkg.github.com
+          scope: '@uipath'
+
+      # Step two of two: publish the tarballs the pack job produced, untouched.
+      # `packages/npm/coreipc` and `packages/npm/coreipc-web` are both already
+      # linked to UiPath/coreipc, so GITHUB_TOKEN is authorized for both.
+      - name: Publish both packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.pack.outputs.version }}
+        run: |
+          set -euo pipefail
+          npm publish "tarballs/uipath-coreipc-$VERSION.tgz"
+          npm publish "tarballs/uipath-coreipc-web-$VERSION.tgz"
+
+  publish-npmjs:
+    name: Publish to npmjs (Trusted Publishing)
+    needs: [pack, publish-github-packages]
+    # Stable releases only. CI builds stop at GitHub Packages.
+    if: needs.pack.outputs.stable == 'true'
+    runs-on: uipath-ubuntu-latest
+    environment: npm # MANDATORY protection (required reviewers + default-branch only)
+    permissions:
+      contents: read
+      id-token: write # OIDC Trusted Publishing — no long-lived token
+    steps:
+      - name: Retrieve tarballs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: npm-tarballs
+          path: tarballs/
+
+      - name: Setup Node for npmjs
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+          scope: '@uipath'
+
+      # Trusted Publishing needs npm >= 11.5.1; Node 20.11.0 ships npm 10.x.
+      - name: Upgrade npm for Trusted Publishing
+        run: |
+          set -euo pipefail
+          npm install -g npm@^11.5.1
+          npm --version
+
+      # No NODE_AUTH_TOKEN: npm exchanges the job's OIDC token for a short-lived
+      # publish credential and attaches a provenance attestation automatically.
+      # Only the NodeJS package goes to npmjs — @uipath/coreipc-web has never been
+      # published there, and a Trusted Publisher can only be configured on a name
+      # that already exists.
+      - name: Publish @uipath/coreipc
+        env:
+          VERSION: ${{ needs.pack.outputs.version }}
+        run: npm publish "tarballs/uipath-coreipc-$VERSION.tgz" --access public
