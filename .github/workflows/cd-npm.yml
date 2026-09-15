@@ -164,14 +164,22 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: '@uipath'
 
+      # Skip-if-present keeps re-runs safe, matching skip-existing on the PyPI side.
       - name: Publish both packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.pack.outputs.version }}
         run: |
           set -euo pipefail
-          npm publish "tarballs/uipath-coreipc-$VERSION.tgz"
-          npm publish "tarballs/uipath-coreipc-web-$VERSION.tgz"
+          publish_if_new() {
+            if npm view "$1@$VERSION" version >/dev/null 2>&1; then
+              echo "$1@$VERSION is already on GitHub Packages — skipping."
+            else
+              npm publish "$2"
+            fi
+          }
+          publish_if_new '@uipath/coreipc' "tarballs/uipath-coreipc-$VERSION.tgz"
+          publish_if_new '@uipath/coreipc-web' "tarballs/uipath-coreipc-web-$VERSION.tgz"
 
   publish-npmjs:
     name: Publish to npmjs (Trusted Publishing)
@@ -206,7 +214,16 @@ jobs:
       # No NODE_AUTH_TOKEN by design — npm trades the job's OIDC token for a
       # short-lived credential. @uipath/coreipc-web is absent because a Trusted
       # Publisher can only be configured on a name that already exists on npmjs.
+      # Queried over plain HTTPS, not `npm view`: setup-node writes an _authToken
+      # placeholder for a token this job deliberately does not have.
       - name: Publish @uipath/coreipc
         env:
           VERSION: ${{ needs.pack.outputs.version }}
-        run: npm publish "tarballs/uipath-coreipc-$VERSION.tgz" --access public
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/@uipath%2Fcoreipc/$VERSION")
+          if [ "$code" = "200" ]; then
+            echo "@uipath/coreipc@$VERSION is already on npmjs — skipping."
+            exit 0
+          fi
+          npm publish "tarballs/uipath-coreipc-$VERSION.tgz" --access public
