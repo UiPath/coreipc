@@ -67,7 +67,7 @@
         "cli-color": "^2.0.3",
         "command-line-args": "^5.2.1",
         "concurrently": "^7.5.0",
-        "copy-webpack-plugin": "^11.0.0",
+        "copy-webpack-plugin": "^14.0.0",
         "cross-env": "^7.0.3",
         "generate-package-json-webpack-plugin": "^2.6.0",
         "istanbul": "^0.4.5",
