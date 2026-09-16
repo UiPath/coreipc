@@ -5,7 +5,7 @@
 
 ## Introduction
 
-The **UiPath CoreIpc client for JavaScript** API is complementary to the **[UiPath CoreIpc for .NET](../../../README.md)** API. It facilitates Node.js and Web apps to interop with .NET servers via RPC.
+The **UiPath CoreIpc client for JavaScript** API is complementary to the **[UiPath CoreIpc for .NET](https://github.com/UiPath/coreipc#readme)** API. It facilitates Node.js and Web apps to interop with .NET servers via RPC.
 
 The JavaScript API is provided as two NPM packages:
 

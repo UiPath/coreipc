@@ -103,6 +103,16 @@ function createConfig(params) {
                 context: path.resolve(__dirname, '../../..'),
                 to: './',
             },
+            {
+                // the JS client documentation covers both published packages, so
+                // each one ships it together with the images it links.
+                from: 'README.md',
+                to: './',
+            },
+            {
+                from: './readme-assets/',
+                to: './readme-assets/',
+            },
         ]
     });
 
