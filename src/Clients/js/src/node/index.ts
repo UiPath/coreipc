@@ -3,3 +3,4 @@ export * from './Transport';
 export * from './Ipc';
 export * from '../std';
 export * from './NodeAddressBuilder';
+export * from './CallOptions';
