@@ -41,7 +41,7 @@
         "type": "git",
         "url": "git+https://github.com/UiPath/coreipc.git"
     },
-    "author": "Eduard Dumitru",
+    "author": "UiPath",
     "license": "MIT",
     "bugs": {
         "url": "https://github.com/UiPath/coreipc/issues"
