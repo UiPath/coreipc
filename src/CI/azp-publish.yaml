@@ -32,7 +32,7 @@ parameters:
     default: true
 
   - name: publishNpm
-    displayName: 'Publish NPM (Node + Web) → uipath-ipc-deps (+ GitHub Packages best-effort)'
+    displayName: 'Publish NPM (Node + Web) → GitHub Packages (+ npmjs on a stable release)'
     type: boolean
     default: true
 
@@ -120,6 +120,8 @@ stages:
   - stage: Publish_NPM
     displayName: '🚚 Publish NPM'
     dependsOn: []
+    variables:
+      - group: github-dispatch          # supplies secret GITHUB_DISPATCH_TOKEN
     jobs:
     - deployment: Publish_NPM_Packages
       displayName: '📦 Publish NPM (Node + Web)'
