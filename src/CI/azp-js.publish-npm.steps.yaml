@@ -32,9 +32,9 @@ steps:
       targetPath: '$(Pipeline.Workspace)/NPM package'
 
 - task: NodeTool@0
-  displayName: 'Use Node.js 20.11.0'
+  displayName: 'Use Node.js 20.20.2'
   inputs:
-    versionSpec: '20.11.0'
+    versionSpec: '20.20.2'
 
 - task: ExtractFiles@1
   displayName: 'Extract Files'
