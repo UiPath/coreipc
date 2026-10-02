@@ -7,6 +7,7 @@ const RemovePlugin = require('remove-files-webpack-plugin');
 // const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 const WebpackShellPluginNext = require('webpack-shell-plugin-next');
 const CopyPlugin = require("copy-webpack-plugin");
+const { CycloneDxWebpackPlugin } = require('@cyclonedx/webpack-plugin');
 
 const pathDist = path.resolve(__dirname, './dist/prepack');
 const pathSrc = './src/';
@@ -86,6 +87,11 @@ function createConfig(params) {
                     },
                     recursive: true,
                 },
+                {
+                    // the SBOM plugin always writes XML next to the JSON; only the JSON ships.
+                    folder: `./dist/prepack/${params.name}`,
+                    method: (absoluteItemPath) => /sbom\.cdx\.xml$/.test(absoluteItemPath),
+                },
             ],
         },
     });
@@ -140,6 +146,19 @@ function createConfig(params) {
         delete package.devDependencies;
 
         const generatePackageJson = new GeneratePackageJsonPlugin(package);
+        // Everything is bundled and package.json declares no dependencies, so the
+        // package carries its own ingredients list (agreed with API-Workflow, which reads it).
+        const sbom = new CycloneDxWebpackPlugin({
+            specVersion: '1.6',
+            reproducibleResults: true,
+            includeWellknown: false,
+            rootComponentAutodetect: false,
+            rootComponentType: 'library',
+            rootComponentName: package.name,
+            rootComponentVersion: package.version,
+        });
+        sbom.resultJson = 'sbom.cdx.json';
+        sbom.resultXml = 'sbom.cdx.xml';
         const packNpm = new WebpackShellPluginNext({
             onBuildEnd: {
                 scripts: [`npm pack ./dist/prepack/${params.name} --pack-destination="./dist-packages"`],
@@ -151,6 +170,7 @@ function createConfig(params) {
         plugins = [
             ...plugins,
             generatePackageJson,
+            sbom,
             packNpm,
         ];
     }
