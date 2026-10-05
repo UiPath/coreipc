@@ -1,4 +1,4 @@
-import { CancellationToken, IAsyncDisposable, PublicCtor, Timeout, TimeSpan } from '../..';
+import { CancellationToken, IAsyncDisposable, PublicCtor, TimeSpan } from '../..';
 
 import {
     IServiceProvider,
@@ -46,7 +46,7 @@ export class ChannelManager implements IAsyncDisposable {
             args,
         });
 
-        const channel = await this.ensureConnection(Timeout.infiniteTimeSpan, ct);
+        const channel = await this.ensureConnection(timeout, ct);
 
         const rpcResponse = await channel.call(rpcRequest, timeout, ct);
 
