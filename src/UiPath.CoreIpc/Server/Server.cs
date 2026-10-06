@@ -246,7 +246,7 @@ internal class Server
         }
     }
 
-    private void Log(string message) => Logger.OrDefault().LogInformation(message);
+    private void Log(string message) => Logger.OrDefault().LogTrace(message);
 
     private ValueTask SendResponse(Response response, CancellationToken responseCancellation) => _connection.Send(response, responseCancellation);
 
