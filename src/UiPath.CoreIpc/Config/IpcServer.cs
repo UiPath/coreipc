@@ -149,7 +149,8 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
         private async Task LoopAccept(ServerTransport.IServerConnectionSlot firstSlot, CancellationToken ct)
         {
             var slot = firstSlot;
-            while (!ct.IsCancellationRequested)
+            // Unconditional: every slot goes through TryAccept, which disposes it when the token is already cancelled.
+            while (true)
             {
                 await TryAccept(slot, ct); /// this method doesn't throw, and in case of non-<see cref="OperationCanceledException"/> exceptions,
                                            /// it will notify the <see cref="_newConnection"/> observer.

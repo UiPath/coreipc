@@ -32,6 +32,22 @@ public sealed class IpcServerStartTests
     }
 
     [Fact]
+    public async Task DisposeRightAfterStart_DisposesEveryFirstSlot()
+    {
+        // Repeated: the leak needed the dispose to land before the accept loops ran, which is a race.
+        for (var i = 0; i < 50; i++)
+        {
+            var transport = new RecordingTransport { ConcurrentAccepts = 3 };
+            var server = new IpcServer { Transport = transport, Endpoints = new() };
+
+            server.Start();
+            await server.DisposeAsync();
+
+            transport.DisposedSlots.ShouldBe(3, $"iteration {i}");
+        }
+    }
+
+    [Fact]
     public async Task Start_TheNamedPipeExistsWhenStartReturns()
     {
         var pipeName = $"ipctest_{Guid.NewGuid():N}";

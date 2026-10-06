@@ -82,7 +82,6 @@ await using var server = new IpcServer
     Endpoints = new() { typeof(IComputingService) }
 };
 server.Start();
-await server.WaitForStart();
 ```
 
 ### 3. Create the Client
@@ -204,8 +203,7 @@ var ipcServer = new IpcServer
 
 | Method | Description |
 | ------ | ----------- |
-| `void Start()` | This method starts hosting the current `IpcServer` instance, meaning that it's imminent the transport will start listening and accepting connections, and those connections' calls will start to be honored. <br /> <br /> It's thread-safe, idempotent and fire&forget in nature, meaning it doesn't wait for the listener to become active. Further changes to the otherwise mutable `IpcServer` instance  have no effect on the listener's settings or its exposed service collection. <br /> <br /> Exceptions: <br />- `InvalidOperationException`: wrong configurations, such a `null` or invalid transport.<br />- `ObjectDisposedException`: the `IpcServer` instance had been disposed. |
-| `Task WaitForStart()` | This method calls `Start` and then awaits for the connection accepter to start. It's thread-safe and idempotent. |
+| `void Start()` | This method starts hosting the current `IpcServer` instance, meaning that it's imminent the transport will start listening and accepting connections, and those connections' calls will start to be honored. <br /> <br /> It's thread-safe and idempotent. It returns once the transport can take connections: a named pipe exists by then, so a client started right after `Start` returns can connect, and the operating system queues that connection until the server accepts it. Further changes to the otherwise mutable `IpcServer` instance  have no effect on the listener's settings or its exposed service collection. <br /> <br /> Exceptions: <br />- `InvalidOperationException`: wrong configurations, such a `null` or invalid transport.<br />- `ObjectDisposedException`: the `IpcServer` instance had been disposed.<br />- Whatever the transport throws while creating its first listening endpoints, for example an `UnauthorizedAccessException` when a named pipe's access control is refused. Whatever was already created is disposed first. |
 | `ValueTask DisposeAsync()` | Stops the connection accepter and cancels all active connections before completing the returned `ValueTask`. |
 
 <hr />
