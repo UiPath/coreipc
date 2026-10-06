@@ -106,8 +106,34 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
         {
             _serverState = transport.CreateServerState();
             _newConnection = connected;
-            _running = RunOnThreadPool(LoopAccept, parallelCount: transport.ConcurrentAccepts, _cts.Token);
+
+            // Created on Start's thread, so a named pipe exists before Start returns and a client
+            // launched right after it can connect: the OS queues the connection until the slot awaits it.
+            var firstSlots = CreateFirstSlots(transport.ConcurrentAccepts);
+            _running = Task.WhenAll(firstSlots.Select(slot => Task.Run(() => LoopAccept(slot, _cts.Token))));
             _dispose = new(DisposeCore);
+        }
+
+        private ServerTransport.IServerConnectionSlot[] CreateFirstSlots(int count)
+        {
+            var slots = new List<ServerTransport.IServerConnectionSlot>(count);
+            try
+            {
+                for (var i = 0; i < count; i++)
+                {
+                    slots.Add(_serverState.CreateConnectionSlot());
+                }
+                return slots.ToArray();
+            }
+            catch
+            {
+                foreach (var slot in slots)
+                {
+                    slot.DisposeAsync().AsTask().TraceError();
+                }
+                _serverState.DisposeAsync().AsTask().TraceError();
+                throw;
+            }
         }
 
         public ValueTask DisposeAsync() => new(_dispose.Value);
@@ -120,12 +146,19 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
         }
 
 
-        private async Task LoopAccept(CancellationToken ct)
+        private async Task LoopAccept(ServerTransport.IServerConnectionSlot firstSlot, CancellationToken ct)
         {
-            while (!ct.IsCancellationRequested)
+            var slot = firstSlot;
+            // Unconditional: every slot goes through TryAccept, which disposes it when the token is already cancelled.
+            while (true)
             {
-                await TryAccept(ct); /// this method doesn't throw, and in case of non-<see cref="OperationCanceledException"/> exceptions,
-                                     /// it will notify the <see cref="_newConnection"/> observer.
+                await TryAccept(slot, ct); /// this method doesn't throw, and in case of non-<see cref="OperationCanceledException"/> exceptions,
+                                           /// it will notify the <see cref="_newConnection"/> observer.
+                if (ct.IsCancellationRequested)
+                {
+                    break;
+                }
+                slot = _serverState.CreateConnectionSlot();
             }
 
             _newConnection.OnCompleted();
@@ -137,10 +170,8 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
         /// In case of a genuine error it will notify the observer; an error that surfaces while cancellation is already
         /// requested (a shutdown-race, e.g. a broken/disposed pipe) is treated as expected teardown and NOT reported.
         /// </summary>
-        private async Task TryAccept(CancellationToken ct)
+        private async Task TryAccept(ServerTransport.IServerConnectionSlot slot, CancellationToken ct)
         {
-            var slot = _serverState.CreateConnectionSlot();
-
             try
             {
                 var newConnection = await slot.AwaitConnection(ct);
@@ -166,8 +197,6 @@ public sealed class IpcServer : IpcBase, IAsyncDisposable
             }
         }
 
-        private static Task RunOnThreadPool(Func<CancellationToken, Task> action, int parallelCount, CancellationToken ct)
-        => Task.WhenAll(Enumerable.Range(start: 0, parallelCount).Select(_ => Task.Run(() => action(ct))));
     }
 
     [MemberNotNullWhen(returnValue: true, member: nameof(Transport))]
