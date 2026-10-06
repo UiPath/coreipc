@@ -1,11 +1,20 @@
 """Rewrite the Python package's pyproject.toml version line to match the
 pipeline's $(FullVersion).
 
-Converts the .NET-flavoured version produced by azp-initialization.yaml
-to a PEP 440-valid string for Python packaging:
+Converts the .NET-flavoured version produced by azp-initialization.yaml to a
+PEP 440-valid string for Python packaging:
 
-  "2.5.1"                   ->  "2.5.1"                   (release)
-  "2.5.1-20260528-08"       ->  "2.5.1+20260528.08"       (local version)
+  "2.5.3"               ->  "2.5.3"                (release, unchanged)
+  "2.5.3-20260724-01"   ->  "2.5.3.dev2026072401"  (dev pre-release)
+
+A build carrying a SemVer suffix (a non-release CI build) becomes a PEP 440
+DEV release — a genuine pre-release that PyPI accepts and that pip/uv skip by
+default — rather than a local ("+") segment. A local segment is wrong here on
+two counts: PyPI rejects it on upload, and pip/uv treat it as a FINAL release
+(so a CI build would masquerade as the real release, and land on public PyPI
+stripped to a clean release). The suffix's digits form the monotonic .devN
+number. NOTE: .devN sorts BEFORE its base release, so bump the base version in
+the csproj right after cutting a release, or later dev builds look "older".
 
 The wheel built right after this step will carry the new version.
 
@@ -24,7 +33,11 @@ def to_pep440(full_version: str) -> str:
     if "-" not in full_version:
         return full_version
     base, rest = full_version.split("-", 1)
-    return f"{base}+{rest.replace('-', '.')}"
+    # The pipeline's FullVersion suffix is the build number (digits), e.g.
+    # "20260724-01" -> ".dev2026072401". Strip any non-digits and drop leading
+    # zeros via int() so it is a valid, monotonic PEP 440 dev number.
+    digits = re.sub(r"\D", "", rest) or "0"
+    return f"{base}.dev{int(digits)}"
 
 
 def main() -> int:
