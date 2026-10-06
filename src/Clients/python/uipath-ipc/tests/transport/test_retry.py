@@ -1,6 +1,8 @@
-"""Unit tests for the shared bounded connect-retry helper."""
+"""Unit tests for the shared connect-retry helper."""
 
 from __future__ import annotations
+
+import asyncio
 
 import pytest
 
@@ -46,7 +48,7 @@ async def test_non_transient_error_is_not_retried() -> None:
     assert calls == 1  # raised immediately, not retried
 
 
-async def test_raises_last_transient_when_ladder_exhausted() -> None:
+async def test_keeps_retrying_transient_errors_until_the_caller_gives_up() -> None:
     calls = 0
 
     async def connect() -> str:
@@ -54,6 +56,6 @@ async def test_raises_last_transient_when_ladder_exhausted() -> None:
         calls += 1
         raise FileNotFoundError("never ready")
 
-    with pytest.raises(FileNotFoundError):
-        await retry_connect(connect, (FileNotFoundError,))
-    assert calls == len(CONNECT_RETRY_DELAYS)
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(retry_connect(connect, (FileNotFoundError,)), timeout=0.5)
+    assert calls > len(CONNECT_RETRY_DELAYS)  # past the ladder: the last wait repeats
