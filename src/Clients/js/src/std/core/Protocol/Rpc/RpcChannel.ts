@@ -1,9 +1,11 @@
 import { Observer } from 'rxjs';
 import {
     CancellationToken,
+    CancellationTokenRegistration,
     TimeSpan,
     Trace,
     ArgumentOutOfRangeError,
+    ObjectDisposedError,
     SocketStream,
     UnknownError,
     PromisePal,
@@ -11,7 +13,7 @@ import {
 
 import { ConnectHelper, Address } from '../..';
 import { MessageStream, IMessageStream, Network } from '..';
-import { IRpcChannel, RpcCallContext, RpcMessage } from '.';
+import { IRpcChannel, RpcCallContext, RpcMessage, IncomingCallTable } from '.';
 
 /* @internal */
 export class RpcChannel implements IRpcChannel {
@@ -38,6 +40,14 @@ export class RpcChannel implements IRpcChannel {
 
         public tryComplete(response: RpcMessage.Response) {
             this._map.get(response.RequestId)?.complete(response);
+        }
+
+        // Mirrors .NET's Connection.CompleteRequests, so a call parked at `await promise`
+        // unblocks when the channel dies. Snapshot first: failing a call deletes its entry.
+        public completeAll(error: Error): void {
+            for (const context of [...this._map.values()]) {
+                context.fail(error);
+            }
         }
 
         private generateId(): string {
@@ -88,6 +98,10 @@ export class RpcChannel implements IRpcChannel {
     public async disposeAsync(): Promise<void> {
         if (!this._isDisposed) {
             this._isDisposed = true;
+            this._incomingCalls.clear();
+            this._outgoingCalls.completeAll(
+                new ObjectDisposedError('RpcChannel', 'The RPC channel was disposed.'),
+            );
             try {
                 const messageStream = await this._$messageStream;
                 await messageStream.disposeAsync();
@@ -101,8 +115,45 @@ export class RpcChannel implements IRpcChannel {
         ct: CancellationToken,
     ): Promise<RpcMessage.Response> {
         const promise = this._outgoingCalls.register(request, timeout, ct);
-        await (await this._$messageStream).writeMessageAsync(request.toNetwork(), ct);
-        return await promise;
+        // The send can park while `promise` is faulted, before it is awaited; a no-throw
+        // handler keeps that from being an unhandled rejection.
+        Trace.traceErrorNoThrow(promise);
+        // Already cancelled: `promise` has synchronously rejected. Mirror .NET and keep the
+        // request off the wire — the peer must never run a call the caller has abandoned.
+        if (ct.isCancellationRequested) {
+            return await promise;
+        }
+        // Arm before sending (as .NET's Connection.RemoteCall does) so a fired token reaches
+        // the peer. The token isn't cancelled yet, so any cancel frame follows the request.
+        const cancellationRegistration = this.registerOutgoingCancellation(request.Id, ct);
+        try {
+            await (await this._$messageStream).writeMessageAsync(request.toNetwork(), ct);
+            return await promise;
+        } finally {
+            cancellationRegistration?.dispose();
+        }
+    }
+
+    private registerOutgoingCancellation(
+        requestId: string,
+        ct: CancellationToken,
+    ): CancellationTokenRegistration | undefined {
+        if (!ct.canBeCanceled) {
+            return undefined;
+        }
+        return ct.register(() => this.sendCancellationRequest(requestId));
+    }
+
+    private sendCancellationRequest(requestId: string): void {
+        const frame = new RpcMessage.CancellationRequest(requestId).toNetwork();
+        // Fire-and-forget: the triggering callback is synchronous, and the peer treats a
+        // cancel for an unknown request as a no-op. Errors are traced, never thrown.
+        Trace.traceErrorNoThrow(
+            (async () => {
+                const messageStream = await this._$messageStream;
+                await messageStream.writeMessageAsync(frame, CancellationToken.none);
+            })(),
+        );
     }
 
     public get isDisposed(): boolean {
@@ -137,6 +188,7 @@ export class RpcChannel implements IRpcChannel {
 
     private readonly _$messageStream: Promise<IMessageStream>;
     private readonly _outgoingCalls = new RpcChannel.OutgoingCallTable();
+    private readonly _incomingCalls = new IncomingCallTable();
 
     private readonly _networkObserver = new (class implements Observer<Network.Message> {
         constructor(private readonly _owner: RpcChannel) {}
@@ -189,20 +241,31 @@ export class RpcChannel implements IRpcChannel {
 
     private processIncommingRequest(message: Network.Message): void {
         const request = RpcMessage.Request.fromNetwork(message);
-        const context = new RpcCallContext.Incomming(request, async (response) => {
-            response.RequestId = request.Id;
-            await (
-                await this._$messageStream
-            ).writeMessageAsync(response.toNetwork(), CancellationToken.none);
-        });
+        const ct = this._incomingCalls.register(request.Id);
+        const context = new RpcCallContext.Incomming(
+            request,
+            async (response) => {
+                try {
+                    response.RequestId = request.Id;
+                    await (
+                        await this._$messageStream
+                    ).writeMessageAsync(response.toNetwork(), CancellationToken.none);
+                } finally {
+                    this._incomingCalls.complete(request.Id);
+                }
+            },
+            ct,
+        );
         try {
             this._observer.next(context);
         } catch (err) {
+            this._incomingCalls.complete(request.Id);
             Trace.log(UnknownError.ensureError(err));
         }
     }
 
     private processIncommingCancellationRequest(message: Network.Message): void {
-        throw new Error('Method not implemented.');
+        const cancellationRequest = RpcMessage.CancellationRequest.fromNetwork(message);
+        this._incomingCalls.tryCancel(cancellationRequest.RequestId);
     }
 }

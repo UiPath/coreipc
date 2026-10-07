@@ -12,6 +12,13 @@ internal static class Contracts
         Task<bool> SendMessage(Message<int> message);
     }
 
+    // A callback the server invokes then cancels; the client handler must observe it
+    // (as a CancellationToken or, interchangeably, an AbortSignal).
+    public interface ICancellationCallback
+    {
+        Task<bool> Wait(CancellationToken ct = default);
+    }
+
     public interface IAlgebra
     {
         Task<string> Ping();
@@ -21,6 +28,14 @@ internal static class Contracts
         Task<bool> Timeout();
         Task<int> Echo(int x);
         Task<bool> TestMessage(Message<int> message);
+        // Blocks until its (injected) CancellationToken fires, then throws — used
+        // to prove a client actually transmits a cancellation to the server.
+        Task<bool> WaitForCancellation(CancellationToken ct = default);
+        // How many times WaitForCancellation has observed a cancellation so far.
+        Task<int> CancellationCount();
+        // Invokes ICancellationCallback.Wait on the client, then cancels it. Returns true
+        // once the client-hosted handler observed the server-initiated cancel.
+        Task<bool> CancelCallback(Message message = default!);
     }
 
     public interface ICalculus

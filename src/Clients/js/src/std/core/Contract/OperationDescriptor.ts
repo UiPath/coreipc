@@ -6,6 +6,7 @@ export type OperationDescriptor = {
 
     readonly methodName: string;
     readonly hasEndingCancellationToken: boolean;
+    readonly hasEndingAbortSignal: boolean;
     readonly returnType: PublicCtor;
     readonly parameterTypes: readonly PublicCtor[];
     returnsPromiseOf?: PublicCtor | Primitive;
