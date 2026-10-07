@@ -54,19 +54,17 @@ public class HttpSysWebSocketsListener : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _cts.Cancel();
-        _httpListener.Stop();
+        _httpListener.Abort(); // Closes the request queue; unblocks pending GetContextAsync()
+        _httpListener.Close(); // Full resource cleanup
 
         try
         {
-            await _processingContexts;
+            // Safety net: on .NET Framework, GetContextAsync() may not respond to Abort()/Close().
+            await Task.WhenAny(_processingContexts, Task.Delay(TimeSpan.FromSeconds(5)));
         }
-        catch (ObjectDisposedException)
+        catch
         {
-            // ignore
-        }
-        catch (OperationCanceledException ex) when (ex.CancellationToken == _cts.Token)
-        {
-            // ignore
+            // Swallow ObjectDisposedException / OperationCanceledException from the listener shutdown.
         }
     }
 }
