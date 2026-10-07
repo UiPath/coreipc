@@ -102,7 +102,14 @@ internal class Server
                 {
                     Log($"{DebugName} sending response for {request}");
                 }
-                await SendResponse(response, token);
+                // Not on `token`: the handler has already produced this response, so cancelling its
+                // delivery throws away work that is done and leaves the peer waiting on a healthy
+                // connection - forever, unless it happens to set a client side RequestTimeout. A handler
+                // that outlives the request timeout is exactly when this bites, because the token is
+                // already canceled by the time we get here. OnError sends on `default` for the same reason,
+                // and Connection.SendMessage already writes with CancellationToken.None once it holds the
+                // send lock - the token only ever gated acquiring that lock.
+                await SendResponse(response, default);
             }
             catch (Exception ex) when (response is null)
             {
