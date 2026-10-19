@@ -1,5 +1,23 @@
 name: $(Date:yyyyMMdd)$(Rev:-rr)
 
+# The .NET job Authenticode-signs UiPath.CoreIpc.dll (every TFM) and NuGet-signs the
+# .nupkg through the shared Signing/signing.yml template (ROBO-6151), except on PR
+# builds and when `signPackages` is off.
+parameters:
+  - name: signPackages
+    displayName: 'Sign UiPath.CoreIpc.dll and the .nupkg (skipped on PR builds regardless)'
+    type: boolean
+    default: true
+
+resources:
+  repositories:
+    # Signing/signing.yml: Authenticode for files, NuGet signing for packages. Same pin as master.
+    - repository: common
+      type: github
+      name: UiPath/AzurePipelinesTemplates
+      ref: refs/tags/uipath.package-signing.2.0.18
+      endpoint: UiPath
+
 variables:
   Label_Initialization: 'Initialization:'
   Label_DotNet: '.NET:'
@@ -10,6 +28,10 @@ variables:
   DotNet_MainProjectName: 'UiPath.CoreIpc'
   DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
+  # Azure RM service connection the signing template runs under (it reaches the
+  # devopsprodsigningwekv Key Vault). The Studio project's one; it has to be
+  # shared into the CoreIpc project before the first signed build.
+  Signing_AzureConnectionName: 'InternalProdEAServiceConnection'
   
   NodeJS_DotNet_BuildConfiguration: 'Debug'
   NodeJS_ProjectPath: './src/Clients/nodejs'
@@ -29,6 +51,9 @@ jobs:
     steps:
       - template: azp-initialization.yaml
       - template: azp-dotnet.yaml
+        parameters:
+          sign: ${{ and(eq(parameters.signPackages, true), ne(variables['Build.Reason'], 'PullRequest')) }}
+          signingConnection: ${{ variables.Signing_AzureConnectionName }}
       - template: azp-dotnet-dist.yaml
 
   - job:
