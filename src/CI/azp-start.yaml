@@ -47,7 +47,8 @@ jobs:
   - job:
     displayName: '.NET on Windows'
     pool:
-      vmImage: 'windows-latest'
+      # windows-latest is Server 2025 since June 2026, where the EncryptAndSign named-pipe tests fail NTLM loopback.
+      vmImage: 'windows-2022'
     steps:
       - template: azp-initialization.yaml
       - template: azp-dotnet.yaml
