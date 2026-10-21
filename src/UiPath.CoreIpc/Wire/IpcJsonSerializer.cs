@@ -25,6 +25,12 @@ internal class IpcJsonSerializer : IArrayPool<char>
         {
             throw new InvalidOperationException("Buffer underrun detected.");
         }
+
+        if (typeof(T) is IPostDeserializeProcessor<T> postDeserializeProcessor)
+        {
+            result = postDeserializeProcessor.ProcessAfterDeserialization();
+        }
+
         return result;
     }
     public void Serialize(object? obj, Stream stream) => Serialize(obj, new StreamWriter(stream), StringArgsSerializer);

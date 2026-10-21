@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
-using System.Diagnostics;
+using System.Collections;
+using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.ExceptionServices;
 using System.Text;
 
 namespace UiPath.Ipc;
@@ -18,16 +18,30 @@ public class Message<TPayload> : Message
     public Message(TPayload payload) => Payload = payload;
     public TPayload Payload { get; }
 }
-internal record Request(string Endpoint, string Id, string MethodName, string[] Parameters, double TimeoutInSeconds)
+
+internal interface IPostDeserializeProcessor<T> 
+{
+    T ProcessAfterDeserialization();
+}
+
+internal record Request(string Endpoint, string Id, string MethodName, string[] Parameters, double TimeoutInSeconds) : IPostDeserializeProcessor<Request>
 {
     [JsonIgnore]
     public Stream? UploadStream { get; set; }
 
+    public HeaderCollection? Headers { get; set; }
+
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
 
-    public  TimeSpan GetTimeout(TimeSpan? defaultTimeout) => TimeoutInSeconds == 0 
-        ? defaultTimeout.OrInfinite() 
+    public TimeSpan GetTimeout(TimeSpan? defaultTimeout) => TimeoutInSeconds == 0
+        ? defaultTimeout.OrInfinite()
         : TimeSpan.FromSeconds(TimeoutInSeconds);
+
+    public Request ProcessAfterDeserialization()
+    {
+        _ = Headers?.Freeze();
+        return this;
+    }
 }
 record CancellationRequest(string RequestId);
 
@@ -40,7 +54,7 @@ internal record Response(string RequestId, string? Data = null, Error? Error = n
     public static Response Success(Request request, string data) => new(request.Id, data);
     public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
     public TResult Deserialize<TResult>()
-    {        
+    {
         if (Error != null)
         {
             throw new RemoteException(Error);
@@ -54,12 +68,12 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
 {
     [return: NotNullIfNotNull("exception")]
     public static Error? FromException(Exception? exception)
-    => exception is null 
-        ? null 
+    => exception is null
+        ? null
         : new(
-            Message: exception.Message, 
-            StackTrace: exception.StackTrace ?? exception.GetBaseException().StackTrace!, 
-            Type: GetExceptionType(exception), 
+            Message: exception.Message,
+            StackTrace: exception.StackTrace ?? exception.GetBaseException().StackTrace!,
+            Type: GetExceptionType(exception),
             InnerError: FromException(exception.InnerException));
     public override string ToString() => new RemoteException(this).ToString();
 
@@ -80,7 +94,7 @@ public class RemoteException : Exception
         }
     }
 
-    public override string? StackTrace => _remoteStackTrace is null 
+    public override string? StackTrace => _remoteStackTrace is null
         ? base.StackTrace
         : $"{_remoteStackTrace}\r\n{StackTraceSeparator}\r\n{base.StackTrace}";
 

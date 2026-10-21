@@ -1,7 +1,11 @@
-using System;
-using System.Threading;
+using System.Collections.Immutable;
 
 namespace UiPath.Ipc;
+
+public sealed class IpcCallingContext
+{
+    private readonly ImmutableDictionary<string, string> _headers;
+}
 
 /// <summary>Ambient context of the IPC call being honored, letting a POCO contract reach
 /// the peer without a <see cref="Message"/> parameter. Coexists with <see cref="Message"/>.</summary>
@@ -29,9 +33,10 @@ public sealed class IpcContext
     /// <exception cref="InvalidOperationException"><see cref="Client"/> is null.</exception>
     public TCallback GetCallback<TCallback>() where TCallback : class
     => (Client ?? throw new InvalidOperationException(
-            $"{nameof(IpcContext)}.{nameof(Current)} has no peer client; " +
-            $"{nameof(GetCallback)} is only available while honoring a server-side IPC call."))
+            $"{nameof(IpcContext)}.{nameof(Current)} has no peer client; {nameof(GetCallback)} is only available while honoring a server-side IPC call."))
         .GetCallback<TCallback>();
+
+    public required IReadOnlyDictionary<string, string> Headers { get; init; }
 
     /// <summary>Publishes <paramref name="context"/> as <see cref="Current"/> for the returned
     /// scope, restoring the previous value on dispose so nested calls compose.</summary>

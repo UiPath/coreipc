@@ -11,4 +11,5 @@ public readonly struct CallInfo
     public bool NewConnection { get; }
     public MethodInfo Method { get; }
     public object?[] Arguments { get; }
+    public required IReadOnlyDictionary<string, string> Headers { get; init; }
 }

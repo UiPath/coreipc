@@ -168,10 +168,16 @@ internal class Server
             async Task<object?> MethodCall()
             {
                 // So a POCO contract can reach the peer without a Message parameter.
-                using (IpcContext.Push(new IpcContext(_client, cancellationToken)))
+                using (IpcContext.Push(new IpcContext(_client, cancellationToken)
+                {
+                    Headers = request.Headers ?? HeaderCollection.Empty
+                }))
                 {
                     await (route.BeforeCall?.Invoke(
-                        new CallInfo(newConnection: false, method.MethodInfo, arguments),
+                        new CallInfo(newConnection: false, method.MethodInfo, arguments)
+                        {
+                            Headers = request.Headers ?? HeaderCollection.Empty
+                        },
                         cancellationToken) ?? Task.CompletedTask);
 
                     Task invocationTask = method.Invoke(service, arguments, cancellationToken);
