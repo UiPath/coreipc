@@ -1,9 +1,19 @@
+parameters:
+  # Authenticode-sign UiPath.CoreIpc.dll (every TFM) before packing; the .nupkg itself stays unsigned.
+  - name: sign
+    type: boolean
+    default: false
+  - name: signingConnection
+    type: string
+    default: ''
+
 steps:
+  # GeneratePackageOnBuild is off here: the DLLs get signed first, then packed below.
   - task: DotNetCoreCLI@2
-    displayName: '$(Label_DotNet) Restore, build and pack'
+    displayName: '$(Label_DotNet) Restore and build'
     inputs:
       projects: '$(DotNet_SessionSolution)'
-      arguments: '--configuration $(DotNet_BuildConfiguration) -p:Version="$(FullVersion)" -p:DefineConstantsEx="CI"'
+      arguments: '--configuration $(DotNet_BuildConfiguration) -p:Version="$(FullVersion)" -p:DefineConstantsEx="CI" -p:GeneratePackageOnBuild=false'
       
   - task: DotNetCoreCLI@2
     displayName: '$(Label_DotNet) Run unit tests'
@@ -13,3 +23,25 @@ steps:
       publishTestResults: true
       testRunTitle: '.NET tests'
       arguments: '--no-build --configuration $(DotNet_BuildConfiguration) --logger "console;verbosity=detailed"'
+
+  - ${{ if eq(parameters.sign, true) }}:
+    - template: Signing/signing.yml@common
+      parameters:
+        azureConnectionName: ${{ parameters.signingConnection }}
+        runInParallel: true
+        pathsToSign:
+          - '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)/net461/UiPath.CoreIpc.dll'
+          - '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)/netstandard2.0/UiPath.CoreIpc.dll'
+          - '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)/net5.0-windows/UiPath.CoreIpc.dll'
+
+  # Same output folder the csproj used to pack into, so azp-dotnet-dist.yaml picks it up unchanged.
+  - task: DotNetCoreCLI@2
+    displayName: '$(Label_DotNet) Pack'
+    inputs:
+      command: 'pack'
+      packagesToPack: '$(DotNet_MainProjectPath)'
+      configurationToPack: '$(DotNet_BuildConfiguration)'
+      nobuild: true
+      versioningScheme: 'off'
+      buildProperties: 'Version=$(FullVersion)'
+      packDirectory: '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)'
