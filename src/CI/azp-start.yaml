@@ -1,5 +1,5 @@
 # =====================================================================
-# CI pipeline — always builds & tests everything, no parameters.
+# CI pipeline — always builds & tests everything.
 # =====================================================================
 # Kept at this path (azp-start.yaml) on purpose: the existing CI pipeline
 # definition already points here, and the path resolves on EVERY branch, so
@@ -11,6 +11,10 @@
 # tests, and publishes each as a pipeline artifact:
 #   'NuGet package' / 'NPM package' / 'Python package'.
 #
+# The .NET build Authenticode-signs UiPath.Ipc.dll (every TFM) before packing,
+# through the shared Signing/signing.yml template (ROBO-6151); the .nupkg
+# itself stays unsigned. Skipped on PR builds and when `signPackages` is off.
+#
 # Pushes to NO feed. Publishing is the separate, manual Publish pipeline
 # (azp-publish.yaml): it takes a CI build id and pushes that build's artifacts
 # to the feeds behind approval-gated environments.
@@ -20,6 +24,21 @@
 # =====================================================================
 
 name: $(Date:yyyyMMdd)$(Rev:-rr)
+
+parameters:
+  - name: signPackages
+    displayName: 'Sign UiPath.Ipc.dll (skipped on PR builds regardless)'
+    type: boolean
+    default: true
+
+resources:
+  repositories:
+    # Signing/signing.yml: Authenticode for files, NuGet signing for packages. Same pin as Studio.
+    - repository: common
+      type: github
+      name: UiPath/AzurePipelinesTemplates
+      ref: refs/tags/uipath.package-signing.2.0.18
+      endpoint: UiPath
 
 variables:
   SCG_KILL_SWITCH: 'true' # Because our integration with the Aikido Safe Chain pipeline decorator (SGC rollout) is still buggy: https://uipath-product.slack.com/archives/CMCKWF5TR/p1780002214456709
@@ -32,6 +51,10 @@ variables:
   DotNet_MainProjectName: 'UiPath.CoreIpc'
   DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
+  # Azure RM service connection the signing template runs under (it reaches the
+  # devopsprodsigningwekv Key Vault). The Studio project's one; it has to be
+  # shared into the CoreIpc project before the first signed build.
+  Signing_AzureConnectionName: 'InternalProdEAServiceConnection'
 
   NodeJS_DotNet_BuildConfiguration: 'Debug'
   NodeJS_ProjectPath: './src/Clients/js'
@@ -55,6 +78,9 @@ stages:
     steps:
       - template: azp-initialization.yaml
       - template: azp-dotnet.yaml
+        parameters:
+          sign: ${{ and(eq(parameters.signPackages, true), ne(variables['Build.Reason'], 'PullRequest')) }}
+          signingConnection: ${{ variables.Signing_AzureConnectionName }}
       - template: azp-dotnet-dist.yaml
 
 - stage: Build_NPM
