@@ -10,7 +10,7 @@ internal sealed class HeaderCollection : IDictionary<string, string>, IReadOnlyD
     private volatile bool _frozen;
 
     public HeaderCollection() : this(capacity: 0) { }
-    private HeaderCollection(int capacity) => _innerMap = [with(capacity)];
+    private HeaderCollection(int capacity) => _innerMap = new(capacity);
 
     public HeaderCollection Freeze()
     {

@@ -1,10 +1,8 @@
-using System.Collections.Immutable;
-
 namespace UiPath.Ipc;
 
 public sealed class IpcCallingContext
 {
-    private readonly ImmutableDictionary<string, string> _headers;
+    private readonly IReadOnlyDictionary<string, string>? _headers;
 }
 
 /// <summary>Ambient context of the IPC call being honored, letting a POCO contract reach

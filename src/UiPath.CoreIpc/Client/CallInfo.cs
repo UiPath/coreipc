@@ -11,5 +11,6 @@ public readonly struct CallInfo
     public bool NewConnection { get; }
     public MethodInfo Method { get; }
     public object?[] Arguments { get; }
-    public required IReadOnlyDictionary<string, string> Headers { get; init; }
+    internal IReadOnlyDictionary<string, string>? HeadersCore { get; init; }
+    public IReadOnlyDictionary<string, string> Headers => HeadersCore ?? HeaderCollection.Empty;
 }

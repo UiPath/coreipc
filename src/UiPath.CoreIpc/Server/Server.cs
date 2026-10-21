@@ -176,7 +176,7 @@ internal class Server
                     await (route.BeforeCall?.Invoke(
                         new CallInfo(newConnection: false, method.MethodInfo, arguments)
                         {
-                            Headers = request.Headers ?? HeaderCollection.Empty
+                            HeadersCore = request.Headers
                         },
                         cancellationToken) ?? Task.CompletedTask);
 
