@@ -9,7 +9,10 @@
 //     callback path the Python uipath-ipc client added in 0.2.0.
 //   - Pipe name configurable via the first CLI argument; defaults to
 //     "uipath-ipc-py-test".
+//   - TelemetryPropagation is Both, and ITraceProbe reports what trace
+//     context arrived, for the cross-language trace-propagation tests.
 
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using UiPath.Ipc;
@@ -75,6 +78,64 @@ public interface ICallbackTester
 {
     Task<string> TriggerEcho(string value, Message message = null!, CancellationToken ct = default);
     Task<int> TriggerAdd(int x, int y, Message message = null!, CancellationToken ct = default);
+}
+
+/// <summary>What a trace-probe handler saw: the raw values received
+/// (IpcContext.Current.TraceContext) and the Activity it ran under.</summary>
+public sealed record TraceProbeResult
+{
+    public string? TraceParent { get; init; }
+    public string? TraceState { get; init; }
+    public string? Baggage { get; init; }
+    public string? ActivityTraceId { get; init; }
+    public string? ActivityParentSpanId { get; init; }
+    public string? ActivitySpanId { get; init; }
+    /// <summary>Activity.Current's decoded baggage as "key=value", in wire order.</summary>
+    public string[]? ActivityBaggage { get; init; }
+
+    public static TraceProbeResult Capture()
+    {
+        var received = IpcContext.Current?.TraceContext;
+        var activity = Activity.Current;
+        return new()
+        {
+            TraceParent = received?.TraceParent,
+            TraceState = received?.TraceState,
+            Baggage = received?.Baggage,
+            ActivityTraceId = activity?.TraceId.ToHexString(),
+            ActivityParentSpanId = activity?.ParentSpanId.ToHexString(),
+            ActivitySpanId = activity?.SpanId.ToHexString(),
+            ActivityBaggage = activity?.Baggage.Select(pair => $"{pair.Key}={pair.Value}").ToArray(),
+        };
+    }
+}
+
+public sealed record TraceProbeCallbackResult
+{
+    /// <summary>What ITraceProbeCallback.Probe returned.</summary>
+    public string? Callback { get; init; }
+    public string? ServerActivityTraceId { get; init; }
+    public string? ServerActivitySpanId { get; init; }
+}
+
+/// <summary>Hosted by the client; the string is whatever the client composes
+/// from the trace context it received with the callback.</summary>
+public interface ITraceProbeCallback
+{
+    Task<string> Probe();
+}
+
+public interface ITraceProbe
+{
+    Task<TraceProbeResult> Probe(CancellationToken ct = default);
+
+    /// <summary>Calls the client's ITraceProbeCallback.Probe from inside the traced call,
+    /// so the callback's parent span is the client span started under this server's activity.</summary>
+    Task<TraceProbeCallbackResult> ProbeViaCallback(CancellationToken ct = default);
+
+    /// <summary>Like <see cref="ProbeViaCallback"/>, but the callback carries exactly the given
+    /// values (IpcTelemetry.Context.Use), whatever the incoming call carried.</summary>
+    Task<TraceProbeCallbackResult> ProbeViaCallbackWithTraceContext(string traceParent, string? traceState, string? baggage, CancellationToken ct = default);
 }
 
 public readonly record struct ComplexNumber
@@ -174,6 +235,30 @@ public sealed class CallbackTester : ICallbackTester
     }
 }
 
+public sealed class TraceProbe : ITraceProbe
+{
+    public Task<TraceProbeResult> Probe(CancellationToken ct) => Task.FromResult(TraceProbeResult.Capture());
+
+    public async Task<TraceProbeCallbackResult> ProbeViaCallback(CancellationToken ct)
+    {
+        var activity = Activity.Current;
+        return new()
+        {
+            Callback = await IpcContext.Current!.GetCallback<ITraceProbeCallback>().Probe(),
+            ServerActivityTraceId = activity?.TraceId.ToHexString(),
+            ServerActivitySpanId = activity?.SpanId.ToHexString(),
+        };
+    }
+
+    public async Task<TraceProbeCallbackResult> ProbeViaCallbackWithTraceContext(string traceParent, string? traceState, string? baggage, CancellationToken ct)
+    {
+        using (IpcTelemetry.Context.Use(new(traceParent, traceState, baggage)))
+        {
+            return await ProbeViaCallback(ct);
+        }
+    }
+}
+
 internal static class Program
 {
     public static async Task Main(string[] args)
@@ -185,6 +270,7 @@ internal static class Program
             .AddSingleton<IComputingService, ComputingService>()
             .AddSingleton<ISystemService, SystemService>()
             .AddSingleton<ICallbackTester, CallbackTester>()
+            .AddSingleton<ITraceProbe, TraceProbe>()
             .BuildServiceProvider();
 
         await using var server = new IpcServer
@@ -196,8 +282,10 @@ internal static class Program
                 typeof(IComputingService),
                 typeof(ISystemService),
                 typeof(ICallbackTester),
+                typeof(ITraceProbe),
             },
             RequestTimeout = TimeSpan.FromSeconds(2),
+            TelemetryPropagation = TelemetryPropagationPolicy.Both,
         };
 
         server.Start();

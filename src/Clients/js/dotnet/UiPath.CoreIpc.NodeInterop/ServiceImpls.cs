@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -76,6 +77,44 @@ internal static class ServiceImpls
     public sealed class EnvironmentVariableGetter : IEnvironmentVariableGetter
     {
         public Task<string?> Get(string variable) => Task.FromResult<string?>(Environment.GetEnvironmentVariable(variable));
+    }
+
+    public sealed class TraceProbe : ITraceProbe
+    {
+        public Task<TraceProbeResult> Probe()
+        {
+            var received = IpcContext.Current?.TraceContext;
+            var activity = Activity.Current;
+            return Task.FromResult(new TraceProbeResult
+            {
+                TraceParent = received?.TraceParent,
+                TraceState = received?.TraceState,
+                Baggage = received?.Baggage,
+                ActivityTraceId = activity?.TraceId.ToHexString(),
+                ActivityParentSpanId = activity?.ParentSpanId.ToHexString(),
+                ActivitySpanId = activity?.SpanId.ToHexString(),
+                ActivityBaggage = activity?.Baggage.Select(pair => $"{pair.Key}={pair.Value}").ToArray(),
+            });
+        }
+
+        public async Task<TraceProbeCallbackResult> ProbeViaCallback()
+        {
+            var activity = Activity.Current;
+            return new TraceProbeCallbackResult
+            {
+                Callback = await IpcContext.Current!.GetCallback<ITraceProbeCallback>().Probe(),
+                ServerActivityTraceId = activity?.TraceId.ToHexString(),
+                ServerActivitySpanId = activity?.SpanId.ToHexString(),
+            };
+        }
+
+        public async Task<TraceProbeCallbackResult> ProbeViaCallbackWithTraceContext(string traceParent, string? traceState, string? baggage)
+        {
+            using (IpcTelemetry.Context.Use(new(traceParent, traceState, baggage)))
+            {
+                return await ProbeViaCallback();
+            }
+        }
     }
 
     public sealed class DtoService : IDtoService

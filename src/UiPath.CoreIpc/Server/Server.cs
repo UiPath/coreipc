@@ -26,6 +26,7 @@ internal class Server
 
     private readonly TimeSpan? _requestTimeout;
     private readonly IReadOnlyCollection<string>? _propagatedExceptionDataKeys;
+    private readonly bool _propagateIncoming;
 
     private ILogger? Logger => _connection.Logger;
     private bool LogEnabled => _connection.LogEnabled;
@@ -36,6 +37,7 @@ internal class Server
         _router = router;
         _requestTimeout = ipc.RequestTimeout;
         _propagatedExceptionDataKeys = ipc.PropagatedExceptionDataKeys is { Count: > 0 } keys ? keys : null;
+        _propagateIncoming = (ipc.TelemetryPropagation & TelemetryPropagationPolicy.Incoming) != 0;
         _connection = connection;
         _client = client;
         connection.RequestReceived += OnRequestReceived;
@@ -135,6 +137,7 @@ internal class Server
 #endif
     private async ValueTask<Response> HandleRequest(Method method, Route route, Request request, CancellationToken cancellationToken)
     {
+        var traceContext = _propagateIncoming ? IpcTelemetry.Context.FromHeaders(request.Headers) : null;
         var arguments = GetArguments();
 
         object service;
@@ -169,8 +172,9 @@ internal class Server
             Task<object?> ScheduleMethodCall() => defaultScheduler ? MethodCall() : RunOnScheduler();
             async Task<object?> MethodCall()
             {
+                using var activity = traceContext?.StartActivity($"{request.Endpoint}/{request.MethodName}");
                 // So a POCO contract can reach the peer without a Message parameter.
-                using (IpcContext.Push(new IpcContext(_client, cancellationToken)))
+                using (IpcContext.Push(new IpcContext(_client, cancellationToken, traceContext)))
                 {
                     await (route.BeforeCall?.Invoke(
                         new CallInfo(newConnection: false, method.MethodInfo, arguments),

@@ -12,10 +12,11 @@ public sealed class IpcContext
     /// <summary>The call in progress on the current async flow, or null if there is none.</summary>
     public static IpcContext? Current => CurrentContext.Value;
 
-    internal IpcContext(IClient? client, CancellationToken cancellationToken)
+    internal IpcContext(IClient? client, CancellationToken cancellationToken, IpcTelemetry.Context? traceContext = null)
     {
         Client = client;
         CancellationToken = cancellationToken;
+        TraceContext = traceContext;
     }
 
     /// <summary>The peer of the in-flight call (same handle as <see cref="Message.Client"/>),
@@ -24,6 +25,10 @@ public sealed class IpcContext
 
     /// <summary>The cancellation token of the in-flight call.</summary>
     public CancellationToken CancellationToken { get; }
+
+    /// <summary>The trace context received with the in-flight call, or null when none arrived
+    /// or this endpoint's <see cref="IpcBase.TelemetryPropagation"/> lacks <see cref="TelemetryPropagationPolicy.Incoming"/>.</summary>
+    public IpcTelemetry.Context? TraceContext { get; }
 
     /// <summary>Equivalent to <c>Message.Client.GetCallback&lt;TCallback&gt;()</c>.</summary>
     /// <exception cref="InvalidOperationException"><see cref="Client"/> is null.</exception>

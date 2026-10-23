@@ -47,6 +47,7 @@ from ..hooks import BeforeCallHandler, CallInfo
 from ..errors import EndpointNotFoundError, MethodNotFoundError, RemoteException
 from ..markers import is_ipc_cancellable
 from ..message import Message
+from ..trace_context import TelemetryPropagationPolicy, from_headers, incoming_scope
 from ..transport.base import ClientTransport
 from ..wire import (
     MAX_PAYLOAD_BYTES,
@@ -245,6 +246,9 @@ class IpcConnection:
         inbound_request_timeout: float | None = None,
         send_timeout: float | None = None,
         max_message_size: int = MAX_PAYLOAD_BYTES,
+        telemetry_propagation: TelemetryPropagationPolicy = (
+            TelemetryPropagationPolicy.NONE
+        ),
     ) -> None:
         self._reader = reader
         self._writer = writer
@@ -267,6 +271,10 @@ class IpcConnection:
         self._max_message_size = max_message_size
         #: Awaited before dispatching each incoming request (server side).
         self._before_incoming_call = before_incoming_call
+        #: Trace-context propagation of this connection: ``OUTGOING`` injects it
+        #: on outgoing calls (incl. `get_callback` proxies; read by `_IpcProxy`
+        #: per call), ``INCOMING`` extracts it on incoming ones.
+        self.telemetry_propagation = telemetry_propagation
         self._pending: dict[str, asyncio.Future[Response]] = {}
         # request id -> (handler task, whether the contract method is
         # @ipc_cancellable). The flag gates whether a peer CancellationRequest
@@ -288,6 +296,9 @@ class IpcConnection:
         callbacks: dict[str, tuple[type, object]] | None = None,
         request_timeout: float | None = None,
         max_message_size: int = MAX_PAYLOAD_BYTES,
+        telemetry_propagation: TelemetryPropagationPolicy = (
+            TelemetryPropagationPolicy.NONE
+        ),
     ) -> IpcConnection:
         """Connect via the transport, wrap the stream in a new connection."""
         reader, writer = await transport.connect()
@@ -297,6 +308,7 @@ class IpcConnection:
             callbacks=callbacks,
             request_timeout=request_timeout,
             max_message_size=max_message_size,
+            telemetry_propagation=telemetry_propagation,
         )
         conn.start()
         return conn
@@ -635,7 +647,7 @@ class IpcConnection:
         if entry is not None:
             contract, _instance = entry
             cancellable = is_ipc_cancellable(contract, req.method_name)
-        task = asyncio.create_task(self._invoke_callback(req))
+        task = asyncio.create_task(self._invoke_traced(req))
         self._incoming_handlers[req.id] = (task, cancellable)
         task.add_done_callback(
             lambda _t, rid=req.id: self._incoming_handlers.pop(rid, None)
@@ -720,6 +732,20 @@ class IpcConnection:
                 # keep scanning so later Message params are still injected.
             # "skip": **kwargs / non-Message keyword-only — not fillable here.
         return pos, kwargs
+
+    async def _invoke_traced(self, req: Request) -> None:
+        """Run `_invoke_callback` under the call's trace context. Failing to
+        apply it fails just this call; without ``INCOMING`` the headers are
+        never read."""
+        try:
+            incoming = TelemetryPropagationPolicy.INCOMING in self.telemetry_propagation
+            trace_context = from_headers(req.headers) if incoming else None
+            with incoming_scope(trace_context, incoming):
+                await self._invoke_callback(req)
+        except Exception as ex:
+            await self._try_send_response(
+                Response(request_id=req.id, error=_error_from_exception(ex))
+            )
 
     async def _invoke_callback(self, req: Request) -> None:
         """Run the user's handler for an incoming Request, then reply.

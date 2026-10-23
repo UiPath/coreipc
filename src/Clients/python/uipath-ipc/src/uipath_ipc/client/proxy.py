@@ -12,6 +12,7 @@ from ..errors import RemoteException
 from ..hooks import CallInfo
 from ..markers import is_ipc_cancellable
 from ..message import INFINITE_REQUEST_TIMEOUT, Message
+from ..trace_context import TelemetryPropagationPolicy, outgoing_headers
 from ..wire import Request, Response, from_wire, to_wire
 from ..wire.serialization import resolve_hints
 
@@ -143,6 +144,11 @@ class _IpcProxy:
         # value as unbounded.
         if wire_timeout is not None and wire_timeout < 0:
             wire_timeout = INFINITE_REQUEST_TIMEOUT
+        headers = (
+            outgoing_headers()
+            if TelemetryPropagationPolicy.OUTGOING in self._client.telemetry_propagation
+            else None
+        )
         async def _connect_and_send() -> Response:
             # The dial shares the call deadline (see below) — a black-holed or
             # unreachable host no longer escapes `request_timeout` via an
@@ -167,6 +173,7 @@ class _IpcProxy:
                 parameters=params,
                 id=conn.next_id(),
                 timeout_in_seconds=wire_timeout,
+                headers=headers,
             )
             return await conn.send_request(req, propagate_cancellation=cancellable)
 
