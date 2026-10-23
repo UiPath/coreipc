@@ -226,7 +226,7 @@ internal sealed class ServiceClientProper : ServiceClient
 
             LatestConnection = new Connection(network, Config.GetComputedDebugName(), Config.Logger);
             var router = new Router(_client.CreateCallbackRouterConfig(), _client.ServiceProvider);
-            _latestServer = new Server(router, _client.RequestTimeout, LatestConnection);
+            _latestServer = new Server(router, _client.RequestTimeout, _client.PropagatedExceptionDataKeys, LatestConnection);
 
             _ = Pal();
             return (LatestConnection, newlyConnected: true);

@@ -33,7 +33,7 @@ internal sealed class ServerConnection : IClient, IDisposable, IClientConfig
         _network = network;
 
         _connection = new Connection(network, _debugName, _logger, maxMessageSize: _ipcServer.Transport.MaxMessageSize);
-        _server = new Server(new Router(_ipcServer), _ipcServer.RequestTimeout, _connection, client: this);
+        _server = new Server(new Router(_ipcServer), _ipcServer.RequestTimeout, _ipcServer.PropagatedExceptionDataKeys, _connection, client: this);
 
         _listening = Listen(ct);
     }

@@ -36,7 +36,7 @@ internal record Response(string RequestId, string? Data = null, Error? Error = n
     [JsonIgnore]
     public Stream? DownloadStream { get; set; }
 
-    public static Response Fail(Request request, Exception ex) => new(request.Id, Error: ex.ToError());
+    public static Response Fail(Request request, Exception ex, IEnumerable<string>? dataKeys) => new(request.Id, Error: Error.FromException(ex, dataKeys));
     public static Response Success(Request request, string data) => new(request.Id, data);
     public static Response Success(Request request, Stream downloadStream) => new(request.Id) { DownloadStream = downloadStream };
     public TResult Deserialize<TResult>()
@@ -52,19 +52,72 @@ internal record Response(string RequestId, string? Data = null, Error? Error = n
 
 public record Error(string Message, string StackTrace, string Type, Error? InnerError)
 {
+    /// <summary>
+    /// The selected <see cref="Exception.Data"/> entries of the exception this error was built from, or <c>null</c> when there are none.
+    /// </summary>
+    /// <remarks>
+    /// On the wire this is a JSON object whose values are strings. The record's equality compares this dictionary by reference.
+    /// </remarks>
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public IReadOnlyDictionary<string, string>? Data { get; init; }
+
     [return: NotNullIfNotNull("exception")]
-    public static Error? FromException(Exception? exception)
-    => exception is null 
-        ? null 
+    public static Error? FromException(Exception? exception) => FromException(exception, dataKeys: null);
+
+    /// <summary>
+    /// Like <see cref="FromException(Exception?)"/>, and also copies the <see cref="Exception.Data"/> entries listed in <paramref name="dataKeys"/>
+    /// into <see cref="Data"/>, at every level of the inner exception chain. Only <see cref="string"/> values are copied; other values are skipped.
+    /// </summary>
+    [return: NotNullIfNotNull("exception")]
+    public static Error? FromException(Exception? exception, IEnumerable<string>? dataKeys)
+    => exception is null
+        ? null
         : new(
-            Message: exception.Message, 
-            StackTrace: exception.StackTrace ?? exception.GetBaseException().StackTrace!, 
-            Type: GetExceptionType(exception), 
-            InnerError: FromException(exception.InnerException));
+            Message: exception.Message,
+            StackTrace: exception.StackTrace ?? exception.GetBaseException().StackTrace!,
+            Type: GetExceptionType(exception),
+            InnerError: FromException(exception.InnerException, dataKeys))
+        {
+            Data = GetData(exception, dataKeys)
+        };
     public override string ToString() => new RemoteException(this).ToString();
 
     private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName!;
+
+    private static Dictionary<string, string>? GetData(Exception exception, IEnumerable<string>? dataKeys)
+    {
+        if (dataKeys is null)
+        {
+            return null;
+        }
+
+        Dictionary<string, string>? data = null;
+        try
+        {
+            var exceptionData = exception.Data;
+            foreach (var key in dataKeys)
+            {
+                try
+                {
+                    if (key is not null && exceptionData[key] is string value)
+                    {
+                        (data ??= [])[key] = value;
+                    }
+                }
+                catch
+                {
+                    // Exception.Data is virtual: one faulty entry must not cost the caller the other entries.
+                }
+            }
+        }
+        catch
+        {
+            // A faulty Data getter or key collection must not cost the caller the error itself.
+        }
+        return data;
+    }
 }
+
 
 public class RemoteException : Exception
 {
@@ -77,6 +130,13 @@ public class RemoteException : Exception
         if (error.StackTrace is not null)
         {
             _remoteStackTrace = error.StackTrace.TrimEnd('\r', '\n');
+        }
+        if (error.Data is not null)
+        {
+            foreach (var pair in error.Data)
+            {
+                Data[pair.Key] = pair.Value;
+            }
         }
     }
 
