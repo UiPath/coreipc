@@ -1,6 +1,7 @@
 import { assertArgument, PublicCtor, TimeSpan } from '../..';
 import { Address, AddressBuilder, IServiceProvider } from '..';
 import { ConnectHelper } from '.';
+import { TelemetryPropagationPolicy } from '../Telemetry';
 
 /* @internal */
 export class ConfigStore<TAddressBuilder extends AddressBuilder> {
@@ -9,6 +10,8 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
     constructor(
         private readonly _serviceProvider: IServiceProvider<TAddressBuilder>,
     ) {}
+
+    public telemetryPropagation = TelemetryPropagationPolicy.None;
 
     public getConnectHelper(address: Address): ConnectHelper | undefined {
         const key = ConfigStore.computeCompositeKey(this._serviceProvider, address, undefined);

@@ -23,6 +23,9 @@ internal record Request(string Endpoint, string Id, string MethodName, string[] 
     [JsonIgnore]
     public Stream? UploadStream { get; set; }
 
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public Dictionary<string, string?>? Headers { get; set; }
+
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
 
     public  TimeSpan GetTimeout(TimeSpan? defaultTimeout) => TimeoutInSeconds == 0 

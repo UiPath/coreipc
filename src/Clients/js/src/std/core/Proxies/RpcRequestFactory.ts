@@ -7,6 +7,7 @@ import {
 } from '../..';
 import { Address, Converter, Message, RpcMessage, ServiceId } from '..';
 import { IServiceProvider } from '.';
+import { TelemetryPropagationPolicy, TraceContextRuntime } from '../Telemetry';
 
 /* @internal */
 export class RpcRequestFactory {
@@ -80,6 +81,13 @@ export class RpcRequestFactory {
             args,
             timeout,
         );
+
+        if (params.sp.configStore.telemetryPropagation & TelemetryPropagationPolicy.Outgoing) {
+            const headers = TraceContextRuntime.getOutgoingHeaders();
+            if (headers) {
+                rpcRequest.Headers = headers;
+            }
+        }
 
         return [rpcRequest, returnsPromiseOf, ct, timeout];
     }

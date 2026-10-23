@@ -22,6 +22,7 @@ import {
 } from './Proxies';
 import { ContractStore, IContractStore } from './Contract';
 import { Callback, CallbackImpl } from './Callbacks';
+import { TelemetryPropagationPolicy } from './Telemetry';
 
 export interface IpcBase<TAddressBuilder extends AddressBuilder> {
     readonly $service: ServiceAnnotations;
@@ -45,6 +46,13 @@ export module IpcBase {
     }
 
     export interface Configuration<TAddressBuilder extends AddressBuilder> {
+        /**
+         * Sets the directions in which this `ipc` instance propagates the W3C trace context (default `None`):
+         * with `Outgoing` its calls carry the ambient trace context (`withTraceContext`, else the active OpenTelemetry
+         * span on Node); with `Incoming` its callbacks run within the trace context they arrived with (`currentIncomingTraceContext`).
+         */
+        setTelemetryPropagation(policy: TelemetryPropagationPolicy): void;
+
         forAnyAddress(): ConfigurationWithAddress;
 
         forAddress<TAddress extends Address>(configure: AddressSelectionDelegate<TAddressBuilder>): ConfigurationWithAddress<TAddress>;
@@ -167,6 +175,11 @@ export module IpcBaseImpl {
 
     export class Configuration<TAddressBuilder extends AddressBuilder> {
         constructor(private readonly _ipc: IServiceProvider<TAddressBuilder>) {}
+
+        public setTelemetryPropagation(policy: TelemetryPropagationPolicy): void {
+            assertArgument({ policy }, 'number');
+            this._ipc.configStore.telemetryPropagation = policy;
+        }
 
         public forAnyAddress(): ConfigurationWithAddress {
             return new ConfigurationWithAddress(this._ipc);
