@@ -16,6 +16,7 @@ internal static class Helpers
     internal static Error ToError(this Exception ex) => new(ex.Message, ex.StackTrace ?? ex.GetBaseException().StackTrace!, GetExceptionType(ex), ex.InnerException?.ToError());
     private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName!;
     internal static bool Enabled(this ILogger? logger, LogLevel logLevel = LogLevel.Information) => logger is not null && logger.IsEnabled(logLevel);
+    internal static AsyncFlowControl? EnsureFlowSuppressed() => ExecutionContext.IsFlowSuppressed() ? null : ExecutionContext.SuppressFlow();
     [Conditional("DEBUG")]
     internal static void AssertDisposed(this SemaphoreSlim semaphore) => semaphore.AssertFieldNull("m_waitHandle");
     [Conditional("DEBUG")]
