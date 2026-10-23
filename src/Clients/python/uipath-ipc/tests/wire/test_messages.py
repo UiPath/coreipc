@@ -109,6 +109,50 @@ def test_request_matches_dotnet_wire_shape() -> None:
     )
 
 
+_TRACE_HEADERS = {
+    "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    "tracestate": "congo=t61rcWkgMzE",
+    "baggage": "userId=alice,tenant=acme",
+}
+
+
+def test_request_without_headers_has_no_headers_on_the_wire() -> None:
+    req = Request(endpoint="X", method_name="Y", parameters=[])
+    assert "Headers" not in req.to_dict()
+    assert "Headers" not in req.to_json()
+
+
+def test_request_headers_are_written_verbatim_and_round_trip() -> None:
+    req = Request(
+        endpoint="ISystemService", method_name="Foo", parameters=["1"], id="3",
+        headers=dict(_TRACE_HEADERS),
+    )
+    d = req.to_dict()
+    assert list(d) == [
+        "Endpoint", "MethodName", "Parameters", "Id", "TimeoutInSeconds", "Headers",
+    ]
+    assert d["Headers"] == _TRACE_HEADERS
+    assert Request.from_json(req.to_json()) == req
+
+
+def test_request_reads_dotnet_headers() -> None:
+    captured = (
+        '{"Endpoint":"ISystemService","Id":"3","MethodName":"Foo",'
+        '"Parameters":["1"],"TimeoutInSeconds":0.0,'
+        '"Headers":{"traceparent":"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",'
+        '"tracestate":"congo=t61rcWkgMzE","baggage":"userId=alice,tenant=acme"}}'
+    )
+    assert Request.from_json(captured).headers == _TRACE_HEADERS
+
+
+def test_request_repr_excludes_headers() -> None:
+    req = Request(endpoint="X", method_name="Y", parameters=[], headers=dict(_TRACE_HEADERS))
+    text = repr(req)
+    assert "alice" not in text
+    assert "congo" not in text
+    assert "traceparent" not in text
+
+
 # --- Response --------------------------------------------------------------
 
 def test_response_with_data_round_trip() -> None:

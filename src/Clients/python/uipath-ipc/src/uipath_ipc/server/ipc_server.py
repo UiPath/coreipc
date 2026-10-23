@@ -30,6 +30,7 @@ import asyncio
 
 from ..client.connection import IpcConnection
 from ..hooks import BeforeCallHandler
+from ..trace_context import TelemetryPropagationPolicy
 from ..transport.base import ServerHandle, ServerTransport
 from ..wire import MAX_PAYLOAD_BYTES
 
@@ -44,6 +45,9 @@ class IpcServer:
         request_timeout: float | None = None,
         before_call: BeforeCallHandler | None = None,
         max_message_size: int = MAX_PAYLOAD_BYTES,
+        telemetry_propagation: TelemetryPropagationPolicy = (
+            TelemetryPropagationPolicy.NONE
+        ),
     ) -> None:
         """Create a server.
 
@@ -71,6 +75,11 @@ class IpcServer:
                 payload, applied to every accepted connection (the analog of
                 .NET's ``MaxReceivedMessageSize``). A larger frame is rejected
                 before allocation. Defaults to 2 MB.
+            telemetry_propagation: Opt in to W3C trace-context propagation
+                (see `uipath_ipc.trace_context`): ``INCOMING`` for incoming
+                calls, ``OUTGOING`` for the callbacks services make through
+                ``message.client``, ``BOTH`` for both. ``NONE`` by default:
+                nothing is read or sent. Read per accepted connection.
         """
         self._transport = transport
         # Translate contract-type keys to endpoint-name keys once; the
@@ -87,6 +96,7 @@ class IpcServer:
         self._request_timeout = request_timeout
         self._before_call = before_call
         self._max_message_size = max_message_size
+        self.telemetry_propagation = telemetry_propagation
         self._handle: ServerHandle | None = None
         # Serializes ALL lifecycle state changes (`_disposed`, `_handle`) so
         # start()/aclose() can't race; held across serve() in start().
@@ -141,6 +151,7 @@ class IpcServer:
             # budget so a non-reading client can't wedge the shared writer.
             send_timeout=self._request_timeout,
             max_message_size=self._max_message_size,
+            telemetry_propagation=self.telemetry_propagation,
         )
         self._connections.add(conn)
         # Prune from the live set when the peer disconnects or we close it.

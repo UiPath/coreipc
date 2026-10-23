@@ -315,6 +315,23 @@ ipc.config
 >   - the request timeout for pipe name "foo" and contract ISample is 3 seconds
 >   ```
 
+## Trace context (telemetry)
+
+`ipc.config.setTelemetryPropagation(policy)` carries the W3C `traceparent`, `tracestate` and `baggage` across this `ipc` instance's calls and callbacks (wire-compatible with the .NET and Python sides). The `TelemetryPropagationPolicy` picks the directions: `None` (the default: nothing is sent or read), `Incoming`, `Outgoing` or `Both`.
+
+- **Outgoing** (the calls it makes): a `withTraceContext(...)` scope wins; otherwise, on Node, the active span and baggage of the optional peer dependency `@opentelemetry/api`; otherwise nothing is sent. If `@opentelemetry/api` is missing or fails to load, it is treated as not installed.
+- **Incoming** (the callbacks it receives): `currentIncomingTraceContext()` gives the raw values. On Node the callback also runs within an OpenTelemetry context whose parent is the remote span, so the spans it starts, and with `Outgoing` also its calls, continue the trace. With `Outgoing` alone, callbacks ignore what they received and run outside any span.
+- **Limits**: a context you pass to `withTraceContext` must have `tracestate` at most 32 members and `baggage` at most 64 members and 8192 UTF-8 bytes, else it throws `ArgumentError`. Ambient OpenTelemetry values and incoming headers are not checked.
+- **Browser** (`@uipath/coreipc-web`): explicit-only for now. The OpenTelemetry context is not read or set; only `withTraceContext` and `currentIncomingTraceContext` apply, and only until the first `await`.
+
+```typescript
+import { ipc, TelemetryPropagationPolicy, withTraceContext } from '@uipath/coreipc';
+
+ipc.config.setTelemetryPropagation(TelemetryPropagationPolicy.Both);
+
+await withTraceContext({ traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01' }, () => proxy.Foo());
+```
+
 ---
 ## Notes for Contributors
 

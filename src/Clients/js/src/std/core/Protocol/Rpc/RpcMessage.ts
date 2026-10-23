@@ -19,6 +19,9 @@ export module RpcMessage {
 
         public Id: string = '';
 
+        /** Left unset when empty, so the property is absent from the JSON. */
+        public declare Headers?: { [name: string]: string };
+
         public toNetwork(): Network.Message {
             return {
                 type: Network.Message.Type.Request,

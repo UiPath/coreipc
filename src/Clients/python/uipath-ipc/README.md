@@ -181,6 +181,21 @@ async with IpcClient(transport, before_connect=launch_server, before_call=log_ca
 
 `before_connect` runs before each (re)connect; `before_call` runs before each outgoing call with a `CallInfo` (`endpoint`, `method_name`, `arguments`, and `new_connection` — `True` only on the call that opened the connection).
 
+### Trace context (telemetry)
+
+Opt in with `IpcClient(..., telemetry_propagation=TelemetryPropagationPolicy.BOTH)` / `IpcServer(..., telemetry_propagation=TelemetryPropagationPolicy.BOTH)` to carry the W3C `traceparent`, `tracestate` and `baggage` across calls and callbacks (wire-compatible with .NET's `TelemetryPropagation`). `OUTGOING` covers the calls an object makes (a client's calls, a server's callbacks), `INCOMING` the calls it handles (a server's calls, a client's callbacks); `NONE` (the default) sends and reads nothing.
+
+- **Outgoing**: an explicit `use_trace_context(TraceContext(...))` scope wins; otherwise the current OpenTelemetry span + baggage is used when `opentelemetry-api` is installed (`pip install "uipath-ipc[otel]"`); otherwise nothing is sent.
+- **Incoming**: the handler runs under an OpenTelemetry context whose (non-recording) remote parent is the caller's span, so nested calls continue the trace; `incoming_trace_context()` returns the raw values. A `traceparent` OpenTelemetry rejects gives no remote parent (a new trace), not an error.
+- A context you pass to `use_trace_context(...)` is checked against the W3C size limits (`tracestate` at most 32 list members, `baggage` at most 64 list members and 8192 UTF-8 bytes) and raises `ValueError` when it breaks them; the `traceparent` isn't checked. OpenTelemetry values and incoming headers aren't checked.
+
+```python
+from uipath_ipc import TraceContext, use_trace_context
+
+with use_trace_context(TraceContext("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", baggage="userId=alice")):
+    await svc.AddFloats(1.5, 2.5)
+```
+
 ### Custom serialization (advanced)
 
 The proxy materializes results into a contract's declared return type via reflection — `bytes`, `UUID`, `datetime`, `Decimal`, enums, and dataclasses all round-trip (see [Features](#features) above). If you need to (de)serialize values yourself, the same primitives are exported as `from_wire(value, hint)` / `to_wire(value)`. The contract vocabulary is intentionally narrow — plain JSON values and dataclasses — so the IPC layer stays decoupled from any modeling framework (pydantic, ORM entities, …); map IPC DTOs to your own validated/domain types at your boundary if you need them.
