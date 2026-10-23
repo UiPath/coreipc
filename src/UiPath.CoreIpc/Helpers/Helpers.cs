@@ -14,6 +14,7 @@ internal static class Helpers
 {
     internal const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly;
     internal static bool Enabled(this ILogger? logger, LogLevel logLevel = LogLevel.Information) => logger is not null && logger.IsEnabled(logLevel);
+    internal static AsyncFlowControl? EnsureFlowSuppressed() => ExecutionContext.IsFlowSuppressed() ? null : ExecutionContext.SuppressFlow();
     [Conditional("DEBUG")]
     internal static void AssertDisposed(this SemaphoreSlim semaphore) => semaphore.AssertFieldNull("m_waitHandle");
     [Conditional("DEBUG")]
