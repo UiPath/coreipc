@@ -52,8 +52,7 @@ variables:
   DotNet_MainProjectPath: './src/UiPath.CoreIpc/UiPath.CoreIpc.csproj'
   DotNet_ArtifactName: 'NuGet package'
   # Azure RM service connection the signing template runs under (it reaches the
-  # devopsprodsigningwekv Key Vault). The Studio project's one; it has to be
-  # shared into the CoreIpc project before the first signed build.
+  # devopsprodsigningwekv Key Vault).
   Signing_AzureConnectionName: 'InternalProdEAServiceConnection'
 
   NodeJS_DotNet_BuildConfiguration: 'Debug'
@@ -80,7 +79,6 @@ stages:
       - template: azp-dotnet.yaml
         parameters:
           sign: ${{ and(eq(parameters.signPackages, true), ne(variables['Build.Reason'], 'PullRequest')) }}
-          signingConnection: ${{ variables.Signing_AzureConnectionName }}
       - template: azp-dotnet-dist.yaml
 
 - stage: Build_NPM

@@ -3,9 +3,6 @@ parameters:
   - name: sign
     type: boolean
     default: false
-  - name: signingConnection
-    type: string
-    default: ''
 
 steps:
   # GeneratePackageOnBuild is off here: the DLLs get signed first, then packed below.
@@ -41,12 +38,11 @@ steps:
   - ${{ if eq(parameters.sign, true) }}:
     - template: Signing/signing.yml@common
       parameters:
-        azureConnectionName: ${{ parameters.signingConnection }}
+        azureConnectionName: ${{ variables.Signing_AzureConnectionName }}
         runInParallel: true
+        # The file name is a recursive filter, so every target framework folder is covered.
         pathsToSign:
-          - '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)/net461/UiPath.Ipc.dll'
-          - '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)/net6.0/UiPath.Ipc.dll'
-          - '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)/net6.0-windows/UiPath.Ipc.dll'
+          - '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)/UiPath.Ipc.dll'
 
   # Same output folder the csproj used to pack into, so azp-dotnet-dist.yaml picks it up unchanged.
   - task: DotNetCoreCLI@2
