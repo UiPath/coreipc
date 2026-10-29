@@ -1,7 +1,8 @@
 <Project>
+    <Import Project="src/TargetFrameworks.props" />
     <PropertyGroup>
         <LangVersion>latest</LangVersion>
-        <DefineConstants Condition="'$(TargetFramework)' == 'net461'">$(DefineConstants);WINDOWS</DefineConstants>
-        <DefineConstants Condition="'$(TargetFramework)' == 'net5.0-windows'">$(DefineConstants);NET5_0_WINDOWS</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == '$(NetFrameworkTfm)'">$(DefineConstants);WINDOWS</DefineConstants>
+        <DefineConstants Condition="'$(TargetFramework)' == '$(NetWindowsTfm)'">$(DefineConstants);NET5_0_WINDOWS</DefineConstants>
     </PropertyGroup>
 </Project>
