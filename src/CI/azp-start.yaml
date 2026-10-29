@@ -1,11 +1,11 @@
 name: $(Date:yyyyMMdd)$(Rev:-rr)
 
-# The .NET job Authenticode-signs UiPath.CoreIpc.dll (every TFM) before packing,
-# through the shared Signing/signing.yml template (ROBO-6151); the .nupkg
-# itself stays unsigned. Skipped on PR builds and when `signPackages` is off.
+# The .NET job Authenticode-signs UiPath.CoreIpc.dll (every TFM) before packing and
+# NuGet-signs the .nupkg, through the shared Signing/signing.yml template
+# (ROBO-6151). Skipped on PR builds and when `signPackages` is off.
 parameters:
   - name: signPackages
-    displayName: 'Sign UiPath.CoreIpc.dll (skipped on PR builds regardless)'
+    displayName: 'Sign UiPath.CoreIpc.dll and the .nupkg (skipped on PR builds regardless)'
     type: boolean
     default: true
 
