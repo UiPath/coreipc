@@ -11,9 +11,9 @@
 # tests, and publishes each as a pipeline artifact:
 #   'NuGet package' / 'NPM package' / 'Python package'.
 #
-# The .NET build Authenticode-signs UiPath.Ipc.dll (every TFM) before packing,
-# through the shared Signing/signing.yml template (ROBO-6151); the .nupkg
-# itself stays unsigned. Skipped on PR builds and when `signPackages` is off.
+# The .NET build Authenticode-signs UiPath.Ipc.dll (every TFM) before packing and
+# NuGet-signs the .nupkg, through the shared Signing/signing.yml template
+# (ROBO-6151). Skipped on PR builds and when `signPackages` is off.
 #
 # Pushes to NO feed. Publishing is the separate, manual Publish pipeline
 # (azp-publish.yaml): it takes a CI build id and pushes that build's artifacts
@@ -27,7 +27,7 @@ name: $(Date:yyyyMMdd)$(Rev:-rr)
 
 parameters:
   - name: signPackages
-    displayName: 'Sign UiPath.Ipc.dll (skipped on PR builds regardless)'
+    displayName: 'Sign UiPath.Ipc.dll and the .nupkg (skipped on PR builds regardless)'
     type: boolean
     default: true
 

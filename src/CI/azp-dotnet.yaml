@@ -1,5 +1,5 @@
 parameters:
-  # Authenticode-sign UiPath.Ipc.dll (every TFM) before packing; the .nupkg itself stays unsigned.
+  # Authenticode-sign UiPath.Ipc.dll (every TFM) before packing, then NuGet-sign the .nupkg.
   - name: sign
     type: boolean
     default: false
@@ -55,3 +55,13 @@ steps:
       versioningScheme: 'off'
       buildProperties: 'Version=$(FullVersion)'
       packDirectory: '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)'
+
+  # The tools and Key Vault variables from the first signing block are still in the job.
+  - ${{ if eq(parameters.sign, true) }}:
+    - template: Signing/signing.yml@common
+      parameters:
+        azureConnectionName: ${{ variables.Signing_AzureConnectionName }}
+        runSetUpSteps: false
+        runInParallel: true
+        pathsToSign:
+          - '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)/*.nupkg'
