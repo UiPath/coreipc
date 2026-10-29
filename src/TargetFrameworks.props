@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Single source of the target frameworks. UiPath.Ipc targets every one of them; CI signs one UiPath.Ipc.dll per entry. -->
+    <NetTfm>net6.0</NetTfm>
+    <NetFrameworkTfm>net461</NetFrameworkTfm>
+    <NetWindowsTfm>net6.0-windows</NetWindowsTfm>
+  </PropertyGroup>
+</Project>

@@ -36,13 +36,24 @@ steps:
       arguments: '--no-build --configuration $(DotNet_BuildConfiguration) --filter "FullyQualifiedName!~WebSocket" --logger "console;verbosity=detailed" --blame-hang --blame-hang-timeout 10m --blame-hang-dump-type mini -p:Version="$(FullVersion)" -p:DefineConstantsEx="CI"'
 
   - ${{ if eq(parameters.sign, true) }}:
+    # One UiPath.Ipc.dll per target framework in src/TargetFrameworks.props, and none built outside that list.
+    - pwsh: |
+        $tfms = ([xml](Get-Content '$(Build.SourcesDirectory)/src/TargetFrameworks.props' -Raw)).Project.PropertyGroup.ChildNodes |
+          Where-Object NodeType -eq 'Element' | ForEach-Object { $_.InnerText.Trim() }
+        $bin = '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)'
+        $paths = $tfms | ForEach-Object { "$bin/$_/UiPath.Ipc.dll" }
+        $missing = $paths | Where-Object { -not (Test-Path $_) }
+        if ($missing) { throw "Not built: $($missing -join ', ')" }
+        $built = @(Get-ChildItem "$bin/*/UiPath.Ipc.dll").Count
+        if ($built -ne $paths.Count) { throw "Built $built UiPath.Ipc.dll, TargetFrameworks.props lists $($paths.Count)." }
+        Write-Host "##vso[task.setvariable variable=SignPaths]$($paths -join ',')"
+      displayName: 'List the DLLs to sign'
     - template: Signing/signing.yml@common
       parameters:
         azureConnectionName: ${{ variables.Signing_AzureConnectionName }}
         runInParallel: true
-        # The file name is a recursive filter, so every target framework folder is covered.
         pathsToSign:
-          - '$(Build.SourcesDirectory)/src/UiPath.CoreIpc/bin/$(DotNet_BuildConfiguration)/UiPath.Ipc.dll'
+          - '$(SignPaths)'
 
   # Same output folder the csproj used to pack into, so azp-dotnet-dist.yaml picks it up unchanged.
   - task: DotNetCoreCLI@2
