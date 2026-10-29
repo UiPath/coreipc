@@ -3,6 +3,10 @@ parameters:
   - name: sign
     type: boolean
     default: false
+  # Template expressions here can't see azp-start.yaml's variables, so the caller passes it in.
+  - name: signingConnection
+    type: string
+    default: ''
 
 steps:
   # GeneratePackageOnBuild is off here: the DLLs get signed first, then packed below.
@@ -50,7 +54,7 @@ steps:
       displayName: 'List the DLLs to sign'
     - template: Signing/signing.yml@common
       parameters:
-        azureConnectionName: ${{ variables.Signing_AzureConnectionName }}
+        azureConnectionName: ${{ parameters.signingConnection }}
         runInParallel: true
         pathsToSign:
           - '$(SignPaths)'
@@ -71,7 +75,7 @@ steps:
   - ${{ if eq(parameters.sign, true) }}:
     - template: Signing/signing.yml@common
       parameters:
-        azureConnectionName: ${{ variables.Signing_AzureConnectionName }}
+        azureConnectionName: ${{ parameters.signingConnection }}
         runSetUpSteps: false
         runInParallel: true
         pathsToSign:
