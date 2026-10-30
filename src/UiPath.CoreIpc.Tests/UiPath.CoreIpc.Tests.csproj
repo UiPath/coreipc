@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFrameworks>net6.0;net461</TargetFrameworks>
+    <TargetFrameworks>$(NetTfm);$(NetFrameworkTfm)</TargetFrameworks>
     <AssemblyName>UiPath.Ipc.Tests</AssemblyName>
     <RootNamespace>UiPath.Ipc.Tests</RootNamespace>
     <NoWarn>$(NoWarn);1998</NoWarn>
@@ -55,7 +55,7 @@
     <Using Include="System.Diagnostics" />
   </ItemGroup>
   
-  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+  <ItemGroup Condition="'$(TargetFramework)' == '$(NetTfm)'">
     <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing">
       <Version>8.0.0</Version>
     </PackageReference>
