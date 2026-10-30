@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Single source of the target frameworks. UiPath.CoreIpc targets every one of them; CI signs one UiPath.CoreIpc.dll per entry. -->
+    <NetFrameworkTfm>net461</NetFrameworkTfm>
+    <NetStandardTfm>netstandard2.0</NetStandardTfm>
+    <NetWindowsTfm>net5.0-windows</NetWindowsTfm>
+  </PropertyGroup>
+</Project>
