@@ -232,9 +232,10 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
-    public void FromException_FaultyEntry_DoesNotDropTheOtherKeys()
+    public void FromException_FaultyEntry_KeepsTheEntriesGatheredBeforeIt()
     {
-        var error = Error.FromException(new FaultyEntryException(), Keys);
+        var error = Error.FromException(new FaultyEntryException(), [ErrorDataProbe.ListedKey2, ErrorDataProbe.ListedKey]);
+        error.Message.ShouldBe("faulty entry");
         error.Data!.Keys.ShouldBe(new[] { ErrorDataProbe.ListedKey2 });
         error.Data[ErrorDataProbe.ListedKey2].ShouldBe("ok");
     }

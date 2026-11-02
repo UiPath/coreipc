@@ -53,23 +53,24 @@ internal record Response(string RequestId, string? Data = null, Error? Error = n
 public record Error(string Message, string StackTrace, string Type, Error? InnerError)
 {
     /// <summary>
-    /// The selected <see cref="Exception.Data"/> entries of the exception this error was built from, or <c>null</c> when there are none.
+    /// The <see cref="Exception.Data"/> entries this error carries, or <c>null</c> when there are none.
     /// </summary>
     /// <remarks>
-    /// On the wire this is a JSON object whose values are strings. The record's equality compares this dictionary by reference.
+    /// Each value is an opaque string to CoreIpc: a structured payload goes inside the string (e.g. as JSON, as <c>UiPath.ErrorInfo.Error</c> already does),
+    /// so the wire never has to widen. The record's equality compares this dictionary by reference.
     /// </remarks>
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-    public IReadOnlyDictionary<string, string>? Data { get; init; }
+    internal IReadOnlyDictionary<string, string>? Data { get; init; }
 
     [return: NotNullIfNotNull("exception")]
     public static Error? FromException(Exception? exception) => FromException(exception, dataKeys: null);
 
     /// <summary>
     /// Like <see cref="FromException(Exception?)"/>, and also copies the <see cref="Exception.Data"/> entries listed in <paramref name="dataKeys"/>
-    /// into <see cref="Data"/>, at every level of the inner exception chain. Only <see cref="string"/> values are copied; other values are skipped.
+    /// into <see cref="Data"/>, at every level of the inner exception chain.
     /// </summary>
     [return: NotNullIfNotNull("exception")]
-    public static Error? FromException(Exception? exception, IEnumerable<string>? dataKeys)
+    internal static Error? FromException(Exception? exception, IEnumerable<string>? dataKeys)
     => exception is null
         ? null
         : new(
@@ -97,22 +98,15 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
             var exceptionData = exception.Data;
             foreach (var key in dataKeys)
             {
-                try
+                if (key is not null && exceptionData[key] is string value)
                 {
-                    if (key is not null && exceptionData[key] is string value)
-                    {
-                        (data ??= [])[key] = value;
-                    }
-                }
-                catch
-                {
-                    // Exception.Data is virtual: one faulty entry must not cost the caller the other entries.
+                    (data ??= [])[key] = value;
                 }
             }
         }
         catch
         {
-            // A faulty Data getter or key collection must not cost the caller the error itself.
+            // A faulty Data getter, entry or key collection must not cost the caller the error itself.
         }
         return data;
     }
