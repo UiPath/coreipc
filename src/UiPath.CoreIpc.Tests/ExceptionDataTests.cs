@@ -1,5 +1,4 @@
 using Newtonsoft.Json.Linq;
-using UiPath.Ipc.Transport.NamedPipe;
 
 namespace UiPath.Ipc.Tests;
 
@@ -87,7 +86,7 @@ public sealed class ExceptionDataTests
     [Fact]
     public async Task ListedKey_ReachesTheCaller_UnlistedDoesNot()
     {
-        await using var pair = await Pair.Create(serverKeys: Keys);
+        await using var pair = await CreatePair(serverKeys: Keys);
         var ex = await pair.Proxy.Throw().ShouldThrowAsync<RemoteException>();
         ex.Data[ErrorDataProbe.ListedKey].ShouldBe(ErrorDataProbe.Value);
         ex.Data.Contains(ErrorDataProbe.UnlistedKey).ShouldBeFalse();
@@ -97,7 +96,7 @@ public sealed class ExceptionDataTests
     [Fact]
     public async Task NoKeys_ByDefault_NothingIsCarried()
     {
-        await using var pair = await Pair.Create();
+        await using var pair = await CreatePair();
         var ex = await pair.Proxy.Throw().ShouldThrowAsync<RemoteException>();
         ex.Data.Count.ShouldBe(0);
     }
@@ -105,7 +104,7 @@ public sealed class ExceptionDataTests
     [Fact]
     public async Task InnerExceptions_CarryTheirOwnData()
     {
-        await using var pair = await Pair.Create(serverKeys: Keys);
+        await using var pair = await CreatePair(serverKeys: Keys);
         var ex = await pair.Proxy.ThrowWrapped().ShouldThrowAsync<RemoteException>();
         ex.Data[ErrorDataProbe.ListedKey].ShouldBe("outer-value");
         ex.InnerException!.Data[ErrorDataProbe.ListedKey].ShouldBe("inner-value");
@@ -115,7 +114,7 @@ public sealed class ExceptionDataTests
     [Fact]
     public async Task AggregateException_InnerDataIsReachable()
     {
-        await using var pair = await Pair.Create(serverKeys: Keys);
+        await using var pair = await CreatePair(serverKeys: Keys);
         var ex = await pair.Proxy.ThrowAggregate().ShouldThrowAsync<RemoteException>();
         ex.Is<AggregateException>().ShouldBeTrue();
         ex.InnerException!.Data[ErrorDataProbe.ListedKey].ShouldBe("inner-value");
@@ -124,7 +123,7 @@ public sealed class ExceptionDataTests
     [Fact]
     public async Task NonStringValue_IsSkipped_WithoutBreakingTheError()
     {
-        await using var pair = await Pair.Create(serverKeys: Keys);
+        await using var pair = await CreatePair(serverKeys: Keys);
         var ex = await pair.Proxy.ThrowNonString().ShouldThrowAsync<RemoteException>();
         ex.Message.ShouldBe("non-string");
         ex.Data.Contains(ErrorDataProbe.ListedKey).ShouldBeFalse();
@@ -134,7 +133,7 @@ public sealed class ExceptionDataTests
     [Fact]
     public async Task Timeout_KeepsTheOriginalsDataReachable()
     {
-        await using var pair = await Pair.Create(serverKeys: Keys, serverTimeout: TimeSpan.FromMilliseconds(300));
+        await using var pair = await CreatePair(serverKeys: Keys, serverTimeout: TimeSpan.FromMilliseconds(300));
         var ex = await pair.Proxy.HangThenThrow().ShouldThrowAsync<RemoteException>();
         ex.Is<TimeoutException>().ShouldBeTrue();
         ex.InnerException!.Data[ErrorDataProbe.ListedKey].ShouldBe(ErrorDataProbe.Value);
@@ -143,14 +142,14 @@ public sealed class ExceptionDataTests
     [Fact]
     public async Task Callback_ClientKeys_ReachTheServerSideCaller()
     {
-        await using var pair = await Pair.Create(clientKeys: Keys);
+        await using var pair = await CreatePair(clientKeys: Keys);
         (await pair.Proxy.CallFailingCallback()).ShouldBe("callback-value|False");
     }
 
     [Fact]
     public async Task Callback_ServerKeysDoNotApplyToTheClientsErrors()
     {
-        await using var pair = await Pair.Create(serverKeys: Keys);
+        await using var pair = await CreatePair(serverKeys: Keys);
         (await pair.Proxy.CallFailingCallback()).ShouldBe("|False");
     }
 
@@ -244,7 +243,7 @@ public sealed class ExceptionDataTests
     public async Task Keys_AreCopiedWhenTheConnectionIsEstablished()
     {
         var keys = new List<string>(Keys);
-        await using var pair = await Pair.Create(serverKeys: keys);
+        await using var pair = await CreatePair(serverKeys: keys);
         await pair.Proxy.Throw().ShouldThrowAsync<RemoteException>();
         keys.Clear();
         var ex = await pair.Proxy.Throw().ShouldThrowAsync<RemoteException>();
@@ -287,51 +286,17 @@ public sealed class ExceptionDataTests
 
     private static Error Deserialize(string json) => (Error)IpcJsonSerializer.Instance.Deserialize(json, typeof(Error))!;
 
-    private sealed class Pair : IAsyncDisposable
-    {
-        private readonly IpcServer _server;
-        public IErrorDataProbe Proxy { get; }
-
-        private Pair(IpcServer server, IErrorDataProbe proxy)
-        {
-            _server = server;
-            Proxy = proxy;
-        }
-
-        public static async Task<Pair> Create(IReadOnlyCollection<string>? serverKeys = null, IReadOnlyCollection<string>? clientKeys = null, TimeSpan? serverTimeout = null)
-        {
-            var pipeName = $"ipctest_errdata_{Guid.NewGuid():N}";
-
-            var server = new IpcServer
+    private static Task<IpcPair<IErrorDataProbe>> CreatePair(IReadOnlyCollection<string>? serverKeys = null, IReadOnlyCollection<string>? clientKeys = null, TimeSpan? serverTimeout = null)
+        => IpcPair<IErrorDataProbe>.Create(
+            new ErrorDataProbe(),
+            server =>
             {
-                Transport = new NamedPipeServerTransport { PipeName = pipeName },
-                Endpoints = new() { typeof(IErrorDataProbe) },
-                ServiceProvider = new ServiceCollection()
-                    .AddLogging()
-                    .AddSingleton<IErrorDataProbe, ErrorDataProbe>()
-                    .BuildServiceProvider(),
-                RequestTimeout = serverTimeout,
-                PropagatedExceptionDataKeys = serverKeys,
-            };
-
-            var client = new IpcClient
+                server.RequestTimeout = serverTimeout;
+                server.PropagatedExceptionDataKeys = serverKeys;
+            },
+            client =>
             {
-                Transport = new NamedPipeClientTransport { PipeName = pipeName },
-                Callbacks = new() { { typeof(IErrorDataCallback), new ErrorDataCallback() } },
-                PropagatedExceptionDataKeys = clientKeys,
-            };
-            var proxy = client.GetProxy<IErrorDataProbe>();
-
-            server.Start();
-            await Task.Yield();
-            return new Pair(server, proxy);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            (Proxy as IpcProxy)?.Dispose();
-            await ((Proxy as IpcProxy)?.CloseConnection() ?? default);
-            await _server.DisposeAsync();
-        }
-    }
+                client.Callbacks = new() { { typeof(IErrorDataCallback), new ErrorDataCallback() } };
+                client.PropagatedExceptionDataKeys = clientKeys;
+            });
 }
