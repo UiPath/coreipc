@@ -66,8 +66,8 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
     public static Error? FromException(Exception? exception) => FromException(exception, dataKeys: null);
 
     /// <summary>
-    /// Like <see cref="FromException(Exception?)"/>, and also copies the <see cref="Exception.Data"/> entries listed in <paramref name="dataKeys"/>
-    /// into <see cref="Data"/>, at every level of the inner exception chain.
+    /// Like <see cref="FromException(Exception?)"/>, and at every level of the inner exception chain also fills <see cref="Data"/> with
+    /// the entries that level's <see cref="RemoteException"/> received, plus the <see cref="Exception.Data"/> entries listed in <paramref name="dataKeys"/>.
     /// </summary>
     [return: NotNullIfNotNull("exception")]
     internal static Error? FromException(Exception? exception, IEnumerable<string>? dataKeys)
@@ -85,11 +85,12 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
 
     private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName!;
 
-    private static Dictionary<string, string>? GetData(Exception exception, IEnumerable<string>? dataKeys)
+    private static IReadOnlyDictionary<string, string>? GetData(Exception exception, IEnumerable<string>? dataKeys)
     {
+        var received = (exception as RemoteException)?.ReceivedData;
         if (dataKeys is null)
         {
-            return null;
+            return received;
         }
 
         Dictionary<string, string>? data = null;
@@ -100,7 +101,8 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
             {
                 if (key is not null && exceptionData[key] is string value)
                 {
-                    (data ??= [])[key] = value;
+                    data ??= received?.ToDictionary(pair => pair.Key, pair => pair.Value) ?? [];
+                    data[key] = value;
                 }
             }
         }
@@ -108,7 +110,7 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
         {
             // A faulty Data getter, entry or key collection must not cost the caller the error itself.
         }
-        return data;
+        return data ?? received;
     }
 }
 
@@ -125,6 +127,7 @@ public class RemoteException : Exception
         {
             _remoteStackTrace = error.StackTrace.TrimEnd('\r', '\n');
         }
+        ReceivedData = error.Data;
         if (error.Data is not null)
         {
             foreach (var pair in error.Data)
@@ -133,6 +136,8 @@ public class RemoteException : Exception
             }
         }
     }
+
+    internal IReadOnlyDictionary<string, string>? ReceivedData { get; }
 
     public override string? StackTrace => _remoteStackTrace is null 
         ? base.StackTrace

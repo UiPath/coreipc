@@ -79,6 +79,31 @@ public sealed class ErrorDataCallback : IErrorDataCallback
     public Task<bool> Throw() => throw ErrorDataProbe.WithData(new InvalidOperationException("callback boom"), "callback-value");
 }
 
+public interface IErrorDataRelay
+{
+    Task<bool> Rethrow();
+    Task<bool> Wrap();
+}
+
+public sealed class ErrorDataRelay(IErrorDataProbe next) : IErrorDataRelay
+{
+    public Task<bool> Rethrow() => next.Throw();
+
+    public async Task<bool> Wrap()
+    {
+        try
+        {
+            return await next.Throw();
+        }
+        catch (RemoteException ex)
+        {
+            var wrapper = new InvalidOperationException("relay", ex);
+            wrapper.Data[ErrorDataProbe.ListedKey2] = "relay-value";
+            throw wrapper;
+        }
+    }
+}
+
 public sealed class ExceptionDataTests
 {
     private static readonly string[] Keys = [ErrorDataProbe.ListedKey, ErrorDataProbe.ListedKey2];
@@ -240,6 +265,68 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
+    public void FromException_RemoteException_PassesOnWhatItReceived_ListedKeysCurrentValueWins()
+    {
+        var remote = new RemoteException(new Error("m", "s", "t", InnerError: new Error("i", "s", "t", InnerError: null) { Data = new Dictionary<string, string> { ["k2"] = "received" } })
+        {
+            Data = new Dictionary<string, string> { ["k"] = "received", [ErrorDataProbe.ListedKey] = "received" }
+        });
+        remote.Data.Remove("k");
+        remote.Data[ErrorDataProbe.ListedKey] = "changed";
+
+        var error = Error.FromException(remote, Keys);
+
+        error.Data!["k"].ShouldBe("received");
+        error.Data[ErrorDataProbe.ListedKey].ShouldBe("changed");
+        error.InnerError!.Data!["k2"].ShouldBe("received");
+        Error.FromException(remote).Data!.Keys.ShouldBe(new[] { "k", ErrorDataProbe.ListedKey }, ignoreOrder: true);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Chain_RethrownAsIs_CsEntriesReachA(bool bListsAnotherKey)
+    {
+        await using var c = await CreatePair(serverKeys: [ErrorDataProbe.ListedKey]);
+        await using var b = await CreateRelay(c.Proxy, bListsAnotherKey ? [ErrorDataProbe.ListedKey2] : null);
+
+        var ex = await b.Proxy.Rethrow().ShouldThrowAsync<RemoteException>();
+
+        ex.Message.ShouldBe("boom");
+        ex.Data[ErrorDataProbe.ListedKey].ShouldBe(ErrorDataProbe.Value);
+        ex.Data.Contains(ErrorDataProbe.UnlistedKey).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Chain_WrappedAsInner_CsEntriesReachA_NextToBsOwn(bool bListsItsOwnKey)
+    {
+        await using var c = await CreatePair(serverKeys: [ErrorDataProbe.ListedKey]);
+        await using var b = await CreateRelay(c.Proxy, bListsItsOwnKey ? [ErrorDataProbe.ListedKey2] : null);
+
+        var ex = await b.Proxy.Wrap().ShouldThrowAsync<RemoteException>();
+
+        ex.Message.ShouldBe("relay");
+        ex.Data.Contains(ErrorDataProbe.ListedKey).ShouldBeFalse();
+        ex.Data.Contains(ErrorDataProbe.ListedKey2).ShouldBe(bListsItsOwnKey);
+        ex.InnerException!.Data[ErrorDataProbe.ListedKey].ShouldBe(ErrorDataProbe.Value);
+        ex.InnerException.Data.Contains(ErrorDataProbe.ListedKey2).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Chain_NothingListedAnywhere_NothingTravels()
+    {
+        await using var c = await CreatePair();
+        await using var b = await CreateRelay(c.Proxy, serverKeys: null);
+
+        (await b.Proxy.Rethrow().ShouldThrowAsync<RemoteException>()).Data.Count.ShouldBe(0);
+        var wrapped = await b.Proxy.Wrap().ShouldThrowAsync<RemoteException>();
+        wrapped.Data.Count.ShouldBe(0);
+        wrapped.InnerException!.Data.Count.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Keys_AreCopiedWhenTheConnectionIsEstablished()
     {
         var keys = new List<string>(Keys);
@@ -299,4 +386,7 @@ public sealed class ExceptionDataTests
                 client.Callbacks = new() { { typeof(IErrorDataCallback), new ErrorDataCallback() } };
                 client.PropagatedExceptionDataKeys = clientKeys;
             });
+
+    private static Task<IpcPair<IErrorDataRelay>> CreateRelay(IErrorDataProbe next, IReadOnlyCollection<string>? serverKeys)
+        => IpcPair<IErrorDataRelay>.Create(new ErrorDataRelay(next), server => server.PropagatedExceptionDataKeys = serverKeys);
 }
