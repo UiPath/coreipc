@@ -31,11 +31,11 @@ internal class Server
     private bool LogEnabled => _connection.LogEnabled;
     public string DebugName => _connection.DebugName;
 
-    public Server(Router router, TimeSpan? requestTimeout, IReadOnlyCollection<string>? propagatedExceptionDataKeys, Connection connection, IClient? client = null)
+    public Server(Router router, IpcBase endpoint, Connection connection, IClient? client = null)
     {
         _router = router;
-        _requestTimeout = requestTimeout;
-        _propagatedExceptionDataKeys = propagatedExceptionDataKeys is { Count: > 0 } ? propagatedExceptionDataKeys.ToArray() : null;
+        _requestTimeout = endpoint.RequestTimeout;
+        _propagatedExceptionDataKeys = endpoint.PropagatedExceptionDataKeys is { Count: > 0 } keys ? keys.ToArray() : null;
         _connection = connection;
         _client = client;
         connection.RequestReceived += OnRequestReceived;
