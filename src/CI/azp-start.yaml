@@ -33,11 +33,12 @@ parameters:
 
 resources:
   repositories:
-    # Signing/signing.yml: Authenticode for files, NuGet signing for packages. Same pin as Studio.
+    # Signing/signing.yml: Authenticode for files, NuGet signing for packages.
+    # The branch DevOps keeps working with workload identity federation connections.
     - repository: common
       type: github
       name: UiPath/AzurePipelinesTemplates
-      ref: refs/tags/uipath.package-signing.2.1.1
+      ref: refs/heads/stable/uipath.binary.signing-v1
       endpoint: UiPath
 
 variables:
