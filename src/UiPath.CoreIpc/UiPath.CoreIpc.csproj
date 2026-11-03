@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net6.0;net461;net6.0-windows</TargetFrameworks>
+    <TargetFrameworks>$(NetTfm);$(NetFrameworkTfm);$(NetWindowsTfm)</TargetFrameworks>
     <RootNamespace>UiPath.Ipc</RootNamespace>
     <AssemblyName>UiPath.Ipc</AssemblyName>
     <GeneratePackageOnBuild Condition="$(Configuration)=='Release'">true</GeneratePackageOnBuild>
@@ -21,7 +21,7 @@
     <Nullable>enable</Nullable>
     <EnablePreviewFeatures>true</EnablePreviewFeatures>
   </PropertyGroup>
-  <ItemGroup Condition="$(TargetFramework) == 'net461'">
+  <ItemGroup Condition="'$(TargetFramework)' == '$(NetFrameworkTfm)'">
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
     <PackageReference Include="System.Reflection.DispatchProxy" Version="4.7.1" />
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
@@ -44,7 +44,7 @@
     <InternalsVisibleTo Include="UiPath.Ipc.Extensions.Abstractions" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net461'">
+  <ItemGroup Condition="'$(TargetFramework)' == '$(NetFrameworkTfm)'">
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="6.0.0" />
   </ItemGroup>
 
