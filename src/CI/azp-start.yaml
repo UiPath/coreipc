@@ -53,7 +53,6 @@ jobs:
       - template: azp-dotnet.yaml
         parameters:
           sign: ${{ and(eq(parameters.signPackages, true), ne(variables['Build.Reason'], 'PullRequest')) }}
-          signingConnection: ${{ variables.Signing_AzureConnectionName }}
       - template: azp-dotnet-dist.yaml
 
   - job:
