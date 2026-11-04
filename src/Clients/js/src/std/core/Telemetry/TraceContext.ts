@@ -16,7 +16,8 @@ export enum TelemetryPropagationPolicy {
  * The W3C trace context of an IPC call, propagated only in the directions `ipc.config.setTelemetryPropagation` allows.
  */
 export interface TraceContext {
-    traceparent: string;
+    /** Optional: W3C Baggage doesn't depend on Trace Context, so a baggage can travel alone. The tracestate travels only with a traceparent. */
+    traceparent?: string;
     tracestate?: string;
     /** W3C Baggage format: comma-separated, percent-encoded key=value members. */
     baggage?: string;
@@ -32,8 +33,7 @@ export interface TraceContext {
  * to calls started before `callback` first awaits (a proxy call builds its request synchronously, so
  * `withTraceContext(tc, () => proxy.Method())` is covered).
  *
- * @throws ArgumentError when a value breaks its W3C rule: `tracestate` at most 32 list members,
- * `baggage` at most 64 list members and 8192 UTF-8 bytes.
+ * @throws ArgumentError when the `traceparent` breaks W3C Trace Context §3.2.
  */
 export function withTraceContext<T>(traceContext: TraceContext, callback: () => T): T {
     assertArgument({ traceContext }, 'object');

@@ -210,9 +210,10 @@ async def test_callback_propagates_the_opentelemetry_context() -> None:
 async def test_callback_forwards_a_tracestate_opentelemetry_rejects() -> None:
     pytest.importorskip("opentelemetry.trace")
     async with _pair() as (client, _):
-        with use_trace_context(TraceContext(TP, "Congo=t61,rojo=00f0")):
+        # Duplicate keys follow the member grammar, but OpenTelemetry rejects them.
+        with use_trace_context(TraceContext(TP, "congo=t61,congo=x")):
             seen = await client.get_proxy(ITraceProbe).ProbeViaCallback()
-    assert seen == f"{TP}|Congo=t61,rojo=00f0|None"
+    assert seen == f"{TP}|congo=t61,congo=x|None"
 
 
 async def test_received_values_are_not_the_callback_override(
@@ -318,9 +319,7 @@ async def test_server_outgoing_only_callback_does_not_send_the_server_starters_s
 async def test_invalid_override_in_the_server_fails_the_call() -> None:
     async with _pair() as (client, _):
         with pytest.raises(RemoteException) as ei:
-            await client.get_proxy(ITraceProbe).ProbeViaCallbackWithTraceContext(
-                TP2, ",".join(f"k{i}=v" for i in range(65))
-            )
+            await client.get_proxy(ITraceProbe).ProbeViaCallbackWithTraceContext("garbage", None)
     assert ei.value.type_name == "System.ArgumentException"
 
 
@@ -352,7 +351,7 @@ async def test_incoming_headers_over_the_limits_reach_the_handler_as_they_are(
     assert json.loads(data) == f"{TP}|{headers.get('tracestate')}|{headers.get('baggage')}"
 
 
-async def test_over_limit_opentelemetry_baggage_is_received_as_is() -> None:
+async def test_over_limit_opentelemetry_baggage_is_cut_on_send() -> None:
     trace = pytest.importorskip("opentelemetry.trace")
     from opentelemetry import baggage
     from opentelemetry import context as otel_context
@@ -369,7 +368,7 @@ async def test_over_limit_opentelemetry_baggage_is_received_as_is() -> None:
             seen = await client.get_proxy(ITraceProbe).Probe()
         finally:
             otel_context.detach(token)
-    assert seen == f"{TP}|None|" + ",".join(f"k{i}=v" for i in range(65))
+    assert seen == f"{TP}|None|" + ",".join(f"k{i}=v" for i in range(64))
 
 
 async def test_lone_surrogate_baggage_gets_a_response() -> None:
@@ -379,7 +378,7 @@ async def test_lone_surrogate_baggage_gets_a_response() -> None:
     assert seen == f"{TP}|None|k=\ud800"
 
 
-async def test_a_traceparent_opentelemetry_rejects_gives_the_handler_no_remote_parent() -> None:
+async def test_an_invalid_traceparent_is_ignored_with_its_tracestate() -> None:
     trace = pytest.importorskip("opentelemetry.trace")
     from opentelemetry import baggage
 
@@ -393,7 +392,7 @@ async def test_a_traceparent_opentelemetry_rejects_gives_the_handler_no_remote_p
             client, "Probe", {"traceparent": "garbage", "tracestate": "congo=t61", "baggage": "k=v"}
         )
     assert isinstance(data, str)
-    assert json.loads(data) == "garbage|congo=t61|k=v|False|{'k': 'v'}"
+    assert json.loads(data) == "None|None|k=v|False|{'k': 'v'}"
 
 
 async def test_a_tracestate_without_a_remote_parent_is_not_forwarded(

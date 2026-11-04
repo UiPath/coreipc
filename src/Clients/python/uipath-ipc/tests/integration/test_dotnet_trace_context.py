@@ -177,7 +177,7 @@ async def test_invalid_server_override_fails_the_dotnet_call(dotnet_server) -> N
     async with _client() as client:
         with pytest.raises(RemoteException) as ei:
             await client.get_proxy(ITraceProbe).ProbeViaCallbackWithTraceContext(
-                TP2, None, ",".join(f"k{i}=v" for i in range(65))
+                "garbage", None, None
             )
     assert ei.value.type_name == "System.ArgumentException"
 

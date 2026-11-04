@@ -19,12 +19,30 @@ from uipath_ipc.trace_context import (
 TP = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
 TP2 = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-00"
 
+INVALID_TRACEPARENTS = pytest.mark.parametrize(
+    "traceparent",
+    [
+        "garbage",
+        TP.upper(),
+        "00-00000000000000000000000000000000-00f067aa0ba902b7-01",
+        "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01",
+        "ff" + TP[2:],
+        TP + "-extra",
+        "01" + TP[2:] + "extra",
+    ],
+    ids=[
+        "garbage", "uppercase", "zero-trace-id", "zero-span-id", "version-ff",
+        "version-00-with-extra", "higher-version-without-dash",
+    ],
+)
+
 
 # --- TraceContext -------------------------------------------------------------
 
 def test_trace_context_normalizes_empty_optionals() -> None:
     tc = TraceContext(TP, "", "")
     assert (tc.traceparent, tc.tracestate, tc.baggage) == (TP, None, None)
+    assert TraceContext("", baggage="k=v").traceparent is None
 
 
 def test_repr_prints_traceparent_only() -> None:
@@ -46,28 +64,62 @@ def test_use_requires_a_trace_context() -> None:
         _use(None)  # type: ignore[arg-type]
 
 
-def test_use_rejects_too_many_tracestate_members() -> None:
-    _use(TraceContext(TP, ",".join(f"k{i}=v" for i in range(32))))
-    with pytest.raises(InvalidTraceContextError, match="tracestate.*32"):
-        _use(TraceContext(TP, ",".join(f"k{i}=v" for i in range(33))))
+@INVALID_TRACEPARENTS
+def test_use_rejects_an_invalid_traceparent(traceparent: str) -> None:
+    with pytest.raises(InvalidTraceContextError, match="traceparent"):
+        _use(TraceContext(traceparent))
 
 
-def test_use_rejects_baggage_over_the_limits() -> None:
-    _use(TraceContext(TP, baggage=",".join(f"k{i}=v" for i in range(64))))
-    with pytest.raises(InvalidTraceContextError, match="baggage.*64"):
-        _use(TraceContext(TP, baggage=",".join(f"k{i}=v" for i in range(65))))
-    _use(TraceContext(TP, baggage="k=" + "v" * 8190))
-    with pytest.raises(InvalidTraceContextError, match="baggage.*8192"):
-        _use(TraceContext(TP, baggage="k=" + "v" * 8191))
-    # UTF-8 bytes, not characters: 4096 two-byte chars + "k=" = 8194 bytes.
-    with pytest.raises(ValueError, match="8192"):
-        _use(TraceContext(TP, baggage="k=" + "é" * 4096))
+def _sent(tc: TraceContext) -> dict[str, str] | None:
+    with use_trace_context(tc):
+        return outgoing_headers()
+
+
+def test_tracestate_over_32_members_is_cut_dropping_long_members_first() -> None:
+    members = [f"k{i}=v" for i in range(34)]
+    with_long = [f"long{i}={'v' * 130}" if i in (3, 5) else m for i, m in enumerate(members)]
+    assert _sent(TraceContext(TP, ",".join(with_long))) == {
+        "traceparent": TP,
+        "tracestate": ",".join(m for i, m in enumerate(members) if i not in (3, 5)),
+    }
+    assert _sent(TraceContext(TP, ",".join(f"k{i}=v" for i in range(40)))) == {
+        "traceparent": TP,
+        "tracestate": ",".join(f"k{i}=v" for i in range(32)),
+    }
+
+
+def test_tracestate_members_that_break_the_grammar_are_not_sent() -> None:
+    assert _sent(TraceContext(TP, "congo=t61rcWkgMzE,Bad=1")) == {
+        "traceparent": TP, "tracestate": "congo=t61rcWkgMzE",
+    }
+
+
+def test_baggage_over_the_limits_drops_whole_members() -> None:
+    assert _sent(TraceContext(TP, baggage=",".join(f"k{i}=v" for i in range(65)))) == {
+        "traceparent": TP, "baggage": ",".join(f"k{i}=v" for i in range(64)),
+    }
+    fits = "k=" + "v" * 8190
+    assert _sent(TraceContext(TP, baggage=fits)) == {"traceparent": TP, "baggage": fits}
+    assert _sent(TraceContext(TP, baggage="k=" + "v" * 8191)) == {"traceparent": TP}
+    # UTF-8 bytes, not characters: "a=1," + "k=" + 4095 two-byte chars = 8196 bytes.
+    assert _sent(TraceContext(TP, baggage="a=1,k=" + "é" * 4095)) == {
+        "traceparent": TP, "baggage": "a=1",
+    }
 
 
 def test_lone_surrogate_baggage_is_counted_not_raised() -> None:
-    _use(TraceContext(TP, baggage="k=\ud800"))
-    with pytest.raises(InvalidTraceContextError, match="8192"):
-        _use(TraceContext(TP, baggage="k=" + "\ud800" * 2731))
+    assert _sent(TraceContext(TP, baggage="k=\ud800")) == {"traceparent": TP, "baggage": "k=\ud800"}
+    assert _sent(TraceContext(TP, baggage="k=" + "\ud800" * 2731)) == {"traceparent": TP}
+
+
+def test_baggage_members_a_receiver_cannot_parse_are_not_sent() -> None:
+    assert _sent(TraceContext(TP, baggage="foo,a=1,,=x")) == {"traceparent": TP, "baggage": "a=1"}
+    assert _sent(TraceContext(TP, baggage="foo")) == {"traceparent": TP}
+
+
+def test_without_a_traceparent_the_baggage_travels_alone() -> None:
+    assert _sent(TraceContext(tracestate="a=b", baggage="k=v")) == {"baggage": "k=v"}
+    assert _sent(TraceContext(tracestate="a=b")) is None
 
 
 def test_no_ambient_context_sends_nothing() -> None:
@@ -99,11 +151,33 @@ async def test_override_flows_into_tasks_created_inside() -> None:
 
 # --- incoming headers ---------------------------------------------------------
 
-def test_from_headers_without_traceparent_is_ignored() -> None:
+def test_from_headers_without_traceparent_keeps_only_the_baggage() -> None:
     assert from_headers(None) is None
     assert from_headers({}) is None
-    assert from_headers({"tracestate": "x" * 10, "baggage": ",".join(["a=b"] * 100)}) is None
+    assert from_headers({"tracestate": "a=b"}) is None
     assert from_headers({"traceparent": None}) is None  # type: ignore[dict-item]
+    baggage = ",".join(["a=b"] * 100)
+    assert from_headers({"tracestate": "a=b", "baggage": baggage}) == TraceContext(baggage=baggage)
+
+
+@INVALID_TRACEPARENTS
+def test_from_headers_ignores_an_invalid_traceparent_with_its_tracestate(traceparent: str) -> None:
+    assert from_headers({"traceparent": traceparent, "tracestate": "a=b"}) is None
+    assert from_headers({"traceparent": traceparent, "tracestate": "a=b", "baggage": "k=v"}) == (
+        TraceContext(baggage="k=v")
+    )
+
+
+def test_from_headers_accepts_a_higher_version_traceparent() -> None:
+    future = "01" + TP[2:] + "-future"
+    assert from_headers({"traceparent": future}) == TraceContext(future)
+
+
+def test_from_headers_drops_tracestate_members_that_break_the_grammar() -> None:
+    received = from_headers(
+        {"traceparent": TP, "tracestate": "2020-01-01T00:00:00Z, congo=t61rcWkgMzE ,Bad=1,,x=a=b"}
+    )
+    assert received == TraceContext(TP, "congo=t61rcWkgMzE")
 
 
 def test_from_headers_is_case_insensitive_and_ignores_unknown_keys() -> None:
@@ -152,23 +226,31 @@ def test_baggage_with_encoded_separators_round_trips() -> None:
 
 
 @pytest.mark.parametrize(
-    ("baggage", "decoded"),
+    ("escaped", "decoded"),
     [
-        ("k=50%,x=%zz%41,y=%FF%C3%A9", [("k", "50%"), ("x", "%zzA"), ("y", "%FFé")]),
-        ("a=%C3%A9%A9,b=%E2%82%C3%A9", [("a", "é%A9"), ("b", "%E2%82é")]),
-        ("%c3%a9=%C0%80%ED%A0%80%F4%90%80%80", [("é", "%C0%80%ED%A0%80%F4%90%80%80")]),
+        ("50%", "50%"),
+        ("%zz%41", "%zzA"),
+        ("%FF%C3%A9", "\ufffdé"),
+        ("%c3%a9", "é"),
+        ("%C3%28", "\ufffd("),
+        ("%C3%A9%A9", "é\ufffd"),
+        ("%E2%82%C3%A9", "\ufffdé"),
+        ("%C0%80", "\ufffd\ufffd"),
+        ("%ED%A0%80", "\ufffd\ufffd\ufffd"),
+        ("%F4%90%80%80", "\ufffd\ufffd\ufffd\ufffd"),
+        ("%F0%9F%98%80", "\U0001f600"),
     ],
-    ids=["stray-and-invalid", "truncated-sequences", "overlong-surrogate-out-of-range"],
 )
-def test_baggage_decoding_keeps_escapes_that_are_not_utf8_like_dotnet(
-    baggage: str, decoded: list[tuple[str, str]]
+def test_baggage_decoding_matches_dotnet_and_js_with_u_fffd_for_invalid_utf8(
+    escaped: str, decoded: str
 ) -> None:
-    assert _decode_baggage(baggage) == decoded
+    assert _decode_baggage(f"k={escaped}") == [("k", decoded)]
 
 
-def test_baggage_member_without_equals_raises() -> None:
-    with pytest.raises(ValueError):
-        _decode_baggage("k=v,novalue")
+def test_baggage_decoding_skips_members_with_no_key_and_trims() -> None:
+    assert _decode_baggage("foo,a=1,,=x, b = 2 ,c=3;ttl=30,d;p=1,") == [
+        ("a", "1"), ("b", "2"), ("c", "3"),
+    ]
 
 
 # --- OpenTelemetry precedence -------------------------------------------------------
@@ -235,17 +317,22 @@ def test_explicit_override_wins_over_opentelemetry() -> None:
 
 
 @pytest.mark.parametrize(
-    "entries",
-    [{"big": "v" * 9000}, {f"k{i}": "v" for i in range(65)}],
+    ("entries", "sent"),
+    [
+        ({"big": "v" * 9000}, {"traceparent": TP}),
+        (
+            {f"k{i}": "v" for i in range(65)},
+            {"traceparent": TP, "baggage": ",".join(f"k{i}=v" for i in range(64))},
+        ),
+    ],
     ids=["over-8192-bytes", "over-64-members"],
 )
-def test_opentelemetry_baggage_over_the_w3c_limits_is_sent_as_is(entries: dict[str, str]) -> None:
+def test_opentelemetry_baggage_over_the_w3c_limits_is_cut(
+    entries: dict[str, str], sent: dict[str, str]
+) -> None:
     # OpenTelemetry's TraceState already refuses more than 32 members.
-    expected = ",".join(f"{key}={value}" for key, value in entries.items())
     with _otel_scope(TP, **entries):
-        headers = outgoing_headers()
-    assert headers == {"traceparent": TP, "baggage": expected}
-    assert from_headers(headers) == TraceContext(TP, baggage=expected)
+        assert outgoing_headers() == sent
 
 
 def test_incoming_scope_sets_the_remote_parent_and_baggage() -> None:
@@ -292,23 +379,28 @@ def test_incoming_scope_gives_no_remote_parent_for_a_traceparent_opentelemetry_r
             assert incoming_trace_context() is received
             assert not trace.get_current_span().get_span_context().is_valid
             assert dict(baggage.get_all()) == {"k": "v"}
-            # No span context, so a nested call sends nothing, not even the tracestate.
-            assert outgoing_headers() is None
+            # No span context, so a nested call sends the baggage alone, without the tracestate.
+            assert outgoing_headers() == {"baggage": "k=v"}
 
 
 @pytest.mark.parametrize(
-    ("tracestate", "parsed"),
+    ("tracestate", "parsed", "forwarded"),
     [
-        ("congo=t61rcWkgMzE, rojo=00f0", "congo=t61rcWkgMzE,rojo=00f0"),
-        ("Congo=t61,rojo=00f0", ""),
-        ("congo=t61rcWkgMzE,Bad Member", ""),
-        ("congo=t61,congo=x", ""),
-        ("Bad", ""),
-        (",".join(f"k{i}={'v' * 256}" for i in range(32)), ""),
+        ("congo=t61rcWkgMzE, rojo=00f0", "congo=t61rcWkgMzE,rojo=00f0", "congo=t61rcWkgMzE,rojo=00f0"),
+        ("Congo=t61,rojo=00f0", "rojo=00f0", "rojo=00f0"),
+        ("congo=t61rcWkgMzE,Bad Member", "congo=t61rcWkgMzE", "congo=t61rcWkgMzE"),
+        ("congo=t61,congo=x", "", "congo=t61,congo=x"),
+        (
+            ",".join(f"k{i}={'v' * 256}" for i in range(32)),
+            "",
+            ",".join(f"k{i}={'v' * 256}" for i in range(32)),
+        ),
     ],
-    ids=["whitespace", "uppercase-key", "bad-member", "duplicate-key", "bad", "over-8192-chars"],
+    ids=["whitespace", "uppercase-key", "bad-member", "duplicate-key", "over-8192-chars"],
 )
-def test_received_tracestate_is_forwarded_verbatim(tracestate: str, parsed: str) -> None:
+def test_received_tracestate_is_forwarded_as_received(
+    tracestate: str, parsed: str, forwarded: str
+) -> None:
     trace = pytest.importorskip("opentelemetry.trace")
     from opentelemetry import context as otel_context
 
@@ -322,10 +414,10 @@ def test_received_tracestate_is_forwarded_verbatim(tracestate: str, parsed: str)
     with incoming_scope(from_headers({"traceparent": TP, "tracestate": tracestate}), enabled=True):
         parent = trace.get_current_span().get_span_context()
         assert parent.trace_state.to_header() == parsed
-        assert outgoing_headers()["tracestate"] == tracestate  # type: ignore[index]
+        assert outgoing_headers()["tracestate"] == forwarded  # type: ignore[index]
         # A child span inherits the TraceState unchanged.
         child = trace.SpanContext(parent.trace_id, 0x1234, False, parent.trace_flags, parent.trace_state)
-        assert outgoing_tracestate_under(child) == tracestate
+        assert outgoing_tracestate_under(child) == forwarded
         changed = trace.SpanContext(
             parent.trace_id, 0x1234, False, parent.trace_flags, trace.TraceState([("other", "1")])
         )

@@ -245,25 +245,102 @@ public sealed class TraceContextTests
     }
 
     [Fact]
-    public async Task IncomingHeaderValues_AreKeptVerbatim()
+    public async Task IncomingTraceState_DropsMembersThatBreakTheGrammar()
     {
         await using var pair = await Pair.Create();
         using var raw = await RawConnection.Create(pair.PipeName);
 
-        var result = await raw.Probe(new() { ["traceparent"] = TraceParentA, ["tracestate"] = "2020-01-01T00:00:00Z" });
+        var result = await raw.Probe(new() { ["traceparent"] = TraceParentA, ["tracestate"] = "2020-01-01T00:00:00Z, congo=t61rcWkgMzE ,Bad=1,,rojo=00f067aa0ba902b7,x=a=b" });
 
-        result.TraceState.ShouldBe("2020-01-01T00:00:00Z");
+        result.TraceState.ShouldBe(TraceState);
+    }
+
+    [Theory]
+    [InlineData("garbage")]
+    [InlineData("00-4BF92F3577B34DA6A3CE929D0E0E4736-00f067aa0ba902b7-01")]
+    [InlineData("00-00000000000000000000000000000000-00f067aa0ba902b7-01")]
+    [InlineData("00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01")]
+    [InlineData("ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")]
+    [InlineData("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra")]
+    [InlineData("01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01extra")]
+    public async Task IncomingInvalidTraceParent_IsIgnored_WithItsTraceState(string traceParent)
+    {
+        await using var pair = await Pair.Create();
+        using var raw = await RawConnection.Create(pair.PipeName);
+
+        var result = await raw.Probe(new() { ["traceparent"] = traceParent, ["tracestate"] = TraceState });
+        var withBaggage = await raw.Probe(new() { ["traceparent"] = traceParent, ["tracestate"] = TraceState, ["baggage"] = "k=v" });
+
+        result.TraceParent.ShouldBeNull();
+        result.TraceState.ShouldBeNull();
+        result.ActivityTraceId.ShouldBeNull();
+        withBaggage.TraceParent.ShouldBeNull();
+        withBaggage.TraceState.ShouldBeNull();
+        withBaggage.ActivityBaggage.ShouldBe(["k=v"]);
     }
 
     [Fact]
-    public async Task IncomingBaggage_KeepsDuplicatesInWireOrder_AndBadEscapesStayEscaped()
+    public async Task IncomingHigherVersionTraceParent_IsReadByItsFirst55Characters()
+    {
+        await using var pair = await Pair.Create();
+        using var raw = await RawConnection.Create(pair.PipeName);
+        const string TraceParent = "01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-future";
+
+        var result = await raw.Probe(new() { ["traceparent"] = TraceParent });
+
+        result.TraceParent.ShouldBe(TraceParent);
+        result.ActivityTraceId.ShouldBe("4bf92f3577b34da6a3ce929d0e0e4736");
+        result.ActivityParentSpanId.ShouldBe("00f067aa0ba902b7");
+    }
+
+    [Fact]
+    public async Task IncomingBaggageWithoutTraceParent_IsReceived()
+    {
+        await using var pair = await Pair.Create();
+        using var raw = await RawConnection.Create(pair.PipeName);
+
+        var result = await raw.Probe(new() { ["baggage"] = "k=v" });
+
+        result.TraceParent.ShouldBeNull();
+        result.Baggage.ShouldBe("k=v");
+        result.ActivityBaggage.ShouldBe(["k=v"]);
+    }
+
+    [Fact]
+    public async Task IncomingBaggage_KeepsDuplicatesInWireOrder()
     {
         await using var pair = await Pair.Create();
         using var raw = await RawConnection.Create(pair.PipeName);
 
         var result = await raw.Probe(new() { ["traceparent"] = TraceParentA, ["baggage"] = "k=1,k=2,x=a%20b%FF" });
 
-        result.ActivityBaggage.ShouldBe(["k=1", "k=2", "x=a b%FF"]);
+        result.ActivityBaggage.ShouldBe(["k=1", "k=2", "x=a b\uFFFD"]);
+    }
+
+    [Theory]
+    [InlineData("50%", "50%")]
+    [InlineData("%zz%41", "%zzA")]
+    [InlineData("%FF%C3%A9", "\uFFFDé")]
+    [InlineData("%c3%a9", "é")]
+    [InlineData("%C3%28", "\uFFFD(")]
+    [InlineData("%C3%A9%A9", "é\uFFFD")]
+    [InlineData("%E2%82%C3%A9", "\uFFFDé")]
+    [InlineData("%C0%80", "\uFFFD\uFFFD")]
+    [InlineData("%ED%A0%80", "\uFFFD\uFFFD\uFFFD")]
+    [InlineData("%F4%90%80%80", "\uFFFD\uFFFD\uFFFD\uFFFD")]
+    [InlineData("%F0%9F%98%80", "\U0001F600")]
+    public void Unescape_DecodesInvalidUtf8AsReplacementCharacters(string escaped, string decoded)
+        => TraceHeaders.Unescape(escaped).ShouldBe(decoded);
+
+    [Fact]
+    public async Task IncomingBaggage_SkipsMembersItCantParse_AndTrimsKeysAndValues()
+    {
+        await using var pair = await Pair.Create();
+        using var raw = await RawConnection.Create(pair.PipeName);
+
+        var result = await raw.Probe(new() { ["traceparent"] = TraceParentA, ["baggage"] = "foo,a=1,,=x, b = 2 ,c=3;ttl=30,d;p=1," });
+
+        result.ActivityBaggage.ShouldBe(["a=1", "b=2", "c=3"]);
     }
 
     [Fact]
@@ -350,17 +427,17 @@ public sealed class TraceContextTests
     }
 
     [Fact]
-    public async Task AmbientTraceStateOverTheMemberLimit_IsReceivedAsIs()
+    public async Task AmbientTraceStateOverTheMemberLimit_IsCutFromTheEnd()
     {
         await using var pair = await Pair.Create();
         using var activity = StartW3CActivity();
         activity.TraceStateString = Members(40);
 
-        (await pair.Proxy.Probe()).TraceState.ShouldBe(Members(40));
+        (await pair.Proxy.Probe()).TraceState.ShouldBe(Members(32));
     }
 
     [Fact]
-    public async Task AmbientBaggageOverTheMemberLimit_IsReceivedAsIs()
+    public async Task AmbientBaggageOverTheMemberLimit_SendsTheFirst64()
     {
         await using var pair = await Pair.Create();
         using var activity = StartW3CActivity();
@@ -371,18 +448,19 @@ public sealed class TraceContextTests
 
         var result = await pair.Proxy.Probe();
 
-        result.Baggage.ShouldBe(activity.ToBaggageHeader());
-        result.ActivityBaggage!.Length.ShouldBe(70);
+        result.Baggage.ShouldBe(string.Join(",", activity.ToBaggageHeader()!.Split(',').Take(64)));
+        result.ActivityBaggage!.Length.ShouldBe(64);
     }
 
     [Fact]
-    public async Task AmbientBaggageOverTheByteLimit_IsReceivedAsIs()
+    public async Task AmbientBaggageOverTheByteLimit_DropsTheMemberThatDoesNotFit()
     {
         await using var pair = await Pair.Create();
         using var activity = StartW3CActivity();
+        activity.AddBaggage("small", "v");
         activity.AddBaggage("big", new string('v', 9_000));
 
-        (await pair.Proxy.Probe()).Baggage.ShouldBe("big=" + new string('v', 9_000));
+        (await pair.Proxy.Probe()).Baggage.ShouldBe("small=v");
     }
 
     [Fact]
@@ -571,7 +649,10 @@ public sealed class TraceContextTests
 
     [Theory]
     [InlineData("garbage")]
-    [InlineData("")]
+    [InlineData("00-4BF92F3577B34DA6A3CE929D0E0E4736-00f067aa0ba902b7-01")]
+    [InlineData("00-00000000000000000000000000000000-00f067aa0ba902b7-01")]
+    [InlineData("ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")]
+    [InlineData("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra")]
     public void Use_InvalidTraceParent_Throws(string traceParent)
     {
         var ex = Should.Throw<ArgumentException>(() => IpcTelemetry.Context.Use(new(traceParent)));
@@ -580,29 +661,90 @@ public sealed class TraceContextTests
     }
 
     [Fact]
-    public void Use_TooManyTraceStateMembers_Throws()
+    public async Task Use_WithoutTraceParent_SendsTheBaggageAlone()
     {
-        IpcTelemetry.Context.Use(new(TraceParentA, Members(32))).Dispose();
-        var ex = Should.Throw<ArgumentException>(() => IpcTelemetry.Context.Use(new(TraceParentA, Members(33))));
-        ex.ParamName.ShouldBe("traceContext");
-        ex.Message.ShouldContain("tracestate");
+        await using var pair = await Pair.Create();
+        using var activity = StartW3CActivity();
+
+        using (IpcTelemetry.Context.Use(new(null, TraceState, "k=v")))
+        {
+            var result = await pair.Proxy.Probe();
+
+            result.TraceParent.ShouldBeNull();
+            result.TraceState.ShouldBeNull();
+            result.Baggage.ShouldBe("k=v");
+            result.ActivityBaggage.ShouldBe(["k=v"]);
+        }
     }
 
     [Fact]
-    public void Use_BaggageLimits_Throw()
+    public async Task AmbientTraceState_DropsMembersThatBreakTheGrammar()
     {
-        IpcTelemetry.Context.Use(new(TraceParentA, baggage: Members(64))).Dispose();
-        IpcTelemetry.Context.Use(new(TraceParentA, baggage: "k=" + new string('v', 8190))).Dispose();
-        ShouldReject(Members(65));
-        ShouldReject("k=" + new string('v', 8191));
-        // UTF-8 bytes, not chars.
-        ShouldReject("k=" + new string('é', 4096));
+        await using var pair = await Pair.Create();
+        using var activity = StartW3CActivity();
+        activity.TraceStateString = "congo=t61rcWkgMzE,Bad=1";
 
-        static void ShouldReject(string baggage)
+        (await pair.Proxy.Probe()).TraceState.ShouldBe("congo=t61rcWkgMzE");
+    }
+
+    [Fact]
+    public async Task Use_TraceStateOverTheMemberLimit_DropsLongMembersFirst()
+    {
+        await using var pair = await Pair.Create();
+        var traceState = string.Join(",", Enumerable.Range(0, 34).Select(i => i is 3 or 5 ? $"long{i}={new string('v', 130)}" : $"k{i}=v"));
+
+        using (IpcTelemetry.Context.Use(new(TraceParentA, traceState)))
         {
-            var ex = Should.Throw<ArgumentException>(() => IpcTelemetry.Context.Use(new(TraceParentA, baggage: baggage)));
-            ex.ParamName.ShouldBe("traceContext");
-            ex.Message.ShouldContain("baggage");
+            (await pair.Proxy.Probe()).TraceState.ShouldBe(string.Join(",", Enumerable.Range(0, 34).Where(i => i is not (3 or 5)).Select(i => $"k{i}=v")));
+        }
+    }
+
+    [Theory]
+    [InlineData(64, 64)]
+    [InlineData(65, 64)]
+    public async Task Use_BaggageOverTheMemberLimit_SendsTheFirst64(int count, int sent)
+    {
+        await using var pair = await Pair.Create();
+
+        using (IpcTelemetry.Context.Use(new(TraceParentA, baggage: Members(count))))
+        {
+            (await pair.Proxy.Probe()).Baggage.ShouldBe(Members(sent));
+        }
+    }
+
+    [Theory]
+    [InlineData(8190, true)]
+    [InlineData(8191, false)]
+    public async Task Use_BaggageOverTheByteLimit_DropsTheMember(int valueLength, bool sent)
+    {
+        await using var pair = await Pair.Create();
+        var baggage = "k=" + new string('v', valueLength);
+
+        using (IpcTelemetry.Context.Use(new(TraceParentA, baggage: baggage)))
+        {
+            (await pair.Proxy.Probe()).Baggage.ShouldBe(sent ? baggage : null);
+        }
+    }
+
+    [Fact]
+    public async Task Use_BaggageByteLimit_CountsUtf8Bytes()
+    {
+        await using var pair = await Pair.Create();
+
+        using (IpcTelemetry.Context.Use(new(TraceParentA, baggage: "a=1,k=" + new string('é', 4095))))
+        {
+            (await pair.Proxy.Probe()).Baggage.ShouldBe("a=1");
+        }
+    }
+
+    [Fact]
+    public async Task Use_BaggageMembersAReceiverCantParse_AreNotSent()
+    {
+        await using var pair = await Pair.Create();
+
+        using (IpcTelemetry.Context.Use(new(TraceParentA, baggage: "foo,a=1,,=x")))
+        {
+            (await pair.Proxy.Probe()).Baggage.ShouldBe("a=1");
         }
     }
 
