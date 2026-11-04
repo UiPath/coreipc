@@ -38,6 +38,8 @@ public interface ITraceProbe
     Task<TraceProbeCallbackResult> ProbeViaCallback(string? overrideTraceParent = null);
     Task<TraceProbeResult> ProbeUpload(Stream stream);
     Task<TraceProbeResult> ProbeUploadViaCallback();
+    Task<TraceProbeResult> Fail();
+    Task FailOneWay();
 }
 
 public interface ITraceProbeCallback
@@ -68,6 +70,10 @@ public sealed class TraceProbe : ITraceProbe
 
     public Task<TraceProbeResult> ProbeUploadViaCallback()
     => IpcContext.Current!.GetCallback<ITraceProbeCallback>().ProbeUpload(new MemoryStream());
+
+    public Task<TraceProbeResult> Fail() => throw new InvalidOperationException("probe failed");
+
+    public Task FailOneWay() => throw new InvalidOperationException("one-way probe failed");
 }
 
 public sealed class TraceProbeCallback : ITraceProbeCallback
@@ -685,6 +691,51 @@ public sealed class TraceContextTests
         activity.TraceStateString = "congo=t61rcWkgMzE,Bad=1";
 
         (await pair.Proxy.Probe()).TraceState.ShouldBe("congo=t61rcWkgMzE");
+    }
+
+    [Fact]
+    public async Task FailedCalls_SetTheErrorStatusOnTheClientAndServerSpans()
+    {
+        var stopped = new List<Activity>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "UiPath.Ipc",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity => { lock (stopped) stopped.Add(activity); },
+        };
+        ActivitySource.AddActivityListener(listener);
+        await using var pair = await Pair.Create();
+        using var caller = StartW3CActivity();
+
+        await Should.ThrowAsync<RemoteException>(() => pair.Proxy.Fail());
+        await pair.Proxy.FailOneWay();
+
+        var spans = await Stopped(4);
+        Status(ActivityKind.Client, nameof(ITraceProbe.Fail)).ShouldBe((ActivityStatusCode.Error, "probe failed"));
+        Status(ActivityKind.Server, nameof(ITraceProbe.Fail)).ShouldBe((ActivityStatusCode.Error, "probe failed"));
+        Status(ActivityKind.Client, nameof(ITraceProbe.FailOneWay)).ShouldBe((ActivityStatusCode.Unset, null));
+        Status(ActivityKind.Server, nameof(ITraceProbe.FailOneWay)).ShouldBe((ActivityStatusCode.Error, "one-way probe failed"));
+
+        (ActivityStatusCode, string?) Status(ActivityKind kind, string method)
+        => spans.Single(span => span.Kind == kind && span.DisplayName == $"{nameof(ITraceProbe)}/{method}") is var span
+            ? (span.Status, span.StatusDescription)
+            : default;
+
+        async Task<Activity[]> Stopped(int count)
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            while (true)
+            {
+                lock (stopped)
+                {
+                    if (stopped.Count >= count)
+                    {
+                        return stopped.ToArray();
+                    }
+                }
+                await Task.Delay(10, timeout.Token);
+            }
+        }
     }
 
     [Fact]

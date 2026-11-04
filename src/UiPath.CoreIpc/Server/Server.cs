@@ -171,22 +171,30 @@ internal class Server
             async Task<object?> MethodCall()
             {
                 using var activity = traceContext?.StartActivity($"{request.Endpoint}/{request.MethodName}");
-                // So a POCO contract can reach the peer without a Message parameter.
-                using (IpcContext.Push(new IpcContext(_client, cancellationToken, traceContext)))
+                try
                 {
-                    await (route.BeforeCall?.Invoke(
-                        new CallInfo(newConnection: false, method.MethodInfo, arguments),
-                        cancellationToken) ?? Task.CompletedTask);
-
-                    Task invocationTask = method.Invoke(service, arguments, cancellationToken);
-                    await invocationTask;
-
-                    if (!returnTaskType.IsGenericType)
+                    // So a POCO contract can reach the peer without a Message parameter.
+                    using (IpcContext.Push(new IpcContext(_client, cancellationToken, traceContext)))
                     {
-                        return null;
-                    }
+                        await (route.BeforeCall?.Invoke(
+                            new CallInfo(newConnection: false, method.MethodInfo, arguments),
+                            cancellationToken) ?? Task.CompletedTask);
 
-                    return GetTaskResult(returnTaskType, invocationTask);
+                        Task invocationTask = method.Invoke(service, arguments, cancellationToken);
+                        await invocationTask;
+
+                        if (!returnTaskType.IsGenericType)
+                        {
+                            return null;
+                        }
+
+                        return GetTaskResult(returnTaskType, invocationTask);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                    throw;
                 }
             }
 
