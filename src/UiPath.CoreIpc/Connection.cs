@@ -298,8 +298,7 @@ internal sealed class Connection : IDisposable
                     await OnDownloadResponse();
                     return;
                 default:
-                    Logger?.LogError("Unknown message type " + messageType);
-                    break;
+                    throw new InvalidDataException("Unknown message type " + messageType);
             };
         }
     }
