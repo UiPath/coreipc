@@ -384,6 +384,20 @@ public sealed class ExceptionDataTests
         ex.Data["k"].ShouldBe("v");
     }
 
+    [Fact]
+    public void RemoteException_KeepsAtMostTheCapOfReceivedEntries_AndTraces()
+    {
+        using var capture = new TraceErrorCapture();
+        var received = Enumerable.Range(0, 10_000).ToDictionary(i => $"k{i}", i => "v");
+        var ex = new RemoteException(new Error("m", "s", "t", InnerError: new Error("i", "s", "t", InnerError: null) { Data = received }) { Data = received });
+
+        capture.Errors.Count(e => e.Contains($"keeping the first {RemoteException.MaxReceivedDataEntries}")).ShouldBe(2);
+        ex.Data.Count.ShouldBe(RemoteException.MaxReceivedDataEntries);
+        ex.Data.Contains("k0").ShouldBeTrue();
+        ex.InnerException!.Data.Count.ShouldBe(RemoteException.MaxReceivedDataEntries);
+        Error.FromException(ex).Data!.Count.ShouldBe(RemoteException.MaxReceivedDataEntries);
+    }
+
     private sealed class FaultyDataException() : Exception("faulty")
     {
         public override System.Collections.IDictionary Data => throw new NotSupportedException();

@@ -115,6 +115,8 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
 public class RemoteException : Exception
 {
     private const string StackTraceSeparator = "--- End of stack trace from previous location ---";
+    // Exception.Data is a linked list, so copying n entries into it costs O(n²): a peer must not choose n.
+    internal const int MaxReceivedDataEntries = 64;
     private string? _remoteStackTrace = null;
 
     public RemoteException(Error error) : base(error.Message, error.InnerError == null ? null : new RemoteException(error.InnerError))
@@ -124,10 +126,10 @@ public class RemoteException : Exception
         {
             _remoteStackTrace = error.StackTrace.TrimEnd('\r', '\n');
         }
-        ReceivedData = error.Data;
-        if (error.Data is not null)
+        ReceivedData = Cap(error.Data);
+        if (ReceivedData is not null)
         {
-            foreach (var pair in error.Data)
+            foreach (var pair in ReceivedData)
             {
                 Data[pair.Key] = pair.Value;
             }
@@ -135,6 +137,16 @@ public class RemoteException : Exception
     }
 
     internal IReadOnlyDictionary<string, string>? ReceivedData { get; }
+
+    private static IReadOnlyDictionary<string, string>? Cap(IReadOnlyDictionary<string, string>? data)
+    {
+        if (data is not { Count: > MaxReceivedDataEntries })
+        {
+            return data;
+        }
+        Trace.TraceError($"Received {data.Count} Exception.Data entries; keeping the first {MaxReceivedDataEntries}.");
+        return data.Take(MaxReceivedDataEntries).ToDictionary(pair => pair.Key, pair => pair.Value);
+    }
 
     public override string? StackTrace => _remoteStackTrace is null 
         ? base.StackTrace
