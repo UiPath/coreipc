@@ -82,16 +82,23 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
             return received;
         }
 
-        Dictionary<string, string>? data = null;
+        var data = received?.ToDictionary(pair => pair.Key, pair => pair.Value) ?? [];
         try
         {
             var exceptionData = exception.Data;
             foreach (var key in dataKeys)
             {
-                if (key is not null && exceptionData[key] is string value)
+                if (key is null)
                 {
-                    data ??= received?.ToDictionary(pair => pair.Key, pair => pair.Value) ?? [];
+                    continue;
+                }
+                if (exceptionData[key] is string value)
+                {
                     data[key] = value;
+                }
+                else
+                {
+                    data.Remove(key);
                 }
             }
         }
@@ -99,7 +106,7 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
         {
             // A faulty Data getter, entry or key collection must not cost the caller the error itself.
         }
-        return data ?? received;
+        return data.Count > 0 ? data : null;
     }
 }
 

@@ -15,7 +15,7 @@ public abstract class IpcBase
     /// </summary>
     /// <remarks>
     /// The entries a <see cref="RemoteException"/> received travel on with it, listed or not, when it fails a call this server or client handles,
-    /// whether rethrown as is or as an inner exception.
+    /// whether rethrown as is or as an inner exception. A key listed here takes its current string value instead, or is dropped without one.
     /// </remarks>
     public IReadOnlyCollection<string>? PropagatedExceptionDataKeys { get; set; }
 }

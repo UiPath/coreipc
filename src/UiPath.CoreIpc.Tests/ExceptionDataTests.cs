@@ -285,6 +285,27 @@ public sealed class ExceptionDataTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void FromException_ListedKeyWithoutACurrentStringValue_IsDropped(bool setToNonString)
+    {
+        var remote = new RemoteException(new Error("m", "s", "t", InnerError: null)
+        {
+            Data = new Dictionary<string, string> { [ErrorDataProbe.ListedKey] = "received", ["k"] = "received" }
+        });
+        if (setToNonString)
+        {
+            remote.Data[ErrorDataProbe.ListedKey] = 42;
+        }
+        else
+        {
+            remote.Data.Remove(ErrorDataProbe.ListedKey);
+        }
+
+        Error.FromException(remote, Keys).Data!.Keys.ShouldBe(new[] { "k" });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task Chain_RethrownAsIs_CsEntriesReachA(bool bListsAnotherKey)
     {
         await using var c = await CreatePair(serverKeys: [ErrorDataProbe.ListedKey]);
