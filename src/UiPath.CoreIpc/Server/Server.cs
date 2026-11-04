@@ -35,7 +35,7 @@ internal class Server
     {
         _router = router;
         _requestTimeout = ipc.RequestTimeout;
-        _propagatedExceptionDataKeys = ipc.PropagatedExceptionDataKeys is { Count: > 0 } keys ? keys.ToArray() : null;
+        _propagatedExceptionDataKeys = ipc.PropagatedExceptionDataKeys is { Count: > 0 } keys ? keys : null;
         _connection = connection;
         _client = client;
         connection.RequestReceived += OnRequestReceived;

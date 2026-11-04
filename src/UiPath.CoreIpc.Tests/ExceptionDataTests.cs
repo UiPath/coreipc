@@ -1,4 +1,5 @@
 using Newtonsoft.Json.Linq;
+using UiPath.Ipc.Transport.NamedPipe;
 
 namespace UiPath.Ipc.Tests;
 
@@ -365,14 +366,20 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
-    public async Task Keys_AreCopiedWhenTheConnectionIsEstablished()
+    public async Task Keys_AreCopiedWhenAssigned()
     {
         var keys = new List<string>(Keys);
         await using var pair = await CreatePair(serverKeys: keys);
-        await pair.Proxy.Throw().ShouldThrowAsync<RemoteException>();
         keys.Clear();
         var ex = await pair.Proxy.Throw().ShouldThrowAsync<RemoteException>();
         ex.Data[ErrorDataProbe.ListedKey].ShouldBe(ErrorDataProbe.Value);
+    }
+
+    [Fact]
+    public void Keys_ThatCannotBeRead_FailWhereAssigned()
+    {
+        var client = new IpcClient { Transport = new NamedPipeClientTransport { PipeName = "unused" } };
+        Should.Throw<NotSupportedException>(() => client.PropagatedExceptionDataKeys = new UnreadableKeys());
     }
 
     [Fact]
@@ -430,6 +437,13 @@ public sealed class ExceptionDataTests
             get => key is ErrorDataProbe.ListedKey ? throw new KeyNotFoundException() : base[key];
             set => base[key] = value;
         }
+    }
+
+    private sealed class UnreadableKeys : IReadOnlyCollection<string>
+    {
+        public int Count => throw new NotSupportedException();
+        public IEnumerator<string> GetEnumerator() => throw new NotSupportedException();
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     private static Exception NewWrapped()
