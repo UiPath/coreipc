@@ -99,6 +99,7 @@ internal abstract class ServiceClient : IDisposable
             }
             catch (Exception ex)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 timeoutHelper.ThrowTimeout(ex, methodName);
                 throw;
             }
