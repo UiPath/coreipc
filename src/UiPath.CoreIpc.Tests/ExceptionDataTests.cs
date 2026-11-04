@@ -6,6 +6,7 @@ namespace UiPath.Ipc.Tests;
 public interface IErrorDataProbe
 {
     Task<bool> Throw();
+    Task<bool> ThrowWithErrorInfo();
     Task<bool> ThrowWrapped();
     Task<bool> ThrowAggregate();
     Task<bool> ThrowNonString();
@@ -20,7 +21,8 @@ public interface IErrorDataCallback
 
 public sealed class ErrorDataProbe : IErrorDataProbe
 {
-    public const string ListedKey = "UiPath.ErrorInfo.Error";
+    public const string ErrorInfoKey = "UiPath.ErrorInfo.Error";
+    public const string ListedKey = "Listed";
     public const string ListedKey2 = "Listed2";
     public const string UnlistedKey = "Unlisted";
     public const string Value = """{"Code":"Robot1001"}""";
@@ -33,6 +35,13 @@ public sealed class ErrorDataProbe : IErrorDataProbe
     }
 
     public Task<bool> Throw() => throw WithData(new InvalidOperationException("boom"));
+
+    public Task<bool> ThrowWithErrorInfo()
+    {
+        var exception = WithData(new InvalidOperationException("error info"));
+        exception.Data[ErrorInfoKey] = Value;
+        throw exception;
+    }
 
     public Task<bool> ThrowWrapped()
         => throw WithData(new InvalidOperationException("outer", WithData(new ArgumentException("inner"), "inner-value")), "outer-value");
@@ -70,14 +79,19 @@ public sealed class ErrorDataProbe : IErrorDataProbe
         }
         catch (RemoteException ex)
         {
-            return $"{ex.Data[ListedKey]}|{ex.Data.Contains(UnlistedKey)}";
+            return $"{ex.Data[ListedKey]}|{ex.Data.Contains(UnlistedKey)}|{ex.Data[ErrorInfoKey]}";
         }
     }
 }
 
 public sealed class ErrorDataCallback : IErrorDataCallback
 {
-    public Task<bool> Throw() => throw ErrorDataProbe.WithData(new InvalidOperationException("callback boom"), "callback-value");
+    public Task<bool> Throw()
+    {
+        var exception = ErrorDataProbe.WithData(new InvalidOperationException("callback boom"), "callback-value");
+        exception.Data[ErrorDataProbe.ErrorInfoKey] = "callback-error-info";
+        throw exception;
+    }
 }
 
 public interface IErrorDataRelay
@@ -120,11 +134,56 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
-    public async Task NoKeys_ByDefault_NothingIsCarried()
+    public async Task NoKeysAtAll_NothingIsCarried()
+    {
+        using var defaults = UseDefaultKeys(null);
+        await using var pair = await CreatePair();
+        var ex = await pair.Proxy.ThrowWithErrorInfo().ShouldThrowAsync<RemoteException>();
+        ex.Data.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ErrorInfoKey_IsCarriedByDefault()
     {
         await using var pair = await CreatePair();
+        var ex = await pair.Proxy.ThrowWithErrorInfo().ShouldThrowAsync<RemoteException>();
+        ex.Data.Keys.Cast<string>().ShouldBe(new[] { ErrorDataProbe.ErrorInfoKey });
+        ex.Data[ErrorDataProbe.ErrorInfoKey].ShouldBe(ErrorDataProbe.Value);
+    }
+
+    [Fact]
+    public async Task OwnKeys_AddToTheDefaultOnes()
+    {
+        await using var pair = await CreatePair(serverKeys: [ErrorDataProbe.ListedKey]);
+        var ex = await pair.Proxy.ThrowWithErrorInfo().ShouldThrowAsync<RemoteException>();
+        ex.Data.Keys.Cast<string>().ShouldBe(new[] { ErrorDataProbe.ErrorInfoKey, ErrorDataProbe.ListedKey }, ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task DefaultKeys_Cleared_OnlyOwnKeysAreCarried()
+    {
+        using var defaults = UseDefaultKeys(null);
+        await using var pair = await CreatePair(serverKeys: [ErrorDataProbe.ListedKey]);
+        var ex = await pair.Proxy.ThrowWithErrorInfo().ShouldThrowAsync<RemoteException>();
+        ex.Data.Keys.Cast<string>().ShouldBe(new[] { ErrorDataProbe.ListedKey });
+    }
+
+    [Fact]
+    public async Task DefaultKeys_AreCopiedWhenAssigned()
+    {
+        var keys = new List<string> { ErrorDataProbe.ListedKey };
+        using var defaults = UseDefaultKeys(keys);
+        keys.Clear();
+        await using var pair = await CreatePair();
         var ex = await pair.Proxy.Throw().ShouldThrowAsync<RemoteException>();
-        ex.Data.Count.ShouldBe(0);
+        ex.Data[ErrorDataProbe.ListedKey].ShouldBe(ErrorDataProbe.Value);
+    }
+
+    [Fact]
+    public void DefaultKeys_ThatCannotBeRead_FailWhereAssigned()
+    {
+        using var defaults = UseDefaultKeys(IpcBase.DefaultPropagatedExceptionDataKeys);
+        Should.Throw<NotSupportedException>(() => IpcBase.DefaultPropagatedExceptionDataKeys = new UnreadableKeys());
     }
 
     [Fact]
@@ -169,14 +228,14 @@ public sealed class ExceptionDataTests
     public async Task Callback_ClientKeys_ReachTheServerSideCaller()
     {
         await using var pair = await CreatePair(clientKeys: Keys);
-        (await pair.Proxy.CallFailingCallback()).ShouldBe("callback-value|False");
+        (await pair.Proxy.CallFailingCallback()).ShouldBe("callback-value|False|callback-error-info");
     }
 
     [Fact]
-    public async Task Callback_ServerKeysDoNotApplyToTheClientsErrors()
+    public async Task Callback_ServerKeysDoNotApplyToTheClientsErrors_TheDefaultDoes()
     {
         await using var pair = await CreatePair(serverKeys: Keys);
-        (await pair.Proxy.CallFailingCallback()).ShouldBe("|False");
+        (await pair.Proxy.CallFailingCallback()).ShouldBe("|False|callback-error-info");
     }
 
     [Fact]
@@ -356,6 +415,7 @@ public sealed class ExceptionDataTests
     [Fact]
     public async Task Chain_NothingListedAnywhere_NothingTravels()
     {
+        using var defaults = UseDefaultKeys(null);
         await using var c = await CreatePair();
         await using var b = await CreateRelay(c.Proxy, serverKeys: null);
 
@@ -472,4 +532,16 @@ public sealed class ExceptionDataTests
 
     private static Task<IpcPair<IErrorDataRelay>> CreateRelay(IErrorDataProbe next, IReadOnlyCollection<string>? serverKeys)
         => IpcPair<IErrorDataRelay>.Create(new ErrorDataRelay(next), server => server.PropagatedExceptionDataKeys = serverKeys);
+
+    private static DefaultKeysScope UseDefaultKeys(IReadOnlyCollection<string>? keys)
+    {
+        var scope = new DefaultKeysScope(IpcBase.DefaultPropagatedExceptionDataKeys);
+        IpcBase.DefaultPropagatedExceptionDataKeys = keys;
+        return scope;
+    }
+
+    private sealed class DefaultKeysScope(IReadOnlyCollection<string>? previous) : IDisposable
+    {
+        public void Dispose() => IpcBase.DefaultPropagatedExceptionDataKeys = previous;
+    }
 }
