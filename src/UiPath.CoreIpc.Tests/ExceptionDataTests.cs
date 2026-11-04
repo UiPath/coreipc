@@ -248,11 +248,13 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
-    public void FromException_FaultyDataOverride_DoesNotThrow()
+    public void FromException_FaultyDataOverride_DoesNotThrow_AndTraces()
     {
+        using var capture = new TraceErrorCapture();
         var error = Error.FromException(new FaultyDataException(), Keys);
         error.Message.ShouldBe("faulty");
         error.Data.ShouldBeNull();
+        capture.Errors.ShouldContain(e => e.Contains("Failed to read the Exception.Data entries"));
     }
 
     [Fact]

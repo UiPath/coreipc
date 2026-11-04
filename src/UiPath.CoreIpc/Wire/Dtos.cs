@@ -102,9 +102,10 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
             // A faulty Data getter, entry or key collection must not cost the caller the error itself.
+            Trace.TraceError($"Failed to read the Exception.Data entries to send with the error. Ex: {ex}");
         }
         return data.Count > 0 ? data : null;
     }
