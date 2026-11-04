@@ -27,7 +27,7 @@ internal sealed class Connection : IDisposable
     public Stream Network { get; }
 
     [MemberNotNullWhen(returnValue: true, nameof(Logger))]
-    public bool LogEnabled => Logger.Enabled();
+    public bool LogEnabled => Logger.Enabled(LogLevel.Trace);
 
     public Connection(Stream network, string debugName, ILogger? logger, int maxMessageSize = int.MaxValue)
     {
