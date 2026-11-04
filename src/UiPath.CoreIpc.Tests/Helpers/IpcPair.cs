@@ -31,6 +31,7 @@ internal sealed class IpcPair<TContract> : IAsyncDisposable where TContract : cl
         var client = new IpcClient
         {
             Transport = new NamedPipeClientTransport { PipeName = pipeName },
+            RequestTimeout = Timeouts.DefaultRequest,
         };
         configureClient?.Invoke(client);
         var proxy = client.GetProxy<TContract>();
