@@ -72,6 +72,22 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
         };
     public override string ToString() => new RemoteException(this).ToString();
 
+    public virtual bool Equals(Error? other)
+        => ReferenceEquals(this, other)
+        || other is not null
+            && EqualityContract == other.EqualityContract
+            && Message == other.Message
+            && StackTrace == other.StackTrace
+            && Type == other.Type
+            && InnerError == other.InnerError
+            && DataEquals(Data, other.Data);
+
+    public override int GetHashCode() => (Message, StackTrace, Type, InnerError).GetHashCode();
+
+    private static bool DataEquals(IReadOnlyDictionary<string, string>? left, IReadOnlyDictionary<string, string>? right)
+        => (left?.Count ?? 0) == (right?.Count ?? 0)
+        && (left is null || right is null || left.All(pair => right.TryGetValue(pair.Key, out var value) && value == pair.Value));
+
     private static string GetExceptionType(Exception exception) => (exception as RemoteException)?.Type ?? exception.GetType().FullName!;
 
     private static IReadOnlyDictionary<string, string>? GetData(Exception exception, IEnumerable<string>? dataKeys)

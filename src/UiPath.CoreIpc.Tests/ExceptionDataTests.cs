@@ -219,6 +219,21 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
+    public void Errors_ReadFromTheSameJson_AreEqual()
+    {
+        const string Json = """{"Message":"m","StackTrace":"s","Type":"t","InnerError":{"Message":"i","StackTrace":"s","Type":"t","InnerError":null,"Data":{"k2":"v2"}},"Data":{"k":"v"}}""";
+        var error = Deserialize(Json);
+        var same = Deserialize(Json);
+
+        error.ShouldBe(same);
+        error.GetHashCode().ShouldBe(same.GetHashCode());
+        error.ShouldNotBe(Deserialize(Json.Replace("\"v\"", "\"other\"")));
+        error.ShouldNotBe(Deserialize(Json.Replace("\"v2\"", "\"other\"")));
+        error.ShouldNotBe(Deserialize(Json.Replace(""","Data":{"k":"v"}""", "")));
+        Deserialize(Json.Replace("\"k\":\"v\"", "")).ShouldBe(Deserialize(Json.Replace(""","Data":{"k":"v"}""", "")));
+    }
+
+    [Fact]
     public void Response_RoundTrips()
     {
         var json = IpcJsonSerializer.Instance.Serialize(Response.Fail(Request(), NewWrapped(), Keys));
