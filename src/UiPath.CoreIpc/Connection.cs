@@ -8,7 +8,6 @@ using static IOHelpers;
 
 internal sealed class Connection : IDisposable
 {
-    private static readonly IOException ClosedException = new("Connection closed.");
     private readonly ConcurrentDictionary<string, ManualResetValueTaskSource> _requests = new();
     private long _requestCounter = -1;
     private readonly int _maxMessageSize;
@@ -201,7 +200,7 @@ internal sealed class Connection : IDisposable
         {
             if (_requests.TryRemove(requestId, out var requestCompletion))
             {
-                requestCompletion.SetException(ClosedException);
+                requestCompletion.SetException(NewClosedException());
             }
         }
     }
@@ -339,11 +338,13 @@ internal sealed class Connection : IDisposable
     {
         if (!await ReadBuffer(sizeof(long)))
         {
-            throw ClosedException;
+            throw NewClosedException();
         }
         var userStreamLength = BitConverter.ToInt64(_buffer, startIndex: 0);
         _nestedStream.Reset(userStreamLength);
     }
+    // One per failure: a handler may tag the exception's Data, which would otherwise leak to unrelated callers.
+    private static IOException NewClosedException() => new("Connection closed.");
     private MemoryStream SerializeToStream(object value)
     {
         var stream = GetStream();

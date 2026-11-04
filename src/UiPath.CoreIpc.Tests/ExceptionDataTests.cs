@@ -338,6 +338,23 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
+    public async Task ClosedConnection_FailsEachPendingCallWithItsOwnException()
+    {
+        var connection = new Connection(new MemoryStream(), "test", logger: null);
+        connection.Closed += delegate { };
+        using var timeout = new CancellationTokenSource(Timeouts.DefaultRequest);
+        var first = connection.RemoteCall(Request("1"), timeout.Token).AsTask();
+        var second = connection.RemoteCall(Request("2"), timeout.Token).AsTask();
+        connection.Dispose();
+
+        var firstException = await first.ShouldThrowAsync<IOException>();
+        firstException.Data[ErrorDataProbe.ListedKey] = "tagged";
+        var secondException = await second.ShouldThrowAsync<IOException>();
+        secondException.ShouldNotBeSameAs(firstException);
+        secondException.Data.Count.ShouldBe(0);
+    }
+
+    [Fact]
     public void RemoteException_AcceptsTheValues()
     {
         var ex = new RemoteException(new Error("m", "s", "t", InnerError: null) { Data = new Dictionary<string, string> { ["k"] = "v" } });
@@ -366,7 +383,7 @@ public sealed class ExceptionDataTests
     private static Exception NewWrapped()
         => ErrorDataProbe.WithData(new InvalidOperationException("outer", ErrorDataProbe.WithData(new ArgumentException("inner"), "inner-value")), "outer-value");
 
-    private static Request Request() => new("endpoint", "1", "method", [], 0);
+    private static Request Request(string id = "1") => new("endpoint", id, "method", [], 0);
 
     private static JObject WireError(Response response)
         => (JObject)JObject.Parse(IpcJsonSerializer.Instance.Serialize(response))["Error"]!;
