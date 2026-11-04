@@ -52,23 +52,12 @@ internal record Response(string RequestId, string? Data = null, Error? Error = n
 
 public record Error(string Message, string StackTrace, string Type, Error? InnerError)
 {
-    /// <summary>
-    /// The <see cref="Exception.Data"/> entries this error carries, or <c>null</c> when there are none.
-    /// </summary>
-    /// <remarks>
-    /// Each value is an opaque string to CoreIpc: a structured payload goes inside the string (e.g. as JSON, as <c>UiPath.ErrorInfo.Error</c> already does),
-    /// so the wire never has to widen. The record's equality compares this dictionary by reference.
-    /// </remarks>
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     internal IReadOnlyDictionary<string, string>? Data { get; init; }
 
     [return: NotNullIfNotNull("exception")]
     public static Error? FromException(Exception? exception) => FromException(exception, dataKeys: null);
 
-    /// <summary>
-    /// Like <see cref="FromException(Exception?)"/>, and at every level of the inner exception chain also fills <see cref="Data"/> with
-    /// the entries that level's <see cref="RemoteException"/> received, plus the <see cref="Exception.Data"/> entries listed in <paramref name="dataKeys"/>.
-    /// </summary>
     [return: NotNullIfNotNull("exception")]
     internal static Error? FromException(Exception? exception, IEnumerable<string>? dataKeys)
     => exception is null
