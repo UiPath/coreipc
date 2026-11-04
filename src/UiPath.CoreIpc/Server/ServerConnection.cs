@@ -55,7 +55,7 @@ internal sealed class ServerConnection : IClient, IDisposable, IClientConfig
 
         TCallbackInterface CreateCallback(Type callbackContract)
         {
-            _logger?.LogInformation($"Create callback {callbackContract}.");
+            _logger?.LogTrace($"Create callback {callbackContract}.");
             return new ServiceClientForCallback<TCallbackInterface>(_connection, config: this).GetProxy();
         }
     }
