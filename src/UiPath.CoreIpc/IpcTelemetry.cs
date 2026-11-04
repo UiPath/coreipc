@@ -1,6 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Text;
-
 namespace UiPath.Ipc;
 
 /// <summary>The directions in which an endpoint propagates the W3C trace context, see <see cref="IpcBase.TelemetryPropagation"/>.</summary>
@@ -27,36 +24,32 @@ public static class IpcTelemetry
         internal const string TraceStateHeader = "tracestate";
         internal const string BaggageHeader = "baggage";
 
-        private const int MaxTraceStateMembers = 32;
-        private const int MaxBaggageMembers = 64;
-        private const int MaxBaggageBytes = 8192;
-
         private static readonly AsyncLocal<Context?> Override = new();
         private static readonly ActivitySource Source = new("UiPath.Ipc");
 
         internal static Context? Current => Override.Value;
 
-        public Context(string traceParent, string? traceState = null, string? baggage = null)
+        /// <param name="traceParent">Optional: W3C Baggage doesn't depend on Trace Context, so a baggage can travel alone.
+        /// The tracestate travels only with a traceparent.</param>
+        public Context(string? traceParent, string? traceState = null, string? baggage = null)
         {
-            TraceParent = traceParent;
+            TraceParent = traceParent.NullIfEmpty();
             TraceState = traceState.NullIfEmpty();
             Baggage = baggage.NullIfEmpty();
         }
 
-        public string TraceParent { get; }
+        public string? TraceParent { get; }
         public string? TraceState { get; }
         /// <summary>W3C Baggage format: comma-separated, percent-encoded key=value members.</summary>
         public string? Baggage { get; }
 
-        public override string ToString() => TraceParent;
+        public override string ToString() => TraceParent ?? "";
 
         /// <summary>Makes <paramref name="traceContext"/> the trace context of every outgoing call (forward calls and
         /// callbacks) on the current async flow until disposed, winning over <see cref="Activity.Current"/>.
         /// Scopes nest; disposing restores the previous value.</summary>
         /// <exception cref="ArgumentNullException"><paramref name="traceContext"/> is null.</exception>
-        /// <exception cref="ArgumentException">A value breaks its W3C rule: traceparent must parse with
-        /// <see cref="ActivityContext.TryParse(string, string, out ActivityContext)"/>, tracestate at most 32 list members,
-        /// baggage at most 64 list members and 8192 UTF-8 bytes.</exception>
+        /// <exception cref="ArgumentException">The traceparent breaks W3C Trace Context §3.2.</exception>
         public static IDisposable Use(Context traceContext)
         {
             if (traceContext is null)
@@ -64,9 +57,9 @@ public static class IpcTelemetry
                 throw new ArgumentNullException(nameof(traceContext));
             }
 
-            if (!traceContext.IsValid(out string? error))
+            if (traceContext.TraceParent is { } traceParent && !TraceHeaders.IsValidTraceParent(traceParent))
             {
-                throw new ArgumentException(error, nameof(traceContext));
+                throw new ArgumentException($"The {TraceParentHeader} must be a W3C traceparent.", nameof(traceContext));
             }
 
             return Push(traceContext);
@@ -93,40 +86,54 @@ public static class IpcTelemetry
                 return null;
             }
 
-            var headers = new Dictionary<string, string?> { [TraceParentHeader] = traceContext.TraceParent };
-            if (traceContext.TraceState is { } traceState)
+            var headers = new Dictionary<string, string?>();
+            if (traceContext.TraceParent is { } traceParent && TraceHeaders.IsValidTraceParent(traceParent))
             {
-                headers[TraceStateHeader] = traceState;
+                headers[TraceParentHeader] = traceParent;
+                if (traceContext.TraceState?.LimitTraceState() is { } traceState)
+                {
+                    headers[TraceStateHeader] = traceState;
+                }
             }
-            if (traceContext.Baggage is { } baggage)
+            if (traceContext.Baggage?.LimitBaggage() is { } baggage)
             {
                 headers[BaggageHeader] = baggage;
             }
-            return headers;
+            return headers.Count is 0 ? null : headers;
         }
 
+        /// <summary>A traceparent that breaks W3C Trace Context is ignored, and so is its tracestate (§3.3);
+        /// tracestate members that break their grammar are dropped.</summary>
         internal static Context? FromHeaders(Dictionary<string, string?>? headers)
         {
-            if (headers is null || GetHeader(headers, TraceParentHeader) is not { } traceParent)
+            if (headers is null)
             {
                 return null;
             }
 
-            return new(traceParent, GetHeader(headers, TraceStateHeader), GetHeader(headers, BaggageHeader));
+            var traceParent = GetHeader(headers, TraceParentHeader) is { } received && TraceHeaders.IsValidTraceParent(received) ? received : null;
+            var traceState = traceParent is null ? null : GetHeader(headers, TraceStateHeader)?.ValidTraceState();
+            var baggage = GetHeader(headers, BaggageHeader).NullIfEmpty();
+            return traceParent is null && baggage is null ? null : new(traceParent, traceState, baggage);
         }
 
         internal Activity StartActivity(string name)
         {
-            var activity = Source.HasListeners() && ActivityContext.TryParse(TraceParent, TraceState, out var parent)
-                ? Source.CreateActivity(name, ActivityKind.Server, new ActivityContext(parent.TraceId, parent.SpanId, parent.TraceFlags, parent.TraceState, isRemote: true))
+            ActivityContext? parent = TraceParent is { } traceParent ? TraceHeaders.ParseTraceParent(traceParent, TraceState) : null;
+            var activity = Source.HasListeners()
+                ? Source.CreateActivity(name, ActivityKind.Server, parent ?? default)
                 : null;
 
             if (activity is null)
             {
                 // Without a sampled listener there is no source activity, yet Activity.Current must still
                 // carry the remote trace so nested calls propagate it.
-                activity = new Activity(name).SetParentId(TraceParent);
-                activity.TraceStateString = TraceState;
+                activity = new Activity(name);
+                if (parent is { } remote)
+                {
+                    activity.SetParentId(remote.TraceId, remote.SpanId, remote.TraceFlags);
+                    activity.TraceStateString = remote.TraceState;
+                }
             }
 
             if (Baggage is not null)
@@ -168,31 +175,6 @@ public static class IpcTelemetry
             return null;
         }
 
-        private bool IsValid([NotNullWhen(returnValue: false)] out string? error)
-        {
-            if (!ActivityContext.TryParse(TraceParent, TraceState, out _))
-            {
-                error = $"The {TraceParentHeader} must be a W3C traceparent.";
-            }
-            else if (TraceState is not null && TraceState.CountMembers() > MaxTraceStateMembers)
-            {
-                error = $"The {TraceStateHeader} must have at most {MaxTraceStateMembers} list members.";
-            }
-            else if (Baggage is not null && Baggage.CountMembers() > MaxBaggageMembers)
-            {
-                error = $"The {BaggageHeader} must have at most {MaxBaggageMembers} list members.";
-            }
-            else if (Baggage is not null && Encoding.UTF8.GetByteCount(Baggage) > MaxBaggageBytes)
-            {
-                error = $"The {BaggageHeader} must be at most {MaxBaggageBytes} bytes (UTF-8).";
-            }
-            else
-            {
-                error = null;
-            }
-            return error is null;
-        }
-
         private sealed class Scope : IDisposable
         {
             private readonly Context? _previous;
@@ -218,18 +200,5 @@ public static class IpcTelemetry
         ? string.Join(",", activity.Baggage.Select(pair => $"{Uri.EscapeDataString(pair.Key)}={Uri.EscapeDataString(pair.Value ?? "")}"))
         : null;
 
-    private static List<KeyValuePair<string, string>> DecodeBaggage(this string baggage)
-    {
-        var items = new List<KeyValuePair<string, string>>();
-        foreach (var member in baggage.Split(','))
-        {
-            var separator = member.IndexOf('=');
-            items.Add(new(Uri.UnescapeDataString(member.Substring(0, separator)), Uri.UnescapeDataString(member.Substring(separator + 1))));
-        }
-        return items;
-    }
-
-    private static int CountMembers(this string list) => list.Split(',').Length;
-
-    private static string? NullIfEmpty(this string? value) => string.IsNullOrEmpty(value) ? null : value;
+    internal static string? NullIfEmpty(this string? value) => string.IsNullOrEmpty(value) ? null : value;
 }

@@ -25,12 +25,21 @@ TRACESTATE = "tracestate"
 BAGGAGE = "baggage"
 
 _MAX_TRACESTATE_MEMBERS = 32
+_MAX_TRACESTATE_MEMBER_LENGTH = 128
 _MAX_BAGGAGE_MEMBERS = 64
 _MAX_BAGGAGE_BYTES = 8192
-_UTF8_ESCAPE = re.compile(
-    r"%[0-7][0-9a-f]|%[cd][0-9a-f]%[89ab][0-9a-f]|%e[0-9a-f](?:%[89ab][0-9a-f]){2}"
-    r"|%f[0-7](?:%[89ab][0-9a-f]){3}",
-    re.IGNORECASE,
+_ESCAPES = re.compile(r"(?:%[0-9a-fA-F]{2})+")
+# Trace Context §3.2: lowercase hex, version ff is invalid, non-zero ids; a higher
+# version is read by its first 55 characters, which must then end or be followed
+# by '-' (§3.2.4).
+_TRACEPARENT = re.compile(
+    r"(?!ff)([0-9a-f]{2})-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-[0-9a-f]{2}(-.*)?",
+    re.DOTALL,
+)
+# Trace Context §3.3.1.3.
+_TRACESTATE_MEMBER = re.compile(
+    r"(?:[a-z][a-z0-9_\-*/]{0,255}|[a-z0-9][a-z0-9_\-*/]{0,240}@[a-z][a-z0-9_\-*/]{0,13})"
+    r"=[\x20-\x2b\x2d-\x3c\x3e-\x7e]{0,255}[\x21-\x2b\x2d-\x3c\x3e-\x7e]"
 )
 
 
@@ -48,7 +57,7 @@ class TelemetryPropagationPolicy(enum.Flag):
 
 
 class InvalidTraceContextError(ValueError):
-    """A trace-context value breaks its W3C rule. Crosses the wire as .NET's
+    """The traceparent breaks W3C Trace Context §3.2. Crosses the wire as .NET's
     ``System.ArgumentException``, like the .NET implementation's error."""
 
     wire_type_name = "System.ArgumentException"
@@ -57,15 +66,19 @@ class InvalidTraceContextError(ValueError):
 @dataclass(frozen=True, slots=True)
 class TraceContext:
     """The W3C trace context of an IPC call. ``baggage`` is W3C Baggage:
-    comma-separated, percent-encoded ``key=value``. Empty ``tracestate`` /
-    ``baggage`` normalize to ``None``. The repr shows the traceparent only.
+    comma-separated, percent-encoded ``key=value``. ``traceparent`` is optional:
+    W3C Baggage doesn't depend on Trace Context, so a baggage can travel alone;
+    the ``tracestate`` travels only with a traceparent. Empty values normalize
+    to ``None``. The repr shows the traceparent only.
     """
 
-    traceparent: str
+    traceparent: str | None = None
     tracestate: str | None = field(default=None, repr=False)
     baggage: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
+        if not self.traceparent:
+            object.__setattr__(self, "traceparent", None)
         if not self.tracestate:
             object.__setattr__(self, "tracestate", None)
         if not self.baggage:
@@ -91,14 +104,16 @@ def use_trace_context(trace_context: TraceContext) -> Iterator[TraceContext]:
     inside it — winning over OpenTelemetry. Scopes nest; exiting restores the
     previous value. Ignored by endpoints whose policy lacks ``OUTGOING``.
 
-    Raises `ValueError` when a value breaks its W3C limit: ``tracestate`` at
-    most 32 list members, ``baggage`` at most 64 list members and 8192 UTF-8
-    bytes. The ``traceparent`` isn't checked."""
+    Raises `InvalidTraceContextError` (a `ValueError`) when the ``traceparent``
+    breaks W3C Trace Context §3.2."""
     if not isinstance(trace_context, TraceContext):
         raise TypeError("trace_context must be a TraceContext")
-    message = _validate(trace_context.tracestate, trace_context.baggage)
-    if message is not None:
-        raise InvalidTraceContextError(message)
+    if trace_context.traceparent is not None and not _is_valid_traceparent(
+        trace_context.traceparent
+    ):
+        raise InvalidTraceContextError(
+            f"{TRACEPARENT}: The traceparent must be a W3C traceparent."
+        )
     token = _override.set(trace_context)
     try:
         yield trace_context
@@ -118,25 +133,37 @@ def outgoing_headers() -> dict[str, str] | None:
     tc = _override.get() or _from_opentelemetry()
     if tc is None:
         return None
-    headers = {TRACEPARENT: tc.traceparent}
-    if tc.tracestate:
-        headers[TRACESTATE] = tc.tracestate
-    if tc.baggage:
-        headers[BAGGAGE] = tc.baggage
-    return headers
+    headers: dict[str, str] = {}
+    if tc.traceparent and _is_valid_traceparent(tc.traceparent):
+        headers[TRACEPARENT] = tc.traceparent
+        tracestate = tc.tracestate and _limit_tracestate(tc.tracestate)
+        if tracestate:
+            headers[TRACESTATE] = tracestate
+    baggage = tc.baggage and _limit_baggage(tc.baggage)
+    if baggage:
+        headers[BAGGAGE] = baggage
+    return headers or None
 
 
 def from_headers(headers: Mapping[str, str] | None) -> TraceContext | None:
-    """Read incoming headers as they are, unchecked. A missing traceparent
-    means no trace context (everything else is then ignored)."""
+    """A traceparent that breaks W3C Trace Context is ignored, and so is its
+    tracestate (§3.3); tracestate members that break their grammar are dropped.
+    ``None`` when neither a traceparent nor a baggage is left."""
     if headers is None:
         return None
     traceparent = _get_header(headers, TRACEPARENT)
-    if traceparent is None:
-        return None
-    return TraceContext(
-        traceparent, _get_header(headers, TRACESTATE), _get_header(headers, BAGGAGE)
+    if traceparent is not None and not _is_valid_traceparent(traceparent):
+        traceparent = None
+    received_tracestate = _get_header(headers, TRACESTATE) if traceparent else None
+    tracestate = (
+        ",".join(_valid_tracestate_members(received_tracestate))
+        if received_tracestate
+        else None
     )
+    baggage = _get_header(headers, BAGGAGE)
+    if not traceparent and not baggage:
+        return None
+    return TraceContext(traceparent, tracestate, baggage)
 
 
 @contextlib.contextmanager
@@ -164,31 +191,48 @@ def incoming_scope(trace_context: TraceContext | None, enabled: bool) -> Iterato
         _override.reset(override_token)
 
 
-# --- validation --------------------------------------------------------------
+# --- W3C limits on send --------------------------------------------------------
 
 
-def _validate(tracestate: str | None, baggage: str | None) -> str | None:
-    if tracestate is not None and _count_members(tracestate) > _MAX_TRACESTATE_MEMBERS:
-        return (
-            f"{TRACESTATE}: The tracestate must have at most "
-            f"{_MAX_TRACESTATE_MEMBERS} list members."
-        )
-    if baggage is not None:
-        if _count_members(baggage) > _MAX_BAGGAGE_MEMBERS:
-            return (
-                f"{BAGGAGE}: The baggage must have at most "
-                f"{_MAX_BAGGAGE_MEMBERS} list members."
-            )
-        if len(baggage.encode("utf-8", "surrogatepass")) > _MAX_BAGGAGE_BYTES:
-            return (
-                f"{BAGGAGE}: The baggage must be at most "
-                f"{_MAX_BAGGAGE_BYTES} bytes (UTF-8)."
-            )
-    return None
+def _limit_baggage(baggage: str) -> str | None:
+    """At most 64 members and 8192 bytes, dropping whole members beyond that,
+    and the ones a receiver couldn't parse."""
+    kept: list[str] = []
+    size = 0
+    for raw in baggage.split(","):
+        member = raw.strip(" \t")
+        if _split_baggage_member(member) is None:
+            continue
+        member_size = len(member.encode("utf-8", "surrogatepass")) + (1 if kept else 0)
+        if size + member_size > _MAX_BAGGAGE_BYTES:
+            continue
+        kept.append(member)
+        size += member_size
+        if len(kept) == _MAX_BAGGAGE_MEMBERS:
+            break
+    return ",".join(kept) or None
 
 
-def _count_members(value: str) -> int:
-    return len(value.split(","))
+def _limit_tracestate(tracestate: str) -> str | None:
+    """Trace Context §3.3.1.5: past 32 members, drop the ones over 128
+    characters first, then from the end."""
+    members = _valid_tracestate_members(tracestate)
+    for index in range(len(members) - 1, -1, -1):
+        if len(members) <= _MAX_TRACESTATE_MEMBERS:
+            break
+        if len(members[index]) > _MAX_TRACESTATE_MEMBER_LENGTH:
+            del members[index]
+    return ",".join(members[:_MAX_TRACESTATE_MEMBERS]) or None
+
+
+def _is_valid_traceparent(value: str) -> bool:
+    match = _TRACEPARENT.fullmatch(value)
+    return match is not None and not (match[1] == "00" and match[2] is not None)
+
+
+def _valid_tracestate_members(tracestate: str) -> list[str]:
+    members = (member.strip(" \t") for member in tracestate.split(","))
+    return [member for member in members if _TRACESTATE_MEMBER.fullmatch(member)]
 
 
 def _get_header(headers: Mapping[str, str], name: str) -> str | None:
@@ -211,19 +255,26 @@ def _encode_baggage(entries: Mapping[str, object]) -> str | None:
 
 
 def _decode_baggage(baggage: str) -> list[tuple[str, str]]:
-    pairs = (member.split("=", 1) for member in baggage.split(","))
-    return [(_unescape(key), _unescape(value)) for key, value in pairs]
+    """Skips a member with no key, trims the key and value, and ignores the
+    member's properties (after ``;``)."""
+    pairs = (_split_baggage_member(member) for member in baggage.split(","))
+    return [(_unescape(pair[0]), _unescape(pair[1])) for pair in pairs if pair is not None]
+
+
+def _split_baggage_member(member: str) -> tuple[str, str] | None:
+    key, separator, value = member.split(";", 1)[0].partition("=")
+    key = key.strip(" \t")
+    if not separator or not key:
+        return None
+    return key, value.strip(" \t")
 
 
 def _unescape(value: str) -> str:
-    # Like .NET's Uri.UnescapeDataString: escapes that aren't valid UTF-8 stay as is.
-    def decode(match: re.Match[str]) -> str:
-        try:
-            return bytes.fromhex(match[0].replace("%", "")).decode("utf-8")
-        except UnicodeDecodeError:
-            return match[0]
-
-    return _UTF8_ESCAPE.sub(decode, value)
+    # W3C Baggage: a percent-escape that isn't valid UTF-8 decodes to U+FFFD.
+    return _ESCAPES.sub(
+        lambda match: bytes.fromhex(match[0].replace("%", "")).decode("utf-8", "replace"),
+        value,
+    )
 
 
 # --- OpenTelemetry (optional) --------------------------------------------------
@@ -235,8 +286,9 @@ def _from_opentelemetry() -> TraceContext | None:
     except Exception:
         return None
     span_context = trace.get_current_span().get_span_context()
+    encoded_baggage = _encode_baggage(baggage.get_all())
     if not span_context.is_valid:
-        return None
+        return TraceContext(baggage=encoded_baggage) if encoded_baggage else None
     traceparent = (
         f"00-{span_context.trace_id:032x}-{span_context.span_id:016x}-"
         f"{span_context.trace_flags:02x}"
@@ -252,7 +304,7 @@ def _from_opentelemetry() -> TraceContext | None:
         tracestate = received[2]
     else:
         tracestate = span_context.trace_state.to_header()
-    return TraceContext(traceparent, tracestate, _encode_baggage(baggage.get_all()))
+    return TraceContext(traceparent, tracestate, encoded_baggage)
 
 
 def _attach_opentelemetry(trace_context: TraceContext | None) -> object | None:
@@ -265,7 +317,7 @@ def _attach_opentelemetry(trace_context: TraceContext | None) -> object | None:
     except Exception:
         return None
     ctx = otel_context.Context()
-    if trace_context is not None:
+    if trace_context is not None and trace_context.traceparent:
         carrier = {TRACEPARENT: trace_context.traceparent}
         if trace_context.tracestate:
             carrier[TRACESTATE] = trace_context.tracestate
@@ -275,7 +327,7 @@ def _attach_opentelemetry(trace_context: TraceContext | None) -> object | None:
             _incoming_tracestate.set(
                 (span_context.trace_id, span_context.trace_state, trace_context.tracestate)
             )
-        if trace_context.baggage:
-            for key, value in _decode_baggage(trace_context.baggage):
-                ctx = baggage.set_baggage(key, value, ctx)
+    if trace_context is not None and trace_context.baggage:
+        for key, value in _decode_baggage(trace_context.baggage):
+            ctx = baggage.set_baggage(key, value, ctx)
     return otel_context.attach(ctx)

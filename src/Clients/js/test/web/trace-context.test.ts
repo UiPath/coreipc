@@ -54,7 +54,7 @@ describe('web:trace context end-to-end', () => {
 
         expect(actual.ServerActivityTraceId).to.equal(traceId);
         expect(incoming?.traceparent).to.match(new RegExp(`^00-${traceId}-[0-9a-f]{16}-[0-9a-f]{2}$`));
-        expect(incoming!.traceparent.substring(36, 52)).to.not.equal(actual.ServerActivitySpanId);
+        expect(incoming!.traceparent!.substring(36, 52)).to.not.equal(actual.ServerActivitySpanId);
     });
 
     it('should expose exactly the values a callback arrived with', async () => {

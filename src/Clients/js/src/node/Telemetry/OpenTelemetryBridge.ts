@@ -62,17 +62,14 @@ export class OpenTelemetryBridge implements TracingBridge {
 
         const active = api.context.active();
         const spanContext = api.trace.getSpanContext(active);
+        const baggage = api.propagation.getBaggage(active);
+        const encodedBaggage = baggage && TraceHeaders.encodeBaggage(baggage.getAllEntries().map(([key, entry]) => [key, entry.value]));
         if (!spanContext || !api.trace.isSpanContextValid(spanContext)) {
-            return undefined;
+            return encodedBaggage ? TraceHeaders.normalize(undefined, undefined, encodedBaggage) : undefined;
         }
 
         const flags = spanContext.traceFlags.toString(16).padStart(2, '0');
-        const baggage = api.propagation.getBaggage(active);
-        return TraceHeaders.normalize(
-            `00-${spanContext.traceId}-${spanContext.spanId}-${flags}`,
-            spanContext.traceState?.serialize(),
-            baggage && TraceHeaders.encodeBaggage(baggage.getAllEntries().map(([key, entry]) => [key, entry.value])),
-        );
+        return TraceHeaders.normalize(`00-${spanContext.traceId}-${spanContext.spanId}-${flags}`, spanContext.traceState?.serialize(), encodedBaggage);
     }
 
     public runWithRemoteParent<R>(traceContext: TraceContext | undefined, callback: () => R): R {
@@ -85,13 +82,15 @@ export class OpenTelemetryBridge implements TracingBridge {
             return api.context.with(api.ROOT_CONTEXT, callback);
         }
 
-        const [, traceId, spanId, flags] = traceContext.traceparent.split('-');
-        const spanContext: OtelSpanContext = { traceId, spanId, traceFlags: parseInt(flags, 16), isRemote: true };
-        if (traceContext.tracestate) {
-            spanContext.traceState = api.createTraceState(traceContext.tracestate);
+        let context = api.ROOT_CONTEXT;
+        if (traceContext.traceparent) {
+            const [, traceId, spanId, flags] = traceContext.traceparent.split('-');
+            const spanContext: OtelSpanContext = { traceId, spanId, traceFlags: parseInt(flags, 16), isRemote: true };
+            if (traceContext.tracestate) {
+                spanContext.traceState = api.createTraceState(traceContext.tracestate);
+            }
+            context = api.trace.setSpanContext(context, spanContext);
         }
-
-        let context = api.trace.setSpanContext(api.ROOT_CONTEXT, spanContext);
 
         if (traceContext.baggage) {
             // A null prototype keeps an untrusted "__proto__" key an ordinary entry.

@@ -3,7 +3,6 @@ import { context, createTraceState, propagation, ROOT_CONTEXT, trace, INVALID_SP
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 
 import {
-    ArgumentError,
     PromisePal,
     RemoteError,
     TelemetryPropagationPolicy,
@@ -37,7 +36,7 @@ function otelContext(params: { traceState?: string; baggage?: { [key: string]: s
 }
 
 function outgoingHeadersFromFakeOtel(sent: TraceContext) {
-    const [, fakeTraceId, fakeSpanId, flags] = sent.traceparent.split('-');
+    const [, fakeTraceId, fakeSpanId, flags] = sent.traceparent!.split('-');
     const api: OtelApi = {
         ROOT_CONTEXT,
         context: { active: () => ROOT_CONTEXT, with: context.with.bind(context) },
@@ -108,22 +107,18 @@ describe('node:trace context', () => {
             expect(context.with(trace.setSpanContext(ROOT_CONTEXT, INVALID_SPAN_CONTEXT), () => bridge.current())).to.equal(undefined);
         });
 
-        it('should send an uppercase trace-id from the tracing library as it is', () => {
-            const sent = { traceparent: `00-${traceId.toUpperCase()}-${spanId}-01` };
-            expect(outgoingHeadersFromFakeOtel(sent)).to.deep.equal(sent);
+        it('should not send an uppercase trace-id from the tracing library', () => {
+            expect(outgoingHeadersFromFakeOtel({ traceparent: `00-${traceId.toUpperCase()}-${spanId}-01` })).to.equal(undefined);
         });
 
         const members = (count: number) => Array.from({ length: count }, (_, i) => `k${i}=v`).join(',');
-        for (const [name, header, sent] of [
-            ['33 tracestate members', 'tracestate', { traceparent, tracestate: members(33) }],
-            ['65 baggage members', 'baggage', { traceparent, baggage: members(65) }],
-            ['a baggage over 8192 bytes', 'baggage', { traceparent, baggage: `k=${'v'.repeat(8191)}` }],
-        ] as Array<[string, string, TraceContext]>) {
-            it(`should send ${name} from the tracing library as it is, though withTraceContext rejects it`, () => {
-                expect(outgoingHeadersFromFakeOtel(sent)).to.deep.equal(sent);
-                expect(() => withTraceContext(sent, () => 0))
-                    .to.throw(ArgumentError)
-                    .with.property('paramName', header);
+        for (const [name, fromLibrary, sent] of [
+            ['33 tracestate members', { traceparent, tracestate: members(33) }, { traceparent, tracestate: members(32) }],
+            ['65 baggage members', { traceparent, baggage: members(65) }, { traceparent, baggage: members(64) }],
+            ['a baggage over 8192 bytes', { traceparent, baggage: `k=${'v'.repeat(8191)}` }, { traceparent }],
+        ] as Array<[string, TraceContext, TraceContext]>) {
+            it(`should cut ${name} from the tracing library to the W3C limits`, () => {
+                expect(outgoingHeadersFromFakeOtel(fromLibrary)).to.deep.equal(sent);
             });
         }
 
@@ -273,7 +268,7 @@ describe('node:trace context', () => {
                 expect(actual.Callback).to.equal('done');
                 expect(actual.ServerActivityTraceId).to.equal(traceId);
                 expect(seen.incoming?.traceparent).to.match(new RegExp(`^00-${traceId}-[0-9a-f]{16}-[0-9a-f]{2}$`));
-                const clientSpanId = seen.incoming!.traceparent.substring(36, 52);
+                const clientSpanId = seen.incoming!.traceparent!.substring(36, 52);
                 expect(clientSpanId).to.not.equal(actual.ServerActivitySpanId);
                 expect(seen.incoming?.baggage).to.equal('userId=alice');
                 expect(seen).to.deep.include({ otelSpanId: clientSpanId, otelTraceId: traceId, remote: true, userId: 'alice' });
@@ -357,7 +352,7 @@ describe('node:trace context', () => {
             it('should surface the server rejecting an invalid trace context', async () => {
                 let error: unknown;
                 try {
-                    await proxy.ProbeViaCallbackWithTraceContext(traceparent, null, 'k=v,'.repeat(65));
+                    await proxy.ProbeViaCallbackWithTraceContext('garbage', null, null);
                 } catch (err) {
                     error = err;
                 }
