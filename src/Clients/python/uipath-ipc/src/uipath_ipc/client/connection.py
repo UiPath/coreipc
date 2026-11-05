@@ -45,6 +45,7 @@ from typing import (
 
 from ..hooks import BeforeCallHandler, CallInfo
 from ..errors import EndpointNotFoundError, MethodNotFoundError, RemoteException
+from ..context import IpcContext
 from ..markers import is_ipc_cancellable
 from ..message import Message
 from ..transport.base import ClientTransport
@@ -731,6 +732,9 @@ class IpcConnection:
         exception only logged — mirroring .NET's non-generic `Task`.
         """
         deferred_one_way: tuple[Callable[..., object], list, dict] | None = None
+        # So a POCO handler can reach the peer without a Message parameter. No reset
+        # needed: this runs in its own asyncio task, which owns its contextvars copy.
+        IpcContext._activate(self)
         try:
             entry = self._callbacks.get(req.endpoint)
             if entry is None:
