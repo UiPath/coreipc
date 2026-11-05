@@ -11,8 +11,8 @@ public sealed class ComputingTestsOverWebSockets : ComputingTests
 
     protected override async Task DisposeAsync()
     {
-        await _webSocketContext.DisposeAsync();
         await base.DisposeAsync();
+        await _webSocketContext.DisposeAsync();
     }
 
     protected override async Task<ListenerConfig> CreateListener()
