@@ -302,6 +302,29 @@ async def test_serve_forever_before_start_raises() -> None:
         await server.serve_forever()
 
 
+async def test_named_pipe_call_waits_for_a_server_that_starts_later() -> None:
+    """Like .NET, a call dials until its request timeout, so a server started
+    after the client called (here past the old ~1.85s retry ladder) still answers."""
+    _skip_if_no_pipe_support()
+    name = f"uipath-ipc-srvtest-{uuid.uuid4().hex}"
+    async with IpcClient(NamedPipeClientTransport(name), request_timeout=15) as client:
+        call = asyncio.create_task(client.get_proxy(ICalculator).Add(1, 2))
+        await asyncio.sleep(2.5)
+        assert not call.done()
+        async with IpcServer(NamedPipeServerTransport(name), {ICalculator: Calculator()}):
+            assert await asyncio.wait_for(call, timeout=10) == 3
+
+
+async def test_named_pipe_call_without_a_server_gives_up_at_its_request_timeout() -> None:
+    _skip_if_no_pipe_support()
+    name = f"uipath-ipc-srvtest-{uuid.uuid4().hex}"
+    async with IpcClient(NamedPipeClientTransport(name), request_timeout=0.5) as client:
+        started = asyncio.get_running_loop().time()
+        with pytest.raises(asyncio.TimeoutError):
+            await client.get_proxy(ICalculator).Add(1, 2)
+        assert asyncio.get_running_loop().time() - started < 3
+
+
 async def test_serve_forever_blocks_for_named_pipe_until_aclose() -> None:
     """Regression: a named-pipe ServerHandle's wait_closed() must block, so
     serve_forever() doesn't return immediately and tear the server down."""
