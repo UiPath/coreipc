@@ -119,6 +119,7 @@ public sealed class ErrorDataRelay(IErrorDataProbe next) : IErrorDataRelay
         {
             var wrapper = new InvalidOperationException("relay", ex);
             wrapper.Data[ErrorDataProbe.ListedKey2] = "relay-value";
+            wrapper.Data[ErrorDataProbe.ErrorInfoKey] = "relay-error-info";
             throw wrapper;
         }
     }
@@ -430,7 +431,7 @@ public sealed class ExceptionDataTests
 
         (await b.Proxy.RethrowErrorInfo().ShouldThrowAsync<RemoteException>()).Data[ErrorDataProbe.ErrorInfoKey].ShouldBe(ErrorDataProbe.Value);
         var wrapped = await b.Proxy.WrapErrorInfo().ShouldThrowAsync<RemoteException>();
-        wrapped.Data.Contains(ErrorDataProbe.ErrorInfoKey).ShouldBeFalse();
+        wrapped.Data.Contains(ErrorDataProbe.ErrorInfoKey).ShouldBe(!bListsNothing);
         wrapped.InnerException!.Data[ErrorDataProbe.ErrorInfoKey].ShouldBe(ErrorDataProbe.Value);
     }
 
