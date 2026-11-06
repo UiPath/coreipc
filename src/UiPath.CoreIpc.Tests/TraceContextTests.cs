@@ -26,7 +26,7 @@ public sealed record TraceProbeResult(
             activity?.ParentSpanId.ToHexString(),
             activity?.SpanId.ToHexString(),
             activity?.Baggage.Select(pair => $"{pair.Key}={pair.Value}").ToArray(),
-            IpcTelemetry.Context.Current?.TraceParent);
+            IpcTraceContext.Current?.TraceParent);
     }
 }
 
@@ -60,7 +60,7 @@ public sealed class TraceProbe : ITraceProbe
         {
             return new(server, await callback.Probe());
         }
-        using (IpcTelemetry.Context.Use(new(overrideTraceParent)))
+        using (IpcTraceContext.Use(new(overrideTraceParent)))
         {
             return new(server, await callback.Probe());
         }
@@ -94,7 +94,7 @@ public sealed class TraceContextTests
     {
         await using var pair = await Pair.Create(clientPropagation: TelemetryPropagationPolicy.None);
         using var activity = StartW3CActivity();
-        using (IpcTelemetry.Context.Use(new(TraceParentA)))
+        using (IpcTraceContext.Use(new(TraceParentA)))
         {
             var result = await pair.Proxy.Probe();
 
@@ -154,7 +154,7 @@ public sealed class TraceContextTests
         await using var pair = await Pair.Create();
         using var activity = StartW3CActivity();
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA, TraceState, "k=v")))
+        using (IpcTraceContext.Use(new(TraceParentA, TraceState, "k=v")))
         {
             var result = await pair.Proxy.Probe();
 
@@ -172,10 +172,10 @@ public sealed class TraceContextTests
     {
         await using var pair = await Pair.Create();
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA)))
+        using (IpcTraceContext.Use(new(TraceParentA)))
         {
             (await pair.Proxy.Probe()).TraceParent.ShouldBe(TraceParentA);
-            using (IpcTelemetry.Context.Use(new(TraceParentB)))
+            using (IpcTraceContext.Use(new(TraceParentB)))
             {
                 (await pair.Proxy.Probe()).TraceParent.ShouldBe(TraceParentB);
             }
@@ -187,13 +187,13 @@ public sealed class TraceContextTests
     [Fact]
     public void OverrideScope_DisposedTwice_RestoresOnce()
     {
-        var outer = IpcTelemetry.Context.Use(new(TraceParentA));
-        var inner = IpcTelemetry.Context.Use(new(TraceParentB));
+        var outer = IpcTraceContext.Use(new(TraceParentA));
+        var inner = IpcTraceContext.Use(new(TraceParentB));
         inner.Dispose();
         inner.Dispose();
-        IpcTelemetry.Context.Current!.TraceParent.ShouldBe(TraceParentA);
+        IpcTraceContext.Current!.TraceParent.ShouldBe(TraceParentA);
         outer.Dispose();
-        IpcTelemetry.Context.Current.ShouldBeNull();
+        IpcTraceContext.Current.ShouldBeNull();
     }
 
     [Fact]
@@ -201,7 +201,7 @@ public sealed class TraceContextTests
     {
         await using var pair = await Pair.Create(serverPropagation: TelemetryPropagationPolicy.None);
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA)))
+        using (IpcTraceContext.Use(new(TraceParentA)))
         {
             var result = await pair.Proxy.Probe();
 
@@ -411,7 +411,7 @@ public sealed class TraceContextTests
     public async Task UploadHandler_DoesNotSeeTheOverrideOfWhoStartedTheServer()
     {
         Pair pair;
-        using (IpcTelemetry.Context.Use(new(TraceParentA)))
+        using (IpcTraceContext.Use(new(TraceParentA)))
         {
             pair = await Pair.Create();
         }
@@ -424,7 +424,7 @@ public sealed class TraceContextTests
     public async Task UploadCallback_DoesNotSeeTheOverrideOfWhoOpenedTheConnection()
     {
         await using var pair = await Pair.Create();
-        using (IpcTelemetry.Context.Use(new(TraceParentA)))
+        using (IpcTraceContext.Use(new(TraceParentA)))
         {
             await pair.Proxy.Probe();
         }
@@ -512,7 +512,7 @@ public sealed class TraceContextTests
     {
         await using var pair = await Pair.Create(clientPropagation: TelemetryPropagationPolicy.Outgoing);
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA)))
+        using (IpcTraceContext.Use(new(TraceParentA)))
         {
             var result = await pair.Proxy.ProbeViaCallback(TraceParentB);
 
@@ -527,7 +527,7 @@ public sealed class TraceContextTests
     {
         await using var pair = await Pair.Create(clientPropagation: TelemetryPropagationPolicy.Incoming);
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA)))
+        using (IpcTraceContext.Use(new(TraceParentA)))
         {
             var result = await pair.Proxy.ProbeViaCallback(TraceParentB);
 
@@ -543,7 +543,7 @@ public sealed class TraceContextTests
     {
         await using var pair = await Pair.Create(serverPropagation: TelemetryPropagationPolicy.Incoming);
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA)))
+        using (IpcTraceContext.Use(new(TraceParentA)))
         {
             var result = await pair.Proxy.ProbeViaCallback();
 
@@ -559,7 +559,7 @@ public sealed class TraceContextTests
     {
         await using var pair = await Pair.Create(serverPropagation: TelemetryPropagationPolicy.Outgoing);
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA)))
+        using (IpcTraceContext.Use(new(TraceParentA)))
         {
             var result = await pair.Proxy.ProbeViaCallback(TraceParentB);
 
@@ -592,7 +592,7 @@ public sealed class TraceContextTests
         ActivitySource.AddActivityListener(listener);
         await using var pair = await Pair.Create();
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA, TraceState, "k=v")))
+        using (IpcTraceContext.Use(new(TraceParentA, TraceState, "k=v")))
         {
             var result = await pair.Proxy.Probe();
             result.ActivityParentSpanId.ShouldBe("00f067aa0ba902b7");
@@ -661,7 +661,7 @@ public sealed class TraceContextTests
     [InlineData("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra")]
     public void Use_InvalidTraceParent_Throws(string traceParent)
     {
-        var ex = Should.Throw<ArgumentException>(() => IpcTelemetry.Context.Use(new(traceParent)));
+        var ex = Should.Throw<ArgumentException>(() => IpcTraceContext.Use(new(traceParent)));
         ex.ParamName.ShouldBe("traceContext");
         ex.Message.ShouldContain("traceparent");
     }
@@ -672,7 +672,7 @@ public sealed class TraceContextTests
         await using var pair = await Pair.Create();
         using var activity = StartW3CActivity();
 
-        using (IpcTelemetry.Context.Use(new(null, TraceState, "k=v")))
+        using (IpcTraceContext.Use(new(null, TraceState, "k=v")))
         {
             var result = await pair.Proxy.Probe();
 
@@ -744,7 +744,7 @@ public sealed class TraceContextTests
         await using var pair = await Pair.Create();
         var traceState = string.Join(",", Enumerable.Range(0, 34).Select(i => i is 3 or 5 ? $"long{i}={new string('v', 130)}" : $"k{i}=v"));
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA, traceState)))
+        using (IpcTraceContext.Use(new(TraceParentA, traceState)))
         {
             (await pair.Proxy.Probe()).TraceState.ShouldBe(string.Join(",", Enumerable.Range(0, 34).Where(i => i is not (3 or 5)).Select(i => $"k{i}=v")));
         }
@@ -757,7 +757,7 @@ public sealed class TraceContextTests
     {
         await using var pair = await Pair.Create();
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA, baggage: Members(count))))
+        using (IpcTraceContext.Use(new(TraceParentA, baggage: Members(count))))
         {
             (await pair.Proxy.Probe()).Baggage.ShouldBe(Members(sent));
         }
@@ -771,7 +771,7 @@ public sealed class TraceContextTests
         await using var pair = await Pair.Create();
         var baggage = "k=" + new string('v', valueLength);
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA, baggage: baggage)))
+        using (IpcTraceContext.Use(new(TraceParentA, baggage: baggage)))
         {
             (await pair.Proxy.Probe()).Baggage.ShouldBe(sent ? baggage : null);
         }
@@ -782,7 +782,7 @@ public sealed class TraceContextTests
     {
         await using var pair = await Pair.Create();
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA, baggage: "a=1,k=" + new string('é', 4095))))
+        using (IpcTraceContext.Use(new(TraceParentA, baggage: "a=1,k=" + new string('é', 4095))))
         {
             (await pair.Proxy.Probe()).Baggage.ShouldBe("a=1");
         }
@@ -793,7 +793,7 @@ public sealed class TraceContextTests
     {
         await using var pair = await Pair.Create();
 
-        using (IpcTelemetry.Context.Use(new(TraceParentA, baggage: "foo,a=1,,=x")))
+        using (IpcTraceContext.Use(new(TraceParentA, baggage: "foo,a=1,,=x")))
         {
             (await pair.Proxy.Probe()).Baggage.ShouldBe("a=1");
         }
@@ -801,11 +801,11 @@ public sealed class TraceContextTests
 
     [Fact]
     public void Use_Null_Throws()
-        => Should.Throw<ArgumentNullException>(() => IpcTelemetry.Context.Use(null!));
+        => Should.Throw<ArgumentNullException>(() => IpcTraceContext.Use(null!));
 
     [Fact]
     public void ToString_DoesNotPrintBaggage()
-        => new IpcTelemetry.Context(TraceParentA, TraceState, "secret=1").ToString().ShouldNotContain("secret");
+        => new IpcTraceContext(TraceParentA, TraceState, "secret=1").ToString().ShouldNotContain("secret");
 
     [Fact]
     public void RequestWithoutHeaders_HasNoHeadersOnTheWire()

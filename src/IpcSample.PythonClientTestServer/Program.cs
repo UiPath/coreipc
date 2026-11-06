@@ -134,7 +134,7 @@ public interface ITraceProbe
     Task<TraceProbeCallbackResult> ProbeViaCallback(CancellationToken ct = default);
 
     /// <summary>Like <see cref="ProbeViaCallback"/>, but the callback carries exactly the given
-    /// values (IpcTelemetry.Context.Use), whatever the incoming call carried.</summary>
+    /// values (IpcTraceContext.Use), whatever the incoming call carried.</summary>
     Task<TraceProbeCallbackResult> ProbeViaCallbackWithTraceContext(string traceParent, string? traceState, string? baggage, CancellationToken ct = default);
 }
 
@@ -252,7 +252,7 @@ public sealed class TraceProbe : ITraceProbe
 
     public async Task<TraceProbeCallbackResult> ProbeViaCallbackWithTraceContext(string traceParent, string? traceState, string? baggage, CancellationToken ct)
     {
-        using (IpcTelemetry.Context.Use(new(traceParent, traceState, baggage)))
+        using (IpcTraceContext.Use(new(traceParent, traceState, baggage)))
         {
             return await ProbeViaCallback(ct);
         }

@@ -135,7 +135,7 @@ internal class Server
 #endif
     private async ValueTask<Response> HandleRequest(Method method, Route route, Request request, CancellationToken cancellationToken)
     {
-        var traceContext = _propagateIncoming ? IpcTelemetry.Context.FromHeaders(request.Headers) : null;
+        var traceContext = _propagateIncoming ? IpcTraceContext.FromHeaders(request.Headers) : null;
         var arguments = GetArguments();
 
         object service;
