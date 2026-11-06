@@ -110,7 +110,7 @@ internal static class ServiceImpls
 
         public async Task<TraceProbeCallbackResult> ProbeViaCallbackWithTraceContext(string traceParent, string? traceState, string? baggage)
         {
-            using (IpcTelemetry.Context.Use(new(traceParent, traceState, baggage)))
+            using (IpcTraceContext.Use(new(traceParent, traceState, baggage)))
             {
                 return await ProbeViaCallback();
             }

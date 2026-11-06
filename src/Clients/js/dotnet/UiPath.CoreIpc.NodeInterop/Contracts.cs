@@ -56,7 +56,7 @@ internal static class Contracts
         Task<TraceProbeCallbackResult> ProbeViaCallback();
 
         /// <summary>Like <see cref="ProbeViaCallback"/>, but the callback carries exactly the given
-        /// values (IpcTelemetry.Context.Use), whatever the incoming call carried.</summary>
+        /// values (IpcTraceContext.Use), whatever the incoming call carried.</summary>
         Task<TraceProbeCallbackResult> ProbeViaCallbackWithTraceContext(string traceParent, string? traceState, string? baggage);
     }
 
