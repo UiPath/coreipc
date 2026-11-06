@@ -60,11 +60,6 @@ public sealed class IpcTraceContext
             throw new ArgumentException($"The {TraceParentHeader} must be a W3C traceparent.", nameof(traceContext));
         }
 
-        return Push(traceContext);
-    }
-
-    internal static IDisposable Push(IpcTraceContext? traceContext)
-    {
         var previous = Override.Value;
         Override.Value = traceContext;
         return new Scope(previous);
