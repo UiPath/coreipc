@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
@@ -53,6 +54,7 @@ internal record Response(string RequestId, string? Data = null, Error? Error = n
 public record Error(string Message, string StackTrace, string Type, Error? InnerError)
 {
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    [JsonConverter(typeof(DataConverter))]
     internal IReadOnlyDictionary<string, string>? Data { get; init; }
 
     [return: NotNullIfNotNull("exception")]
@@ -124,6 +126,31 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
             Trace.TraceError($"Failed to read the Exception.Data entries to send with the error. Ex: {ex}");
         }
         return data.Count > 0 ? data : null;
+    }
+
+    // Keeps the string values and skips any other, so a peer that sends richer ones doesn't fail the read, which would close the connection.
+    private sealed class DataConverter : JsonConverter<IReadOnlyDictionary<string, string>>
+    {
+        public override bool CanWrite => false;
+
+        public override IReadOnlyDictionary<string, string>? ReadJson(JsonReader reader, Type objectType, IReadOnlyDictionary<string, string>? existingValue, bool hasExistingValue, JsonSerializer serializer)
+        {
+            var dateParseHandling = reader.DateParseHandling;
+            // Otherwise a string that looks like a date is read as a date, and skipped.
+            reader.DateParseHandling = DateParseHandling.None;
+            try
+            {
+                return JToken.ReadFrom(reader) is JObject data
+                    ? data.Properties().Where(entry => entry.Value.Type is JTokenType.String).ToDictionary(entry => entry.Name, entry => entry.Value.Value<string>()!)
+                    : null;
+            }
+            finally
+            {
+                reader.DateParseHandling = dateParseHandling;
+            }
+        }
+
+        public override void WriteJson(JsonWriter writer, IReadOnlyDictionary<string, string>? value, JsonSerializer serializer) => throw new NotSupportedException();
     }
 }
 

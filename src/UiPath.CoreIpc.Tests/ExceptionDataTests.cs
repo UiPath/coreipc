@@ -258,6 +258,35 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
+    public void NewerPeer_DataValuesThatAreNotStrings_AreSkipped()
+    {
+        var error = Deserialize("""{"Data":{"s":"v","d":"2026-11-05T10:00:00Z","o":{"Code":1},"a":["v"],"n":1,"b":true,"z":null,"dup":"v","dup":{}},"Message":"m","StackTrace":"s","Type":"t","InnerError":{"Message":"i","StackTrace":"s","Type":"t","InnerError":null,"Data":{"o":{"Code":2},"k2":"v2"}}}""");
+        error.Message.ShouldBe("m");
+        error.Data!.Keys.ShouldBe(new[] { "s", "d" }, ignoreOrder: true);
+        error.Data["d"].ShouldBe("2026-11-05T10:00:00Z");
+        error.InnerError!.Data!.Keys.ShouldBe(new[] { "k2" });
+    }
+
+    [Fact]
+    public void Wire_KeysThatLookLikeJsonMetadata_AreReadAsKeys()
+    {
+        var error = Deserialize("""{"Data":{"$ref":"x","$id":"y","k":"v"},"Message":"m","StackTrace":"s","Type":"t","InnerError":null}""");
+        error.Data!.Keys.ShouldBe(new[] { "$ref", "$id", "k" }, ignoreOrder: true);
+    }
+
+    [Theory]
+    [InlineData("""["v"]""")]
+    [InlineData("\"v\"")]
+    [InlineData("1")]
+    [InlineData("null")]
+    public void NewerPeer_DataThatIsNotAnObject_IsSkipped(string data)
+    {
+        var error = Deserialize($$"""{"Message":"m","StackTrace":"s","Type":"t","Data":{{data}},"InnerError":null}""");
+        error.Message.ShouldBe("m");
+        error.Data.ShouldBeNull();
+    }
+
+    [Fact]
     public void Errors_ReadFromTheSameJson_AreEqual()
     {
         const string Json = """{"Message":"m","StackTrace":"s","Type":"t","InnerError":{"Message":"i","StackTrace":"s","Type":"t","InnerError":null,"Data":{"k2":"v2"}},"Data":{"k":"v"}}""";
