@@ -25,15 +25,17 @@ internal class Server
     private readonly ConcurrentDictionary<string, PooledCancellationTokenSource> _requests = new();
 
     private readonly TimeSpan? _requestTimeout;
+    private readonly bool _propagateIncoming;
 
     private ILogger? Logger => _connection.Logger;
     private bool LogEnabled => _connection.LogEnabled;
     public string DebugName => _connection.DebugName;
 
-    public Server(Router router, TimeSpan? requestTimeout, Connection connection, IClient? client = null)
+    public Server(Router router, TimeSpan? requestTimeout, TelemetryPropagationPolicy telemetryPropagation, Connection connection, IClient? client = null)
     {
         _router = router;
         _requestTimeout = requestTimeout;
+        _propagateIncoming = (telemetryPropagation & TelemetryPropagationPolicy.Incoming) != 0;
         _connection = connection;
         _client = client;
         connection.RequestReceived += OnRequestReceived;
@@ -133,6 +135,7 @@ internal class Server
 #endif
     private async ValueTask<Response> HandleRequest(Method method, Route route, Request request, CancellationToken cancellationToken)
     {
+        var traceContext = _propagateIncoming ? IpcTraceContext.FromHeaders(request.Headers) : null;
         var arguments = GetArguments();
 
         object service;
@@ -167,22 +170,31 @@ internal class Server
             Task<object?> ScheduleMethodCall() => defaultScheduler ? MethodCall() : RunOnScheduler();
             async Task<object?> MethodCall()
             {
-                // So a POCO contract can reach the peer without a Message parameter.
-                using (IpcContext.Push(new IpcContext(_client, cancellationToken)))
+                using var activity = traceContext?.StartActivity($"{request.Endpoint}/{request.MethodName}");
+                try
                 {
-                    await (route.BeforeCall?.Invoke(
-                        new CallInfo(newConnection: false, method.MethodInfo, arguments),
-                        cancellationToken) ?? Task.CompletedTask);
-
-                    Task invocationTask = method.Invoke(service, arguments, cancellationToken);
-                    await invocationTask;
-
-                    if (!returnTaskType.IsGenericType)
+                    // So a POCO contract can reach the peer without a Message parameter.
+                    using (IpcContext.Push(new IpcContext(_client, cancellationToken, traceContext)))
                     {
-                        return null;
-                    }
+                        await (route.BeforeCall?.Invoke(
+                            new CallInfo(newConnection: false, method.MethodInfo, arguments),
+                            cancellationToken) ?? Task.CompletedTask);
 
-                    return GetTaskResult(returnTaskType, invocationTask);
+                        Task invocationTask = method.Invoke(service, arguments, cancellationToken);
+                        await invocationTask;
+
+                        if (!returnTaskType.IsGenericType)
+                        {
+                            return null;
+                        }
+
+                        return GetTaskResult(returnTaskType, invocationTask);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                    throw;
                 }
             }
 

@@ -315,6 +315,25 @@ ipc.config
 >   - the request timeout for pipe name "foo" and contract ISample is 3 seconds
 >   ```
 
+## Trace context (telemetry)
+
+`ipc.config.forAnyAddress().setTelemetryPropagation(policy)` carries the W3C `traceparent`, `tracestate` and `baggage` across this `ipc` instance's calls and callbacks (wire-compatible with the .NET and Python sides). `ipc.config.forAddress(...).setTelemetryPropagation(policy)` sets it for one address, and wins over `forAnyAddress()`. The `TelemetryPropagationPolicy` picks the directions: `None` (the default: nothing is sent or read), `Incoming`, `Outgoing` or `Both`.
+
+- **Outgoing** (the calls it makes): a `withTraceContext(...)` scope wins; otherwise, on Node, the active span and baggage of the optional peer dependency `@opentelemetry/api`; otherwise nothing is sent. If `@opentelemetry/api` is missing or fails to load, it is treated as not installed.
+- **Incoming** (the callbacks it receives): `currentIncomingTraceContext()` gives the received values. On Node the callback also runs within an OpenTelemetry context whose parent is the remote span, so the spans it starts, and with `Outgoing` also its calls, continue the trace. With `Outgoing` alone, callbacks ignore what they received and run outside any span.
+- **Rules**: the same on .NET, JS and Python. A `traceparent` must follow W3C Trace Context §3.2; a received one that doesn't is ignored, and so is its `tracestate`. `tracestate` members that break their grammar are dropped. On send, `tracestate` is cut to 32 members (the ones over 128 characters go first), and `baggage` to 64 members and 8192 UTF-8 bytes, by dropping whole members; baggage members with no key are dropped too. The `traceparent` is optional: a `baggage` can travel without it, but a `tracestate` can't. `withTraceContext` throws `ArgumentError` for an invalid `traceparent`.
+- **Browser** (`@uipath/coreipc-web`): explicit-only for now. The OpenTelemetry context is not read or set; only `withTraceContext` and `currentIncomingTraceContext` apply, and only until the first `await`.
+
+```typescript
+import { ipc, TelemetryPropagationPolicy, withTraceContext } from '@uipath/coreipc';
+
+ipc.config.forAnyAddress().setTelemetryPropagation(TelemetryPropagationPolicy.Both);
+// Or, for one address only:
+ipc.config.forAddress(options => options.isPipe('foo')).setTelemetryPropagation(TelemetryPropagationPolicy.Outgoing);
+
+await withTraceContext({ traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01' }, () => proxy.Foo());
+```
+
 ---
 ## Notes for Contributors
 

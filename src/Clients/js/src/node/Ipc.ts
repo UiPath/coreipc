@@ -1,5 +1,8 @@
-import { IpcBaseImpl, AddressSelectionDelegate, IpcBase } from '../std';
+import { IpcBaseImpl, AddressSelectionDelegate, IpcBase, TraceContextRuntime } from '../std';
 import { NodeAddressBuilder } from './NodeAddressBuilder';
+import { AsyncLocalSlot, OpenTelemetryBridge } from './Telemetry';
+
+TraceContextRuntime.install(() => new AsyncLocalSlot(), new OpenTelemetryBridge());
 
 /* @internal */
 export class IpcNodeImpl extends IpcBaseImpl<NodeAddressBuilder> implements Ipc {

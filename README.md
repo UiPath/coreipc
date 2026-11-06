@@ -165,6 +165,32 @@ var ipcServer = new IpcServer
 };
 ```
 
+### Trace context (telemetry)
+
+Set `TelemetryPropagation` on an `IpcClient` / `IpcServer` to carry the W3C `traceparent`, `tracestate` and `baggage` across its calls and callbacks (wire-compatible with the JS and Python clients). It is a `[Flags]` `TelemetryPropagationPolicy`: `Outgoing` covers the calls and callbacks the endpoint makes, `Incoming` the ones it receives, `Both` is both. `None` by default: nothing is sent or read.
+
+```csharp
+var client = new IpcClient
+{
+    Transport = new NamedPipeClientTransport { PipeName = "my-pipe" },
+    TelemetryPropagation = TelemetryPropagationPolicy.Both,
+};
+```
+
+- **Outgoing**: an explicit `IpcTraceContext.Use(...)` scope wins. Otherwise, when `Activity.Current` has W3C ids, each call starts a client span `<Endpoint>/<MethodName>` (`ActivityKind.Client`, a child of `Activity.Current`, from connecting until the call returns) and sends its ids, `tracestate` and `baggage`, like `HttpClient` does. Otherwise nothing is sent and no span is started.
+- **Incoming**: the handler runs under an `Activity` named `<Endpoint>/<MethodName>` whose parent is the received `traceparent` (the caller's client span, or its `Use` value), so nested calls continue the trace; `IpcContext.Current.TraceContext` gives the received values.
+- **Rules**: the same on .NET, JS and Python. A `traceparent` must follow W3C Trace Context §3.2; a received one that doesn't is ignored, and so is its `tracestate`. `tracestate` members that break their grammar are dropped. On send, `tracestate` is cut to 32 members (the ones over 128 characters go first), and `baggage` to 64 members and 8192 UTF-8 bytes, by dropping whole members; baggage members with no key are dropped too. The `traceparent` is optional: a `baggage` can travel without it, but a `tracestate` can't. `IpcTraceContext.Use` throws `ArgumentException` for an invalid `traceparent`.
+- A failed call sets `ActivityStatusCode.Error` on the client and server spans.
+- On .NET Framework the default `Activity` id format is hierarchical, so set `Activity.DefaultIdFormat = ActivityIdFormat.W3C; Activity.ForceDefaultIdFormat = true;` at startup (the OpenTelemetry SDK does this) or your activities are not propagated.
+- Subscribe to the `UiPath.Ipc` `ActivitySource` (OpenTelemetry: `.AddSource("UiPath.Ipc")`) in both the calling and the serving process. Otherwise the client and server spans are plain, unexported `Activity`s, and the spans under them point to a parent the backend never receives (as with `HttpClient`).
+
+```csharp
+using (IpcTraceContext.Use(new IpcTraceContext("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", baggage: "userId=alice")))
+{
+    await proxy.AddFloats(1.5f, 2.5f);
+}
+```
+
 ## 🧩 Notable Types
 
 ### 1. The `IpcServer`, `IpcClient` and `IpcBase` classes.
@@ -188,6 +214,7 @@ var ipcServer = new IpcServer
 | ServiceProvider | IServiceProvider? | **Optional**, defaults to **null**: Resolves services when handling incomming calls. |
 | Scheduler | TaskScheduler? |  **Optional**, defaults to the thread pool: Schedules incomming calls. |
 | RequestTimeout | TimeSpan? | **Optional**, defaults to infinity: Interval after which the honoring of requests will time out. |
+| TelemetryPropagation | TelemetryPropagationPolicy | **Optional**, defaults to **None**: Directions (`Incoming`, `Outgoing`, `Both`) in which W3C trace context is propagated, see [Trace context](#trace-context-telemetry). |
 
 
 #### ii. `IpcServer`

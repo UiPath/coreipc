@@ -248,7 +248,15 @@ internal sealed class Connection : IDisposable
         while (toRead > 0);
         return true;
     }
-    private async Task ReceiveLoop()
+    private Task ReceiveLoop()
+    {
+        // Upload handlers run on the loop, so it must not carry whatever was ambient when the connection opened.
+        using (Helpers.EnsureFlowSuppressed())
+        {
+            return Task.Run(ReceiveLoopCore);
+        }
+    }
+    private async Task ReceiveLoopCore()
     {
         try
         {
