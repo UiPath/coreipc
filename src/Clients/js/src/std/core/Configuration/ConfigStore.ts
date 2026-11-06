@@ -11,8 +11,6 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         private readonly _serviceProvider: IServiceProvider<TAddressBuilder>,
     ) {}
 
-    public telemetryPropagation = TelemetryPropagationPolicy.None;
-
     public getConnectHelper(address: Address): ConnectHelper | undefined {
         const key = ConfigStore.computeCompositeKey(this._serviceProvider, address, undefined);
 
@@ -39,6 +37,31 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         }
 
         this._connectHelpers.set(key, value);
+    }
+
+    /** The value set for `address`, else the one set for any address, else `None`. */
+    public getTelemetryPropagation(address: Address): TelemetryPropagationPolicy {
+        const key = ConfigStore.computeCompositeKey(this._serviceProvider, address, undefined);
+
+        return (
+            this._telemetryPropagations.get(key) ??
+            this._telemetryPropagations.get(ConfigStore.EmptyKey) ??
+            TelemetryPropagationPolicy.None
+        );
+    }
+
+    public setTelemetryPropagation(
+        address: Address | undefined,
+        value: TelemetryPropagationPolicy,
+    ): void {
+        assertArgument({ address }, Address, 'undefined');
+        assertArgument({ value }, 'number');
+
+        const key = (!address
+            ? ConfigStore.EmptyKey
+            : ConfigStore.computeCompositeKey(this._serviceProvider, address));
+
+        this._telemetryPropagations.set(key, value);
     }
 
     public getRequestTimeout(address: Address, service: PublicCtor): TimeSpan | undefined {
@@ -105,4 +128,6 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
     private readonly _requestTimeouts = new Map<string, TimeSpan>();
 
     private readonly _connectHelpers = new Map<string, ConnectHelper<any>>();
+
+    private readonly _telemetryPropagations = new Map<string, TelemetryPropagationPolicy>();
 }

@@ -2,7 +2,7 @@ import { assertArgument } from '../../bcl';
 import { TraceContextRuntime } from './TraceContextRuntime';
 import { TraceHeaders } from './TraceHeaders';
 
-/** The directions in which an `ipc` instance propagates the W3C trace context, see `ipc.config.setTelemetryPropagation`. */
+/** The directions in which an `ipc` instance propagates the W3C trace context, set per address with `ipc.config.forAddress(...).setTelemetryPropagation` (or `forAnyAddress()`). */
 export enum TelemetryPropagationPolicy {
     None = 0,
     /** The callbacks it receives run within the trace context they arrived with (`currentIncomingTraceContext`). */
@@ -13,7 +13,7 @@ export enum TelemetryPropagationPolicy {
 }
 
 /**
- * The W3C trace context of an IPC call, propagated only in the directions `ipc.config.setTelemetryPropagation` allows.
+ * The W3C trace context of an IPC call, propagated only in the directions `setTelemetryPropagation` allows for its address.
  */
 export interface TraceContext {
     /** Optional: W3C Baggage doesn't depend on Trace Context, so a baggage can travel alone. The tracestate travels only with a traceparent. */

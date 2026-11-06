@@ -196,7 +196,7 @@ describe('node:trace context', () => {
             let onCallback: () => Promise<string> = async () => '';
 
             beforeAll(async () => {
-                sut.config.setTelemetryPropagation(TelemetryPropagationPolicy.Both);
+                sut.config.forAnyAddress().setTelemetryPropagation(TelemetryPropagationPolicy.Both);
                 proxy = sut.proxy.withAddress(testContext.address).withService(ITraceProbe);
                 sut.callback
                     .forAddress(testContext.address)
@@ -311,7 +311,7 @@ describe('node:trace context', () => {
             ] as Array<[TelemetryPropagationPolicy, boolean, boolean]>) {
                 it(`should ${sends ? '' : 'not '}send and ${reads ? '' : 'not '}read with ${TelemetryPropagationPolicy[policy]}`, async () => {
                     const callbackTraceparent = '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01';
-                    sut.config.setTelemetryPropagation(policy);
+                    sut.config.forAddress(testContext.address).setTelemetryPropagation(policy);
                     try {
                         onCallback = async () => `${currentIncomingTraceContext()?.traceparent}`;
 
@@ -321,13 +321,13 @@ describe('node:trace context', () => {
                         expect(probe).to.deep.include(sends ? { TraceParent: traceparent, ActivityParentSpanId: spanId } : { TraceParent: null, TraceState: null, Baggage: null });
                         expect(callback.Callback).to.equal(reads ? callbackTraceparent : 'undefined');
                     } finally {
-                        sut.config.setTelemetryPropagation(TelemetryPropagationPolicy.Both);
+                        sut.config.forAddress(testContext.address).setTelemetryPropagation(TelemetryPropagationPolicy.Both);
                     }
                 });
             }
 
             it('should ignore a received trace context with Outgoing alone, and not leak the span that opened the connection', async () => {
-                sut.config.setTelemetryPropagation(TelemetryPropagationPolicy.Outgoing);
+                sut.config.forAddress(testContext.address).setTelemetryPropagation(TelemetryPropagationPolicy.Outgoing);
                 try {
                     let seen: { incoming?: TraceContext; otelSpanId?: string; nestedTraceParent?: string | null } = {};
                     onCallback = async () => {
@@ -345,7 +345,7 @@ describe('node:trace context', () => {
                     expect(actual.Callback).to.equal('done');
                     expect(seen).to.deep.equal({ incoming: undefined, otelSpanId: undefined, nestedTraceParent: null });
                 } finally {
-                    sut.config.setTelemetryPropagation(TelemetryPropagationPolicy.Both);
+                    sut.config.forAddress(testContext.address).setTelemetryPropagation(TelemetryPropagationPolicy.Both);
                 }
             });
 

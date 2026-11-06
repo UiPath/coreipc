@@ -10,7 +10,7 @@ const packagedBundle = resolve(__dirname, '../../dist/prepack/node/index.js');
 
 const probe = `
 const coreipc = require(process.argv[1]);
-coreipc.ipc.config.setTelemetryPropagation(coreipc.TelemetryPropagationPolicy.Both);
+coreipc.ipc.config.forAnyAddress().setTelemetryPropagation(coreipc.TelemetryPropagationPolicy.Both);
 const outgoing = coreipc.TraceContextRuntime.getOutgoingHeaders() ?? null;
 const incoming = coreipc.TraceContextRuntime.runIncoming({ traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01' }, () => 'ran');
 process.stdout.write(JSON.stringify({ outgoing, incoming }));
