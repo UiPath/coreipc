@@ -38,35 +38,6 @@ public sealed partial class NamedPipeSmokeTests
             await Task.Delay(Timeouts.Short); // let the accept slots re-park before teardown
         } // DisposeAsync awaits the accept-loop teardown, so any OnError has fired by here
 
-        capture.AcceptErrors.ShouldBeEmpty();
-    }
-
-    private sealed class TraceErrorCapture : TraceListener
-    {
-        private readonly List<string> _errors = new();
-
-        public TraceErrorCapture() => Trace.Listeners.Add(this);
-
-        public string[] AcceptErrors
-        {
-            get { lock (_errors) return _errors.Where(e => e.Contains("Failed to accept new connection")).ToArray(); }
-        }
-
-        public override void TraceEvent(TraceEventCache? eventCache, string source, TraceEventType eventType, int id, string? message)
-        {
-            if (eventType == TraceEventType.Error && message is not null)
-            {
-                lock (_errors) _errors.Add(message);
-            }
-        }
-
-        public override void Write(string? message) { }
-        public override void WriteLine(string? message) { }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing) Trace.Listeners.Remove(this);
-            base.Dispose(disposing);
-        }
+        capture.Errors.Where(e => e.Contains("Failed to accept new connection")).ShouldBeEmpty();
     }
 }
