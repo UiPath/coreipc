@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
@@ -131,8 +130,6 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
     // Keeps the string values and skips any other, so a peer that sends richer ones doesn't fail the read, which would close the connection.
     private sealed class DataConverter : JsonConverter<IReadOnlyDictionary<string, string>>
     {
-        private static readonly JsonLoadSettings SkipComments = new() { CommentHandling = CommentHandling.Ignore };
-
         public override bool CanWrite => false;
 
         public override IReadOnlyDictionary<string, string>? ReadJson(JsonReader reader, Type objectType, IReadOnlyDictionary<string, string>? existingValue, bool hasExistingValue, JsonSerializer serializer)
@@ -142,9 +139,31 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
             reader.DateParseHandling = DateParseHandling.None;
             try
             {
-                return JToken.ReadFrom(reader, SkipComments) is JObject data
-                    ? data.Properties().Where(entry => entry.Value.Type is JTokenType.String).ToDictionary(entry => entry.Name, entry => entry.Value.Value<string>()!)
-                    : null;
+                if (reader.TokenType is JsonToken.Comment)
+                {
+                    ReadToContent(reader);
+                }
+                if (reader.TokenType is not JsonToken.StartObject)
+                {
+                    reader.Skip();
+                    return null;
+                }
+                var data = new Dictionary<string, string>();
+                while (ReadToContent(reader) && reader.TokenType is JsonToken.PropertyName)
+                {
+                    var key = (string)reader.Value!;
+                    ReadToContent(reader);
+                    if (reader.TokenType is JsonToken.String)
+                    {
+                        data[key] = (string)reader.Value!;
+                    }
+                    else
+                    {
+                        data.Remove(key);
+                        reader.Skip();
+                    }
+                }
+                return data;
             }
             finally
             {
@@ -153,6 +172,18 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
         }
 
         public override void WriteJson(JsonWriter writer, IReadOnlyDictionary<string, string>? value, JsonSerializer serializer) => throw new NotSupportedException();
+
+        private static bool ReadToContent(JsonReader reader)
+        {
+            while (reader.Read())
+            {
+                if (reader.TokenType is not JsonToken.Comment)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 }
 
