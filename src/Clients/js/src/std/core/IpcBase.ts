@@ -46,13 +46,6 @@ export module IpcBase {
     }
 
     export interface Configuration<TAddressBuilder extends AddressBuilder> {
-        /**
-         * Sets the directions in which this `ipc` instance propagates the W3C trace context (default `None`):
-         * with `Outgoing` its calls carry the ambient trace context (`withTraceContext`, else the active OpenTelemetry
-         * span on Node); with `Incoming` its callbacks run within the trace context they arrived with (`currentIncomingTraceContext`).
-         */
-        setTelemetryPropagation(policy: TelemetryPropagationPolicy): void;
-
         forAnyAddress(): ConfigurationWithAddress;
 
         forAddress<TAddress extends Address>(configure: AddressSelectionDelegate<TAddressBuilder>): ConfigurationWithAddress<TAddress>;
@@ -62,6 +55,14 @@ export module IpcBase {
 
     export interface ConfigurationWithAddress<TAddress extends Address = Address> {
         setConnectHelper(value: ConnectHelper<TAddress>): void;
+
+        /**
+         * Sets the directions in which the calls to this address and the callbacks from it propagate the W3C trace context
+         * (default `None`): with `Outgoing` the calls carry the ambient trace context (`withTraceContext`, else the active
+         * OpenTelemetry span on Node); with `Incoming` the callbacks run within the trace context they arrived with
+         * (`currentIncomingTraceContext`). A value set with `forAddress` wins over the one set with `forAnyAddress`.
+         */
+        setTelemetryPropagation(policy: TelemetryPropagationPolicy): void;
 
         forAnyService(): ConfigurationWithAddressService<TAddress>;
 
@@ -176,11 +177,6 @@ export module IpcBaseImpl {
     export class Configuration<TAddressBuilder extends AddressBuilder> {
         constructor(private readonly _ipc: IServiceProvider<TAddressBuilder>) {}
 
-        public setTelemetryPropagation(policy: TelemetryPropagationPolicy): void {
-            assertArgument({ policy }, 'number');
-            this._ipc.configStore.telemetryPropagation = policy;
-        }
-
         public forAnyAddress(): ConfigurationWithAddress {
             return new ConfigurationWithAddress(this._ipc);
         }
@@ -198,6 +194,11 @@ export module IpcBaseImpl {
         public setConnectHelper(value: ConnectHelper): void {
             assertArgument({ value }, 'function');
             this._ipc.configStore.setConnectHelper(this._address, value);
+        }
+
+        public setTelemetryPropagation(policy: TelemetryPropagationPolicy): void {
+            assertArgument({ policy }, 'number');
+            this._ipc.configStore.setTelemetryPropagation(this._address, policy);
         }
 
         public forAnyService(): ConfigurationWithAddressService {

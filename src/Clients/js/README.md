@@ -317,7 +317,7 @@ ipc.config
 
 ## Trace context (telemetry)
 
-`ipc.config.setTelemetryPropagation(policy)` carries the W3C `traceparent`, `tracestate` and `baggage` across this `ipc` instance's calls and callbacks (wire-compatible with the .NET and Python sides). The `TelemetryPropagationPolicy` picks the directions: `None` (the default: nothing is sent or read), `Incoming`, `Outgoing` or `Both`.
+`ipc.config.forAnyAddress().setTelemetryPropagation(policy)` carries the W3C `traceparent`, `tracestate` and `baggage` across this `ipc` instance's calls and callbacks (wire-compatible with the .NET and Python sides). `ipc.config.forAddress(...).setTelemetryPropagation(policy)` sets it for one address, and wins over `forAnyAddress()`. The `TelemetryPropagationPolicy` picks the directions: `None` (the default: nothing is sent or read), `Incoming`, `Outgoing` or `Both`.
 
 - **Outgoing** (the calls it makes): a `withTraceContext(...)` scope wins; otherwise, on Node, the active span and baggage of the optional peer dependency `@opentelemetry/api`; otherwise nothing is sent. If `@opentelemetry/api` is missing or fails to load, it is treated as not installed.
 - **Incoming** (the callbacks it receives): `currentIncomingTraceContext()` gives the received values. On Node the callback also runs within an OpenTelemetry context whose parent is the remote span, so the spans it starts, and with `Outgoing` also its calls, continue the trace. With `Outgoing` alone, callbacks ignore what they received and run outside any span.
@@ -327,7 +327,9 @@ ipc.config
 ```typescript
 import { ipc, TelemetryPropagationPolicy, withTraceContext } from '@uipath/coreipc';
 
-ipc.config.setTelemetryPropagation(TelemetryPropagationPolicy.Both);
+ipc.config.forAnyAddress().setTelemetryPropagation(TelemetryPropagationPolicy.Both);
+// Or, for one address only:
+ipc.config.forAddress(options => options.isPipe('foo')).setTelemetryPropagation(TelemetryPropagationPolicy.Outgoing);
 
 await withTraceContext({ traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01' }, () => proxy.Foo());
 ```

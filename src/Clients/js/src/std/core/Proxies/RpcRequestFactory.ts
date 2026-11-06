@@ -82,7 +82,7 @@ export class RpcRequestFactory {
             timeout,
         );
 
-        if (params.sp.configStore.telemetryPropagation & TelemetryPropagationPolicy.Outgoing) {
+        if (params.sp.configStore.getTelemetryPropagation(params.address) & TelemetryPropagationPolicy.Outgoing) {
             const headers = TraceContextRuntime.getOutgoingHeaders();
             if (headers) {
                 rpcRequest.Headers = headers;

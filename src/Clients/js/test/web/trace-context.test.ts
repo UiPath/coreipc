@@ -15,7 +15,7 @@ describe('web:trace context end-to-end', () => {
     let onCallback: () => Promise<string> = async () => '';
 
     beforeAll(() => {
-        sut.config.setTelemetryPropagation(TelemetryPropagationPolicy.Both);
+        sut.config.forAnyAddress().setTelemetryPropagation(TelemetryPropagationPolicy.Both);
         proxy = sut.proxy.withAddress(address).withService(ITraceProbe);
         sut.callback.forAddress(address).forService<ITraceProbeCallback>('ITraceProbeCallback').is({ Probe: () => onCallback() });
     });
@@ -76,7 +76,7 @@ describe('web:trace context end-to-end', () => {
     ] as Array<[TelemetryPropagationPolicy, boolean, boolean]>) {
         it(`should ${sends ? '' : 'not '}send and ${reads ? '' : 'not '}read with ${TelemetryPropagationPolicy[policy]}`, async () => {
             const callbackTraceparent = '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01';
-            sut.config.setTelemetryPropagation(policy);
+            sut.config.forAddress(address).setTelemetryPropagation(policy);
             try {
                 onCallback = async () => `${currentIncomingTraceContext()?.traceparent}`;
 
@@ -86,7 +86,7 @@ describe('web:trace context end-to-end', () => {
                 expect(probe).to.deep.include(sends ? { TraceParent: traceparent, ActivityParentSpanId: spanId } : { TraceParent: null, TraceState: null, Baggage: null });
                 expect(callback.Callback).to.equal(reads ? callbackTraceparent : 'undefined');
             } finally {
-                sut.config.setTelemetryPropagation(TelemetryPropagationPolicy.Both);
+                sut.config.forAddress(address).setTelemetryPropagation(TelemetryPropagationPolicy.Both);
             }
         });
     }

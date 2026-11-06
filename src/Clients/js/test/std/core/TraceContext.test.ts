@@ -4,6 +4,7 @@ import { expect } from 'chai';
 import {
     Address,
     ArgumentError,
+    ArgumentOutOfRangeError,
     CallbackStoreImpl,
     CancellationToken,
     ChannelManager,
@@ -72,14 +73,28 @@ class IService {
     }
 }
 
-function createSut(policy: TelemetryPropagationPolicy) {
+class OtherAddress extends MockAddress {
+    get key() {
+        return 'mock:other';
+    }
+}
+
+function createConfigStore() {
+    return new ConfigStore<any>(new MockServiceProvider<any>({ implementation: { contractStore: new ContractStore() } }));
+}
+
+/** `policy` is set for any address; `addressPolicy`, when given, for the address the calls and callbacks use. */
+function createSut(policy: TelemetryPropagationPolicy, addressPolicy?: TelemetryPropagationPolicy) {
     const contractStore = new ContractStore();
     const callbackStore = new CallbackStoreImpl();
     const configStore = new ConfigStore<any>(new MockServiceProvider<any>({ implementation: { contractStore } }));
-    configStore.telemetryPropagation = policy;
+    configStore.setTelemetryPropagation(undefined, policy);
     const sp = new MockServiceProvider<any>({ implementation: { configStore, contractStore, callbackStore } });
     const factory = new CapturingChannelFactory();
     const address = new MockAddress();
+    if (addressPolicy !== undefined) {
+        configStore.setTelemetryPropagation(address, addressPolicy);
+    }
     const channelManager = new ChannelManager(sp, address, factory);
 
     return {
@@ -433,6 +448,45 @@ describe('trace context', () => {
                 expect(seen).to.deep.equal(reads ? { traceparent: otherTraceparent, baggage: 'k=v' } : undefined);
             });
         }
+    });
+
+    describe('per address', () => {
+        it('should be None by default', () => {
+            expect(createConfigStore().getTelemetryPropagation(new MockAddress())).to.equal(TelemetryPropagationPolicy.None);
+        });
+
+        it('should fall back to the value set for any address', () => {
+            const configStore = createConfigStore();
+            configStore.setTelemetryPropagation(undefined, TelemetryPropagationPolicy.Outgoing);
+            configStore.setTelemetryPropagation(new OtherAddress(), TelemetryPropagationPolicy.None);
+
+            expect(configStore.getTelemetryPropagation(new MockAddress())).to.equal(TelemetryPropagationPolicy.Outgoing);
+            expect(configStore.getTelemetryPropagation(new OtherAddress())).to.equal(TelemetryPropagationPolicy.None);
+        });
+
+        for (const [anyAddress, address, sends, reads] of [
+            [TelemetryPropagationPolicy.Both, TelemetryPropagationPolicy.None, false, false],
+            [TelemetryPropagationPolicy.None, TelemetryPropagationPolicy.Both, true, true],
+            [TelemetryPropagationPolicy.Both, TelemetryPropagationPolicy.Incoming, false, true],
+        ] as Array<[TelemetryPropagationPolicy, TelemetryPropagationPolicy, boolean, boolean]>) {
+            it(`should let ${TelemetryPropagationPolicy[address]} for the address win over ${TelemetryPropagationPolicy[anyAddress]} for any address`, async () => {
+                const sut = createSut(anyAddress, address);
+                const request = await withTraceContext({ traceparent }, () => sut.call());
+                let seen: TraceContext | undefined;
+                await sut.receiveCallback({ traceparent: otherTraceparent }, () => {
+                    seen = currentIncomingTraceContext();
+                });
+
+                expect(request.Headers).to.deep.equal(sends ? { traceparent } : undefined);
+                expect(seen).to.deep.equal(reads ? { traceparent: otherTraceparent } : undefined);
+            });
+        }
+
+        it('should reject a policy that is not a number', () => {
+            expect(() => createConfigStore().setTelemetryPropagation(undefined, 'Both' as any))
+                .to.throw(ArgumentOutOfRangeError)
+                .with.property('paramName', 'value');
+        });
     });
 
     describe('baggage encoding', () => {
