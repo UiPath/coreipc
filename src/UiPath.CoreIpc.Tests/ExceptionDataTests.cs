@@ -347,6 +347,21 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
+    public void FromException_ValueWithAHalfEmoji_IsDropped_SoTheErrorStillGoesOut()
+    {
+        var exception = new InvalidOperationException("m");
+        exception.Data[ErrorDataProbe.ListedKey] = "cut \ud83d";
+        exception.Data[ErrorDataProbe.ListedKey2] = "\ude00 alone";
+        exception.Data[ErrorDataProbe.UnlistedKey] = "\ud83d cut";
+        exception.Data[ErrorDataProbe.ErrorInfoKey] = "whole \ud83d\ude00";
+
+        var response = Response.Fail(Request(), exception, [ErrorDataProbe.ListedKey, ErrorDataProbe.ListedKey2, ErrorDataProbe.ErrorInfoKey, ErrorDataProbe.UnlistedKey]);
+
+        response.Error!.Data!.Keys.ShouldBe(new[] { ErrorDataProbe.ErrorInfoKey });
+        Should.NotThrow(() => IpcJsonSerializer.Instance.Serialize(response, new MemoryStream()));
+    }
+
+    [Fact]
     public void FromException_WithoutKeys_CarriesNoData()
     {
         Error.FromException(NewWrapped()).Data.ShouldBeNull();
