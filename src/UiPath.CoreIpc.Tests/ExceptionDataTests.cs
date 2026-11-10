@@ -362,6 +362,18 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
+    public void FromException_ListedEntriesComeFirst_SoTheCallersCapKeepsThem()
+    {
+        var remote = new RemoteException(new Error("m", "s", "t", InnerError: null) { Data = Enumerable.Range(0, 64).ToDictionary(i => $"k{i}", i => "received") });
+        remote.Data[ErrorDataProbe.ListedKey] = "own";
+
+        var error = Error.FromException(remote, Keys);
+
+        error.Data!.Keys.First().ShouldBe(ErrorDataProbe.ListedKey);
+        new RemoteException(error).Data[ErrorDataProbe.ListedKey].ShouldBe("own");
+    }
+
+    [Fact]
     public void FromException_WithoutKeys_CarriesNoData()
     {
         Error.FromException(NewWrapped()).Data.ShouldBeNull();
@@ -386,6 +398,15 @@ public sealed class ExceptionDataTests
         error.Message.ShouldBe("faulty entry");
         error.Data!.Keys.ShouldBe(new[] { ErrorDataProbe.ListedKey2 });
         error.Data[ErrorDataProbe.ListedKey2].ShouldBe("ok");
+    }
+
+    [Fact]
+    public void FromException_FaultyEntryOnARelay_StillPassesOnWhatItReceived()
+    {
+        var remote = new FaultyEntryRemoteException(new Error("m", "s", "t", InnerError: null) { Data = new Dictionary<string, string> { ["k"] = "received", [ErrorDataProbe.ListedKey] = "received" } });
+        var error = Error.FromException(remote, [ErrorDataProbe.ListedKey2, ErrorDataProbe.ListedKey]);
+        error.Data!.Keys.ShouldBe(new[] { ErrorDataProbe.ListedKey2, "k", ErrorDataProbe.ListedKey }, ignoreOrder: true);
+        error.Data[ErrorDataProbe.ListedKey].ShouldBe("received");
     }
 
     [Fact]
@@ -546,6 +567,11 @@ public sealed class ExceptionDataTests
     }
 
     private sealed class FaultyEntryException() : Exception("faulty entry")
+    {
+        public override System.Collections.IDictionary Data { get; } = new FaultyEntryData { [ErrorDataProbe.ListedKey2] = "ok" };
+    }
+
+    private sealed class FaultyEntryRemoteException(Error error) : RemoteException(error)
     {
         public override System.Collections.IDictionary Data { get; } = new FaultyEntryData { [ErrorDataProbe.ListedKey2] = "ok" };
     }

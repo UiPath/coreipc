@@ -99,7 +99,9 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
             return received;
         }
 
-        var data = received?.ToDictionary(pair => pair.Key, pair => pair.Value) ?? [];
+        // The listed keys go first: the caller keeps only the first entries it receives.
+        var data = new Dictionary<string, string>();
+        var listed = new HashSet<string>();
         try
         {
             var exceptionData = exception.Data;
@@ -117,12 +119,23 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
                 {
                     data.Remove(key);
                 }
+                listed.Add(key);
             }
         }
         catch (Exception ex)
         {
             // A faulty Data getter, entry or key collection must not cost the caller the error itself.
             Trace.TraceError($"Failed to read the Exception.Data entries to send with the error. Ex: {ex}");
+        }
+        if (received is not null)
+        {
+            foreach (var pair in received)
+            {
+                if (!listed.Contains(pair.Key))
+                {
+                    data[pair.Key] = pair.Value;
+                }
+            }
         }
         return data.Count > 0 ? data : null;
     }
