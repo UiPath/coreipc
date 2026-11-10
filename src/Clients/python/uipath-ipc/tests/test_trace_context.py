@@ -134,18 +134,15 @@ def test_an_override_without_a_traceparent_takes_only_the_ambient_trace(
     # The ambient trace is faked, so this runs without OpenTelemetry too (as in CI).
     import uipath_ipc.trace_context as trace_context_module
 
-    calls: list[bool] = []
-
-    def ambient(with_baggage: bool = True) -> TraceContext:
-        calls.append(with_baggage)
-        return TraceContext(TP, "congo=t61rcWkgMzE", "ambient=1" if with_baggage else None)
-
-    monkeypatch.setattr(trace_context_module, "_from_opentelemetry", ambient)
+    monkeypatch.setattr(
+        trace_context_module,
+        "_from_opentelemetry",
+        lambda: TraceContext(TP, "congo=t61rcWkgMzE", "ambient=1"),
+    )
+    # The scope's baggage replaces the ambient one.
     assert _sent(TraceContext(tracestate="a=b", baggage="k=v")) == {
         "traceparent": TP, "tracestate": "congo=t61rcWkgMzE", "baggage": "k=v",
     }
-    # The ambient baggage is never encoded: the scope's baggage replaces it.
-    assert calls == [False]
 
 
 def test_a_higher_version_traceparent_is_sent_unchanged() -> None:
@@ -249,6 +246,12 @@ def test_baggage_encoding_matches_dotnet_uri_escape_data_string() -> None:
     assert _encode_baggage({"userId": "alice", "x": "a b,c=d", "k~-_.": "é"}) == (
         "userId=alice,x=a%20b%2Cc%3Dd,k~-_.=%C3%A9"
     )
+
+
+def test_baggage_encoding_sends_a_lone_surrogate_as_u_fffd_like_dotnet_and_js() -> None:
+    assert _encode_baggage(
+        {"k\udc00": "a\ud800b", "pair": "\ud83d\ude00", "reversed": "\ude00\ud83d"}
+    ) == "k%EF%BF%BD=a%EF%BF%BDb,pair=%F0%9F%98%80,reversed=%EF%BF%BD%EF%BF%BD"
 
 
 def test_baggage_with_encoded_separators_round_trips() -> None:

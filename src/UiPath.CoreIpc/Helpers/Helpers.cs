@@ -371,14 +371,6 @@ internal readonly struct TimeoutHelper : IDisposable
         }
         return exception;
     }
-    public void ThrowTimeout(Exception exception, string message)
-    {
-        var newException = CheckTimeout(exception, message);
-        if (newException != exception)
-        {
-            throw newException;
-        }
-    }
     public void Dispose()
     {
         _linkedRegistration.Dispose();

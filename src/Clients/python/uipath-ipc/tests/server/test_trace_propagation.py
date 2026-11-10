@@ -371,6 +371,21 @@ async def test_over_limit_opentelemetry_baggage_is_cut_on_send() -> None:
     assert seen == f"{TP}|None|" + ",".join(f"k{i}=v" for i in range(64))
 
 
+async def test_a_lone_surrogate_in_opentelemetry_baggage_is_sent_as_u_fffd() -> None:
+    pytest.importorskip("opentelemetry")
+    from opentelemetry import baggage
+    from opentelemetry import context as otel_context
+
+    ctx = baggage.set_baggage("k", "a\ud800b", otel_context.Context())
+    async with _pair() as (client, _):
+        token = otel_context.attach(ctx)
+        try:
+            seen = await client.get_proxy(ITraceProbe).Probe()
+        finally:
+            otel_context.detach(token)
+    assert seen == "None|None|k=a%EF%BF%BDb"
+
+
 async def test_lone_surrogate_baggage_gets_a_response() -> None:
     async with _pair() as (client, _):
         with use_trace_context(TraceContext(TP, baggage="k=\ud800")):

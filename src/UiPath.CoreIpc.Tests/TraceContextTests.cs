@@ -26,7 +26,7 @@ public sealed record TraceProbeResult(
             activity?.ParentSpanId.ToHexString(),
             activity?.SpanId.ToHexString(),
             activity?.Baggage.Select(pair => $"{pair.Key}={pair.Value}").ToArray(),
-            IpcTraceContext.Override.Value?.TraceParent);
+            IpcTraceContext.OutgoingTrace.Scope?.TraceParent);
     }
 }
 
@@ -214,12 +214,12 @@ public sealed class TraceContextTests
         var inner = IpcTraceContext.Use(new(TraceParentB));
         inner.Dispose();
         inner.Dispose();
-        IpcTraceContext.Override.Value!.TraceParent.ShouldBe(TraceParentA);
+        IpcTraceContext.OutgoingTrace.Scope!.TraceParent.ShouldBe(TraceParentA);
         outer.Dispose();
-        IpcTraceContext.Override.Value.ShouldBeNull();
+        IpcTraceContext.OutgoingTrace.Scope.ShouldBeNull();
         // A late second Dispose must not bring back what the scope found when it opened.
         inner.Dispose();
-        IpcTraceContext.Override.Value.ShouldBeNull();
+        IpcTraceContext.OutgoingTrace.Scope.ShouldBeNull();
     }
 
     [Fact]
@@ -538,6 +538,19 @@ public sealed class TraceContextTests
     }
 
     [Fact]
+    public async Task AmbientBaggageWithALoneSurrogate_IsSentAsU_FFFD()
+    {
+        await using var pair = await Pair.Create();
+        using var activity = StartW3CActivity();
+        activity.AddBaggage("k", "a\uD800b");
+
+        var result = await pair.Proxy.Probe();
+
+        result.Baggage.ShouldBe("k=a%EF%BF%BDb");
+        result.ActivityBaggage.ShouldBe(["k=a\uFFFDb"]);
+    }
+
+    [Fact]
     public async Task AmbientBaggageOverTheByteLimit_DropsTheMemberThatDoesNotFit()
     {
         await using var pair = await Pair.Create();
@@ -783,7 +796,7 @@ public sealed class TraceContextTests
     {
         var ex = Should.Throw<ArgumentException>(() => IpcTraceContext.Use(new(traceParent, traceState)));
         ex.ParamName.ShouldBe("traceContext");
-        IpcTraceContext.Override.Value.ShouldBeNull();
+        IpcTraceContext.OutgoingTrace.Scope.ShouldBeNull();
     }
 
     [Fact]
@@ -808,9 +821,26 @@ public sealed class TraceContextTests
         activity.TraceStateString = TraceState;
         activity.AddBaggage("k", "v");
         // Checked on the headers themselves: a .NET receiver would drop that traceparent anyway.
-        using var client = IpcTraceContext.StartClientActivity("ITraceProbe/Probe", explicitContext: null);
+        using var trace = IpcTraceContext.OutgoingTrace.Start("ITraceProbe/Probe");
 
-        IpcTraceContext.GetOutgoingHeaders(explicitContext: null, client).ShouldBe(new Dictionary<string, string?> { ["baggage"] = "k=v" });
+        trace.Headers().ShouldBe(new Dictionary<string, string?> { ["baggage"] = "k=v" });
+    }
+
+    [Fact]
+    public async Task BeforeOutgoingCall_WhatItAddsToTheClientSpan_IsSent()
+    {
+        await using var pair = await Pair.Create(beforeOutgoingCall: (_, _) =>
+        {
+            Activity.Current!.AddBaggage("hook", "added");
+            Activity.Current.TraceStateString = "hook=1";
+            return Task.CompletedTask;
+        });
+        using var activity = StartW3CActivity();
+
+        var result = await pair.Proxy.Probe();
+
+        result.Baggage.ShouldBe("hook=added");
+        result.TraceState.ShouldBe("hook=1");
     }
 
     [Fact]
@@ -1016,6 +1046,17 @@ public sealed class TraceContextTests
         child.ToBaggageHeader().ShouldBe("shared=child-newer,shared=child,inherited=parent,shared=parent");
     }
 
+    [Fact]
+    public void ToBaggageHeader_SendsALoneSurrogateAsU_FFFD_LikeJsAndPython()
+    {
+        using var activity = StartW3CActivity();
+        activity.AddBaggage("reversed", "\uDE00\uD83D");
+        activity.AddBaggage("pair", "\uD83D\uDE00");
+        activity.AddBaggage("k\uDC00", "a\uD800b");
+
+        activity.ToBaggageHeader().ShouldBe("k%EF%BF%BD=a%EF%BF%BDb,pair=%F0%9F%98%80,reversed=%EF%BF%BD%EF%BF%BD");
+    }
+
     private static Activity StartW3CActivity() => new Activity("caller").SetIdFormat(ActivityIdFormat.W3C).Start();
 
     private static string Members(int count) => string.Join(",", Enumerable.Range(0, count).Select(i => $"k{i}=v"));
@@ -1090,7 +1131,8 @@ public sealed class TraceContextTests
         public static async Task<Pair> Create(
             TelemetryPropagationPolicy clientPropagation = TelemetryPropagationPolicy.Both,
             TelemetryPropagationPolicy serverPropagation = TelemetryPropagationPolicy.Both,
-            TimeSpan? requestTimeout = null)
+            TimeSpan? requestTimeout = null,
+            BeforeCallHandler? beforeOutgoingCall = null)
         {
             var pipeName = $"ipctest_trace_{Guid.NewGuid():N}";
 
@@ -1107,6 +1149,7 @@ public sealed class TraceContextTests
                 Callbacks = new() { { typeof(ITraceProbeCallback), new TraceProbeCallback() } },
                 TelemetryPropagation = clientPropagation,
                 RequestTimeout = requestTimeout ?? TimeSpan.FromSeconds(10),
+                BeforeOutgoingCall = beforeOutgoingCall,
             };
             var proxy = client.GetProxy<ITraceProbe>();
 

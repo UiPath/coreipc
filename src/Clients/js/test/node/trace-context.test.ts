@@ -233,6 +233,22 @@ describe('node:trace context', () => {
                 expect(actual).to.deep.include({ TraceParent: traceparent, Baggage: 'userId=alice', ActivityTraceId: traceId, ActivityParentSpanId: spanId });
             });
 
+            it('should send a lone surrogate in the OpenTelemetry baggage as U+FFFD', async () => {
+                const actual = await context.with(otelContext({ baggage: { k: 'a\uD800b' } }), () => proxy.Probe());
+
+                expect(actual).to.deep.include({ TraceParent: traceparent, Baggage: 'k=a%EF%BF%BDb' });
+                expect(actual.ActivityBaggage).to.deep.equal(['k=a\uFFFDb']);
+            });
+
+            it('should send an OpenTelemetry baggage value that is not a string as text, with or without a scope', async () => {
+                const ambient = otelContext({ baggage: { attempt: 3 as unknown as string } });
+                const alone = await context.with(ambient, () => proxy.Probe());
+                const withScope = await context.with(ambient, () => withTraceContext({ baggage: 'userId=alice' }, () => proxy.Probe()));
+
+                expect(alone.Baggage).to.equal('attempt=3');
+                expect(withScope.Baggage).to.equal('userId=alice');
+            });
+
             it('should let the explicit override win over the active span', async () => {
                 const other = '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-00';
                 const actual = await context.with(otelContext(), () => withTraceContext({ traceparent: other }, () => proxy.Probe()));

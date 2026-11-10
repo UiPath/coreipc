@@ -134,18 +134,11 @@ const invalidTraceparents: Array<[string, string]> = [
 
 const ambientTraceContext: TraceContext = { traceparent: otherTraceparent, tracestate: 'congo=t61rcWkgMzE', baggage: 'ambient=1' };
 
-/** The `withBaggage` argument of each read of the fake bridge in `withAmbientTraceContext`. */
-let ambientReads: boolean[] = [];
-
 /** Runs `act` with a tracing bridge whose ambient trace context is `ambientTraceContext`. */
 async function withAmbientTraceContext<T>(act: () => Promise<T>): Promise<T> {
     const previous = TraceContextRuntime.bridge;
-    ambientReads = [];
     TraceContextRuntime.bridge = {
-        current: (withBaggage = true) => {
-            ambientReads.push(withBaggage);
-            return withBaggage ? ambientTraceContext : { ...ambientTraceContext, baggage: undefined };
-        },
+        current: () => ambientTraceContext,
         runWithRemoteParent: (_, callback) => callback(),
     };
     try {
@@ -295,7 +288,6 @@ describe('trace context', () => {
             const request = await withAmbientTraceContext(() => sut.call());
 
             expect(request.Headers).to.deep.equal(ambientTraceContext);
-            expect(ambientReads).to.deep.equal([true]);
         });
 
         it('should send the ambient traceparent and tracestate with the baggage of an override that has no traceparent', async () => {
@@ -303,8 +295,6 @@ describe('trace context', () => {
             const request = await withAmbientTraceContext(() => withTraceContext({ tracestate: 'ignored=1', baggage: 'userId=alice' }, () => sut.call()));
 
             expect(request.Headers).to.deep.equal({ traceparent: otherTraceparent, tracestate: 'congo=t61rcWkgMzE', baggage: 'userId=alice' });
-            // The ambient baggage is never encoded: the override's baggage replaces it.
-            expect(ambientReads).to.deep.equal([false]);
         });
 
         it('should let an override with a traceparent win outright over the ambient trace context', async () => {
@@ -581,6 +571,16 @@ describe('trace context', () => {
                 ]),
             ).to.equal('userId=alice,x=a%20b%2Cc%3Dd%3B%21%27%28%29%2A%C3%A9');
             expect(TraceHeaders.encodeBaggage([])).to.equal(undefined);
+        });
+
+        it('should send a lone surrogate as U+FFFD, as .NET and Python do', () => {
+            expect(
+                TraceHeaders.encodeBaggage([
+                    ['k\uDC00', 'a\uD800b'],
+                    ['pair', '\uD83D\uDE00'],
+                    ['reversed', '\uDE00\uD83D'],
+                ]),
+            ).to.equal('k%EF%BF%BD=a%EF%BF%BDb,pair=%F0%9F%98%80,reversed=%EF%BF%BD%EF%BF%BD');
         });
 
         it('should decode an encoded , = and ; back exactly', () => {

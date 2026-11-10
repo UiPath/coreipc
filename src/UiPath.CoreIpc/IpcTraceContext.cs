@@ -8,7 +8,7 @@ public sealed class IpcTraceContext
     internal const string TraceStateHeader = "tracestate";
     internal const string BaggageHeader = "baggage";
 
-    internal static readonly AsyncLocal<IpcTraceContext?> Override = new();
+    private static readonly AsyncLocal<IpcTraceContext?> Override = new();
     private static readonly ActivitySource Source = new("UiPath.Ipc");
 
     /// <param name="traceParent">Optional: W3C Baggage doesn't depend on Trace Context, so a baggage can travel alone.
@@ -54,40 +54,6 @@ public sealed class IpcTraceContext
         }
 
         return Override.Push(traceContext);
-    }
-
-    /// <summary>The client span of an outgoing call, a child of the ambient W3C <see cref="Activity.Current"/>, unless
-    /// <paramref name="explicitContext"/> brings its own traceparent; a plain <see cref="Activity"/> when nobody samples
-    /// the source, so its ids still carry the caller's current flags.</summary>
-    internal static Activity? StartClientActivity(string name, IpcTraceContext? explicitContext)
-    => explicitContext?.TraceParent is null && Activity.Current is { IdFormat: ActivityIdFormat.W3C }
-        ? (Source.CreateActivity(name, ActivityKind.Client) ?? new Activity(name)).Start()
-        : null;
-
-    // The headers are written by hand, not through DistributedContextPropagator.Current, so they are the same on every runtime
-    // and are what JS and Python read (Current is LegacyPropagator on .NET 6, 8 and net461, W3CPropagator on .NET 10).
-    internal static Dictionary<string, string?>? GetOutgoingHeaders(IpcTraceContext? explicitContext, Activity? clientActivity)
-    {
-        if ((explicitContext is { TraceParent: not null } ? explicitContext : FromActivity(clientActivity, explicitContext)) is not { } traceContext)
-        {
-            return null;
-        }
-
-        var headers = new Dictionary<string, string?>();
-        // Use checked its own traceparent, but an Activity can have an all-zero trace id (SetParentId(default, ...)).
-        if (traceContext.TraceParent is { } traceParent && TraceHeaders.IsValidTraceParent(traceParent))
-        {
-            headers[TraceParentHeader] = traceParent;
-            if (traceContext.TraceState?.LimitTraceState() is { } traceState)
-            {
-                headers[TraceStateHeader] = traceState;
-            }
-        }
-        if (traceContext.Baggage?.LimitBaggage() is { } baggage)
-        {
-            headers[BaggageHeader] = baggage;
-        }
-        return headers.Count is 0 ? null : headers;
     }
 
     /// <summary>A traceparent that breaks W3C Trace Context is ignored, and so is its tracestate (§3.3);
@@ -139,18 +105,6 @@ public sealed class IpcTraceContext
         return activity.Start();
     }
 
-    /// <summary>The traceparent and tracestate of a W3C <paramref name="activity"/>, with <paramref name="explicitContext"/>'s
-    /// baggage when there is an explicit context, else the activity's own; <paramref name="explicitContext"/> without such an activity.</summary>
-    private static IpcTraceContext? FromActivity(Activity? activity, IpcTraceContext? explicitContext)
-    {
-        if (activity is not { IdFormat: ActivityIdFormat.W3C })
-        {
-            return explicitContext;
-        }
-
-        return new(activity.Id!, activity.TraceStateString, explicitContext is null ? activity.ToBaggageHeader() : explicitContext.Baggage);
-    }
-
     private static string? GetHeader(Dictionary<string, string?> headers, string name)
     {
         if (headers.TryGetValue(name, out var value))
@@ -165,5 +119,70 @@ public sealed class IpcTraceContext
             }
         }
         return null;
+    }
+
+    /// <summary>What one outgoing call sends: the <see cref="Use"/> scope, read once, and the client span it allows.</summary>
+    internal sealed class OutgoingTrace : IDisposable
+    {
+        private readonly IpcTraceContext? _scope;
+        private readonly Activity? _activity;
+
+        private OutgoingTrace(IpcTraceContext? scope, Activity? activity)
+        {
+            _scope = scope;
+            _activity = activity;
+        }
+
+        /// <summary>The innermost <see cref="Use"/> scope on the current async flow; only <see cref="Use"/> sets it.</summary>
+        public static IpcTraceContext? Scope => Override.Value;
+
+        /// <summary>Reads the scope and, unless it brings its own traceparent, starts the client span, a child of the ambient
+        /// W3C <see cref="Activity.Current"/>: a plain <see cref="Activity"/> when nobody samples the source, so its ids still
+        /// carry the caller's current flags.</summary>
+        public static OutgoingTrace Start(string name)
+        {
+            var scope = Scope;
+            var activity = scope?.TraceParent is null && Activity.Current is { IdFormat: ActivityIdFormat.W3C }
+                ? (Source.CreateActivity(name, ActivityKind.Client) ?? new Activity(name)).Start()
+                : null;
+            return new(scope, activity);
+        }
+
+        // The headers are written by hand, not through DistributedContextPropagator.Current, so they are the same on every runtime
+        // and are what JS and Python read (Current is LegacyPropagator on .NET 6, 8 and net461, W3CPropagator on .NET 10).
+        public Dictionary<string, string?>? Headers()
+        {
+            if (TraceContext() is not { } traceContext)
+            {
+                return null;
+            }
+
+            var headers = new Dictionary<string, string?>();
+            // Use checked its own traceparent, but an Activity can have an all-zero trace id (SetParentId(default, ...)).
+            if (traceContext.TraceParent is { } traceParent && TraceHeaders.IsValidTraceParent(traceParent))
+            {
+                headers[TraceParentHeader] = traceParent;
+                if (traceContext.TraceState?.LimitTraceState() is { } traceState)
+                {
+                    headers[TraceStateHeader] = traceState;
+                }
+            }
+            if (traceContext.Baggage?.LimitBaggage() is { } baggage)
+            {
+                headers[BaggageHeader] = baggage;
+            }
+            return headers.Count is 0 ? null : headers;
+        }
+
+        public void SetError(string message) => _activity?.SetStatus(ActivityStatusCode.Error, message);
+
+        public void Dispose() => _activity?.Dispose();
+
+        /// <summary>The client span's traceparent and tracestate, with the scope's baggage when there is a scope, else the span's
+        /// own; the scope alone without a W3C span, as always when the scope has a traceparent.</summary>
+        private IpcTraceContext? TraceContext()
+        => _activity is { IdFormat: ActivityIdFormat.W3C }
+            ? new(_activity.Id!, _activity.TraceStateString, _scope is null ? _activity.ToBaggageHeader() : _scope.Baggage)
+            : _scope;
     }
 }

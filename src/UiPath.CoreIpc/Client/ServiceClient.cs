@@ -61,9 +61,8 @@ internal abstract class ServiceClient : IDisposable
 
             using var timeoutHelper = new TimeoutHelper(clientTimeout, cancellationToken);
             var propagateOutgoing = (Config.TelemetryPropagation & TelemetryPropagationPolicy.Outgoing) != 0;
-            // Read before the first await, which can resume without the caller's ExecutionContext (SuppressFlow).
-            var explicitContext = propagateOutgoing ? IpcTraceContext.Override.Value : null;
-            using var activity = propagateOutgoing ? IpcTraceContext.StartClientActivity($"{_interfaceType.Name}/{methodName}", explicitContext) : null;
+            // Started before the first await, which can resume without the caller's ExecutionContext (SuppressFlow).
+            using var trace = propagateOutgoing ? IpcTraceContext.OutgoingTrace.Start($"{_interfaceType.Name}/{methodName}") : null;
             try
             {
                 var ct = timeoutHelper.Token;
@@ -75,12 +74,9 @@ internal abstract class ServiceClient : IDisposable
                 var requestId = connection.NewRequestId();
                 var request = new Request(_interfaceType.Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds)
                 {
-                    UploadStream = uploadStream
+                    UploadStream = uploadStream,
+                    Headers = trace?.Headers(),
                 };
-                if (propagateOutgoing)
-                {
-                    request.Headers = IpcTraceContext.GetOutgoingHeaders(explicitContext, activity);
-                }
 
                 Config.Logger?.ServiceClient_Calling(methodName, requestId, Config.GetComputedDebugName());
 
@@ -102,7 +98,7 @@ internal abstract class ServiceClient : IDisposable
             catch (Exception ex)
             {
                 var error = timeoutHelper.CheckTimeout(ex, methodName);
-                activity?.SetStatus(ActivityStatusCode.Error, error.Message);
+                trace?.SetError(error.Message);
                 if (error != ex)
                 {
                     throw error;

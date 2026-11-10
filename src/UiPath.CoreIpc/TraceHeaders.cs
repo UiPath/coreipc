@@ -80,7 +80,7 @@ internal static class TraceHeaders
     /// <summary>The W3C baggage of <paramref name="activity"/> and its parents, in <see cref="Activity.Baggage"/> order, or <c>null</c> when there is none.</summary>
     internal static string? ToBaggageHeader(this Activity activity)
     => activity.Baggage.Any()
-        ? string.Join(",", activity.Baggage.Select(pair => $"{Uri.EscapeDataString(pair.Key)}={Uri.EscapeDataString(pair.Value ?? "")}"))
+        ? string.Join(",", activity.Baggage.Select(pair => $"{Escape(pair.Key)}={Escape(pair.Value ?? "")}"))
         : null;
 
     /// <summary>W3C Baggage: send at most 64 members and 8192 bytes, dropping whole members beyond that, and the ones
@@ -147,6 +147,10 @@ internal static class TraceHeaders
 
         static bool IsHex(char c) => c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
     }
+
+    // Encoding.UTF8 turns a lone surrogate into U+FFFD first, as JS and Python do. .NET's Uri.EscapeDataString does that
+    // itself, but .NET Framework's throws on some.
+    private static string Escape(string value) => Uri.EscapeDataString(Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(value)));
 
     private static List<string> ValidTraceStateMembers(string traceState)
     => traceState.Split(',').Select(member => member.Trim(OptionalWhitespace)).Where(member => TraceStateMember.IsMatch(member)).ToList();

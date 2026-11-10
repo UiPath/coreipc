@@ -143,7 +143,7 @@ def outgoing_headers() -> dict[str, str] | None:
         tc = _from_opentelemetry()
     elif tc.traceparent is None:
         # Without a traceparent, the scope's baggage goes with the span's trace.
-        ambient = _from_opentelemetry(with_baggage=False)
+        ambient = _from_opentelemetry()
         if ambient is not None and ambient.traceparent:
             tc = TraceContext(ambient.traceparent, ambient.tracestate, tc.baggage)
     if tc is None:
@@ -254,13 +254,17 @@ def _get_header(headers: Mapping[str, str], name: str) -> str | None:
 
 
 def _encode_baggage(entries: Mapping[str, object]) -> str | None:
-    # quote(safe="") leaves exactly RFC 3986's unreserved set, like .NET's
-    # Uri.EscapeDataString, so both sides encode identically.
-    encoded = ",".join(
-        f"{quote(str(key), safe='')}={quote(str(value), safe='')}"
-        for key, value in entries.items()
-    )
+    encoded = ",".join(f"{_escape(key)}={_escape(value)}" for key, value in entries.items())
     return encoded or None
+
+
+def _escape(value: object) -> str:
+    # quote(safe="") leaves exactly RFC 3986's unreserved set, like .NET's
+    # Uri.EscapeDataString, so both sides encode identically. quote raises on a
+    # surrogate: the UTF-16 round trip sends a lone one as U+FFFD and a pair as
+    # its character, as .NET and JS do.
+    text = str(value).encode("utf-16-le", "surrogatepass").decode("utf-16-le", "replace")
+    return quote(text, safe="")
 
 
 def _decode_baggage(baggage: str) -> list[tuple[str, str]]:
@@ -283,13 +287,13 @@ def _split_baggage_member(member: str) -> tuple[str, str] | None:
 # --- OpenTelemetry (optional) --------------------------------------------------
 
 
-def _from_opentelemetry(with_baggage: bool = True) -> TraceContext | None:
+def _from_opentelemetry() -> TraceContext | None:
     try:
         from opentelemetry import baggage, trace
     except Exception:
         return None
     span_context = trace.get_current_span().get_span_context()
-    encoded_baggage = _encode_baggage(baggage.get_all()) if with_baggage else None
+    encoded_baggage = _encode_baggage(baggage.get_all())
     if not span_context.is_valid:
         return TraceContext(baggage=encoded_baggage) if encoded_baggage else None
     traceparent = (

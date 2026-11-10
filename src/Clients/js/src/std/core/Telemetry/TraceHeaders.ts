@@ -173,9 +173,15 @@ export module TraceHeaders {
         return key === undefined ? undefined : headers[key];
     }
 
-    // Like .NET's Uri.EscapeDataString, so both sides produce the same bytes.
+    // A surrogate pair, else a lone surrogate.
+    const surrogates = /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g;
+
+    // Like .NET's Uri.EscapeDataString, so both sides produce the same bytes. A lone surrogate, which encodeURIComponent
+    // throws on, is sent as U+FFFD, as on .NET and Python. String(), because OpenTelemetry keeps any value plain JS puts in
+    // its baggage, such as a number, which goes as text, as with Python's str().
     function escape(value: string): string {
-        return encodeURIComponent(value).replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+        const wellFormed = String(value).replace(surrogates, match => (match.length === 2 ? match : '\uFFFD'));
+        return encodeURIComponent(wellFormed).replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
     }
 
     const escapes = /(?:%[0-9a-f]{2})+/gi;

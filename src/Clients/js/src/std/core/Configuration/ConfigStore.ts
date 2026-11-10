@@ -98,10 +98,7 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
     }
 
     private getForAddress<T>(map: Map<string, T>, address: Address): T | undefined {
-        return (
-            map.get(ConfigStore.computeCompositeKey(this._serviceProvider, address, undefined)) ??
-            map.get(ConfigStore.EmptyKey)
-        );
+        return map.get(this.addressKey(address)) ?? map.get(ConfigStore.EmptyKey);
     }
 
     private static computeCompositeKey(

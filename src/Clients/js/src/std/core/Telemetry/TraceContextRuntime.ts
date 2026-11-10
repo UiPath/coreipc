@@ -10,8 +10,8 @@ export interface AmbientSlot<T> {
 /** Bridges to the platform's idiomatic tracing library (OpenTelemetry on Node). */
 /* @internal */
 export interface TracingBridge {
-    /** The active trace context, with its baggage unless `withBaggage` is false. */
-    current(withBaggage?: boolean): TraceContext | undefined;
+    /** The active trace context. */
+    current(): TraceContext | undefined;
     /** Runs `callback` in a fresh tracing context: the remote parent when one arrived, else no span at all. */
     runWithRemoteParent<R>(traceContext: TraceContext | undefined, callback: () => R): R;
 }
@@ -54,7 +54,7 @@ export class TraceContextRuntime {
             return TraceHeaders.toHeaders(override);
         }
         // An override without a traceparent brings only its baggage: the ambient trace, if any, supplies the rest.
-        const ambient = TraceContextRuntime.bridge?.current(!override);
+        const ambient = TraceContextRuntime.bridge?.current();
         const traceContext = override ? TraceHeaders.normalize(ambient?.traceparent, ambient?.tracestate, override.baggage) : ambient;
         return traceContext && TraceHeaders.toHeaders(traceContext);
     }
