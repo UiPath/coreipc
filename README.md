@@ -188,6 +188,7 @@ var ipcServer = new IpcServer
 | ServiceProvider | IServiceProvider? | **Optional**, defaults to **null**: Resolves services when handling incomming calls. |
 | Scheduler | TaskScheduler? |  **Optional**, defaults to the thread pool: Schedules incomming calls. |
 | RequestTimeout | TimeSpan? | **Optional**, defaults to infinity: Interval after which the honoring of requests will time out. |
+| PropagatedExceptionDataKeys | `IReadOnlyCollection<string>?` | **Optional**, defaults to `["UiPath.ErrorInfo.Error"]`: The `Exception.Data` keys whose string values are sent with the errors of the calls it handles, landing in the caller's `RemoteException.Data`. Assigning replaces the list, so list `UiPath.ErrorInfo.Error` too to keep it. `null` or empty sends none of its own; entries received from a further call still travel on. |
 
 
 #### ii. `IpcServer`

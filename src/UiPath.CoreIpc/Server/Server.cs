@@ -25,15 +25,17 @@ internal class Server
     private readonly ConcurrentDictionary<string, PooledCancellationTokenSource> _requests = new();
 
     private readonly TimeSpan? _requestTimeout;
+    private readonly IReadOnlyCollection<string>? _propagatedExceptionDataKeys;
 
     private ILogger? Logger => _connection.Logger;
     private bool LogEnabled => _connection.LogEnabled;
     public string DebugName => _connection.DebugName;
 
-    public Server(Router router, TimeSpan? requestTimeout, Connection connection, IClient? client = null)
+    public Server(Router router, IpcBase ipc, Connection connection, IClient? client = null)
     {
         _router = router;
-        _requestTimeout = requestTimeout;
+        _requestTimeout = ipc.RequestTimeout;
+        _propagatedExceptionDataKeys = ipc.PropagatedExceptionDataKeys is { Count: > 0 } keys ? keys : null;
         _connection = connection;
         _client = client;
         connection.RequestReceived += OnRequestReceived;
@@ -125,7 +127,7 @@ internal class Server
     ValueTask OnError(Request request, Exception ex)
     {
         Logger.LogException(ex, $"{DebugName} {request}");
-        return SendResponse(Response.Fail(request, ex), default);
+        return SendResponse(Response.Fail(request, ex, _propagatedExceptionDataKeys), default);
     }
 
 #if !NET461
