@@ -30,10 +30,9 @@ _MAX_BAGGAGE_MEMBERS = 64
 _MAX_BAGGAGE_BYTES = 8192
 # Trace Context §3.2: lowercase hex, version ff is invalid, non-zero ids; a higher
 # version is read by its first 55 characters, which must then end or be followed
-# by '-' (§3.2.4).
+# by '-' (§3.2.4) and visible ASCII, as in any header.
 _TRACEPARENT = re.compile(
-    r"(?!ff)([0-9a-f]{2})-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-[0-9a-f]{2}(-.*)?",
-    re.DOTALL,
+    r"(?!ff)([0-9a-f]{2})-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-[0-9a-f]{2}(-[\x21-\x7e]*)?"
 )
 # Trace Context §3.3.1.3.
 _TRACESTATE_MEMBER = re.compile(
@@ -214,11 +213,11 @@ def _limit_baggage(baggage: str) -> str | None:
     and the ones a receiver couldn't parse."""
     kept: list[str] = []
     size = 0
-    for raw in baggage.split(","):
+    for raw in _well_formed(baggage).split(","):
         member = raw.strip(" \t")
         if _split_baggage_member(member) is None:
             continue
-        member_size = len(member.encode("utf-8", "surrogatepass")) + (1 if kept else 0)
+        member_size = len(member.encode("utf-8")) + (1 if kept else 0)
         if size + member_size > _MAX_BAGGAGE_BYTES:
             continue
         kept.append(member)
@@ -254,17 +253,24 @@ def _get_header(headers: Mapping[str, str], name: str) -> str | None:
 
 
 def _encode_baggage(entries: Mapping[str, object]) -> str | None:
-    encoded = ",".join(f"{_escape(key)}={_escape(value)}" for key, value in entries.items())
+    # A member with no key is dropped, as _limit_baggage drops one with an empty key.
+    encoded = ",".join(
+        f"{_escape(key)}={_escape(value)}" for key, value in entries.items() if key is not None
+    )
     return encoded or None
 
 
 def _escape(value: object) -> str:
     # quote(safe="") leaves exactly RFC 3986's unreserved set, like .NET's
-    # Uri.EscapeDataString, so both sides encode identically. quote raises on a
-    # surrogate: the UTF-16 round trip sends a lone one as U+FFFD and a pair as
-    # its character, as .NET and JS do.
-    text = str(value).encode("utf-16-le", "surrogatepass").decode("utf-16-le", "replace")
-    return quote(text, safe="")
+    # Uri.EscapeDataString, so both sides encode identically.
+    return quote(_well_formed(str(value)), safe="")
+
+
+def _well_formed(text: str) -> str:
+    # The UTF-16 round trip turns a lone surrogate into U+FFFD and a pair into
+    # its character, as .NET and JS send them. As is, a surrogate would make
+    # quote raise, or reach a .NET receiver as U+FFFD while JS and Python keep it.
+    return text.encode("utf-16-le", "surrogatepass").decode("utf-16-le", "replace")
 
 
 def _decode_baggage(baggage: str) -> list[tuple[str, str]]:

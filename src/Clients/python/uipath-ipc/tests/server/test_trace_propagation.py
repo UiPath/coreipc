@@ -386,11 +386,11 @@ async def test_a_lone_surrogate_in_opentelemetry_baggage_is_sent_as_u_fffd() -> 
     assert seen == "None|None|k=a%EF%BF%BDb"
 
 
-async def test_lone_surrogate_baggage_gets_a_response() -> None:
+async def test_a_lone_surrogate_in_the_scope_baggage_is_sent_as_u_fffd() -> None:
     async with _pair() as (client, _):
         with use_trace_context(TraceContext(TP, baggage="k=\ud800")):
             seen = await client.get_proxy(ITraceProbe).Probe()
-    assert seen == f"{TP}|None|k=\ud800"
+    assert seen == f"{TP}|None|k=\ufffd"
 
 
 async def test_an_invalid_traceparent_is_ignored_with_its_tracestate() -> None:

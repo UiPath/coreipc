@@ -314,6 +314,7 @@ public sealed class TraceContextTests
     [InlineData("ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")]
     [InlineData("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra")]
     [InlineData("01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01extra")]
+    [InlineData("01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-é")]
     public async Task IncomingInvalidTraceParent_IsIgnored_WithItsTraceState(string traceParent)
     {
         await using var pair = await Pair.Create();
@@ -556,9 +557,35 @@ public sealed class TraceContextTests
         await using var pair = await Pair.Create();
         using var activity = StartW3CActivity();
         activity.AddBaggage("small", "v");
-        activity.AddBaggage("big", new string('v', 9_000));
+        // Over 65519 characters, where .NET Framework's Uri.EscapeDataString throws.
+        activity.AddBaggage("big", new string('v', 70_000));
 
         (await pair.Proxy.Probe()).Baggage.ShouldBe("small=v");
+    }
+
+    [Theory]
+    [InlineData(8190, true)]
+    [InlineData(8191, false)]
+    public async Task AmbientBaggageNearTheByteLimit_IsSentOnlyWhenItFits(int valueLength, bool sent)
+    {
+        await using var pair = await Pair.Create();
+        using var activity = StartW3CActivity();
+        var value = new string('v', valueLength);
+        activity.AddBaggage("k", value);
+
+        (await pair.Proxy.Probe()).Baggage.ShouldBe(sent ? "k=" + value : null);
+    }
+
+    [Fact]
+    public async Task AmbientBaggageWithoutAKey_IsNotSent()
+    {
+        await using var pair = await Pair.Create();
+        using var activity = StartW3CActivity();
+        activity.AddBaggage(null!, "x");
+        activity.AddBaggage("", "y");
+        activity.AddBaggage("k", "v");
+
+        (await pair.Proxy.Probe()).Baggage.ShouldBe("k=v");
     }
 
     [Fact]
@@ -751,6 +778,7 @@ public sealed class TraceContextTests
     [InlineData("00-00000000000000000000000000000000-00f067aa0ba902b7-01")]
     [InlineData("ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")]
     [InlineData("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra")]
+    [InlineData("01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-é")]
     public void Use_InvalidTraceParent_Throws(string traceParent)
     {
         var ex = Should.Throw<ArgumentException>(() => IpcTraceContext.Use(new(traceParent)));
@@ -824,6 +852,27 @@ public sealed class TraceContextTests
         using var trace = IpcTraceContext.OutgoingTrace.Start("ITraceProbe/Probe");
 
         trace.Headers().ShouldBe(new Dictionary<string, string?> { ["baggage"] = "k=v" });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OutgoingTrace_DisposedWhereItsSpanIsNotCurrent_LeavesThatContextAsItFoundIt(bool stopped)
+    {
+        using var caller = StartW3CActivity();
+        var trace = IpcTraceContext.OutgoingTrace.Start("ITraceProbe/Probe");
+        // As on the pool thread that ends a call made under SuppressFlow, holding whatever other work left there.
+        Activity.Current = null;
+        using var poolThread = new Activity("pool thread").Start();
+        if (stopped)
+        {
+            // Stopped elsewhere, so it stays current here, and the Activity.Current setter would refuse it.
+            ExecutionContext.Run(ExecutionContext.Capture()!, _ => poolThread.Stop(), null);
+        }
+
+        trace.Dispose();
+
+        Activity.Current.ShouldBeSameAs(poolThread);
     }
 
     [Fact]
@@ -983,6 +1032,17 @@ public sealed class TraceContextTests
         using (IpcTraceContext.Use(new(TraceParentA, baggage: "foo,a=1,,=x")))
         {
             (await pair.Proxy.Probe()).Baggage.ShouldBe("a=1");
+        }
+    }
+
+    [Fact]
+    public async Task Use_BaggageWithALoneSurrogate_SendsU_FFFD()
+    {
+        await using var pair = await Pair.Create();
+
+        using (IpcTraceContext.Use(new(TraceParentA, baggage: "k=\uD800,pair=\uD83D\uDE00")))
+        {
+            (await pair.Proxy.Probe()).Baggage.ShouldBe("k=\uFFFD,pair=\uD83D\uDE00");
         }
     }
 

@@ -176,7 +176,21 @@ public sealed class IpcTraceContext
 
         public void SetError(string message) => _activity?.SetStatus(ActivityStatusCode.Error, message);
 
-        public void Dispose() => _activity?.Dispose();
+        public void Dispose()
+        {
+            if (_activity is null)
+            {
+                return;
+            }
+            // Stopping makes the span's parent current wherever it runs. Under a SuppressFlow caller, that's a pool thread that
+            // never had the span as current and that .NET Framework doesn't reset, so stop it in a copy of that thread's context.
+            if (Activity.Current == _activity || ExecutionContext.Capture() is not { } context)
+            {
+                _activity.Dispose();
+                return;
+            }
+            ExecutionContext.Run(context, static activity => ((Activity)activity!).Dispose(), _activity);
+        }
 
         /// <summary>The client span's traceparent and tracestate, with the scope's baggage when there is a scope, else the span's
         /// own; the scope alone without a W3C span, as always when the scope has a traceparent.</summary>

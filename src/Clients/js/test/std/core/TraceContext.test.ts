@@ -130,6 +130,7 @@ const invalidTraceparents: Array<[string, string]> = [
     ['version ff', 'ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'],
     ['version 00 with an extra field', '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra'],
     ['a higher version without a dash after 55 characters', '01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01extra'],
+    ['a higher version whose rest is not visible ASCII', '01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-é'],
 ];
 
 const ambientTraceContext: TraceContext = { traceparent: otherTraceparent, tracestate: 'congo=t61rcWkgMzE', baggage: 'ambient=1' };
@@ -274,6 +275,13 @@ describe('trace context', () => {
 
             expect(request.Headers!.baggage).to.equal('a=1');
             expect(nothingLeft.Headers).to.deep.equal({ traceparent });
+        });
+
+        it('should send a lone surrogate in the baggage as U+FFFD, as .NET and Python do', async () => {
+            const sut = createSut(TelemetryPropagationPolicy.Both);
+            const request = await withTraceContext({ traceparent, baggage: 'k=\uD800,pair=\uD83D\uDE00' }, () => sut.call());
+
+            expect(request.Headers!.baggage).to.equal('k=\uFFFD,pair=\uD83D\uDE00');
         });
 
         it('should send the baggage alone, without the tracestate, when there is no traceparent', async () => {
@@ -581,6 +589,10 @@ describe('trace context', () => {
                     ['reversed', '\uDE00\uD83D'],
                 ]),
             ).to.equal('k%EF%BF%BD=a%EF%BF%BDb,pair=%F0%9F%98%80,reversed=%EF%BF%BD%EF%BF%BD');
+        });
+
+        it('should skip a member with no key, as .NET and Python do', () => {
+            expect(TraceHeaders.encodeBaggage([[null as unknown as string, 'x'], ['k', 'v']])).to.equal('k=v');
         });
 
         it('should decode an encoded , = and ; back exactly', () => {

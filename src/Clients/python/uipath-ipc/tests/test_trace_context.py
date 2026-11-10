@@ -29,10 +29,12 @@ INVALID_TRACEPARENTS = pytest.mark.parametrize(
         "ff" + TP[2:],
         TP + "-extra",
         "01" + TP[2:] + "extra",
+        "01" + TP[2:] + "-é",
     ],
     ids=[
         "garbage", "uppercase", "zero-trace-id", "zero-span-id", "version-ff",
         "version-00-with-extra", "higher-version-without-dash",
+        "higher-version-not-visible-ascii",
     ],
 )
 
@@ -114,8 +116,14 @@ def test_baggage_over_the_limits_drops_whole_members() -> None:
     }
 
 
-def test_lone_surrogate_baggage_is_counted_not_raised() -> None:
-    assert _sent(TraceContext(TP, baggage="k=\ud800")) == {"traceparent": TP, "baggage": "k=\ud800"}
+def test_lone_surrogate_baggage_is_sent_as_u_fffd_like_dotnet_and_js() -> None:
+    assert _sent(TraceContext(TP, baggage="k=\ud800,pair=\ud83d\ude00")) == {
+        "traceparent": TP, "baggage": "k=\ufffd,pair=\U0001f600",
+    }
+    # Each counts as U+FFFD's 3 bytes: "k=" and 2730 of them make 8192.
+    assert _sent(TraceContext(TP, baggage="k=" + "\ud800" * 2730)) == {
+        "traceparent": TP, "baggage": "k=" + "\ufffd" * 2730,
+    }
     assert _sent(TraceContext(TP, baggage="k=" + "\ud800" * 2731)) == {"traceparent": TP}
 
 
@@ -252,6 +260,10 @@ def test_baggage_encoding_sends_a_lone_surrogate_as_u_fffd_like_dotnet_and_js() 
     assert _encode_baggage(
         {"k\udc00": "a\ud800b", "pair": "\ud83d\ude00", "reversed": "\ude00\ud83d"}
     ) == "k%EF%BF%BD=a%EF%BF%BDb,pair=%F0%9F%98%80,reversed=%EF%BF%BD%EF%BF%BD"
+
+
+def test_baggage_encoding_skips_a_member_with_no_key_like_dotnet_and_js() -> None:
+    assert _encode_baggage({None: "x", "k": "v"}) == "k=v"
 
 
 def test_baggage_with_encoded_separators_round_trips() -> None:

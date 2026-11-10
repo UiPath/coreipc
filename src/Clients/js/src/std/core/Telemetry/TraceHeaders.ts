@@ -17,8 +17,8 @@ export module TraceHeaders {
     type Header = typeof traceparent | typeof tracestate | typeof baggage;
 
     // Trace Context §3.2: lowercase hex, version ff is invalid, non-zero ids; a higher version is read by its first
-    // 55 characters, which must then end or be followed by '-' (§3.2.4).
-    const traceParentPattern = /^(?!ff)([0-9a-f]{2})-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-[0-9a-f]{2}(-[\s\S]*)?$/;
+    // 55 characters, which must then end or be followed by '-' (§3.2.4) and visible ASCII, as in any header.
+    const traceParentPattern = /^(?!ff)([0-9a-f]{2})-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-[0-9a-f]{2}(-[\x21-\x7e]*)?$/;
 
     // Trace Context §3.3.1.3.
     const traceStateMemberPattern =
@@ -94,7 +94,10 @@ export module TraceHeaders {
     export function encodeBaggage(entries: Iterable<[string, string]>): string | undefined {
         const members = new Array<string>();
         for (const [key, value] of entries) {
-            members.push(`${escape(key)}=${escape(value)}`);
+            // A member with no key is dropped, as limitBaggage drops one with an empty key.
+            if (key != null) {
+                members.push(`${escape(key)}=${escape(value)}`);
+            }
         }
         return members.length > 0 ? members.join(',') : undefined;
     }
@@ -127,7 +130,7 @@ export module TraceHeaders {
         const encoder = new TextEncoder();
         const kept = new Array<string>();
         let bytes = 0;
-        for (const raw of value.split(',')) {
+        for (const raw of toWellFormed(value).split(',')) {
             const member = trimOptionalWhitespace(raw);
             if (!splitBaggageMember(member)) {
                 continue;
@@ -176,12 +179,16 @@ export module TraceHeaders {
     // A surrogate pair, else a lone surrogate.
     const surrogates = /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g;
 
-    // Like .NET's Uri.EscapeDataString, so both sides produce the same bytes. A lone surrogate, which encodeURIComponent
-    // throws on, is sent as U+FFFD, as on .NET and Python. String(), because OpenTelemetry keeps any value plain JS puts in
-    // its baggage, such as a number, which goes as text, as with Python's str().
+    // A lone surrogate becomes U+FFFD, as on .NET and Python; a pair stays.
+    function toWellFormed(value: string): string {
+        return value.replace(surrogates, match => (match.length === 2 ? match : '\uFFFD'));
+    }
+
+    // Like .NET's Uri.EscapeDataString, so both sides produce the same bytes. toWellFormed, because encodeURIComponent throws on
+    // a lone surrogate; String(), because OpenTelemetry keeps any value plain JS puts in its baggage, such as a number, which goes
+    // as text, as with Python's str().
     function escape(value: string): string {
-        const wellFormed = String(value).replace(surrogates, match => (match.length === 2 ? match : '\uFFFD'));
-        return encodeURIComponent(wellFormed).replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+        return encodeURIComponent(toWellFormed(String(value))).replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
     }
 
     const escapes = /(?:%[0-9a-f]{2})+/gi;

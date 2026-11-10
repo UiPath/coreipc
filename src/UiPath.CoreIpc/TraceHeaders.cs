@@ -12,10 +12,10 @@ internal static class TraceHeaders
     internal const int MaxBaggageBytes = 8192;
 
     // Trace Context §3.2: lowercase hex, version ff is invalid, non-zero ids; a higher version is read by its first
-    // 55 characters, which must then end or be followed by '-' (§3.2.4).
+    // 55 characters, which must then end or be followed by '-' (§3.2.4) and visible ASCII, as in any header.
     private static readonly Regex TraceParent = new(
-        @"^(?!ff)[0-9a-f]{2}-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-[0-9a-f]{2}(?<rest>-.*)?\z",
-        RegexOptions.CultureInvariant | RegexOptions.Singleline);
+        @"^(?!ff)[0-9a-f]{2}-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-[0-9a-f]{2}(?<rest>-[\x21-\x7e]*)?\z",
+        RegexOptions.CultureInvariant);
 
     // Trace Context §3.3.1.3.
     private static readonly Regex TraceStateMember = new(
@@ -77,11 +77,16 @@ internal static class TraceHeaders
         return items;
     }
 
-    /// <summary>The W3C baggage of <paramref name="activity"/> and its parents, in <see cref="Activity.Baggage"/> order, or <c>null</c> when there is none.</summary>
+    /// <summary>The W3C baggage of <paramref name="activity"/> and its parents, in <see cref="Activity.Baggage"/> order, without the
+    /// members that could never be sent, or <c>null</c> when none is left.</summary>
     internal static string? ToBaggageHeader(this Activity activity)
-    => activity.Baggage.Any()
-        ? string.Join(",", activity.Baggage.Select(pair => $"{Escape(pair.Key)}={Escape(pair.Value ?? "")}"))
-        : null;
+    => JoinOrNull(activity.Baggage
+        // LimitBaggage would drop a member with no key, and one whose key and value have MaxBaggageBytes characters or more,
+        // since every character escapes to a byte or more. Skipping the long ones here also spares .NET Framework's
+        // Uri.EscapeDataString, which throws for 65520 characters or more.
+        .Where(pair => pair.Key is not null && pair.Key.Length + (pair.Value?.Length ?? 0) < MaxBaggageBytes)
+        .Select(pair => $"{Escape(pair.Key)}={Escape(pair.Value ?? "")}")
+        .ToList());
 
     /// <summary>W3C Baggage: send at most 64 members and 8192 bytes, dropping whole members beyond that, and the ones
     /// a receiver couldn't parse.</summary>
@@ -89,7 +94,8 @@ internal static class TraceHeaders
     {
         var kept = new List<string>();
         var bytes = 0;
-        foreach (var raw in baggage.Split(','))
+        // The request's UTF-8 writer throws on a lone surrogate.
+        foreach (var raw in WellFormed(baggage).Split(','))
         {
             var member = raw.Trim(OptionalWhitespace);
             if (SplitBaggageMember(member) is null)
@@ -148,9 +154,11 @@ internal static class TraceHeaders
         static bool IsHex(char c) => c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
     }
 
-    // Encoding.UTF8 turns a lone surrogate into U+FFFD first, as JS and Python do. .NET's Uri.EscapeDataString does that
-    // itself, but .NET Framework's throws on some.
-    private static string Escape(string value) => Uri.EscapeDataString(Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(value)));
+    // A lone surrogate becomes U+FFFD, as on JS and Python; a pair stays.
+    private static string WellFormed(string value) => Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(value));
+
+    // .NET's Uri.EscapeDataString makes a lone surrogate U+FFFD itself, but .NET Framework's throws on some.
+    private static string Escape(string value) => Uri.EscapeDataString(WellFormed(value));
 
     private static List<string> ValidTraceStateMembers(string traceState)
     => traceState.Split(',').Select(member => member.Trim(OptionalWhitespace)).Where(member => TraceStateMember.IsMatch(member)).ToList();
