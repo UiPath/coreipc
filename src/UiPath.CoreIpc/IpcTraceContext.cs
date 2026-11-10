@@ -43,7 +43,7 @@ public sealed class IpcTraceContext
             throw new ArgumentNullException(nameof(traceContext));
         }
 
-        if (traceContext.TraceParent is { } traceParent && !TraceHeaders.TryParseTraceParent(traceParent, null, out _))
+        if (traceContext.TraceParent is { } traceParent && !TraceHeaders.IsValidTraceParent(traceParent))
         {
             throw new ArgumentException($"The {TraceParentHeader} must be a W3C traceparent.", nameof(traceContext));
         }
@@ -99,7 +99,7 @@ public sealed class IpcTraceContext
             return null;
         }
 
-        var traceParent = GetHeader(headers, TraceParentHeader) is { } received && TraceHeaders.TryParseTraceParent(received, null, out _) ? received : null;
+        var traceParent = GetHeader(headers, TraceParentHeader) is { } received && TraceHeaders.IsValidTraceParent(received) ? received : null;
         var traceState = traceParent is null ? null : GetHeader(headers, TraceStateHeader)?.ValidTraceState();
         var baggage = GetHeader(headers, BaggageHeader).NullIfEmpty();
         return traceParent is null && baggage is null ? null : new(traceParent, traceState, baggage);
