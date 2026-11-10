@@ -111,13 +111,10 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
                 {
                     continue;
                 }
-                if (exceptionData[key] is string value && IsWellFormed(value))
+                if (exceptionData[key] is string value)
                 {
-                    data[key] = value;
-                }
-                else
-                {
-                    data.Remove(key);
+                    // Encoding.UTF8 swaps a lone surrogate for U+FFFD; written as is, it would fail the whole response.
+                    data[key] = Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(value));
                 }
                 listed.Add(key);
             }
@@ -138,23 +135,6 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
             }
         }
         return data.Count > 0 ? data : null;
-    }
-
-    // A lone surrogate can't be written as UTF-8, so the whole response would fail to send.
-    private static bool IsWellFormed(string value)
-    {
-        for (var index = 0; index < value.Length; index++)
-        {
-            if (char.IsHighSurrogate(value[index]) && index + 1 < value.Length && char.IsLowSurrogate(value[index + 1]))
-            {
-                index++;
-            }
-            else if (char.IsSurrogate(value[index]))
-            {
-                return false;
-            }
-        }
-        return true;
     }
 
     // Keeps the string values and skips any other without loading it, so a peer that sends richer ones costs nothing and doesn't fail the read,

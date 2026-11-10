@@ -348,7 +348,7 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
-    public void FromException_ValueWithAHalfEmoji_IsDropped_SoTheErrorStillGoesOut()
+    public void FromException_HalfAnEmoji_IsReplaced_SoTheErrorStillGoesOut()
     {
         var exception = new InvalidOperationException("m");
         exception.Data[ErrorDataProbe.ListedKey] = "cut \ud83d";
@@ -358,7 +358,11 @@ public sealed class ExceptionDataTests
 
         var response = Response.Fail(Request(), exception, [ErrorDataProbe.ListedKey, ErrorDataProbe.ListedKey2, ErrorDataProbe.ErrorInfoKey, ErrorDataProbe.UnlistedKey]);
 
-        response.Error!.Data!.Keys.ShouldBe(new[] { ErrorDataProbe.ErrorInfoKey });
+        var data = response.Error!.Data!;
+        data[ErrorDataProbe.ListedKey].ShouldBe("cut \ufffd");
+        data[ErrorDataProbe.ListedKey2].ShouldBe("\ufffd alone");
+        data[ErrorDataProbe.UnlistedKey].ShouldBe("\ufffd cut");
+        data[ErrorDataProbe.ErrorInfoKey].ShouldBe("whole \ud83d\ude00");
         Should.NotThrow(() => IpcJsonSerializer.Instance.Serialize(response, new MemoryStream()));
     }
 
