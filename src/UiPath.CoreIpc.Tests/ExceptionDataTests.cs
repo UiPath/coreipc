@@ -344,6 +344,7 @@ public sealed class ExceptionDataTests
         error.InnerError!.Data!.Keys.ShouldBe(new[] { ErrorDataProbe.ListedKey });
         error.InnerError.Data[ErrorDataProbe.ListedKey].ShouldBe("inner-value");
         error.ToString().ShouldNotContain("outer-value");
+        Error.FromException(NewWrapped(), [null!, ErrorDataProbe.ListedKey]).Data![ErrorDataProbe.ListedKey].ShouldBe("outer-value");
     }
 
     [Fact]
@@ -425,6 +426,7 @@ public sealed class ExceptionDataTests
         error.Data[ErrorDataProbe.ListedKey].ShouldBe("changed");
         error.InnerError!.Data!["k2"].ShouldBe("received");
         Error.FromException(remote).Data!.Keys.ShouldBe(new[] { "k", ErrorDataProbe.ListedKey }, ignoreOrder: true);
+        Error.FromException(remote).Data![ErrorDataProbe.ListedKey].ShouldBe("received");
     }
 
     [Theory]
@@ -554,11 +556,23 @@ public sealed class ExceptionDataTests
         var received = Enumerable.Range(0, 10_000).ToDictionary(i => $"k{i}", i => "v");
         var ex = new RemoteException(new Error("m", "s", "t", InnerError: new Error("i", "s", "t", InnerError: null) { Data = received }) { Data = received });
 
-        capture.Errors.Count(e => e.Contains($"keeping the first {RemoteException.MaxReceivedDataEntries}")).ShouldBe(2);
-        ex.Data.Count.ShouldBe(RemoteException.MaxReceivedDataEntries);
+        capture.Errors.Count(e => e.Contains("keeping the first 64")).ShouldBe(2);
+        ex.Data.Count.ShouldBe(64);
         ex.Data.Contains("k0").ShouldBeTrue();
-        ex.InnerException!.Data.Count.ShouldBe(RemoteException.MaxReceivedDataEntries);
-        Error.FromException(ex).Data!.Count.ShouldBe(RemoteException.MaxReceivedDataEntries);
+        ex.InnerException!.Data.Count.ShouldBe(64);
+        Error.FromException(ex).Data!.Count.ShouldBe(64);
+    }
+
+    [Theory]
+    [InlineData(64, 64, 0)]
+    [InlineData(65, 64, 1)]
+    public void RemoteException_CapsOnlyAbove64(int received, int kept, int traces)
+    {
+        using var capture = new TraceErrorCapture();
+        var ex = new RemoteException(new Error("m", "s", "t", InnerError: null) { Data = Enumerable.Range(0, received).ToDictionary(i => $"k{i}", i => "v") });
+
+        ex.Data.Count.ShouldBe(kept);
+        capture.Errors.Count(e => e.Contains($"Received {received} Exception.Data entries")).ShouldBe(traces);
     }
 
     private sealed class FaultyDataException() : Exception("faulty")
