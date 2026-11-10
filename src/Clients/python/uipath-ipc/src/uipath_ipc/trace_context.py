@@ -4,10 +4,11 @@ Opt-in per endpoint object and direction (``IpcClient``/``IpcServer``
 ``telemetry_propagation=``, a `TelemetryPropagationPolicy`). Outgoing calls
 carry, in precedence order, the explicit `use_trace_context` override, else the
 current OpenTelemetry span context + baggage (only when ``opentelemetry-api``
-is installed — the ``otel`` extra), else nothing. Incoming handlers run under
-the received context: `incoming_trace_context` returns the raw values, and with
-OpenTelemetry installed the handler's current span is the (non-recording)
-remote parent.
+is installed — the ``otel`` extra), else nothing; an override without a
+traceparent takes the span's traceparent and tracestate. Incoming handlers run
+under the received context: `incoming_trace_context` returns the raw values,
+and with OpenTelemetry installed the handler's current span is the
+(non-recording) remote parent.
 """
 
 from __future__ import annotations
@@ -18,17 +19,15 @@ import enum
 import re
 from dataclasses import dataclass, field
 from typing import Iterator, Mapping
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 TRACEPARENT = "traceparent"
 TRACESTATE = "tracestate"
 BAGGAGE = "baggage"
 
 _MAX_TRACESTATE_MEMBERS = 32
-_MAX_TRACESTATE_MEMBER_LENGTH = 128
 _MAX_BAGGAGE_MEMBERS = 64
 _MAX_BAGGAGE_BYTES = 8192
-_ESCAPES = re.compile(r"(?:%[0-9a-fA-F]{2})+")
 # Trace Context §3.2: lowercase hex, version ff is invalid, non-zero ids; a higher
 # version is read by its first 55 characters, which must then end or be followed
 # by '-' (§3.2.4).
@@ -57,7 +56,8 @@ class TelemetryPropagationPolicy(enum.Flag):
 
 
 class InvalidTraceContextError(ValueError):
-    """The traceparent breaks W3C Trace Context §3.2. Crosses the wire as .NET's
+    """The traceparent breaks W3C Trace Context §3.2, or there is neither a
+    traceparent nor a baggage. Crosses the wire as .NET's
     ``System.ArgumentException``, like the .NET implementation's error."""
 
     wire_type_name = "System.ArgumentException"
@@ -101,11 +101,15 @@ _incoming_tracestate: contextvars.ContextVar[tuple[int, object, str] | None] = (
 def use_trace_context(trace_context: TraceContext) -> Iterator[TraceContext]:
     """Make `trace_context` the trace context of every outgoing call (forward
     calls and callbacks) made within this scope — including from tasks created
-    inside it — winning over OpenTelemetry. Scopes nest; exiting restores the
-    previous value. Ignored by endpoints whose policy lacks ``OUTGOING``.
+    inside it — winning over OpenTelemetry. Without a ``traceparent``, its
+    ``baggage`` goes with the current OpenTelemetry span's traceparent and
+    tracestate, or alone when there is no span. Scopes nest, and an inner one
+    replaces the outer one; exiting restores the previous value. Ignored by
+    endpoints whose policy lacks ``OUTGOING``.
 
     Raises `InvalidTraceContextError` (a `ValueError`) when the ``traceparent``
-    breaks W3C Trace Context §3.2."""
+    breaks W3C Trace Context §3.2, or when there is neither a ``traceparent``
+    nor a ``baggage``."""
     if not isinstance(trace_context, TraceContext):
         raise TypeError("trace_context must be a TraceContext")
     if trace_context.traceparent is not None and not _is_valid_traceparent(
@@ -113,6 +117,10 @@ def use_trace_context(trace_context: TraceContext) -> Iterator[TraceContext]:
     ):
         raise InvalidTraceContextError(
             f"{TRACEPARENT}: The traceparent must be a W3C traceparent."
+        )
+    if trace_context.traceparent is None and trace_context.baggage is None:
+        raise InvalidTraceContextError(
+            f"The trace context must have a {TRACEPARENT} or a {BAGGAGE}."
         )
     token = _override.set(trace_context)
     try:
@@ -130,7 +138,14 @@ def incoming_trace_context() -> TraceContext | None:
 
 def outgoing_headers() -> dict[str, str] | None:
     """The headers for an outgoing call made now, or ``None`` for none."""
-    tc = _override.get() or _from_opentelemetry()
+    tc = _override.get()
+    if tc is None:
+        tc = _from_opentelemetry()
+    elif tc.traceparent is None:
+        # Without a traceparent, the scope's baggage goes with the span's trace.
+        ambient = _from_opentelemetry(with_baggage=False)
+        if ambient is not None and ambient.traceparent:
+            tc = TraceContext(ambient.traceparent, ambient.tracestate, tc.baggage)
     if tc is None:
         return None
     headers: dict[str, str] = {}
@@ -214,15 +229,9 @@ def _limit_baggage(baggage: str) -> str | None:
 
 
 def _limit_tracestate(tracestate: str) -> str | None:
-    """Trace Context §3.3.1.5: past 32 members, drop the ones over 128
-    characters first, then from the end."""
-    members = _valid_tracestate_members(tracestate)
-    for index in range(len(members) - 1, -1, -1):
-        if len(members) <= _MAX_TRACESTATE_MEMBERS:
-            break
-        if len(members[index]) > _MAX_TRACESTATE_MEMBER_LENGTH:
-            del members[index]
-    return ",".join(members[:_MAX_TRACESTATE_MEMBERS]) or None
+    """Trace Context §3.3.1.1: at most 32 members, so keep the first 32 valid
+    ones."""
+    return ",".join(_valid_tracestate_members(tracestate)[:_MAX_TRACESTATE_MEMBERS]) or None
 
 
 def _is_valid_traceparent(value: str) -> bool:
@@ -258,7 +267,9 @@ def _decode_baggage(baggage: str) -> list[tuple[str, str]]:
     """Skips a member with no key, trims the key and value, and ignores the
     member's properties (after ``;``)."""
     pairs = (_split_baggage_member(member) for member in baggage.split(","))
-    return [(_unescape(pair[0]), _unescape(pair[1])) for pair in pairs if pair is not None]
+    # W3C Baggage: a percent-escape that isn't valid UTF-8 decodes to U+FFFD
+    # (unquote's default errors="replace").
+    return [(unquote(pair[0]), unquote(pair[1])) for pair in pairs if pair is not None]
 
 
 def _split_baggage_member(member: str) -> tuple[str, str] | None:
@@ -269,24 +280,16 @@ def _split_baggage_member(member: str) -> tuple[str, str] | None:
     return key, value.strip(" \t")
 
 
-def _unescape(value: str) -> str:
-    # W3C Baggage: a percent-escape that isn't valid UTF-8 decodes to U+FFFD.
-    return _ESCAPES.sub(
-        lambda match: bytes.fromhex(match[0].replace("%", "")).decode("utf-8", "replace"),
-        value,
-    )
-
-
 # --- OpenTelemetry (optional) --------------------------------------------------
 
 
-def _from_opentelemetry() -> TraceContext | None:
+def _from_opentelemetry(with_baggage: bool = True) -> TraceContext | None:
     try:
         from opentelemetry import baggage, trace
     except Exception:
         return None
     span_context = trace.get_current_span().get_span_context()
-    encoded_baggage = _encode_baggage(baggage.get_all())
+    encoded_baggage = _encode_baggage(baggage.get_all()) if with_baggage else None
     if not span_context.is_valid:
         return TraceContext(baggage=encoded_baggage) if encoded_baggage else None
     traceparent = (

@@ -12,8 +12,10 @@ import {
     ConnectHelper,
     ContractStore,
     IMessageStream,
+    IpcBaseImpl,
     IRpcChannel,
     IRpcChannelFactory,
+    RequestHeaders,
     RpcCallContext,
     RpcMessage,
     Socket,
@@ -130,6 +132,29 @@ const invalidTraceparents: Array<[string, string]> = [
     ['a higher version without a dash after 55 characters', '01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01extra'],
 ];
 
+const ambientTraceContext: TraceContext = { traceparent: otherTraceparent, tracestate: 'congo=t61rcWkgMzE', baggage: 'ambient=1' };
+
+/** The `withBaggage` argument of each read of the fake bridge in `withAmbientTraceContext`. */
+let ambientReads: boolean[] = [];
+
+/** Runs `act` with a tracing bridge whose ambient trace context is `ambientTraceContext`. */
+async function withAmbientTraceContext<T>(act: () => Promise<T>): Promise<T> {
+    const previous = TraceContextRuntime.bridge;
+    ambientReads = [];
+    TraceContextRuntime.bridge = {
+        current: (withBaggage = true) => {
+            ambientReads.push(withBaggage);
+            return withBaggage ? ambientTraceContext : { ...ambientTraceContext, baggage: undefined };
+        },
+        runWithRemoteParent: (_, callback) => callback(),
+    };
+    try {
+        return await act();
+    } finally {
+        TraceContextRuntime.bridge = previous;
+    }
+}
+
 function expectArgumentError(act: () => unknown, paramName: string) {
     try {
         act();
@@ -163,6 +188,16 @@ describe('trace context', () => {
             expect(run({ baggage: 'k=v' })).to.equal(1);
         });
 
+        for (const [name, value] of [
+            ['an empty context', {}],
+            ['empty values', { traceparent: '', tracestate: '', baggage: '' }],
+            ['a tracestate alone', { tracestate: 'a=b' }],
+        ] as Array<[string, TraceContext]>) {
+            it(`should reject ${name}, which has neither a traceparent nor a baggage`, () => {
+                expectArgumentError(() => run(value), 'traceContext');
+            });
+        }
+
         it('should reject a missing trace context', () => {
             expect(() => withTraceContext(null!, () => 1)).to.throw();
         });
@@ -195,6 +230,14 @@ describe('trace context', () => {
             );
         });
 
+        it('should send a higher-version traceparent unchanged', async () => {
+            const sut = createSut(TelemetryPropagationPolicy.Both);
+            const future = '01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-future';
+            const request = await withTraceContext({ traceparent: future }, () => sut.call());
+
+            expect(request.Headers).to.deep.equal({ traceparent: future });
+        });
+
         it('should omit empty tracestate and baggage', async () => {
             const sut = createSut(TelemetryPropagationPolicy.Both);
             const request = await withTraceContext({ traceparent, tracestate: '', baggage: '' }, () => sut.call());
@@ -202,16 +245,15 @@ describe('trace context', () => {
             expect(request.Headers).to.deep.equal({ traceparent });
         });
 
-        it('should cut a tracestate over 32 members, dropping the ones over 128 characters first', async () => {
+        it('should keep the first 32 tracestate members that follow the grammar, long ones included', async () => {
             const sut = createSut(TelemetryPropagationPolicy.Both);
             const long = (i: number) => `long${i}=${'v'.repeat(130)}`;
-            const short = Array.from({ length: 34 }, (_, i) => `k${i}=v`);
-            const tracestate = short.map((member, i) => (i === 3 || i === 5 ? long(i) : member)).join(',');
+            const valid = Array.from({ length: 34 }, (_, i) => (i === 3 || i === 5 ? long(i) : `k${i}=v`));
 
-            const request = await withTraceContext({ traceparent, tracestate }, () => sut.call());
+            const request = await withTraceContext({ traceparent, tracestate: ['Bad=1', ...valid].join(',') }, () => sut.call());
             const cutFromTheEnd = await withTraceContext({ traceparent, tracestate: members(40) }, () => sut.call());
 
-            expect(request.Headers!.tracestate).to.equal(short.filter((_, i) => i !== 3 && i !== 5).join(','));
+            expect(request.Headers!.tracestate).to.equal(valid.slice(0, 32).join(','));
             expect(cutFromTheEnd.Headers!.tracestate).to.equal(members(32));
         });
 
@@ -246,6 +288,30 @@ describe('trace context', () => {
             const request = await withTraceContext({ tracestate: 'a=b', baggage: 'k=v' }, () => sut.call());
 
             expect(request.Headers).to.deep.equal({ baggage: 'k=v' });
+        });
+
+        it('should send the ambient trace context without an override', async () => {
+            const sut = createSut(TelemetryPropagationPolicy.Both);
+            const request = await withAmbientTraceContext(() => sut.call());
+
+            expect(request.Headers).to.deep.equal(ambientTraceContext);
+            expect(ambientReads).to.deep.equal([true]);
+        });
+
+        it('should send the ambient traceparent and tracestate with the baggage of an override that has no traceparent', async () => {
+            const sut = createSut(TelemetryPropagationPolicy.Both);
+            const request = await withAmbientTraceContext(() => withTraceContext({ tracestate: 'ignored=1', baggage: 'userId=alice' }, () => sut.call()));
+
+            expect(request.Headers).to.deep.equal({ traceparent: otherTraceparent, tracestate: 'congo=t61rcWkgMzE', baggage: 'userId=alice' });
+            // The ambient baggage is never encoded: the override's baggage replaces it.
+            expect(ambientReads).to.deep.equal([false]);
+        });
+
+        it('should let an override with a traceparent win outright over the ambient trace context', async () => {
+            const sut = createSut(TelemetryPropagationPolicy.Both);
+            const request = await withAmbientTraceContext(() => withTraceContext({ traceparent, baggage: 'userId=alice' }, () => sut.call()));
+
+            expect(request.Headers).to.deep.equal({ traceparent, baggage: 'userId=alice' });
         });
 
         it('should drop tracestate members that break the grammar', async () => {
@@ -413,6 +479,21 @@ describe('trace context', () => {
             expect(seen).to.equal(undefined);
         });
 
+        it('should run the handler isolated from the context it was delivered in, with the None policy too', async () => {
+            const sut = createSut(TelemetryPropagationPolicy.None);
+            await sut.call();
+            let seen: Array<TraceContext | RequestHeaders | undefined> | undefined;
+            await TraceContextRuntime.incoming.run({ traceparent }, () =>
+                withTraceContext({ traceparent: otherTraceparent }, () =>
+                    sut.receiveCallback(undefined, () => {
+                        seen = [currentIncomingTraceContext(), TraceContextRuntime.getOutgoingHeaders()];
+                    }),
+                ),
+            );
+
+            expect(seen).to.deep.equal([undefined, undefined]);
+        });
+
         for (const policy of [TelemetryPropagationPolicy.Both, TelemetryPropagationPolicy.Outgoing]) {
             it(`should not apply an outer override to calls made by the handler (${TelemetryPropagationPolicy[policy]})`, async () => {
                 const sut = createSut(policy);
@@ -483,9 +564,11 @@ describe('trace context', () => {
         }
 
         it('should reject a policy that is not a number', () => {
-            expect(() => createConfigStore().setTelemetryPropagation(undefined, 'Both' as any))
+            const config = new IpcBaseImpl.ConfigurationWithAddress(new MockServiceProvider<any>({ implementation: { configStore: createConfigStore() } }));
+
+            expect(() => config.setTelemetryPropagation('Both' as any))
                 .to.throw(ArgumentOutOfRangeError)
-                .with.property('paramName', 'value');
+                .with.property('paramName', 'policy');
         });
     });
 
@@ -528,6 +611,8 @@ describe('trace context', () => {
             ['%ED%A0%80', '\uFFFD\uFFFD\uFFFD'],
             ['%F4%90%80%80', '\uFFFD\uFFFD\uFFFD\uFFFD'],
             ['%F0%9F%98%80', '\u{1F600}'],
+            ['%EF%BB%BFx', '\uFEFFx'],
+            ['x%EF%BB%BFy', 'x\uFEFFy'],
         ]) {
             it(`should decode ${escaped} like .NET and Python, with U+FFFD for what isn't UTF-8`, () => {
                 expect(TraceHeaders.decodeBaggage(`k=${escaped}`)).to.deep.equal([['k', decoded]]);

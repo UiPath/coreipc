@@ -14,7 +14,7 @@ import {
 } from '../../src/std';
 import { IpcNodeImpl } from '../../src/node';
 import { OpenTelemetryBridge, OtelApi, loadOpenTelemetry } from '../../src/node/Telemetry';
-import { ITraceProbe, ITraceProbeCallback } from './Contracts';
+import { ITraceProbe, ITraceProbeCallback, TraceProbeCallbackResult, TraceProbeResult } from './Contracts';
 import { AddressHelper as TestContext } from './Fixtures';
 
 const traceId = '4bf92f3577b34da6a3ce929d0e0e4736';
@@ -240,8 +240,28 @@ describe('node:trace context', () => {
                 expect(actual.TraceParent).to.equal(other);
             });
 
+            it('should send the active span with the baggage of an override that has no traceparent', async () => {
+                const actual = await context.with(otelContext({ traceState: 'congo=t61rcWkgMzE', baggage: { userId: 'bob' } }), () =>
+                    withTraceContext({ baggage: 'userId=alice' }, () => proxy.Probe()),
+                );
+
+                expect(actual).to.deep.include({
+                    TraceParent: traceparent,
+                    TraceState: 'congo=t61rcWkgMzE',
+                    Baggage: 'userId=alice',
+                    ActivityTraceId: traceId,
+                    ActivityParentSpanId: spanId,
+                });
+            });
+
             it('should send nothing without an ambient trace context', async () => {
                 const actual = await proxy.Probe();
+
+                expect(actual).to.deep.include({ TraceParent: null, TraceState: null, Baggage: null });
+            });
+
+            it("should send nothing in OpenTelemetry's ROOT_CONTEXT", async () => {
+                const actual = await context.with(otelContext({ baggage: { userId: 'alice' } }), () => context.with(ROOT_CONTEXT, () => proxy.Probe()));
 
                 expect(actual).to.deep.include({ TraceParent: null, TraceState: null, Baggage: null });
             });
@@ -362,4 +382,78 @@ describe('node:trace context', () => {
             });
         });
     }
+
+    describe('callbacks from an address at None', () => {
+        // A is left at None and B gets Both from forAnyAddress(); A's callback handler records what it saw and calls B.
+        const [a, b] = [TestContext.NamedPipe, TestContext.WebSocket];
+        const sut = new IpcNodeImpl();
+        let proxyA: ITraceProbe = null!;
+        let proxyB: ITraceProbe = null!;
+        let seen: { incoming?: TraceContext; atB?: TraceProbeResult } = {};
+
+        // Proxies are cached per contract class and address for all ipc instances, so this ipc needs a class of its own.
+        class OwnTraceProbe implements ITraceProbe {
+            public Probe(): Promise<TraceProbeResult> {
+                throw void 0;
+            }
+            public ProbeViaCallback(): Promise<TraceProbeCallbackResult> {
+                throw void 0;
+            }
+            public ProbeViaCallbackWithTraceContext(traceParent: string, traceState: string | null, baggage: string | null): Promise<TraceProbeCallbackResult> {
+                throw void 0;
+            }
+        }
+
+        beforeAll(() => {
+            sut.$service({ endpoint: 'ITraceProbe' })(OwnTraceProbe);
+            sut.config.forAnyAddress().setTelemetryPropagation(TelemetryPropagationPolicy.Both);
+            sut.config.forAddress(a.address).setTelemetryPropagation(TelemetryPropagationPolicy.None);
+            proxyA = sut.proxy.withAddress(a.address).withService(OwnTraceProbe);
+            proxyB = sut.proxy.withAddress(b.address).withService(OwnTraceProbe);
+            sut.callback
+                .forAddress(a.address)
+                .forService<ITraceProbeCallback>('ITraceProbeCallback')
+                .is({
+                    Probe: async () => {
+                        seen = { incoming: currentIncomingTraceContext(), atB: await proxyB.Probe() };
+                        return 'done';
+                    },
+                });
+        });
+
+        beforeEach(() => {
+            seen = {};
+        });
+
+        afterEach(async () => {
+            // Each test opens A's connection its own way.
+            await sut.disposeAllChannels();
+        });
+
+        it('should run isolated from the scope and span that opened the connection', async () => {
+            await context.with(otelContext(), () => withTraceContext({ traceparent, baggage: 'userId=alice' }, () => proxyA.Probe()));
+
+            const actual = await proxyA.ProbeViaCallback();
+
+            expect(actual.Callback).to.equal('done');
+            expect(seen.incoming).to.equal(undefined);
+            expect(seen.atB).to.deep.include({ TraceParent: null, TraceState: null, Baggage: null });
+        });
+
+        it('should run isolated from the incoming callback that opened the connection', async () => {
+            sut.callback
+                .forAddress(b.address)
+                .forService<ITraceProbeCallback>('ITraceProbeCallback')
+                .is({ Probe: async () => `${(await proxyA.Probe()).TraceParent}` });
+            // B's callback arrives with a trace context, and its handler makes A's first call.
+            const opened = await proxyB.ProbeViaCallbackWithTraceContext('00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01', null, 'from=b');
+
+            const actual = await proxyA.ProbeViaCallback();
+
+            expect(opened.Callback).to.equal('null');
+            expect(actual.Callback).to.equal('done');
+            expect(seen.incoming).to.equal(undefined);
+            expect(seen.atB).to.deep.include({ TraceParent: null, TraceState: null, Baggage: null });
+        });
+    });
 });

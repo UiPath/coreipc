@@ -94,3 +94,25 @@ describe('node:packaged bundle without @opentelemetry/api', () => {
         timeout,
     );
 });
+
+describe('node:packaged bundles where TextDecoder is missing', () => {
+    // Jest's jsdom environment has no TextDecoder, so creating one when the module loads would make the import throw.
+    const bundles: Array<[string, string]> = [
+        ['node', packagedBundle],
+        ['web', resolve(__dirname, '../../dist/prepack/web/index.js')],
+    ];
+    const load = 'delete globalThis.TextDecoder; delete globalThis.TextEncoder; require(process.argv[1]); process.stdout.write("loaded");';
+
+    for (const [name, bundle] of bundles) {
+        it(
+            `should load the ${name} bundle`,
+            () => {
+                if (!existsSync(bundle)) {
+                    pending(`Run "npm run build" first: ${bundle} is missing.`);
+                }
+                expect(execFileSync(process.execPath, ['-e', load, bundle], { encoding: 'utf8' })).to.equal('loaded');
+            },
+            timeout,
+        );
+    }
+});

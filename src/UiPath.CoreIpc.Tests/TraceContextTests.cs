@@ -26,7 +26,7 @@ public sealed record TraceProbeResult(
             activity?.ParentSpanId.ToHexString(),
             activity?.SpanId.ToHexString(),
             activity?.Baggage.Select(pair => $"{pair.Key}={pair.Value}").ToArray(),
-            IpcTraceContext.Current?.TraceParent);
+            IpcTraceContext.Override.Value?.TraceParent);
     }
 }
 
@@ -38,8 +38,11 @@ public interface ITraceProbe
     Task<TraceProbeCallbackResult> ProbeViaCallback(string? overrideTraceParent = null);
     Task<TraceProbeResult> ProbeUpload(Stream stream);
     Task<TraceProbeResult> ProbeUploadViaCallback();
+    Task<TraceProbeResult> ProbeViaSink(string sinkPipeName);
     Task<TraceProbeResult> Fail();
     Task FailOneWay();
+    // Not a plain Task: the server answers a call to one of those at once, without waiting for the handler.
+    Task<TraceProbeResult> Hang(CancellationToken ct = default);
 }
 
 public interface ITraceProbeCallback
@@ -71,9 +74,29 @@ public sealed class TraceProbe : ITraceProbe
     public Task<TraceProbeResult> ProbeUploadViaCallback()
     => IpcContext.Current!.GetCallback<ITraceProbeCallback>().ProbeUpload(new MemoryStream());
 
+    public async Task<TraceProbeResult> ProbeViaSink(string sinkPipeName)
+    {
+        var sink = new IpcClient
+        {
+            Transport = new NamedPipeClientTransport { PipeName = sinkPipeName },
+            TelemetryPropagation = TelemetryPropagationPolicy.Outgoing,
+            RequestTimeout = TimeSpan.FromSeconds(10),
+        }.GetProxy<ITraceProbe>();
+        using (sink as IpcProxy)
+        {
+            return await sink.Probe();
+        }
+    }
+
     public Task<TraceProbeResult> Fail() => throw new InvalidOperationException("probe failed");
 
     public Task FailOneWay() => throw new InvalidOperationException("one-way probe failed");
+
+    public async Task<TraceProbeResult> Hang(CancellationToken ct = default)
+    {
+        await Task.Delay(Timeout.Infinite, ct);
+        return TraceProbeResult.Capture();
+    }
 }
 
 public sealed class TraceProbeCallback : ITraceProbeCallback
@@ -191,9 +214,31 @@ public sealed class TraceContextTests
         var inner = IpcTraceContext.Use(new(TraceParentB));
         inner.Dispose();
         inner.Dispose();
-        IpcTraceContext.Current!.TraceParent.ShouldBe(TraceParentA);
+        IpcTraceContext.Override.Value!.TraceParent.ShouldBe(TraceParentA);
         outer.Dispose();
-        IpcTraceContext.Current.ShouldBeNull();
+        IpcTraceContext.Override.Value.ShouldBeNull();
+        // A late second Dispose must not bring back what the scope found when it opened.
+        inner.Dispose();
+        IpcTraceContext.Override.Value.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Use_ReachesTheFirstCallOfANewClient_UnderSuppressFlow()
+    {
+        await using var pair = await Pair.Create();
+
+        // From the thread pool, so the proxy starts the call inline whatever the runner's synchronization context: under one,
+        // the proxy hops through Task.Run, which carries nothing while the flow is suppressed.
+        var result = await Task.Run(() =>
+        {
+            using (IpcTraceContext.Use(new(TraceParentA)))
+            using (ExecutionContext.SuppressFlow())
+            {
+                return pair.Proxy.Probe();
+            }
+        });
+
+        result.TraceParent.ShouldBe(TraceParentA);
     }
 
     [Fact]
@@ -312,6 +357,32 @@ public sealed class TraceContextTests
         result.ActivityBaggage.ShouldBe(["k=v"]);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task IncomingBaggageWithoutTraceParent_IsPassedOnUnderANewW3CTrace(bool listened)
+    {
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "UiPath.Ipc",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+        };
+        if (listened)
+        {
+            ActivitySource.AddActivityListener(listener);
+        }
+        await using var sink = await Pair.Create();
+        await using var pair = await Pair.Create();
+        using var raw = await RawConnection.Create(pair.PipeName);
+
+        var result = await raw.Call(nameof(ITraceProbe.ProbeViaSink), new() { ["baggage"] = "k=v" }, sink.PipeName);
+
+        result.TraceParent.ShouldNotBeNull();
+        result.TraceParent.ShouldMatch("^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$");
+        result.Baggage.ShouldBe("k=v");
+        result.ActivityBaggage.ShouldBe(["k=v"]);
+    }
+
     [Fact]
     public async Task IncomingBaggage_KeepsDuplicatesInWireOrder()
     {
@@ -332,9 +403,17 @@ public sealed class TraceContextTests
     [InlineData("%C3%A9%A9", "é\uFFFD")]
     [InlineData("%E2%82%C3%A9", "\uFFFDé")]
     [InlineData("%C0%80", "\uFFFD\uFFFD")]
+#if NET461
+    // .NET Framework's Encoding.UTF8 gives fewer U+FFFD for these; W3C Baggage asks only for U+FFFD.
+    [InlineData("%ED%A0%80", "\uFFFD\uFFFD")]
+    [InlineData("%F4%90%80%80", "\uFFFD\uFFFD\uFFFD")]
+#else
     [InlineData("%ED%A0%80", "\uFFFD\uFFFD\uFFFD")]
     [InlineData("%F4%90%80%80", "\uFFFD\uFFFD\uFFFD\uFFFD")]
+#endif
     [InlineData("%F0%9F%98%80", "\U0001F600")]
+    [InlineData("%EF%BB%BFx", "\uFEFFx")]
+    [InlineData("x%EF%BB%BFy", "x\uFEFFy")]
     public void Unescape_DecodesInvalidUtf8AsReplacementCharacters(string escaped, string decoded)
         => TraceHeaders.Unescape(escaped).ShouldBe(decoded);
 
@@ -667,20 +746,71 @@ public sealed class TraceContextTests
     }
 
     [Fact]
-    public async Task Use_WithoutTraceParent_SendsTheBaggageAlone()
+    public async Task Use_WithoutTraceParent_KeepsTheAmbientTrace_AndSendsItsBaggage()
     {
         await using var pair = await Pair.Create();
-        using var activity = StartW3CActivity();
+        using var scope = IpcTraceContext.Use(new(null, "rojo=1", "k=v"));
 
-        using (IpcTraceContext.Use(new(null, TraceState, "k=v")))
+        using (var activity = StartW3CActivity())
+        {
+            activity.TraceStateString = TraceState;
+            activity.AddBaggage("user", "alice");
+
+            var traced = await pair.Proxy.Probe();
+
+            var clientSpanId = traced.TraceParent!.Substring(36, 16);
+            traced.TraceParent.ShouldBe($"00-{activity.TraceId.ToHexString()}-{clientSpanId}-00");
+            clientSpanId.ShouldNotBe(activity.SpanId.ToHexString());
+            traced.TraceState.ShouldBe(TraceState);
+            traced.Baggage.ShouldBe("k=v");
+            traced.ActivityTraceId.ShouldBe(activity.TraceId.ToHexString());
+            traced.ActivityBaggage.ShouldBe(["k=v"]);
+        }
+
+        var alone = await pair.Proxy.Probe();
+
+        alone.TraceParent.ShouldBeNull();
+        alone.TraceState.ShouldBeNull();
+        alone.Baggage.ShouldBe("k=v");
+        alone.ActivityBaggage.ShouldBe(["k=v"]);
+    }
+
+    [Theory]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    [InlineData(null, "congo=t61")]
+    public void Use_WithoutTraceParentOrBaggage_Throws(string? traceParent, string? traceState)
+    {
+        var ex = Should.Throw<ArgumentException>(() => IpcTraceContext.Use(new(traceParent, traceState)));
+        ex.ParamName.ShouldBe("traceContext");
+        IpcTraceContext.Override.Value.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Use_HigherVersionTraceParent_IsSentUnchanged()
+    {
+        await using var pair = await Pair.Create();
+        const string TraceParent = "01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-future";
+
+        using (IpcTraceContext.Use(new(TraceParent, TraceState)))
         {
             var result = await pair.Proxy.Probe();
 
-            result.TraceParent.ShouldBeNull();
-            result.TraceState.ShouldBeNull();
-            result.Baggage.ShouldBe("k=v");
-            result.ActivityBaggage.ShouldBe(["k=v"]);
+            result.TraceParent.ShouldBe(TraceParent);
+            result.TraceState.ShouldBe(TraceState);
         }
+    }
+
+    [Fact]
+    public void AmbientActivityWithAnAllZeroTraceId_SendsOnlyItsBaggage()
+    {
+        using var activity = new Activity("caller").SetParentId(default(ActivityTraceId), ActivitySpanId.CreateRandom(), ActivityTraceFlags.Recorded).Start();
+        activity.TraceStateString = TraceState;
+        activity.AddBaggage("k", "v");
+        // Checked on the headers themselves: a .NET receiver would drop that traceparent anyway.
+        using var client = IpcTraceContext.StartClientActivity("ITraceProbe/Probe", explicitContext: null);
+
+        IpcTraceContext.GetOutgoingHeaders(explicitContext: null, client).ShouldBe(new Dictionary<string, string?> { ["baggage"] = "k=v" });
     }
 
     [Fact]
@@ -739,14 +869,41 @@ public sealed class TraceContextTests
     }
 
     [Fact]
-    public async Task Use_TraceStateOverTheMemberLimit_DropsLongMembersFirst()
+    public async Task ClientTimeout_SetsTheCallersErrorOnTheClientSpan()
+    {
+        var stopped = new List<Activity>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "UiPath.Ipc",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity => { lock (stopped) stopped.Add(activity); },
+        };
+        ActivitySource.AddActivityListener(listener);
+        // The client's own timeout: a Message.RequestTimeout would also time the server out, with the same text.
+        await using var pair = await Pair.Create(requestTimeout: TimeSpan.FromMilliseconds(200));
+        using var caller = StartW3CActivity();
+
+        var ex = await Should.ThrowAsync<TimeoutException>(() => pair.Proxy.Hang());
+
+        Activity client;
+        lock (stopped)
+        {
+            client = stopped.Single(span => span.Kind == ActivityKind.Client && span.DisplayName == $"{nameof(ITraceProbe)}/{nameof(ITraceProbe.Hang)}");
+        }
+        client.Status.ShouldBe(ActivityStatusCode.Error);
+        client.StatusDescription.ShouldBe(ex.Message);
+    }
+
+    [Fact]
+    public async Task Use_TraceStateOverTheMemberLimit_SendsTheFirst32()
     {
         await using var pair = await Pair.Create();
-        var traceState = string.Join(",", Enumerable.Range(0, 34).Select(i => i is 3 or 5 ? $"long{i}={new string('v', 130)}" : $"k{i}=v"));
+        var members = Enumerable.Range(0, 34).Select(i => i is 3 or 5 ? $"long{i}={new string('v', 130)}" : $"k{i}=v").ToArray();
 
-        using (IpcTraceContext.Use(new(TraceParentA, traceState)))
+        // A member that breaks the grammar doesn't count toward the 32.
+        using (IpcTraceContext.Use(new(TraceParentA, string.Join(",", new[] { "Bad=1" }.Concat(members)))))
         {
-            (await pair.Proxy.Probe()).TraceState.ShouldBe(string.Join(",", Enumerable.Range(0, 34).Where(i => i is not (3 or 5)).Select(i => $"k{i}=v")));
+            (await pair.Proxy.Probe()).TraceState.ShouldBe(string.Join(",", members.Take(32)));
         }
     }
 
@@ -877,10 +1034,13 @@ public sealed class TraceContextTests
             return new(pipe);
         }
 
+        public Task<TraceProbeResult> Probe(Dictionary<string, string> headers) => Call(nameof(ITraceProbe.Probe), headers);
+
         // Frames are written by hand so the headers can break the rules the client enforces.
-        public async Task<TraceProbeResult> Probe(Dictionary<string, string> headers)
+        public async Task<TraceProbeResult> Call(string methodName, Dictionary<string, string> headers, params object[] arguments)
         {
-            var json = $$"""{"Endpoint":"{{nameof(ITraceProbe)}}","Id":"{{++_requestId}}","MethodName":"{{nameof(ITraceProbe.Probe)}}","Parameters":[],"TimeoutInSeconds":0,"Headers":{{Newtonsoft.Json.JsonConvert.SerializeObject(headers)}}}""";
+            var parameters = Newtonsoft.Json.JsonConvert.SerializeObject(arguments.Select(argument => IpcJsonSerializer.Instance.Serialize(argument)));
+            var json = $$"""{"Endpoint":"{{nameof(ITraceProbe)}}","Id":"{{++_requestId}}","MethodName":"{{methodName}}","Parameters":{{parameters}},"TimeoutInSeconds":0,"Headers":{{Newtonsoft.Json.JsonConvert.SerializeObject(headers)}}}""";
             var payload = Encoding.UTF8.GetBytes(json);
             var frame = new byte[5 + payload.Length];
             frame[0] = (byte)MessageType.Request;
@@ -929,7 +1089,8 @@ public sealed class TraceContextTests
 
         public static async Task<Pair> Create(
             TelemetryPropagationPolicy clientPropagation = TelemetryPropagationPolicy.Both,
-            TelemetryPropagationPolicy serverPropagation = TelemetryPropagationPolicy.Both)
+            TelemetryPropagationPolicy serverPropagation = TelemetryPropagationPolicy.Both,
+            TimeSpan? requestTimeout = null)
         {
             var pipeName = $"ipctest_trace_{Guid.NewGuid():N}";
 
@@ -945,7 +1106,7 @@ public sealed class TraceContextTests
                 Transport = new NamedPipeClientTransport { PipeName = pipeName },
                 Callbacks = new() { { typeof(ITraceProbeCallback), new TraceProbeCallback() } },
                 TelemetryPropagation = clientPropagation,
-                RequestTimeout = TimeSpan.FromSeconds(10),
+                RequestTimeout = requestTimeout ?? TimeSpan.FromSeconds(10),
             };
             var proxy = client.GetProxy<ITraceProbe>();
 

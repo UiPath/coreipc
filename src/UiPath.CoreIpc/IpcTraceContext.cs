@@ -1,19 +1,5 @@
 namespace UiPath.Ipc;
 
-/// <summary>The directions in which an endpoint propagates the W3C trace context, see <see cref="IpcBase.TelemetryPropagation"/>.</summary>
-[Flags]
-public enum TelemetryPropagationPolicy
-{
-    None = 0,
-    /// <summary>The calls and callbacks the endpoint receives run under an <see cref="Activity"/> parented by the received
-    /// traceparent and expose <see cref="IpcContext.TraceContext"/>.</summary>
-    Incoming = 1,
-    /// <summary>The calls and callbacks the endpoint makes carry <see cref="IpcTraceContext.Use"/>'s value, or else the ids
-    /// of a per-call client <see cref="Activity"/> started as a child of a W3C <see cref="Activity.Current"/>.</summary>
-    Outgoing = 2,
-    Both = Incoming | Outgoing,
-}
-
 /// <summary>The W3C trace context (traceparent, tracestate, baggage) of an IPC call,
 /// propagated only in the directions <see cref="IpcBase.TelemetryPropagation"/> allows.</summary>
 public sealed class IpcTraceContext
@@ -22,10 +8,8 @@ public sealed class IpcTraceContext
     internal const string TraceStateHeader = "tracestate";
     internal const string BaggageHeader = "baggage";
 
-    private static readonly AsyncLocal<IpcTraceContext?> Override = new();
+    internal static readonly AsyncLocal<IpcTraceContext?> Override = new();
     private static readonly ActivitySource Source = new("UiPath.Ipc");
-
-    internal static IpcTraceContext? Current => Override.Value;
 
     /// <param name="traceParent">Optional: W3C Baggage doesn't depend on Trace Context, so a baggage can travel alone.
     /// The tracestate travels only with a traceparent.</param>
@@ -44,10 +28,14 @@ public sealed class IpcTraceContext
     public override string ToString() => TraceParent ?? "";
 
     /// <summary>Makes <paramref name="traceContext"/> the trace context of every outgoing call (forward calls and
-    /// callbacks) on the current async flow until disposed, winning over <see cref="Activity.Current"/>.
-    /// Scopes nest; disposing restores the previous value.</summary>
+    /// callbacks) on the current async flow until disposed. With a traceparent it wins over <see cref="Activity.Current"/>
+    /// outright: only its own traceparent, tracestate and baggage are sent. Without one, the calls keep the ambient trace
+    /// (the traceparent and tracestate of a client span under a W3C <see cref="Activity.Current"/>) and send this baggage
+    /// with it, or alone when there is no such activity. To send nothing, make the call with no scope and
+    /// <see cref="Activity.Current"/> set to null. Scopes nest, and an inner one replaces the outer one; disposing restores the previous value.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="traceContext"/> is null.</exception>
-    /// <exception cref="ArgumentException">The traceparent breaks W3C Trace Context §3.2.</exception>
+    /// <exception cref="ArgumentException">The traceparent breaks W3C Trace Context §3.2, or there is neither a traceparent
+    /// nor a baggage.</exception>
     public static IDisposable Use(IpcTraceContext traceContext)
     {
         if (traceContext is null)
@@ -55,31 +43,38 @@ public sealed class IpcTraceContext
             throw new ArgumentNullException(nameof(traceContext));
         }
 
-        if (traceContext.TraceParent is { } traceParent && !TraceHeaders.IsValidTraceParent(traceParent))
+        if (traceContext.TraceParent is { } traceParent && !TraceHeaders.TryParseTraceParent(traceParent, null, out _))
         {
             throw new ArgumentException($"The {TraceParentHeader} must be a W3C traceparent.", nameof(traceContext));
         }
 
-        var previous = Override.Value;
-        Override.Value = traceContext;
-        return new Scope(previous);
+        if (traceContext.TraceParent is null && traceContext.Baggage is null)
+        {
+            throw new ArgumentException($"The trace context must have a {TraceParentHeader} or a {BaggageHeader}.", nameof(traceContext));
+        }
+
+        return Override.Push(traceContext);
     }
 
-    /// <summary>The client span of an outgoing call, a child of the ambient W3C <see cref="Activity.Current"/>;
-    /// a plain <see cref="Activity"/> when nobody samples the source, so its ids still carry the caller's current flags.</summary>
-    internal static Activity? StartClientActivity(string name)
-    => Current is null && Activity.Current is { IdFormat: ActivityIdFormat.W3C }
+    /// <summary>The client span of an outgoing call, a child of the ambient W3C <see cref="Activity.Current"/>, unless
+    /// <paramref name="explicitContext"/> brings its own traceparent; a plain <see cref="Activity"/> when nobody samples
+    /// the source, so its ids still carry the caller's current flags.</summary>
+    internal static Activity? StartClientActivity(string name, IpcTraceContext? explicitContext)
+    => explicitContext?.TraceParent is null && Activity.Current is { IdFormat: ActivityIdFormat.W3C }
         ? (Source.CreateActivity(name, ActivityKind.Client) ?? new Activity(name)).Start()
         : null;
 
-    internal static Dictionary<string, string?>? GetOutgoingHeaders(Activity? clientActivity)
+    // The headers are written by hand, not through DistributedContextPropagator.Current, so they are the same on every runtime
+    // and are what JS and Python read (Current is LegacyPropagator on .NET 6, 8 and net461, W3CPropagator on .NET 10).
+    internal static Dictionary<string, string?>? GetOutgoingHeaders(IpcTraceContext? explicitContext, Activity? clientActivity)
     {
-        if ((Current ?? FromActivity(clientActivity)) is not { } traceContext)
+        if ((explicitContext is { TraceParent: not null } ? explicitContext : FromActivity(clientActivity, explicitContext)) is not { } traceContext)
         {
             return null;
         }
 
         var headers = new Dictionary<string, string?>();
+        // Use checked its own traceparent, but an Activity can have an all-zero trace id (SetParentId(default, ...)).
         if (traceContext.TraceParent is { } traceParent && TraceHeaders.IsValidTraceParent(traceParent))
         {
             headers[TraceParentHeader] = traceParent;
@@ -104,7 +99,7 @@ public sealed class IpcTraceContext
             return null;
         }
 
-        var traceParent = GetHeader(headers, TraceParentHeader) is { } received && TraceHeaders.IsValidTraceParent(received) ? received : null;
+        var traceParent = GetHeader(headers, TraceParentHeader) is { } received && TraceHeaders.TryParseTraceParent(received, null, out _) ? received : null;
         var traceState = traceParent is null ? null : GetHeader(headers, TraceStateHeader)?.ValidTraceState();
         var baggage = GetHeader(headers, BaggageHeader).NullIfEmpty();
         return traceParent is null && baggage is null ? null : new(traceParent, traceState, baggage);
@@ -112,16 +107,18 @@ public sealed class IpcTraceContext
 
     internal Activity StartActivity(string name)
     {
-        ActivityContext? parent = TraceParent is { } traceParent ? TraceHeaders.ParseTraceParent(traceParent, TraceState) : null;
+        ActivityContext? parent = TraceHeaders.TryParseTraceParent(TraceParent, TraceState, out var context) ? context : null;
+        // W3C ids even where the default format is hierarchical (.NET Framework), so that a call with a baggage but no
+        // traceparent still passes its baggage on from the new root activity.
         var activity = Source.HasListeners()
-            ? Source.CreateActivity(name, ActivityKind.Server, parent ?? default)
+            ? Source.CreateActivity(name, ActivityKind.Server, parent ?? default, idFormat: ActivityIdFormat.W3C)
             : null;
 
         if (activity is null)
         {
             // Without a sampled listener there is no source activity, yet Activity.Current must still
             // carry the remote trace so nested calls propagate it.
-            activity = new Activity(name);
+            activity = new Activity(name).SetIdFormat(ActivityIdFormat.W3C);
             if (parent is { } remote)
             {
                 activity.SetParentId(remote.TraceId, remote.SpanId, remote.TraceFlags);
@@ -142,14 +139,16 @@ public sealed class IpcTraceContext
         return activity.Start();
     }
 
-    private static IpcTraceContext? FromActivity(Activity? activity)
+    /// <summary>The traceparent and tracestate of a W3C <paramref name="activity"/>, with <paramref name="explicitContext"/>'s
+    /// baggage when there is an explicit context, else the activity's own; <paramref name="explicitContext"/> without such an activity.</summary>
+    private static IpcTraceContext? FromActivity(Activity? activity, IpcTraceContext? explicitContext)
     {
         if (activity is not { IdFormat: ActivityIdFormat.W3C })
         {
-            return null;
+            return explicitContext;
         }
 
-        return new(activity.Id!, activity.TraceStateString, activity.ToBaggageHeader());
+        return new(activity.Id!, activity.TraceStateString, explicitContext is null ? activity.ToBaggageHeader() : explicitContext.Baggage);
     }
 
     private static string? GetHeader(Dictionary<string, string?> headers, string name)
@@ -167,33 +166,4 @@ public sealed class IpcTraceContext
         }
         return null;
     }
-
-    private sealed class Scope : IDisposable
-    {
-        private readonly IpcTraceContext? _previous;
-        private bool _disposed;
-
-        public Scope(IpcTraceContext? previous) => _previous = previous;
-
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-            _disposed = true;
-            Override.Value = _previous;
-        }
-    }
-}
-
-internal static class IpcTelemetry
-{
-    /// <summary>The W3C baggage of <paramref name="activity"/> and its parents, in <see cref="Activity.Baggage"/> order, or <c>null</c> when there is none.</summary>
-    internal static string? ToBaggageHeader(this Activity activity)
-    => activity.Baggage.Any()
-        ? string.Join(",", activity.Baggage.Select(pair => $"{Uri.EscapeDataString(pair.Key)}={Uri.EscapeDataString(pair.Value ?? "")}"))
-        : null;
-
-    internal static string? NullIfEmpty(this string? value) => string.IsNullOrEmpty(value) ? null : value;
 }

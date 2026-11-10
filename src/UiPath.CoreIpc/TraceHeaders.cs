@@ -8,7 +8,6 @@ namespace UiPath.Ipc;
 internal static class TraceHeaders
 {
     internal const int MaxTraceStateMembers = 32;
-    internal const int MaxTraceStateMemberLength = 128;
     internal const int MaxBaggageMembers = 64;
     internal const int MaxBaggageBytes = 8192;
 
@@ -25,33 +24,37 @@ internal static class TraceHeaders
 
     private static readonly char[] OptionalWhitespace = [' ', '\t'];
 
-    internal static bool IsValidTraceParent(string value)
-    => TraceParent.Match(value) is { Success: true } match && !(value.StartsWith("00", StringComparison.Ordinal) && match.Groups["rest"].Success);
+    internal static bool IsValidTraceParent(string value) => TryParseTraceParent(value, null, out _);
 
-    /// <summary>Parses a traceparent that <see cref="IsValidTraceParent"/> accepted.</summary>
-    internal static ActivityContext ParseTraceParent(string traceParent, string? traceState)
-    => new(
-        ActivityTraceId.CreateFromString(traceParent.AsSpan(3, 32)),
-        ActivitySpanId.CreateFromString(traceParent.AsSpan(36, 16)),
-        (ActivityTraceFlags)byte.Parse(traceParent.Substring(53, 2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture),
-        traceState,
-        isRemote: true);
+    /// <summary>Whether <paramref name="value"/> follows the rule above (a version 00 traceparent has exactly 55 characters),
+    /// and if so its ids and flags, read at their offsets.</summary>
+    internal static bool TryParseTraceParent(string? value, string? traceState, out ActivityContext context)
+    {
+        if (value is null ||
+            TraceParent.Match(value) is not { Success: true } match ||
+            (value.StartsWith("00", StringComparison.Ordinal) && match.Groups["rest"].Success))
+        {
+            context = default;
+            return false;
+        }
+
+        context = new(
+            ActivityTraceId.CreateFromString(value.AsSpan(3, 32)),
+            ActivitySpanId.CreateFromString(value.AsSpan(36, 16)),
+            (ActivityTraceFlags)byte.Parse(value.Substring(53, 2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture),
+            traceState,
+            isRemote: true);
+        return true;
+    }
 
     /// <summary>The members that follow the tracestate grammar, or <c>null</c> when none does.</summary>
     internal static string? ValidTraceState(this string traceState)
     => JoinOrNull(ValidTraceStateMembers(traceState));
 
-    /// <summary>Trace Context §3.3.1.5: past 32 members, drop the ones over 128 characters first, then from the end.</summary>
+    /// <summary>Trace Context §3.3.1.1: at most 32 members, so only the first 32 that follow the grammar are kept.</summary>
     internal static string? LimitTraceState(this string traceState)
     {
         var members = ValidTraceStateMembers(traceState);
-        for (var index = members.Count - 1; index >= 0 && members.Count > MaxTraceStateMembers; index--)
-        {
-            if (members[index].Length > MaxTraceStateMemberLength)
-            {
-                members.RemoveAt(index);
-            }
-        }
         if (members.Count > MaxTraceStateMembers)
         {
             members.RemoveRange(MaxTraceStateMembers, members.Count - MaxTraceStateMembers);
@@ -73,6 +76,12 @@ internal static class TraceHeaders
         }
         return items;
     }
+
+    /// <summary>The W3C baggage of <paramref name="activity"/> and its parents, in <see cref="Activity.Baggage"/> order, or <c>null</c> when there is none.</summary>
+    internal static string? ToBaggageHeader(this Activity activity)
+    => activity.Baggage.Any()
+        ? string.Join(",", activity.Baggage.Select(pair => $"{Uri.EscapeDataString(pair.Key)}={Uri.EscapeDataString(pair.Value ?? "")}"))
+        : null;
 
     /// <summary>W3C Baggage: send at most 64 members and 8192 bytes, dropping whole members beyond that, and the ones
     /// a receiver couldn't parse.</summary>
@@ -102,7 +111,8 @@ internal static class TraceHeaders
         return JoinOrNull(kept);
     }
 
-    /// <summary>W3C Baggage: a percent-escape that isn't valid UTF-8 decodes to U+FFFD.</summary>
+    /// <summary>W3C Baggage: a percent-escape that isn't valid UTF-8 decodes to U+FFFD. For a broken sequence, .NET Framework's
+    /// <see cref="Encoding.UTF8"/> can give fewer U+FFFD than .NET, JS and Python do; W3C asks only for U+FFFD.</summary>
     internal static string Unescape(string value)
     {
         if (value.IndexOf('%') < 0)
@@ -120,11 +130,20 @@ internal static class TraceHeaders
                 index += 2;
                 continue;
             }
-            Utf8.Decode(bytes, result);
+            Decode();
             result.Append(value[index]);
         }
-        Utf8.Decode(bytes, result);
+        Decode();
         return result.ToString();
+
+        void Decode()
+        {
+            if (bytes.Count > 0)
+            {
+                result.Append(Encoding.UTF8.GetString(bytes.ToArray()));
+                bytes.Clear();
+            }
+        }
 
         static bool IsHex(char c) => c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
     }
@@ -146,61 +165,4 @@ internal static class TraceHeaders
     }
 
     private static string? JoinOrNull(List<string> members) => members.Count is 0 ? null : string.Join(",", members);
-
-    /// <summary>UTF-8 decoding with one U+FFFD per maximal invalid subpart (Unicode §3.9, WHATWG Encoding), which
-    /// .NET Framework's <see cref="Encoding.UTF8"/> doesn't follow, so all platforms decode the same.</summary>
-    private static class Utf8
-    {
-        public static void Decode(List<byte> bytes, StringBuilder result)
-        {
-            var index = 0;
-            while (index < bytes.Count)
-            {
-                var lead = bytes[index++];
-                if (lead < 0x80)
-                {
-                    result.Append((char)lead);
-                    continue;
-                }
-
-                var (count, codePoint, lower, upper) = lead switch
-                {
-                    >= 0xC2 and <= 0xDF => (1, lead & 0x1F, 0x80, 0xBF),
-                    0xE0 => (2, lead & 0x0F, 0xA0, 0xBF),
-                    0xED => (2, lead & 0x0F, 0x80, 0x9F),
-                    >= 0xE1 and <= 0xEF => (2, lead & 0x0F, 0x80, 0xBF),
-                    0xF0 => (3, lead & 0x07, 0x90, 0xBF),
-                    0xF4 => (3, lead & 0x07, 0x80, 0x8F),
-                    >= 0xF1 and <= 0xF3 => (3, lead & 0x07, 0x80, 0xBF),
-                    _ => (0, 0, 0, 0),
-                };
-
-                var valid = count > 0;
-                for (var seen = 0; valid && seen < count; seen++)
-                {
-                    if (index >= bytes.Count || bytes[index] < lower || bytes[index] > upper)
-                    {
-                        valid = false;
-                        break;
-                    }
-                    codePoint = (codePoint << 6) | (bytes[index++] & 0x3F);
-                    (lower, upper) = (0x80, 0xBF);
-                }
-
-                if (!valid)
-                {
-                    result.Append('�');
-                }
-                else if (codePoint < 0x10000)
-                {
-                    result.Append((char)codePoint);
-                }
-                else
-                {
-                    result.Append(char.ConvertFromUtf32(codePoint));
-                }
-            }
-            bytes.Clear();
-        }
-    }
 }

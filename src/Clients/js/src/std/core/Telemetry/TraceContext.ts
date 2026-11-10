@@ -7,7 +7,7 @@ export enum TelemetryPropagationPolicy {
     None = 0,
     /** The callbacks it receives run within the trace context they arrived with (`currentIncomingTraceContext`). */
     Incoming = 1,
-    /** The calls it makes carry the ambient trace context (`withTraceContext`, else the active OpenTelemetry span on Node). */
+    /** The calls it makes carry the ambient trace context (the active OpenTelemetry span on Node), with the values a `withTraceContext` scope sets taking precedence. */
     Outgoing = 2,
     Both = 3,
 }
@@ -24,16 +24,19 @@ export interface TraceContext {
 }
 
 /**
- * Runs `callback` with `traceContext` as the trace context of every outgoing call made within it
- * (including calls made by a callback handler), winning over the ambient OpenTelemetry context
- * (read on Node only; the browser package never reads it).
- * Scopes nest; the previous one is restored when `callback` returns.
+ * Runs `callback` with `traceContext` as the trace context of every outgoing call made within it; callback handlers
+ * never see it, since each callback runs isolated from whatever opened the connection.
+ * With a `traceparent` it wins outright over the ambient OpenTelemetry context (read on Node only; the browser
+ * package never reads it): only its own values are sent. Without one, its `baggage` is sent with the ambient
+ * traceparent and tracestate, if any.
+ * Scopes nest, and an inner one replaces the outer one; the previous one is restored when `callback` returns.
  *
  * On Node the scope follows the awaits inside `callback`. In the browser it is synchronous: it only applies
  * to calls started before `callback` first awaits (a proxy call builds its request synchronously, so
  * `withTraceContext(tc, () => proxy.Method())` is covered).
  *
- * @throws ArgumentError when the `traceparent` breaks W3C Trace Context §3.2.
+ * @throws ArgumentError when the `traceparent` breaks W3C Trace Context §3.2, or when there is neither a `traceparent`
+ * nor a `baggage`.
  */
 export function withTraceContext<T>(traceContext: TraceContext, callback: () => T): T {
     assertArgument({ traceContext }, 'object');

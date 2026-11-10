@@ -58,8 +58,8 @@ export module IpcBase {
 
         /**
          * Sets the directions in which the calls to this address and the callbacks from it propagate the W3C trace context
-         * (default `None`): with `Outgoing` the calls carry the ambient trace context (`withTraceContext`, else the active
-         * OpenTelemetry span on Node); with `Incoming` the callbacks run within the trace context they arrived with
+         * (default `None`): with `Outgoing` the calls carry the ambient trace context (the active
+         * OpenTelemetry span on Node, with the values a `withTraceContext` scope sets taking precedence); with `Incoming` the callbacks run within the trace context they arrived with
          * (`currentIncomingTraceContext`). A value set with `forAddress` wins over the one set with `forAnyAddress`.
          */
         setTelemetryPropagation(policy: TelemetryPropagationPolicy): void;

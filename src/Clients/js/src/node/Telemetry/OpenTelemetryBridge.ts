@@ -51,10 +51,10 @@ export function loadOpenTelemetry(load?: () => unknown): OtelApi | undefined {
 export class OpenTelemetryBridge implements TracingBridge {
     private _api: OtelApi | null | undefined;
 
-    // Loaded lazily and synchronously, so the optional peer dependency costs nothing while propagation is off.
+    // Loaded lazily and synchronously, on the first call with Outgoing or the first callback, so an app with neither never loads it.
     constructor(private readonly _load: () => OtelApi | undefined = loadOpenTelemetry) {}
 
-    public current(): TraceContext | undefined {
+    public current(withBaggage = true): TraceContext | undefined {
         const api = this.api;
         if (!api) {
             return undefined;
@@ -62,7 +62,7 @@ export class OpenTelemetryBridge implements TracingBridge {
 
         const active = api.context.active();
         const spanContext = api.trace.getSpanContext(active);
-        const baggage = api.propagation.getBaggage(active);
+        const baggage = withBaggage ? api.propagation.getBaggage(active) : undefined;
         const encodedBaggage = baggage && TraceHeaders.encodeBaggage(baggage.getAllEntries().map(([key, entry]) => [key, entry.value]));
         if (!spanContext || !api.trace.isSpanContextValid(spanContext)) {
             return encodedBaggage ? TraceHeaders.normalize(undefined, undefined, encodedBaggage) : undefined;

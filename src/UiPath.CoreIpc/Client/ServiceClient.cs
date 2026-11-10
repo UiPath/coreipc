@@ -61,7 +61,9 @@ internal abstract class ServiceClient : IDisposable
 
             using var timeoutHelper = new TimeoutHelper(clientTimeout, cancellationToken);
             var propagateOutgoing = (Config.TelemetryPropagation & TelemetryPropagationPolicy.Outgoing) != 0;
-            using var activity = propagateOutgoing ? IpcTraceContext.StartClientActivity($"{_interfaceType.Name}/{methodName}") : null;
+            // Read before the first await, which can resume without the caller's ExecutionContext (SuppressFlow).
+            var explicitContext = propagateOutgoing ? IpcTraceContext.Override.Value : null;
+            using var activity = propagateOutgoing ? IpcTraceContext.StartClientActivity($"{_interfaceType.Name}/{methodName}", explicitContext) : null;
             try
             {
                 var ct = timeoutHelper.Token;
@@ -77,7 +79,7 @@ internal abstract class ServiceClient : IDisposable
                 };
                 if (propagateOutgoing)
                 {
-                    request.Headers = IpcTraceContext.GetOutgoingHeaders(activity);
+                    request.Headers = IpcTraceContext.GetOutgoingHeaders(explicitContext, activity);
                 }
 
                 Config.Logger?.ServiceClient_Calling(methodName, requestId, Config.GetComputedDebugName());
@@ -99,8 +101,12 @@ internal abstract class ServiceClient : IDisposable
             }
             catch (Exception ex)
             {
-                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                timeoutHelper.ThrowTimeout(ex, methodName);
+                var error = timeoutHelper.CheckTimeout(ex, methodName);
+                activity?.SetStatus(ActivityStatusCode.Error, error.Message);
+                if (error != ex)
+                {
+                    throw error;
+                }
                 throw;
             }
 

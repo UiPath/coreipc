@@ -70,17 +70,24 @@ def test_use_rejects_an_invalid_traceparent(traceparent: str) -> None:
         _use(TraceContext(traceparent))
 
 
+def test_use_rejects_a_trace_context_with_neither_a_traceparent_nor_a_baggage() -> None:
+    for tc in (TraceContext(), TraceContext("", ""), TraceContext(tracestate="a=b")):
+        with pytest.raises(InvalidTraceContextError, match="traceparent or a baggage"):
+            _use(tc)
+
+
 def _sent(tc: TraceContext) -> dict[str, str] | None:
     with use_trace_context(tc):
         return outgoing_headers()
 
 
-def test_tracestate_over_32_members_is_cut_dropping_long_members_first() -> None:
+def test_tracestate_over_32_members_keeps_the_first_32() -> None:
     members = [f"k{i}=v" for i in range(34)]
     with_long = [f"long{i}={'v' * 130}" if i in (3, 5) else m for i, m in enumerate(members)]
-    assert _sent(TraceContext(TP, ",".join(with_long))) == {
+    # A member that breaks the grammar doesn't count toward the 32.
+    assert _sent(TraceContext(TP, ",".join(["Bad=1", *with_long]))) == {
         "traceparent": TP,
-        "tracestate": ",".join(m for i, m in enumerate(members) if i not in (3, 5)),
+        "tracestate": ",".join(with_long[:32]),
     }
     assert _sent(TraceContext(TP, ",".join(f"k{i}=v" for i in range(40)))) == {
         "traceparent": TP,
@@ -119,7 +126,32 @@ def test_baggage_members_a_receiver_cannot_parse_are_not_sent() -> None:
 
 def test_without_a_traceparent_the_baggage_travels_alone() -> None:
     assert _sent(TraceContext(tracestate="a=b", baggage="k=v")) == {"baggage": "k=v"}
-    assert _sent(TraceContext(tracestate="a=b")) is None
+
+
+def test_an_override_without_a_traceparent_takes_only_the_ambient_trace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The ambient trace is faked, so this runs without OpenTelemetry too (as in CI).
+    import uipath_ipc.trace_context as trace_context_module
+
+    calls: list[bool] = []
+
+    def ambient(with_baggage: bool = True) -> TraceContext:
+        calls.append(with_baggage)
+        return TraceContext(TP, "congo=t61rcWkgMzE", "ambient=1" if with_baggage else None)
+
+    monkeypatch.setattr(trace_context_module, "_from_opentelemetry", ambient)
+    assert _sent(TraceContext(tracestate="a=b", baggage="k=v")) == {
+        "traceparent": TP, "tracestate": "congo=t61rcWkgMzE", "baggage": "k=v",
+    }
+    # The ambient baggage is never encoded: the scope's baggage replaces it.
+    assert calls == [False]
+
+
+def test_a_higher_version_traceparent_is_sent_unchanged() -> None:
+    # Trace Context §3.4 lets a vendor pass the traceparent on as it is.
+    future = "01" + TP[2:] + "-future"
+    assert _sent(TraceContext(future)) == {"traceparent": future}
 
 
 def test_no_ambient_context_sends_nothing() -> None:
@@ -239,6 +271,9 @@ def test_baggage_with_encoded_separators_round_trips() -> None:
         ("%ED%A0%80", "\ufffd\ufffd\ufffd"),
         ("%F4%90%80%80", "\ufffd\ufffd\ufffd\ufffd"),
         ("%F0%9F%98%80", "\U0001f600"),
+        ("a+b", "a+b"),  # unquote, not unquote_plus
+        ("%EF%BB%BFx", "\ufeffx"),
+        ("x%EF%BB%BFy", "x\ufeffy"),
     ],
 )
 def test_baggage_decoding_matches_dotnet_and_js_with_u_fffd_for_invalid_utf8(
@@ -314,6 +349,23 @@ def test_explicit_override_wins_over_opentelemetry() -> None:
     with _otel_scope(TP, userId="alice"):
         with use_trace_context(TraceContext(TP2)):
             assert outgoing_headers() == {"traceparent": TP2}
+
+
+def test_an_override_without_a_traceparent_keeps_the_opentelemetry_trace() -> None:
+    with _otel_scope(TP, "congo=t61rcWkgMzE", userId="alice"):
+        assert _sent(TraceContext(tracestate="a=b", baggage="k=v")) == {
+            "traceparent": TP, "tracestate": "congo=t61rcWkgMzE", "baggage": "k=v",
+        }
+
+
+def test_an_empty_opentelemetry_context_sends_nothing() -> None:
+    otel_context = pytest.importorskip("opentelemetry.context")
+    with _otel_scope(TP, "congo=t61rcWkgMzE", userId="alice"):
+        token = otel_context.attach(otel_context.Context())
+        try:
+            assert outgoing_headers() is None
+        finally:
+            otel_context.detach(token)
 
 
 @pytest.mark.parametrize(

@@ -12,12 +12,7 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
     ) {}
 
     public getConnectHelper(address: Address): ConnectHelper | undefined {
-        const key = ConfigStore.computeCompositeKey(this._serviceProvider, address, undefined);
-
-        return (
-            this._connectHelpers.get(key) ??
-            this._connectHelpers.get(ConfigStore.EmptyKey)
-        );
+        return this.getForAddress(this._connectHelpers, address);
     }
 
     public setConnectHelper(
@@ -27,9 +22,7 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         assertArgument({ address }, Address, 'undefined');
         assertArgument({ value }, 'function', 'undefined');
 
-        const key = (!address
-            ? ConfigStore.EmptyKey
-            : ConfigStore.computeCompositeKey(this._serviceProvider, address));
+        const key = this.addressKey(address);
 
         if (!value) {
             this._connectHelpers.delete(key);
@@ -39,15 +32,8 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         this._connectHelpers.set(key, value);
     }
 
-    /** The value set for `address`, else the one set for any address, else `None`. */
     public getTelemetryPropagation(address: Address): TelemetryPropagationPolicy {
-        const key = ConfigStore.computeCompositeKey(this._serviceProvider, address, undefined);
-
-        return (
-            this._telemetryPropagations.get(key) ??
-            this._telemetryPropagations.get(ConfigStore.EmptyKey) ??
-            TelemetryPropagationPolicy.None
-        );
+        return this.getForAddress(this._telemetryPropagations, address) ?? TelemetryPropagationPolicy.None;
     }
 
     public setTelemetryPropagation(
@@ -55,13 +41,8 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         value: TelemetryPropagationPolicy,
     ): void {
         assertArgument({ address }, Address, 'undefined');
-        assertArgument({ value }, 'number');
 
-        const key = (!address
-            ? ConfigStore.EmptyKey
-            : ConfigStore.computeCompositeKey(this._serviceProvider, address));
-
-        this._telemetryPropagations.set(key, value);
+        this._telemetryPropagations.set(this.addressKey(address), value);
     }
 
     public getRequestTimeout(address: Address, service: PublicCtor): TimeSpan | undefined {
@@ -108,6 +89,19 @@ export class ConfigStore<TAddressBuilder extends AddressBuilder> {
         }
 
         this._requestTimeouts.set(key, value);
+    }
+
+    private addressKey(address?: Address): string {
+        return !address
+            ? ConfigStore.EmptyKey
+            : ConfigStore.computeCompositeKey(this._serviceProvider, address);
+    }
+
+    private getForAddress<T>(map: Map<string, T>, address: Address): T | undefined {
+        return (
+            map.get(ConfigStore.computeCompositeKey(this._serviceProvider, address, undefined)) ??
+            map.get(ConfigStore.EmptyKey)
+        );
     }
 
     private static computeCompositeKey(

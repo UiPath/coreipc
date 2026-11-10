@@ -83,13 +83,11 @@ export class ChannelManager implements IAsyncDisposable {
     ): Promise<RpcMessage.Response> {
         try {
             const policy = this._sp.configStore.getTelemetryPropagation(this._address);
-            // Outgoing alone still isolates the handler, so its calls never carry the context that opened the connection.
-            const result = policy === TelemetryPropagationPolicy.None
-                ? await this.invokeCallbackCore(request)
-                : await TraceContextRuntime.runIncoming(
-                      policy & TelemetryPropagationPolicy.Incoming ? TraceHeaders.fromHeaders(request.Headers) : undefined,
-                      () => this.invokeCallbackCore(request),
-                  );
+            // Every callback runs isolated from whatever opened the connection, so its calls never carry that context.
+            const result = await TraceContextRuntime.runIncoming(
+                policy & TelemetryPropagationPolicy.Incoming ? TraceHeaders.fromHeaders(request.Headers) : undefined,
+                () => this.invokeCallbackCore(request),
+            );
             return new RpcMessage.Response(request.Id, JSON.stringify(result), null);
         } catch (err) {
             return new RpcMessage.Response(request.Id, null, Converter.toRpcError(err));

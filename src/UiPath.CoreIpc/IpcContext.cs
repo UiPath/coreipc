@@ -40,28 +40,5 @@ public sealed class IpcContext
 
     /// <summary>Publishes <paramref name="context"/> as <see cref="Current"/> for the returned
     /// scope, restoring the previous value on dispose so nested calls compose.</summary>
-    internal static IDisposable Push(IpcContext context)
-    {
-        var previous = CurrentContext.Value;
-        CurrentContext.Value = context;
-        return new Scope(previous);
-    }
-
-    private sealed class Scope : IDisposable
-    {
-        private readonly IpcContext? _previous;
-        private bool _disposed;
-
-        public Scope(IpcContext? previous) => _previous = previous;
-
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-            _disposed = true;
-            CurrentContext.Value = _previous;
-        }
-    }
+    internal static IDisposable Push(IpcContext context) => CurrentContext.Push(context);
 }

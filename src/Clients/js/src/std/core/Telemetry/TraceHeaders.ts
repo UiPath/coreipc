@@ -11,7 +11,6 @@ export module TraceHeaders {
     export const baggage = 'baggage';
 
     const maxTraceStateMembers = 32;
-    const maxTraceStateMemberLength = 128;
     const maxBaggageMembers = 64;
     const maxBaggageBytes = 8192;
 
@@ -30,12 +29,16 @@ export module TraceHeaders {
         return match !== null && !(match[1] === '00' && match[2] !== undefined);
     }
 
-    /** @throws ArgumentError when the traceparent breaks W3C Trace Context §3.2. */
+    /** @throws ArgumentError when the traceparent breaks W3C Trace Context §3.2, or when there is neither a traceparent nor a baggage. */
     export function validated(value: TraceContext): TraceContext {
         if (value.traceparent && !isValidTraceParent(value.traceparent)) {
             throw new ArgumentError(`The ${traceparent} must be a W3C traceparent.`, traceparent);
         }
-        return normalize(value.traceparent, value.tracestate, value.baggage);
+        const result = normalize(value.traceparent, value.tracestate, value.baggage);
+        if (!result.traceparent && !result.baggage) {
+            throw new ArgumentError(`The trace context must have a ${traceparent} or a ${baggage}.`, 'traceContext');
+        }
+        return result;
     }
 
     /** Returns undefined when nothing is left to send. */
@@ -142,16 +145,9 @@ export module TraceHeaders {
         return joinOrUndefined(kept);
     }
 
-    /** Trace Context §3.3.1.5: past 32 members, drop the ones over 128 characters first, then from the end. */
+    /** Trace Context §3.3.1.1: at most 32 members, so the first 32 that follow the grammar are kept. */
     function limitTraceState(value: string): string | undefined {
-        const members = validTraceStateMembers(value);
-        for (let index = members.length - 1; index >= 0 && members.length > maxTraceStateMembers; index--) {
-            if (members[index].length > maxTraceStateMemberLength) {
-                members.splice(index, 1);
-            }
-        }
-        members.length = Math.min(members.length, maxTraceStateMembers);
-        return joinOrUndefined(members);
+        return joinOrUndefined(validTraceStateMembers(value).slice(0, maxTraceStateMembers));
     }
 
     function validTraceStateMembers(value: string): string[] {
@@ -183,7 +179,8 @@ export module TraceHeaders {
     }
 
     const escapes = /(?:%[0-9a-f]{2})+/gi;
-    const utf8Decoder = new TextDecoder();
+    // Created on first use, so loading the package never needs a TextDecoder. ignoreBOM keeps a U+FEFF, as .NET and Python do.
+    let utf8Decoder: TextDecoder | undefined;
 
     // W3C Baggage: a percent-escape that isn't valid UTF-8 decodes to U+FFFD.
     function unescape(value: string): string {
@@ -192,6 +189,7 @@ export module TraceHeaders {
             for (let index = 0; index < bytes.length; index++) {
                 bytes[index] = parseInt(sequence.substring(index * 3 + 1, index * 3 + 3), 16);
             }
+            utf8Decoder ??= new TextDecoder('utf-8', { ignoreBOM: true });
             return utf8Decoder.decode(bytes);
         });
     }

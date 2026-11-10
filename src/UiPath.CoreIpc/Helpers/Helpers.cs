@@ -15,6 +15,7 @@ internal static class Helpers
     internal const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly;
     internal static bool Enabled(this ILogger? logger, LogLevel logLevel = LogLevel.Information) => logger is not null && logger.IsEnabled(logLevel);
     internal static AsyncFlowControl? EnsureFlowSuppressed() => ExecutionContext.IsFlowSuppressed() ? null : ExecutionContext.SuppressFlow();
+    internal static string? NullIfEmpty(this string? value) => string.IsNullOrEmpty(value) ? null : value;
     [Conditional("DEBUG")]
     internal static void AssertDisposed(this SemaphoreSlim semaphore) => semaphore.AssertFieldNull("m_waitHandle");
     [Conditional("DEBUG")]
@@ -86,6 +87,38 @@ internal static class Helpers
         }
 
         task.GetAwaiter().GetResult();
+    }
+
+    /// <summary>Sets <paramref name="slot"/> to <paramref name="value"/> until the returned scope is disposed, which restores
+    /// the previous value once, however often it is disposed, so nested scopes compose.</summary>
+    internal static IDisposable Push<T>(this AsyncLocal<T?> slot, T? value) where T : class
+    {
+        var previous = slot.Value;
+        slot.Value = value;
+        return new AsyncLocalScope<T>(slot, previous);
+    }
+
+    private sealed class AsyncLocalScope<T> : IDisposable where T : class
+    {
+        private readonly AsyncLocal<T?> _slot;
+        private readonly T? _previous;
+        private bool _disposed;
+
+        public AsyncLocalScope(AsyncLocal<T?> slot, T? previous)
+        {
+            _slot = slot;
+            _previous = previous;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+            _slot.Value = _previous;
+        }
     }
 }
 public static class IOHelpers
