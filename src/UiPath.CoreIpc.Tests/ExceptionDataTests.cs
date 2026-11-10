@@ -261,9 +261,10 @@ public sealed class ExceptionDataTests
     [Fact]
     public void NewerPeer_DataValuesThatAreNotStrings_AreSkipped()
     {
-        var error = Deserialize("""{"Data":{"s":"v","d":"2026-11-05T10:00:00Z","o":{"Code":1},"a":["v"],"n":1,"b":true,"z":null,"dup":"v","dup":{}},"Message":"m","StackTrace":"s","Type":"t","InnerError":{"Message":"i","StackTrace":"s","Type":"t","InnerError":null,"Data":{"o":{"Code":2},"k2":"v2"}}}""");
+        var error = Deserialize("""{"Data":{"s":"first","s":"v","d":"2026-11-05T10:00:00Z","o":{"Code":1},"a":["v"],"n":1,"b":true,"z":null,"dup":"v","dup":{}},"Message":"m","StackTrace":"s","Type":"t","InnerError":{"Message":"i","StackTrace":"s","Type":"t","InnerError":null,"Data":{"o":{"Code":2},"k2":"v2"}}}""");
         error.Message.ShouldBe("m");
         error.Data!.Keys.ShouldBe(new[] { "s", "d" }, ignoreOrder: true);
+        error.Data["s"].ShouldBe("v");
         error.Data["d"].ShouldBe("2026-11-05T10:00:00Z");
         error.InnerError!.Data!.Keys.ShouldBe(new[] { "k2" });
     }
@@ -274,6 +275,28 @@ public sealed class ExceptionDataTests
         var error = Deserialize("""{"Data":{"$ref":"x","$id":"y","k":"v"},"Message":"m","StackTrace":"s","Type":"t","InnerError":null}""");
         error.Data!.Keys.ShouldBe(new[] { "$ref", "$id", "k" }, ignoreOrder: true);
     }
+
+    [Theory]
+    [InlineData("""/*c*/{"k":"v"}""")]
+    [InlineData("""{"k":/*c*/"v"}""")]
+    [InlineData("""{"k":"v",/*c*/"k2":"v2"}""")]
+    [InlineData("""{"k":"v"/*c*/}""")]
+    public void Wire_CommentInData_FailsTheRead(string data)
+        => Should.Throw<Newtonsoft.Json.JsonSerializationException>(() => Deserialize($$"""{"Data":{{data}},"Message":"m","StackTrace":"s","Type":"t","InnerError":null}""")).Message.ShouldContain("in Error.Data");
+
+#if !NET461
+    [Theory]
+    [InlineData("""{"k":[%]}""")]
+    [InlineData("[%]")]
+    public void NewerPeer_SkippedDataValues_AreNotLoaded(string data)
+    {
+        var json = $$"""{"Data":{{data.Replace("%", string.Join(",", Enumerable.Repeat("{}", 100_000)))}},"Message":"m","StackTrace":"s","Type":"t","InnerError":null}""";
+        Deserialize(json);
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        Deserialize(json);
+        (GC.GetAllocatedBytesForCurrentThread() - before).ShouldBeLessThan(json.Length);
+    }
+#endif
 
     [Theory]
     [InlineData("""["v"]""")]

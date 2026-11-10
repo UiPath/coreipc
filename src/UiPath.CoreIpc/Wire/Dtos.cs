@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
@@ -128,7 +127,8 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
         return data.Count > 0 ? data : null;
     }
 
-    // Keeps the string values and skips any other, so a peer that sends richer ones doesn't fail the read, which would close the connection.
+    // Keeps the string values and skips any other without loading it, so a peer that sends richer ones costs nothing and doesn't fail the read,
+    // which would close the connection. A comment does fail it: no peer we stay compatible with writes one.
     private sealed class DataConverter : JsonConverter<IReadOnlyDictionary<string, string>>
     {
         public override bool CanWrite => false;
@@ -140,9 +140,35 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
             reader.DateParseHandling = DateParseHandling.None;
             try
             {
-                return JToken.ReadFrom(reader) is JObject data
-                    ? data.Properties().Where(entry => entry.Value.Type is JTokenType.String).ToDictionary(entry => entry.Name, entry => entry.Value.Value<string>()!)
-                    : null;
+                if (reader.TokenType is JsonToken.Comment)
+                {
+                    throw new JsonSerializationException("A comment isn't allowed in Error.Data.");
+                }
+                if (reader.TokenType is not JsonToken.StartObject)
+                {
+                    reader.Skip();
+                    return null;
+                }
+                var data = new Dictionary<string, string>();
+                while (reader.Read() && reader.TokenType is JsonToken.PropertyName)
+                {
+                    var key = (string)reader.Value!;
+                    reader.Read();
+                    if (reader.TokenType is JsonToken.String)
+                    {
+                        data[key] = (string)reader.Value!;
+                    }
+                    else
+                    {
+                        data.Remove(key);
+                        reader.Skip();
+                    }
+                }
+                if (reader.TokenType is not JsonToken.EndObject)
+                {
+                    throw new JsonSerializationException($"Unexpected {reader.TokenType} in Error.Data.");
+                }
+                return data;
             }
             finally
             {
