@@ -6,9 +6,9 @@ carry, in precedence order, the explicit `use_trace_context` override, else the
 current OpenTelemetry span context + baggage (only when ``opentelemetry-api``
 is installed — the ``otel`` extra), else nothing; an override without a
 traceparent takes the span's traceparent and tracestate. Incoming handlers run
-under the received context: `incoming_trace_context` returns the raw values,
-and with OpenTelemetry installed the handler's current span is the
-(non-recording) remote parent.
+under the received context: `incoming_trace_context` returns the received
+values, cut to the limits, and with OpenTelemetry installed the handler's
+current span is the (non-recording) remote parent.
 """
 
 from __future__ import annotations
@@ -18,7 +18,8 @@ import contextvars
 import enum
 import re
 from dataclasses import dataclass, field
-from typing import Iterator, Mapping
+from types import SimpleNamespace
+from typing import Any, Iterator, Mapping
 from urllib.parse import quote, unquote
 
 TRACEPARENT = "traceparent"
@@ -90,7 +91,7 @@ _override: contextvars.ContextVar[TraceContext | None] = contextvars.ContextVar(
 _incoming: contextvars.ContextVar[TraceContext | None] = contextvars.ContextVar(
     "uipath_ipc_incoming_trace_context", default=None
 )
-# (trace_id, the TraceState OpenTelemetry extracted, raw received tracestate)
+# (trace_id, the TraceState OpenTelemetry extracted, the received tracestate)
 _incoming_tracestate: contextvars.ContextVar[tuple[int, object, str] | None] = (
     contextvars.ContextVar("uipath_ipc_incoming_tracestate", default=None)
 )
@@ -161,20 +162,18 @@ def outgoing_headers() -> dict[str, str] | None:
 
 def from_headers(headers: Mapping[str, str] | None) -> TraceContext | None:
     """A traceparent that breaks W3C Trace Context is ignored, and so is its
-    tracestate (§3.3); tracestate members that break their grammar are dropped.
+    tracestate (§3.3); tracestate members that break their grammar are dropped,
+    and the tracestate and baggage are cut to the limits a sender keeps to.
     ``None`` when neither a traceparent nor a baggage is left."""
-    if headers is None:
+    if not isinstance(headers, Mapping):
         return None
     traceparent = _get_header(headers, TRACEPARENT)
     if traceparent is not None and not _is_valid_traceparent(traceparent):
         traceparent = None
     received_tracestate = _get_header(headers, TRACESTATE) if traceparent else None
-    tracestate = (
-        ",".join(_valid_tracestate_members(received_tracestate))
-        if received_tracestate
-        else None
-    )
-    baggage = _get_header(headers, BAGGAGE)
+    tracestate = _limit_tracestate(received_tracestate) if received_tracestate else None
+    received_baggage = _get_header(headers, BAGGAGE)
+    baggage = _limit_baggage(received_baggage) if received_baggage else None
     if not traceparent and not baggage:
         return None
     return TraceContext(traceparent, tracestate, baggage)
@@ -197,15 +196,13 @@ def incoming_scope(trace_context: TraceContext | None, enabled: bool) -> Iterato
         yield
     finally:
         if otel_token is not None:
-            from opentelemetry import context as otel_context
-
-            otel_context.detach(otel_token)
+            _opentelemetry().context.detach(otel_token)
         _incoming_tracestate.reset(tracestate_token)
         _incoming.reset(incoming_token)
         _override.reset(override_token)
 
 
-# --- W3C limits on send --------------------------------------------------------
+# --- W3C limits, on send and on receive -----------------------------------------
 
 
 def _limit_baggage(baggage: str) -> str | None:
@@ -244,12 +241,16 @@ def _valid_tracestate_members(tracestate: str) -> list[str]:
 
 
 def _get_header(headers: Mapping[str, str], name: str) -> str | None:
-    value = headers.get(name)
-    if value is None:
-        for key, candidate in headers.items():
-            if key.lower() == name:
-                return candidate
-    return value
+    # The exact name wins, as on .NET and JS, even when its value is null.
+    if name in headers:
+        value = headers[name]
+    else:
+        value = next(
+            (v for k, v in headers.items() if isinstance(k, str) and k.lower() == name),
+            None,
+        )
+    # A value that isn't a string, from a peer that ignores the wire format, is ignored.
+    return value if isinstance(value, str) else None
 
 
 def _encode_baggage(entries: Mapping[str, object]) -> str | None:
@@ -293,13 +294,39 @@ def _split_baggage_member(member: str) -> tuple[str, str] | None:
 # --- OpenTelemetry (optional) --------------------------------------------------
 
 
+# OpenTelemetry's modules, imported on first use: None until then, False when
+# they can't be. Python doesn't remember a failed import, and retrying it would
+# cost every call.
+_otel: Any = None
+
+
+def _opentelemetry() -> Any:
+    global _otel
+    if _otel is None:
+        try:
+            from opentelemetry import baggage, trace
+            from opentelemetry import context as otel_context
+            from opentelemetry.trace.propagation.tracecontext import (
+                TraceContextTextMapPropagator,
+            )
+        except Exception:
+            _otel = False
+        else:
+            _otel = SimpleNamespace(
+                baggage=baggage,
+                trace=trace,
+                context=otel_context,
+                propagator=TraceContextTextMapPropagator(),
+            )
+    return _otel or None
+
+
 def _from_opentelemetry() -> TraceContext | None:
-    try:
-        from opentelemetry import baggage, trace
-    except Exception:
+    otel = _opentelemetry()
+    if otel is None:
         return None
-    span_context = trace.get_current_span().get_span_context()
-    encoded_baggage = _encode_baggage(baggage.get_all())
+    span_context = otel.trace.get_current_span().get_span_context()
+    encoded_baggage = _encode_baggage(otel.baggage.get_all())
     if not span_context.is_valid:
         return TraceContext(baggage=encoded_baggage) if encoded_baggage else None
     traceparent = (
@@ -321,26 +348,21 @@ def _from_opentelemetry() -> TraceContext | None:
 
 
 def _attach_opentelemetry(trace_context: TraceContext | None) -> object | None:
-    try:
-        from opentelemetry import baggage, trace
-        from opentelemetry import context as otel_context
-        from opentelemetry.trace.propagation.tracecontext import (
-            TraceContextTextMapPropagator,
-        )
-    except Exception:
+    otel = _opentelemetry()
+    if otel is None:
         return None
-    ctx = otel_context.Context()
+    ctx = otel.context.Context()
     if trace_context is not None and trace_context.traceparent:
         carrier = {TRACEPARENT: trace_context.traceparent}
         if trace_context.tracestate:
             carrier[TRACESTATE] = trace_context.tracestate
-        ctx = TraceContextTextMapPropagator().extract(carrier, context=ctx)
-        span_context = trace.get_current_span(ctx).get_span_context()
+        ctx = otel.propagator.extract(carrier, context=ctx)
+        span_context = otel.trace.get_current_span(ctx).get_span_context()
         if span_context.is_valid and trace_context.tracestate:
             _incoming_tracestate.set(
                 (span_context.trace_id, span_context.trace_state, trace_context.tracestate)
             )
     if trace_context is not None and trace_context.baggage:
         for key, value in _decode_baggage(trace_context.baggage):
-            ctx = baggage.set_baggage(key, value, ctx)
-    return otel_context.attach(ctx)
+            ctx = otel.baggage.set_baggage(key, value, ctx)
+    return otel.context.attach(ctx)

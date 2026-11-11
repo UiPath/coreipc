@@ -41,11 +41,32 @@ export interface OtelApi {
 export function loadOpenTelemetry(load?: () => unknown): OtelApi | undefined {
     try {
         // A literal require written inside this try, so a consumer's bundler treats the optional peer as optional.
-        return (load ? load() : require(/* webpackIgnore: true */ '@opentelemetry/api')) as OtelApi;
+        const api: unknown = load ? load() : require(/* webpackIgnore: true */ '@opentelemetry/api');
+        return isOtelApi(api) ? api : undefined;
     } catch {
         return undefined;
     }
 }
+
+// A bundler alias to false gives an empty module, and a stub or an API older than 1.1 lacks parts: neither counts as installed.
+function isOtelApi(api: any): api is OtelApi {
+    return (
+        api?.ROOT_CONTEXT !== undefined &&
+        typeof api.context?.active === 'function' &&
+        typeof api.context.with === 'function' &&
+        typeof api.trace?.getSpanContext === 'function' &&
+        typeof api.trace.setSpanContext === 'function' &&
+        typeof api.trace.isSpanContextValid === 'function' &&
+        typeof api.propagation?.getBaggage === 'function' &&
+        typeof api.propagation.setBaggage === 'function' &&
+        typeof api.propagation.createBaggage === 'function' &&
+        typeof api.createTraceState === 'function'
+    );
+}
+
+// The tracestate each received TraceState was made from, so a callback passes it on as received, as .NET and Python do,
+// rather than as OpenTelemetry writes it again (repeated keys merged, nothing over 512 characters).
+const receivedTraceStates = new WeakMap<object, string>();
 
 /* @internal */
 export class OpenTelemetryBridge implements TracingBridge {
@@ -69,7 +90,8 @@ export class OpenTelemetryBridge implements TracingBridge {
         }
 
         const flags = spanContext.traceFlags.toString(16).padStart(2, '0');
-        return TraceHeaders.normalize(`00-${spanContext.traceId}-${spanContext.spanId}-${flags}`, spanContext.traceState?.serialize(), encodedBaggage);
+        const tracestate = spanContext.traceState && (receivedTraceStates.get(spanContext.traceState) ?? spanContext.traceState.serialize());
+        return TraceHeaders.normalize(`00-${spanContext.traceId}-${spanContext.spanId}-${flags}`, tracestate, encodedBaggage);
     }
 
     public runWithRemoteParent<R>(traceContext: TraceContext | undefined, callback: () => R): R {
@@ -88,6 +110,7 @@ export class OpenTelemetryBridge implements TracingBridge {
             const spanContext: OtelSpanContext = { traceId, spanId, traceFlags: parseInt(flags, 16), isRemote: true };
             if (traceContext.tracestate) {
                 spanContext.traceState = api.createTraceState(traceContext.tracestate);
+                receivedTraceStates.set(spanContext.traceState, traceContext.tracestate);
             }
             context = api.trace.setSpanContext(context, spanContext);
         }

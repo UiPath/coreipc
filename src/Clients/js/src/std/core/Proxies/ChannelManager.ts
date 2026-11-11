@@ -1,4 +1,4 @@
-import { CancellationToken, IAsyncDisposable, PublicCtor, Timeout, TimeSpan } from '../..';
+import { CancellationToken, IAsyncDisposable, PublicCtor, Timeout, TimeSpan, Trace } from '../..';
 
 import {
     IServiceProvider,
@@ -126,11 +126,9 @@ export class ChannelManager implements IAsyncDisposable {
         public closed?: boolean;
 
         public async next(incommingContext: RpcCallContext.Incomming): Promise<void> {
-            incommingContext.respond(
-                await this._channelManager.invokeCallback(
-                    incommingContext.request,
-                ),
-            );
+            const response = await this._channelManager.invokeCallback(incommingContext.request);
+            // The connection can close while the handler runs, and nothing else awaits this.
+            await Trace.traceErrorNoThrow(incommingContext.respond(response));
         }
         public error(err: any): void {}
         public complete(): void {}

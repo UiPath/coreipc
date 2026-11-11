@@ -72,27 +72,55 @@ describe('node:packaged bundle without @opentelemetry/api', () => {
     );
 
     it(
-        "should bundle with a consumer's webpack, and run without tracing",
-        async () => {
+        "should run without tracing when the installed @opentelemetry/api isn't the API",
+        () => {
             const cwd = arrange();
-            const stats = await new Promise<any>((resolvePromise, reject) =>
-                webpack(
-                    {
-                        mode: 'none',
-                        target: 'node',
-                        context: cwd,
-                        entry: './entry.js',
-                        output: { path: join(cwd, 'out'), filename: 'bundle.js', library: { type: 'commonjs2' } },
-                    },
-                    (error, result) => (error ? reject(error) : resolvePromise(result)),
-                ),
-            );
-
-            expect(stats.toJson({ all: false, errors: true }).errors).to.deep.equal([]);
-            expect(runProbe(join(cwd, 'out', 'bundle.js'))).to.deep.equal({ outgoing: null, incoming: 'ran' });
+            const api = join(cwd, 'node_modules', '@opentelemetry', 'api');
+            mkdirSync(api, { recursive: true });
+            writeFileSync(join(api, 'package.json'), '{ "name": "@opentelemetry/api", "main": "index.js" }\n');
+            writeFileSync(join(api, 'index.js'), 'module.exports = {};\n');
+            try {
+                expect(runProbe(join(cwd, 'coreipc.js'))).to.deep.equal({ outgoing: null, incoming: 'ran' });
+            } finally {
+                rmSync(join(cwd, 'node_modules'), { recursive: true, force: true });
+            }
         },
         timeout,
     );
+
+    for (const [name, resolveOptions, warnings] of [
+        ['', {}, 1],
+        [' that aliases @opentelemetry/api to false', { alias: { '@opentelemetry/api': false } }, 0],
+    ] as Array<[string, object, number]>) {
+        it(
+            `should bundle with a consumer's webpack${name}, and run without tracing`,
+            async () => {
+                const cwd = arrange();
+                const stats = await new Promise<any>((resolvePromise, reject) =>
+                    webpack(
+                        {
+                            mode: 'none',
+                            target: 'node',
+                            context: cwd,
+                            entry: './entry.js',
+                            resolve: resolveOptions,
+                            output: { path: join(cwd, 'out'), filename: 'bundle.js', library: { type: 'commonjs2' } },
+                        },
+                        (error, result) => (error ? reject(error) : resolvePromise(result)),
+                    ),
+                );
+
+                const json = stats.toJson({ all: false, errors: true, warnings: true });
+                expect(json.errors).to.deep.equal([]);
+                // Without an alias, webpack warns once that it can't resolve the optional peer, as the README says.
+                expect(json.warnings.map((warning: { message: string }) => warning.message.includes('@opentelemetry/api'))).to.deep.equal(
+                    Array(warnings).fill(true),
+                );
+                expect(runProbe(join(cwd, 'out', 'bundle.js'))).to.deep.equal({ outgoing: null, incoming: 'ran' });
+            },
+            timeout,
+        );
+    }
 });
 
 describe('node:packaged bundles where TextDecoder is missing', () => {
@@ -102,6 +130,24 @@ describe('node:packaged bundles where TextDecoder is missing', () => {
         ['web', resolve(__dirname, '../../dist/prepack/web/index.js')],
     ];
     const load = 'delete globalThis.TextDecoder; delete globalThis.TextEncoder; require(process.argv[1]); process.stdout.write("loaded");';
+
+    it(
+        'should send a baggage, and take one in, with the node bundle',
+        () => {
+            if (!existsSync(packagedBundle)) {
+                pending(`Run "npm run build" first: ${packagedBundle} is missing.`);
+            }
+            const run =
+                'delete globalThis.TextDecoder; delete globalThis.TextEncoder; const { TraceHeaders } = require(process.argv[1]); ' +
+                "process.stdout.write(JSON.stringify([TraceHeaders.fromHeaders({ baggage: 'k=v,x=%C3%A9' }), TraceHeaders.toHeaders({ baggage: 'k=é' })]));";
+
+            expect(JSON.parse(execFileSync(process.execPath, ['-e', run, packagedBundle], { encoding: 'utf8' }))).to.deep.equal([
+                { baggage: 'k=v,x=%C3%A9' },
+                { baggage: 'k=é' },
+            ]);
+        },
+        timeout,
+    );
 
     for (const [name, bundle] of bundles) {
         it(

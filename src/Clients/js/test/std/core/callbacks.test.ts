@@ -15,6 +15,7 @@ import {
     Address,
     ConnectHelper,
     Socket,
+    Trace,
 } from '../../../src/std';
 
 import { NodeAddressBuilder } from '../../../src/node/NodeAddressBuilder';
@@ -81,14 +82,32 @@ async function arrange(callback?: object) {
     const factory = new ObserverCapturingFactory();
     await new ChannelManager(sp, address, factory).invokeMethod(MockService, 'DoWork', []);
 
-    return (methodName: string, parameters: string[] = []) => {
+    const newRequest = (methodName: string, parameters: string[]) => {
         const request = new RpcMessage.Request(0, endpoint, methodName, parameters);
         request.Id = 'server-request-1';
-
-        return new Promise<RpcMessage.Response>(resolve => {
-            factory.observer!.next(new RpcCallContext.Incomming(request, async response => resolve(response)));
-        });
+        return request;
     };
+
+    const dispatch = (methodName: string, parameters: string[] = []) =>
+        new Promise<RpcMessage.Response>(resolve => {
+            factory.observer!.next(new RpcCallContext.Incomming(newRequest(methodName, parameters), async response => resolve(response)));
+        });
+
+    // What the observer's promise does when the response can't be sent, for instance after the connection closed.
+    const dispatchWithFailingRespond = (methodName: string, parameters: string[] = []) =>
+        factory.observer!.next(
+            new RpcCallContext.Incomming(newRequest(methodName, parameters), async () => {
+                throw new Error('The connection closed.');
+            }),
+        ) as unknown as Promise<void>;
+
+    return Object.assign(dispatch, { withFailingRespond: dispatchWithFailingRespond });
+}
+
+function revokedProxy(): object {
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    return proxy;
 }
 
 describe('incoming callback requests', () => {
@@ -127,6 +146,38 @@ describe('incoming callback requests', () => {
 
         expect(response.Data).to.equal(null);
         expect(response.Error?.Message).to.equal('boom');
+    });
+
+    for (const [name, thrown, message] of [
+        ['undefined', undefined, 'undefined'],
+        ['null', null, 'null'],
+        ['a number', 42, '42'],
+        ['a string', 'boom', 'boom'],
+        ['an object without a prototype', Object.create(null), '[object Object]'],
+        ['a revoked proxy', revokedProxy(), 'object'],
+        ['an Error whose message is a number', Object.assign(new Error('x'), { message: 42 }), '42'],
+    ] as Array<[string, unknown, string]>) {
+        it(`should respond with an error when the callback throws ${name}`, async () => {
+            const dispatch = await arrange({ Add: async () => { throw thrown; } });
+
+            const response = await dispatch('Add', ['1', '2']);
+
+            expect(response.Data).to.equal(null);
+            expect(response.Error?.Message).to.equal(message);
+        });
+    }
+
+    it('should log, rather than leave unhandled, a response that cannot be sent', async () => {
+        const dispatch = await arrange({ Add: async (x: number, y: number) => x + y });
+        const logged = new Array<string>();
+        const listener = Trace.addListener(entry => logged.push(String(entry)));
+        try {
+            await dispatch.withFailingRespond('Add', ['1', '2']);
+        } finally {
+            listener.dispose();
+        }
+
+        expect(logged.some(entry => entry.includes('The connection closed.'))).to.equal(true);
     });
 
     it('should keep serving callbacks after a failed one', async () => {

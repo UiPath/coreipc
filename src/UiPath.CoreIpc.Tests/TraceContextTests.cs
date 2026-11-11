@@ -32,6 +32,67 @@ public sealed record TraceProbeResult(
 
 public sealed record TraceProbeCallbackResult(TraceProbeResult Server, TraceProbeResult Callback);
 
+#if NET461
+public interface IAdder
+{
+    Task<int> Add(int x, int y);
+}
+
+public sealed class Adder : IAdder
+{
+    public Task<int> Add(int x, int y) => Task.FromResult(x + y);
+}
+
+/// <summary>Makes a call with propagation off, from an AppDomain whose folder has no System.Diagnostics.DiagnosticSource.</summary>
+public sealed class WithoutDiagnosticSource : MarshalByRefObject
+{
+    public string Call()
+    {
+        try
+        {
+            return CallAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            return $"{ex.GetType().Name}: {ex.Message}";
+        }
+    }
+
+    private static async Task<string> CallAsync()
+    {
+        // A load that fails shows only as a resolve request: the JIT gives up the inlining that asked for it.
+        var requested = 0;
+        AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
+        {
+            if (args.Name.StartsWith("System.Diagnostics.DiagnosticSource", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref requested);
+            }
+            return null;
+        };
+        var pipeName = $"ipctest_nods_{Guid.NewGuid():N}";
+        var server = new IpcServer
+        {
+            Transport = new NamedPipeServerTransport { PipeName = pipeName },
+            Endpoints = new() { { typeof(IAdder), new Adder() } },
+        };
+        server.Start();
+        try
+        {
+            var proxy = new IpcClient { Transport = new NamedPipeClientTransport { PipeName = pipeName } }.GetProxy<IAdder>();
+            var sum = await proxy.Add(1, 2);
+            (proxy as IpcProxy)?.Dispose();
+            var loaded = AppDomain.CurrentDomain.GetAssemblies().Any(assembly => assembly.GetName().Name == "System.Diagnostics.DiagnosticSource");
+            return $"{sum}, DiagnosticSource {(loaded ? "loaded" : "not loaded")}, requested {requested} times";
+        }
+        finally
+        {
+            await server.DisposeAsync();
+        }
+    }
+}
+#endif
+
 public interface ITraceProbe
 {
     Task<TraceProbeResult> Probe();
@@ -284,7 +345,7 @@ public sealed class TraceContextTests
     [InlineData("tracestate", "too-many")]
     [InlineData("baggage", "too-many")]
     [InlineData("baggage", "too-long")]
-    public async Task IncomingHeadersOverTheLimits_AreAcceptedAsIs(string header, string value)
+    public async Task IncomingHeadersOverTheLimits_AreCutToThem(string header, string value)
     {
         await using var pair = await Pair.Create();
         using var raw = await RawConnection.Create(pair.PipeName);
@@ -292,8 +353,94 @@ public sealed class TraceContextTests
 
         var result = await raw.Probe(new() { ["traceparent"] = TraceParentA, [header] = overLimit });
 
-        (header is "baggage" ? result.Baggage : result.TraceState).ShouldBe(overLimit);
+        (header is "baggage" ? result.Baggage : result.TraceState).ShouldBe(value is "too-many" ? Members(header is "baggage" ? 64 : 32) : null);
     }
+
+    [Theory]
+    [InlineData("""{"traceparent":5,"tracestate":{"a":1},"baggage":["k=v"]}""")]
+    [InlineData("\"not an object\"")]
+    [InlineData("[1,2]")]
+    public async Task IncomingHeadersThatArentStrings_AreIgnored_AndTheConnectionStaysUp(string headers)
+    {
+        await using var pair = await Pair.Create();
+        using var raw = await RawConnection.Create(pair.PipeName);
+
+        var ignored = await raw.ProbeWithHeadersJson(headers);
+        var next = await raw.Probe(new() { ["traceparent"] = TraceParentA });
+
+        ignored.TraceParent.ShouldBeNull();
+        next.TraceParent.ShouldBe(TraceParentA);
+    }
+
+    [Fact]
+    public async Task IncomingBaggageWithNothingUsable_GivesNoTraceContextAndNoActivity()
+    {
+        await using var pair = await Pair.Create();
+        using var raw = await RawConnection.Create(pair.PipeName);
+
+        var result = await raw.Probe(new() { ["baggage"] = "foo,=x" });
+
+        result.Baggage.ShouldBeNull();
+        result.ActivityTraceId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task IncomingBaggage_ReachesTheHandlerCleaned()
+    {
+        await using var pair = await Pair.Create();
+        using var raw = await RawConnection.Create(pair.PipeName);
+
+        var result = await raw.Probe(new() { ["traceparent"] = TraceParentA, ["baggage"] = " a=1 , foo ,b=2" });
+
+        result.Baggage.ShouldBe("a=1,b=2");
+    }
+
+#if NET461
+    [Fact]
+    public void PropagationOff_WorksWithoutDiagnosticSource()
+    {
+        // A .NET Framework host may lack DiagnosticSource, or ship another version without a binding redirect.
+        var folder = Path.Combine(Path.GetTempPath(), $"coreipc-no-ds-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+        try
+        {
+            // The test assembly's own folder: a runner without AppDomains has its own base directory.
+            foreach (var file in Directory.GetFiles(Path.GetDirectoryName(new Uri(typeof(WithoutDiagnosticSource).Assembly.CodeBase).LocalPath)!))
+            {
+                var name = Path.GetFileName(file);
+                if (!name.StartsWith("System.Diagnostics.DiagnosticSource", StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Copy(file, Path.Combine(folder, name));
+                }
+            }
+            var configuration = Path.Combine(folder, Path.GetFileName(typeof(WithoutDiagnosticSource).Assembly.Location) + ".config");
+            var domain = AppDomain.CreateDomain("without DiagnosticSource", null, new AppDomainSetup { ApplicationBase = folder, ConfigurationFile = configuration });
+            try
+            {
+                var probe = (WithoutDiagnosticSource)domain.CreateInstanceAndUnwrap(typeof(WithoutDiagnosticSource).Assembly.FullName, typeof(WithoutDiagnosticSource).FullName);
+
+                probe.Call().ShouldBe("3, DiagnosticSource not loaded, requested 0 times");
+            }
+            finally
+            {
+                AppDomain.Unload(domain);
+            }
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+#endif
 
     [Fact]
     public async Task IncomingTraceState_DropsMembersThatBreakTheGrammar()
@@ -385,14 +532,14 @@ public sealed class TraceContextTests
     }
 
     [Fact]
-    public async Task IncomingBaggage_KeepsDuplicatesInWireOrder()
+    public async Task IncomingBaggage_KeepsTheLastOfARepeatedKey_LikeJsAndPython()
     {
         await using var pair = await Pair.Create();
         using var raw = await RawConnection.Create(pair.PipeName);
 
         var result = await raw.Probe(new() { ["traceparent"] = TraceParentA, ["baggage"] = "k=1,k=2,x=a%20b%FF" });
 
-        result.ActivityBaggage.ShouldBe(["k=1", "k=2", "x=a b\uFFFD"]);
+        result.ActivityBaggage.ShouldBe(["k=2", "x=a b\uFFFD"]);
     }
 
     [Theory]
@@ -443,7 +590,7 @@ public sealed class TraceContextTests
     }
 
     [Fact]
-    public async Task Baggage_ReachesTheRemoteActivityAsTheLocalOneListsIt()
+    public async Task Baggage_ReachesTheRemoteActivity_WithEachKeyOnce_AsGetBaggageItemReadsIt()
     {
         await using var pair = await Pair.Create();
         using var parent = StartW3CActivity();
@@ -454,7 +601,8 @@ public sealed class TraceContextTests
 
         var result = await pair.Proxy.Probe();
 
-        result.ActivityBaggage.ShouldBe(["shared=child", "inherited=parent", "shared=parent"]);
+        result.Baggage.ShouldBe("shared=child,inherited=parent");
+        result.ActivityBaggage.ShouldBe(["shared=child", "inherited=parent"]);
     }
 
     [Theory]
@@ -855,9 +1003,11 @@ public sealed class TraceContextTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void OutgoingTrace_DisposedWhereItsSpanIsNotCurrent_LeavesThatContextAsItFoundIt(bool stopped)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void OutgoingTrace_DisposedWhereItsSpanIsNotCurrent_LeavesThatContextAsItFoundIt(bool stopped, bool suppressed)
     {
         using var caller = StartW3CActivity();
         var trace = IpcTraceContext.OutgoingTrace.Start("ITraceProbe/Probe");
@@ -870,7 +1020,18 @@ public sealed class TraceContextTests
             ExecutionContext.Run(ExecutionContext.Capture()!, _ => poolThread.Stop(), null);
         }
 
-        trace.Dispose();
+        if (suppressed)
+        {
+            // As when code under SuppressFlow finishes the call inline: a Cancel, say.
+            using (ExecutionContext.SuppressFlow())
+            {
+                trace.Dispose();
+            }
+        }
+        else
+        {
+            trace.Dispose();
+        }
 
         Activity.Current.ShouldBeSameAs(poolThread);
     }
@@ -1094,7 +1255,19 @@ public sealed class TraceContextTests
     }
 
     [Fact]
-    public void ToBaggageHeader_ListsTheBaggageAsActivityDoes()
+    public void ToBaggageHeader_DropsAKeyWhoseNewestValueIsTooLong_RatherThanSendAnOlderOne()
+    {
+        using var parent = StartW3CActivity();
+        parent.AddBaggage("k", "older");
+        parent.AddBaggage("other", "v");
+        using var child = StartW3CActivity();
+        child.AddBaggage("k", new string('v', 9_000));
+
+        child.ToBaggageHeader().ShouldBe("other=v");
+    }
+
+    [Fact]
+    public void ToBaggageHeader_SendsEachKeyOnce_AsGetBaggageItemReadsIt()
     {
         using var parent = StartW3CActivity();
         parent.AddBaggage("shared", "parent");
@@ -1103,7 +1276,8 @@ public sealed class TraceContextTests
         child.AddBaggage("shared", "child");
         child.AddBaggage("shared", "child-newer");
 
-        child.ToBaggageHeader().ShouldBe("shared=child-newer,shared=child,inherited=parent,shared=parent");
+        child.GetBaggageItem("shared").ShouldBe("child-newer");
+        child.ToBaggageHeader().ShouldBe("shared=child-newer,inherited=parent");
     }
 
     [Fact]
@@ -1138,10 +1312,15 @@ public sealed class TraceContextTests
         public Task<TraceProbeResult> Probe(Dictionary<string, string> headers) => Call(nameof(ITraceProbe.Probe), headers);
 
         // Frames are written by hand so the headers can break the rules the client enforces.
-        public async Task<TraceProbeResult> Call(string methodName, Dictionary<string, string> headers, params object[] arguments)
+        public Task<TraceProbeResult> Call(string methodName, Dictionary<string, string> headers, params object[] arguments)
+            => CallWithHeadersJson(methodName, Newtonsoft.Json.JsonConvert.SerializeObject(headers), arguments);
+
+        public Task<TraceProbeResult> ProbeWithHeadersJson(string headers) => CallWithHeadersJson(nameof(ITraceProbe.Probe), headers);
+
+        private async Task<TraceProbeResult> CallWithHeadersJson(string methodName, string headers, params object[] arguments)
         {
             var parameters = Newtonsoft.Json.JsonConvert.SerializeObject(arguments.Select(argument => IpcJsonSerializer.Instance.Serialize(argument)));
-            var json = $$"""{"Endpoint":"{{nameof(ITraceProbe)}}","Id":"{{++_requestId}}","MethodName":"{{methodName}}","Parameters":{{parameters}},"TimeoutInSeconds":0,"Headers":{{Newtonsoft.Json.JsonConvert.SerializeObject(headers)}}}""";
+            var json = $$"""{"Endpoint":"{{nameof(ITraceProbe)}}","Id":"{{++_requestId}}","MethodName":"{{methodName}}","Parameters":{{parameters}},"TimeoutInSeconds":0,"Headers":{{headers}}}""";
             var payload = Encoding.UTF8.GetBytes(json);
             var frame = new byte[5 + payload.Length];
             frame[0] = (byte)MessageType.Request;

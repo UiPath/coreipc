@@ -24,6 +24,7 @@ internal record Request(string Endpoint, string Id, string MethodName, string[] 
     public Stream? UploadStream { get; set; }
 
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    [JsonConverter(typeof(RequestHeadersConverter))]
     public Dictionary<string, string?>? Headers { get; set; }
 
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
@@ -32,6 +33,53 @@ internal record Request(string Endpoint, string Id, string MethodName, string[] 
         ? defaultTimeout.OrInfinite() 
         : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
+// Keeps the string values and skips the others, and a Headers that isn't an object, as JS and Python do: a peer that breaks
+// the format must not fail the read, which would close the connection.
+internal sealed class RequestHeadersConverter : JsonConverter<Dictionary<string, string?>>
+{
+    public override bool CanWrite => false;
+
+    public override Dictionary<string, string?>? ReadJson(JsonReader reader, Type objectType, Dictionary<string, string?>? existingValue, bool hasExistingValue, JsonSerializer serializer)
+    {
+        if (reader.TokenType is not JsonToken.StartObject)
+        {
+            reader.Skip();
+            return null;
+        }
+        var dateParseHandling = reader.DateParseHandling;
+        // Otherwise a value that looks like a date is read as one, and skipped.
+        reader.DateParseHandling = DateParseHandling.None;
+        try
+        {
+            var headers = new Dictionary<string, string?>();
+            while (reader.Read() && reader.TokenType is JsonToken.PropertyName)
+            {
+                var name = (string)reader.Value!;
+                reader.Read();
+                if (reader.TokenType is JsonToken.String)
+                {
+                    headers[name] = (string)reader.Value!;
+                }
+                else
+                {
+                    reader.Skip();
+                }
+            }
+            if (reader.TokenType is not JsonToken.EndObject)
+            {
+                throw new JsonSerializationException($"Unexpected {reader.TokenType} in Headers.");
+            }
+            return headers;
+        }
+        finally
+        {
+            reader.DateParseHandling = dateParseHandling;
+        }
+    }
+
+    public override void WriteJson(JsonWriter writer, Dictionary<string, string?>? value, JsonSerializer serializer) => throw new NotSupportedException();
+}
+
 record CancellationRequest(string RequestId);
 
 internal record Response(string RequestId, string? Data = null, Error? Error = null)

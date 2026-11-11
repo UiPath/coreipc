@@ -169,38 +169,31 @@ internal class Server
             ScheduleMethodCall().LogException(Logger, method.MethodInfo);
             return Response.Success(request, "");
 
-            Task<object?> ScheduleMethodCall() => defaultScheduler ? MethodCall() : RunOnScheduler();
+            Task<object?> ScheduleMethodCall() => defaultScheduler ? TracedMethodCall() : RunOnScheduler();
+            // No span type appears here, so with propagation off nothing on this path loads DiagnosticSource.
+            Task<object?> TracedMethodCall() => traceContext is null ? MethodCall() : traceContext.RunInServerSpan($"{request.Endpoint}/{request.MethodName}", MethodCall);
             async Task<object?> MethodCall()
             {
-                using var activity = traceContext?.StartActivity($"{request.Endpoint}/{request.MethodName}");
-                try
+                // So a POCO contract can reach the peer without a Message parameter.
+                using (IpcContext.Push(new IpcContext(_client, cancellationToken, traceContext)))
                 {
-                    // So a POCO contract can reach the peer without a Message parameter.
-                    using (IpcContext.Push(new IpcContext(_client, cancellationToken, traceContext)))
+                    await (route.BeforeCall?.Invoke(
+                        new CallInfo(newConnection: false, method.MethodInfo, arguments),
+                        cancellationToken) ?? Task.CompletedTask);
+
+                    Task invocationTask = method.Invoke(service, arguments, cancellationToken);
+                    await invocationTask;
+
+                    if (!returnTaskType.IsGenericType)
                     {
-                        await (route.BeforeCall?.Invoke(
-                            new CallInfo(newConnection: false, method.MethodInfo, arguments),
-                            cancellationToken) ?? Task.CompletedTask);
-
-                        Task invocationTask = method.Invoke(service, arguments, cancellationToken);
-                        await invocationTask;
-
-                        if (!returnTaskType.IsGenericType)
-                        {
-                            return null;
-                        }
-
-                        return GetTaskResult(returnTaskType, invocationTask);
+                        return null;
                     }
-                }
-                catch (Exception ex)
-                {
-                    activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                    throw;
+
+                    return GetTaskResult(returnTaskType, invocationTask);
                 }
             }
 
-            Task<object?> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler).Unwrap();
+            Task<object?> RunOnScheduler() => Task.Factory.StartNew(TracedMethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler).Unwrap();
         }
         object?[] GetArguments()
         {

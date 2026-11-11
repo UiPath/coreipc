@@ -182,7 +182,7 @@ async def test_invalid_server_override_fails_the_dotnet_call(dotnet_server) -> N
     assert ei.value.type_name == "System.ArgumentException"
 
 
-async def test_dotnet_server_takes_headers_over_the_limits_as_they_are(dotnet_server) -> None:
+async def test_dotnet_server_cuts_headers_to_the_limits(dotnet_server) -> None:
     baggage = ",".join(f"k{i}=v" for i in range(65))
     async with _client() as client:
         conn, _ = await client._ensure_connected()
@@ -193,4 +193,4 @@ async def test_dotnet_server_takes_headers_over_the_limits_as_they_are(dotnet_se
         resp = await asyncio.wait_for(conn.send_request(req), timeout=10)
     assert resp.error is None
     assert resp.data is not None
-    assert json.loads(resp.data)["Baggage"] == baggage
+    assert json.loads(resp.data)["Baggage"] == ",".join(f"k{i}=v" for i in range(64))

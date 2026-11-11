@@ -334,21 +334,27 @@ async def _send_raw(client: IpcClient, method: str, headers: dict[str, str]) -> 
 
 
 @pytest.mark.parametrize(
-    "headers",
+    ("headers", "seen"),
     [
-        {"traceparent": TP, "tracestate": ",".join(f"k{i}=v" for i in range(33))},
-        {"traceparent": TP, "baggage": ",".join(f"k{i}=v" for i in range(65))},
-        {"traceparent": TP, "baggage": "k=" + "v" * 8191},
+        (
+            {"traceparent": TP, "tracestate": ",".join(f"k{i}=v" for i in range(33))},
+            f"{TP}|" + ",".join(f"k{i}=v" for i in range(32)) + "|None",
+        ),
+        (
+            {"traceparent": TP, "baggage": ",".join(f"k{i}=v" for i in range(65))},
+            f"{TP}|None|" + ",".join(f"k{i}=v" for i in range(64)),
+        ),
+        ({"traceparent": TP, "baggage": "k=" + "v" * 8191}, f"{TP}|None|None"),
     ],
     ids=["over-32-tracestate-members", "over-64-baggage-members", "over-8192-baggage-bytes"],
 )
-async def test_incoming_headers_over_the_limits_reach_the_handler_as_they_are(
-    headers: dict[str, str],
+async def test_incoming_headers_over_the_limits_are_cut_to_them(
+    headers: dict[str, str], seen: str
 ) -> None:
     async with _pair() as (client, _):
         data = await _send_raw(client, "Probe", headers)
     assert isinstance(data, str)
-    assert json.loads(data) == f"{TP}|{headers.get('tracestate')}|{headers.get('baggage')}"
+    assert json.loads(data) == seen
 
 
 async def test_over_limit_opentelemetry_baggage_is_cut_on_send() -> None:
@@ -386,10 +392,13 @@ async def test_a_lone_surrogate_in_opentelemetry_baggage_is_sent_as_u_fffd() -> 
     assert seen == "None|None|k=a%EF%BF%BDb"
 
 
-async def test_a_lone_surrogate_in_the_scope_baggage_is_sent_as_u_fffd() -> None:
+async def test_a_lone_surrogate_in_the_scope_baggage_is_sent_as_u_fffd(
+    sent_requests: list[Request],
+) -> None:
     async with _pair() as (client, _):
         with use_trace_context(TraceContext(TP, baggage="k=\ud800")):
             seen = await client.get_proxy(ITraceProbe).Probe()
+    assert sent_requests[0].to_dict()["Headers"]["baggage"] == "k=\ufffd"
     assert seen == f"{TP}|None|k=\ufffd"
 
 

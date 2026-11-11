@@ -162,6 +162,31 @@ describe('node:trace context', () => {
             }
         });
 
+        it('should pass a received tracestate on as received, as .NET and Python do', () => {
+            const bridge = new OpenTelemetryBridge();
+            for (const tracestate of ['a=1,b=2,a=3', Array.from({ length: 20 }, (_, i) => `k${i}=${'v'.repeat(30)}`).join(',')]) {
+                const forwarded = bridge.runWithRemoteParent({ traceparent, tracestate }, () => bridge.current()?.tracestate);
+
+                expect(forwarded).to.equal(tracestate);
+            }
+        });
+
+        it('should keep the last of a repeated baggage key, as .NET and Python do', () => {
+            const value = new OpenTelemetryBridge().runWithRemoteParent({ traceparent, baggage: 'k=1,k=2' }, () =>
+                propagation.getBaggage(context.active())?.getEntry('k')?.value,
+            );
+
+            expect(value).to.equal('2');
+        });
+
+        it("should treat a module that isn't the API as not installed", () => {
+            const withoutCreateTraceState = { ...require('@opentelemetry/api') };
+            delete withoutCreateTraceState.createTraceState;
+
+            expect(loadOpenTelemetry(() => ({}))).to.equal(undefined);
+            expect(loadOpenTelemetry(() => withoutCreateTraceState)).to.equal(undefined);
+        });
+
         it('should fall back to nothing when @opentelemetry/api is not installed', () => {
             const bridge = new OpenTelemetryBridge(() =>
                 loadOpenTelemetry(() => {

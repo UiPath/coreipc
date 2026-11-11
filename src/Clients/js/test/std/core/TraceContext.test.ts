@@ -258,6 +258,19 @@ describe('trace context', () => {
             expect(request.Headers!.baggage).to.equal(members(64));
         });
 
+        it('should count UTF-8 bytes as .NET and Python do: 3 for a lone surrogate, sent as U+FFFD, and 4 for a pair', async () => {
+            const sut = createSut(TelemetryPropagationPolicy.Both);
+            const lone = String.fromCharCode(0xd800);
+            const replacement = String.fromCharCode(0xfffd);
+            const pair = String.fromCharCode(0xd83d, 0xde00);
+            const send = async (value: string) => (await withTraceContext({ traceparent, baggage: value }, () => sut.call())).Headers!.baggage;
+
+            expect(await send('k=' + lone.repeat(2730))).to.equal('k=' + replacement.repeat(2730));
+            expect(await send('k=' + lone.repeat(2731))).to.equal(undefined);
+            expect(await send('k=vv' + pair.repeat(2047))).to.equal('k=vv' + pair.repeat(2047));
+            expect(await send('k=' + pair.repeat(2048))).to.equal(undefined);
+        });
+
         it('should drop a baggage member that would go over 8192 UTF-8 bytes', async () => {
             const sut = createSut(TelemetryPropagationPolicy.Both);
             const fits = `k=${'v'.repeat(8190)}`;
@@ -426,12 +439,12 @@ describe('trace context', () => {
             expect(seen).to.deep.equal({ baggage: 'k=v' });
         });
 
-        for (const [name, headers] of [
-            ['33 tracestate members', { traceparent, tracestate: members(33) }],
-            ['65 baggage members', { traceparent, baggage: members(65) }],
-            ['a baggage over 8192 bytes', { traceparent, baggage: `k=${'v'.repeat(8191)}` }],
-        ] as Array<[string, TraceContext]>) {
-            it(`should accept ${name} as is`, async () => {
+        for (const [name, headers, cut] of [
+            ['33 tracestate members', { traceparent, tracestate: members(33) }, { traceparent, tracestate: members(32) }],
+            ['65 baggage members', { traceparent, baggage: members(65) }, { traceparent, baggage: members(64) }],
+            ['a baggage over 8192 bytes', { traceparent, baggage: `k=${'v'.repeat(8191)}` }, { traceparent }],
+        ] as Array<[string, TraceContext, TraceContext]>) {
+            it(`should cut ${name} to the limits, as .NET and Python do`, async () => {
                 const sut = createSut(TelemetryPropagationPolicy.Both);
                 let seen: TraceContext | undefined;
                 const response = await sut.receiveCallback(headers, () => {
@@ -439,9 +452,44 @@ describe('trace context', () => {
                 });
 
                 expect(response.Error).to.equal(null);
-                expect(seen).to.deep.equal(headers);
+                expect(seen).to.deep.equal(cut);
             });
         }
+
+        it('should ignore received values that are not strings', async () => {
+            const sut = createSut(TelemetryPropagationPolicy.Both);
+            let seen: TraceContext | undefined;
+            const response = await sut.receiveCallback({ traceparent, tracestate: 42, baggage: ['k=v'] }, () => {
+                seen = currentIncomingTraceContext();
+            });
+
+            expect(response.Error).to.equal(null);
+            expect(seen).to.deep.equal({ traceparent });
+        });
+
+        it('should trim in linear time, even around a long run of spaces inside a member', () => {
+            const spaces = ' '.repeat(100_000);
+            const started = Date.now();
+
+            const received = TraceHeaders.fromHeaders({ traceparent, tracestate: `a=x${spaces}y,b=1`, baggage: `k=x${spaces}y` });
+
+            expect(received).to.deep.equal({ traceparent, tracestate: 'b=1' });
+            // The regex this replaced took seconds on these.
+            expect(Date.now() - started).to.be.below(1000);
+        });
+
+        it('should clean the received baggage, and ignore one with nothing usable, as .NET and Python do', async () => {
+            const sut = createSut(TelemetryPropagationPolicy.Both);
+            const seen = new Array<TraceContext | undefined>();
+            await sut.receiveCallback({ baggage: 'foo,=x' }, () => {
+                seen.push(currentIncomingTraceContext());
+            });
+            await sut.receiveCallback({ traceparent, baggage: ' a=1 , foo ,b=2' }, () => {
+                seen.push(currentIncomingTraceContext());
+            });
+
+            expect(seen).to.deep.equal([undefined, { traceparent, baggage: 'a=1,b=2' }]);
+        });
 
         it('should fail the call with an error response when the tracing bridge throws', async () => {
             const sut = createSut(TelemetryPropagationPolicy.Both);

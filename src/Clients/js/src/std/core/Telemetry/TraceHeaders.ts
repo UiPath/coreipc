@@ -60,7 +60,8 @@ export module TraceHeaders {
 
     /**
      * A traceparent that breaks W3C Trace Context is ignored, and so is its tracestate (§3.3); tracestate members that
-     * break their grammar are dropped. Returns undefined when neither a traceparent nor a baggage is left.
+     * break their grammar are dropped, and the tracestate and baggage are cut to the limits a sender keeps to. Returns
+     * undefined when neither a traceparent nor a baggage is left.
      */
     export function fromHeaders(headers: RequestHeaders | undefined): TraceContext | undefined {
         if (headers == null) {
@@ -70,8 +71,9 @@ export module TraceHeaders {
         const received = getHeader(headers, traceparent);
         const traceParentValue = received && isValidTraceParent(received) ? received : undefined;
         const receivedTraceState = traceParentValue && getHeader(headers, tracestate);
-        const traceStateValue = receivedTraceState ? joinOrUndefined(validTraceStateMembers(receivedTraceState)) : undefined;
-        const baggageValue = getHeader(headers, baggage) || undefined;
+        const traceStateValue = receivedTraceState ? limitTraceState(receivedTraceState) : undefined;
+        const receivedBaggage = getHeader(headers, baggage);
+        const baggageValue = receivedBaggage ? limitBaggage(receivedBaggage) : undefined;
         return traceParentValue || baggageValue ? normalize(traceParentValue, traceStateValue, baggageValue) : undefined;
     }
 
@@ -127,7 +129,6 @@ export module TraceHeaders {
 
     /** At most 64 members and 8192 bytes, dropping whole members beyond that, and the ones a receiver couldn't parse. */
     function limitBaggage(value: string): string | undefined {
-        const encoder = new TextEncoder();
         const kept = new Array<string>();
         let bytes = 0;
         for (const raw of toWellFormed(value).split(',')) {
@@ -135,7 +136,7 @@ export module TraceHeaders {
             if (!splitBaggageMember(member)) {
                 continue;
             }
-            const memberBytes = encoder.encode(member).length + (kept.length === 0 ? 0 : 1);
+            const memberBytes = utf8Length(member) + (kept.length === 0 ? 0 : 1);
             if (bytes + memberBytes > maxBaggageBytes) {
                 continue;
             }
@@ -160,20 +161,53 @@ export module TraceHeaders {
             .filter(member => traceStateMemberPattern.test(member));
     }
 
+    // A loop rather than /^[ \t]+|[ \t]+$/, which takes quadratic time on a long run of spaces.
     function trimOptionalWhitespace(value: string): string {
-        return value.replace(/^[ \t]+|[ \t]+$/g, '');
+        let start = 0;
+        let end = value.length;
+        while (start < end && isOptionalWhitespace(value.charCodeAt(start))) {
+            start++;
+        }
+        while (end > start && isOptionalWhitespace(value.charCodeAt(end - 1))) {
+            end--;
+        }
+        return start === 0 && end === value.length ? value : value.substring(start, end);
+    }
+
+    function isOptionalWhitespace(code: number): boolean {
+        return code === 0x20 || code === 0x09;
+    }
+
+    // Counted by hand, as some runtimes (Jest's jsdom) have no TextEncoder. toWellFormed left no lone surrogate.
+    function utf8Length(value: string): number {
+        let length = 0;
+        for (let index = 0; index < value.length; index++) {
+            const code = value.charCodeAt(index);
+            if (code < 0x80) {
+                length += 1;
+            } else if (code < 0x800) {
+                length += 2;
+            } else if (code >= 0xd800 && code < 0xdc00) {
+                length += 4;
+                index++;
+            } else {
+                length += 3;
+            }
+        }
+        return length;
     }
 
     function joinOrUndefined(members: string[]): string | undefined {
         return members.length > 0 ? members.join(',') : undefined;
     }
 
+    // A value that isn't a string, from a peer that ignores the wire format, is ignored.
     function getHeader(headers: RequestHeaders, name: Header): string | undefined {
-        if (Object.prototype.hasOwnProperty.call(headers, name)) {
-            return headers[name];
-        }
-        const key = Object.keys(headers).find(candidate => candidate.toLowerCase() === name);
-        return key === undefined ? undefined : headers[key];
+        const key = Object.prototype.hasOwnProperty.call(headers, name)
+            ? name
+            : Object.keys(headers).find(candidate => candidate.toLowerCase() === name);
+        const value: unknown = key === undefined ? undefined : headers[key];
+        return typeof value === 'string' ? value : undefined;
     }
 
     // A surrogate pair, else a lone surrogate.
@@ -195,7 +229,8 @@ export module TraceHeaders {
     // Created on first use, so loading the package never needs a TextDecoder. ignoreBOM keeps a U+FEFF, as .NET and Python do.
     let utf8Decoder: TextDecoder | undefined;
 
-    // W3C Baggage: a percent-escape that isn't valid UTF-8 decodes to U+FFFD.
+    // W3C Baggage: a percent-escape that isn't valid UTF-8 decodes to U+FFFD. This needs a TextDecoder, which Node and
+    // browsers have, unlike Jest's jsdom; only handing a received baggage to OpenTelemetry decodes.
     function unescape(value: string): string {
         return value.replace(escapes, sequence => {
             const bytes = new Uint8Array(sequence.length / 3);

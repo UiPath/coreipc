@@ -139,7 +139,7 @@ def test_without_a_traceparent_the_baggage_travels_alone() -> None:
 def test_an_override_without_a_traceparent_takes_only_the_ambient_trace(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The ambient trace is faked, so this runs without OpenTelemetry too (as in CI).
+    # The ambient trace is faked, so this runs without OpenTelemetry too.
     import uipath_ipc.trace_context as trace_context_module
 
     monkeypatch.setattr(
@@ -193,7 +193,7 @@ def test_from_headers_without_traceparent_keeps_only_the_baggage() -> None:
     assert from_headers({}) is None
     assert from_headers({"tracestate": "a=b"}) is None
     assert from_headers({"traceparent": None}) is None  # type: ignore[dict-item]
-    baggage = ",".join(["a=b"] * 100)
+    baggage = ",".join(["a=b"] * 64)
     assert from_headers({"tracestate": "a=b", "baggage": baggage}) == TraceContext(baggage=baggage)
 
 
@@ -223,17 +223,40 @@ def test_from_headers_is_case_insensitive_and_ignores_unknown_keys() -> None:
 
 
 @pytest.mark.parametrize(
-    "headers",
+    ("headers", "cut"),
     [
-        {"traceparent": TP, "tracestate": ",".join(f"k{i}=v" for i in range(33))},
-        {"traceparent": TP, "baggage": ",".join(f"k{i}=v" for i in range(65))},
-        {"traceparent": TP, "baggage": "k=" + "v" * 8191},
+        (
+            {"traceparent": TP, "tracestate": ",".join(f"k{i}=v" for i in range(33))},
+            TraceContext(TP, ",".join(f"k{i}=v" for i in range(32))),
+        ),
+        (
+            {"traceparent": TP, "baggage": ",".join(f"k{i}=v" for i in range(65))},
+            TraceContext(TP, baggage=",".join(f"k{i}=v" for i in range(64))),
+        ),
+        ({"traceparent": TP, "baggage": "k=" + "v" * 8191}, TraceContext(TP)),
     ],
     ids=["over-32-tracestate-members", "over-64-baggage-members", "over-8192-baggage-bytes"],
 )
-def test_from_headers_takes_values_over_the_limits_as_they_are(headers: dict[str, str]) -> None:
-    tc = from_headers(headers)
-    assert tc == TraceContext(TP, headers.get("tracestate"), headers.get("baggage"))
+def test_from_headers_cuts_values_to_the_limits_like_dotnet_and_js(
+    headers: dict[str, str], cut: TraceContext
+) -> None:
+    assert from_headers(headers) == cut
+
+
+def test_from_headers_cleans_the_received_baggage_like_dotnet_and_js() -> None:
+    assert from_headers({"baggage": "foo,=x"}) is None
+    assert from_headers({"traceparent": TP, "baggage": " a=1 , foo ,b=2"}) == TraceContext(
+        TP, baggage="a=1,b=2"
+    )
+
+
+def test_from_headers_reads_the_exact_name_first_even_when_null() -> None:
+    assert from_headers({"Traceparent": TP, "traceparent": None}) is None  # type: ignore[dict-item]
+
+
+def test_from_headers_ignores_values_that_are_not_strings() -> None:
+    assert from_headers({"traceparent": TP, "tracestate": 42, "baggage": ["k=v"]}) == TraceContext(TP)  # type: ignore[dict-item]
+    assert from_headers(["traceparent", TP]) is None  # type: ignore[arg-type]
 
 
 def test_incoming_scope_exposes_the_values_and_hides_the_override() -> None:
@@ -331,23 +354,31 @@ def _otel_scope(traceparent: str, tracestate: str | None = None, **entries: str)
     return _Scope()
 
 
-def test_opentelemetry_failing_to_import_counts_as_not_installed(
+def test_opentelemetry_failing_to_import_counts_as_not_installed_and_is_tried_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import builtins
 
+    import uipath_ipc.trace_context as trace_context_module
+
     real_import = builtins.__import__
+    attempts: list[str] = []
 
     def failing_import(name: str, *args: object, **kwargs: object) -> object:
         if name.startswith("opentelemetry"):
+            attempts.append(name)
             raise RuntimeError("broken install")
         return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
 
+    monkeypatch.setattr(trace_context_module, "_otel", None)
     monkeypatch.setattr(builtins, "__import__", failing_import)
     received = TraceContext(TP)
-    with incoming_scope(received, enabled=True):
-        assert incoming_trace_context() is received
-        assert outgoing_headers() is None
+    for _ in range(3):
+        with incoming_scope(received, enabled=True):
+            assert incoming_trace_context() is received
+            assert outgoing_headers() is None
+    # Python doesn't remember a failed import: retrying it would cost every call.
+    assert len(attempts) == 1
 
 
 def test_opentelemetry_span_is_propagated() -> None:
@@ -459,14 +490,15 @@ def test_incoming_scope_gives_no_remote_parent_for_a_traceparent_opentelemetry_r
         ("congo=t61,congo=x", "", "congo=t61,congo=x"),
         (
             ",".join(f"k{i}={'v' * 256}" for i in range(32)),
-            "",
+            # OpenTelemetry 1.45.1 and later refuse a tracestate over 8192 characters; earlier ones parse it.
+            None,
             ",".join(f"k{i}={'v' * 256}" for i in range(32)),
         ),
     ],
     ids=["whitespace", "uppercase-key", "bad-member", "duplicate-key", "over-8192-chars"],
 )
 def test_received_tracestate_is_forwarded_as_received(
-    tracestate: str, parsed: str, forwarded: str
+    tracestate: str, parsed: str | None, forwarded: str
 ) -> None:
     trace = pytest.importorskip("opentelemetry.trace")
     from opentelemetry import context as otel_context
@@ -480,7 +512,8 @@ def test_received_tracestate_is_forwarded_as_received(
 
     with incoming_scope(from_headers({"traceparent": TP, "tracestate": tracestate}), enabled=True):
         parent = trace.get_current_span().get_span_context()
-        assert parent.trace_state.to_header() == parsed
+        if parsed is not None:
+            assert parent.trace_state.to_header() == parsed
         assert outgoing_headers()["tracestate"] == forwarded  # type: ignore[index]
         # A child span inherits the TraceState unchanged.
         child = trace.SpanContext(parent.trace_id, 0x1234, False, parent.trace_flags, parent.trace_state)

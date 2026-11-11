@@ -47,10 +47,6 @@ internal static class TraceHeaders
         return true;
     }
 
-    /// <summary>The members that follow the tracestate grammar, or <c>null</c> when none does.</summary>
-    internal static string? ValidTraceState(this string traceState)
-    => JoinOrNull(ValidTraceStateMembers(traceState));
-
     /// <summary>Trace Context §3.3.1.1: at most 32 members, so only the first 32 that follow the grammar are kept.</summary>
     internal static string? LimitTraceState(this string traceState)
     {
@@ -77,19 +73,26 @@ internal static class TraceHeaders
         return items;
     }
 
-    /// <summary>The W3C baggage of <paramref name="activity"/> and its parents, in <see cref="Activity.Baggage"/> order, without the
-    /// members that could never be sent, or <c>null</c> when none is left.</summary>
+    /// <summary>The W3C baggage of <paramref name="activity"/> and its parents: each key once, with the value
+    /// <see cref="Activity.GetBaggageItem"/> gives, in <see cref="Activity.Baggage"/> order, without the members that could
+    /// never be sent; <c>null</c> when none is left.</summary>
     internal static string? ToBaggageHeader(this Activity activity)
-    => JoinOrNull(activity.Baggage
-        // LimitBaggage would drop a member with no key, and one whose key and value have MaxBaggageBytes characters or more,
-        // since every character escapes to a byte or more. Skipping the long ones here also spares .NET Framework's
-        // Uri.EscapeDataString, which throws for 65520 characters or more.
-        .Where(pair => pair.Key is not null && pair.Key.Length + (pair.Value?.Length ?? 0) < MaxBaggageBytes)
-        .Select(pair => $"{Escape(pair.Key)}={Escape(pair.Value ?? "")}")
-        .ToList());
+    {
+        // Activity.Baggage lists a child's items before its parents', and GetBaggageItem takes the first. Receivers keep the
+        // last of a repeated key, so sending the others too would give them a value the sender overrode.
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        return JoinOrNull(activity.Baggage
+            // LimitBaggage would drop a member with no key, and one whose key and value have MaxBaggageBytes characters or
+            // more, since every character escapes to a byte or more. Skipping the long ones here also spares .NET Framework's
+            // Uri.EscapeDataString, which throws for 65520 characters or more. A key counts as sent even when its value is too
+            // long, so an older value can't go out instead.
+            .Where(pair => pair.Key is not null && keys.Add(pair.Key) && pair.Key.Length + (pair.Value?.Length ?? 0) < MaxBaggageBytes)
+            .Select(pair => $"{Escape(pair.Key)}={Escape(pair.Value ?? "")}")
+            .ToList());
+    }
 
-    /// <summary>W3C Baggage: send at most 64 members and 8192 bytes, dropping whole members beyond that, and the ones
-    /// a receiver couldn't parse.</summary>
+    /// <summary>W3C Baggage: at most 64 members and 8192 bytes, on send and on receive, dropping whole members beyond that,
+    /// and the ones a receiver couldn't parse.</summary>
     internal static string? LimitBaggage(this string baggage)
     {
         var kept = new List<string>();

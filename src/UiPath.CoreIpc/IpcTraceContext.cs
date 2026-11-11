@@ -56,8 +56,8 @@ public sealed class IpcTraceContext
         return Override.Push(traceContext);
     }
 
-    /// <summary>A traceparent that breaks W3C Trace Context is ignored, and so is its tracestate (§3.3);
-    /// tracestate members that break their grammar are dropped.</summary>
+    /// <summary>A traceparent that breaks W3C Trace Context is ignored, and so is its tracestate (§3.3); tracestate members
+    /// that break their grammar are dropped, and the tracestate and baggage are cut to the limits a sender keeps to.</summary>
     internal static IpcTraceContext? FromHeaders(Dictionary<string, string?>? headers)
     {
         if (headers is null)
@@ -66,8 +66,8 @@ public sealed class IpcTraceContext
         }
 
         var traceParent = GetHeader(headers, TraceParentHeader) is { } received && TraceHeaders.IsValidTraceParent(received) ? received : null;
-        var traceState = traceParent is null ? null : GetHeader(headers, TraceStateHeader)?.ValidTraceState();
-        var baggage = GetHeader(headers, BaggageHeader).NullIfEmpty();
+        var traceState = traceParent is null ? null : GetHeader(headers, TraceStateHeader)?.LimitTraceState();
+        var baggage = GetHeader(headers, BaggageHeader)?.LimitBaggage();
         return traceParent is null && baggage is null ? null : new(traceParent, traceState, baggage);
     }
 
@@ -95,14 +95,36 @@ public sealed class IpcTraceContext
         if (Baggage is not null)
         {
             var items = Baggage.DecodeBaggage();
-            // AddBaggage puts each item first, so adding in reverse rebuilds the sender's Activity.Baggage order.
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            // AddBaggage puts each item first, so adding in reverse rebuilds the sender's order. Of a repeated key only the last
+            // is added, so GetBaggageItem reads what JS, Python and OpenTelemetry read.
             for (var index = items.Count - 1; index >= 0; index--)
             {
-                activity.AddBaggage(items[index].Key, items[index].Value);
+                if (keys.Add(items[index].Key))
+                {
+                    activity.AddBaggage(items[index].Key, items[index].Value);
+                }
             }
         }
         // Baggage goes in before Start so ActivityStarted listeners see it.
         return activity.Start();
+    }
+
+    /// <summary>Runs <paramref name="call"/> under the server span <paramref name="name"/>, marked as an error when it throws.
+    /// The span is only started here so that a server with propagation off never loads DiagnosticSource, which a .NET
+    /// Framework host may lack, or ship in another version without a binding redirect.</summary>
+    internal async Task<T> RunInServerSpan<T>(string name, Func<Task<T>> call)
+    {
+        using var activity = StartActivity(name);
+        try
+        {
+            return await call();
+        }
+        catch (Exception ex)
+        {
+            activity.SetStatus(ActivityStatusCode.Error, ex.Message);
+            throw;
+        }
     }
 
     private static string? GetHeader(Dictionary<string, string?> headers, string name)
@@ -139,6 +161,8 @@ public sealed class IpcTraceContext
         /// <summary>Reads the scope and, unless it brings its own traceparent, starts the client span, a child of the ambient
         /// W3C <see cref="Activity.Current"/>: a plain <see cref="Activity"/> when nobody samples the source, so its ids still
         /// carry the caller's current flags.</summary>
+        // Not inlined: inlined into ServiceClient.Invoke, it would make the JIT load DiagnosticSource with propagation off.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         public static OutgoingTrace Start(string name)
         {
             var scope = Scope;
@@ -182,15 +206,20 @@ public sealed class IpcTraceContext
             {
                 return;
             }
-            // Stopping makes the span's parent current wherever it runs. Under a SuppressFlow caller, that's a pool thread that
-            // never had the span as current and that .NET Framework doesn't reset, so stop it in a copy of that thread's context.
-            if (Activity.Current == _activity || ExecutionContext.Capture() is not { } context)
+            if (Activity.Current == _activity)
             {
                 _activity.Dispose();
                 return;
             }
-            ExecutionContext.Run(context, static activity => ((Activity)activity!).Dispose(), _activity);
+            // Stopping makes the span's parent current wherever it runs. A call made under SuppressFlow can end on a thread that
+            // never had the span as current: a pool thread, or code that finishes the call inline under SuppressFlow too. An
+            // async method gives that thread its context back when it returns, flow suppressed or not.
+            StopInItsOwnContext(_activity).GetAwaiter().GetResult();
         }
+
+#pragma warning disable CS1998 // Nothing to await: the method is async only for the context its builder restores.
+        private static async Task StopInItsOwnContext(Activity activity) => activity.Dispose();
+#pragma warning restore CS1998
 
         /// <summary>The client span's traceparent and tracestate, with the scope's baggage when there is a scope, else the span's
         /// own; the scope alone without a W3C span, as always when the scope has a traceparent.</summary>
