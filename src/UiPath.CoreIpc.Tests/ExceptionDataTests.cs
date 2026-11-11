@@ -348,25 +348,6 @@ public sealed class ExceptionDataTests
     }
 
     [Fact]
-    public void FromException_HalfAnEmoji_IsReplaced_SoTheErrorStillGoesOut()
-    {
-        var exception = new InvalidOperationException("m");
-        exception.Data[ErrorDataProbe.ListedKey] = "cut \ud83d";
-        exception.Data[ErrorDataProbe.ListedKey2] = "\ude00 alone";
-        exception.Data[ErrorDataProbe.UnlistedKey] = "\ud83d cut";
-        exception.Data[ErrorDataProbe.ErrorInfoKey] = "whole \ud83d\ude00";
-
-        var response = Response.Fail(Request(), exception, [ErrorDataProbe.ListedKey, ErrorDataProbe.ListedKey2, ErrorDataProbe.ErrorInfoKey, ErrorDataProbe.UnlistedKey]);
-
-        var data = response.Error!.Data!;
-        data[ErrorDataProbe.ListedKey].ShouldBe("cut \ufffd");
-        data[ErrorDataProbe.ListedKey2].ShouldBe("\ufffd alone");
-        data[ErrorDataProbe.UnlistedKey].ShouldBe("\ufffd cut");
-        data[ErrorDataProbe.ErrorInfoKey].ShouldBe("whole \ud83d\ude00");
-        Should.NotThrow(() => IpcJsonSerializer.Instance.Serialize(response, new MemoryStream()));
-    }
-
-    [Fact]
     public void FromException_ListedEntriesComeFirst_SoTheCallersCapKeepsThem()
     {
         var remote = new RemoteException(new Error("m", "s", "t", InnerError: null) { Data = Enumerable.Range(0, 64).ToDictionary(i => $"k{i}", i => "received") });

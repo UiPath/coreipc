@@ -11,6 +11,9 @@ internal class IpcJsonSerializer : IArrayPool<char>
 
     static readonly JsonSerializer StringArgsSerializer = new() { CheckAdditionalContent = true };
 
+    // Writes a lone surrogate, as in a string cut mid-emoji, as U+FFFD. StreamWriter's default UTF-8 throws on it instead, so the message isn't sent.
+    static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
+
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
@@ -27,7 +30,7 @@ internal class IpcJsonSerializer : IArrayPool<char>
         }
         return result;
     }
-    public void Serialize(object? obj, Stream stream) => Serialize(obj, new StreamWriter(stream), StringArgsSerializer);
+    public void Serialize(object? obj, Stream stream) => Serialize(obj, new StreamWriter(stream, Utf8), StringArgsSerializer);
     private void Serialize(object? obj, TextWriter streamWriter, JsonSerializer serializer)
     {
         using var writer = new JsonTextWriter(streamWriter) { ArrayPool = this, CloseOutput = false };

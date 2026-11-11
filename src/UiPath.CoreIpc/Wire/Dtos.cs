@@ -113,8 +113,7 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
                 }
                 if (exceptionData[key] is string value)
                 {
-                    // Encoding.UTF8 swaps a lone surrogate for U+FFFD; written as is, it would fail the whole response.
-                    data[key] = Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(value));
+                    data[key] = value;
                 }
                 listed.Add(key);
             }
