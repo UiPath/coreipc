@@ -11,7 +11,7 @@ internal class IpcJsonSerializer : IArrayPool<char>
 
     static readonly JsonSerializer StringArgsSerializer = new() { CheckAdditionalContent = true };
 
-    // Writes a lone surrogate, as in a string cut mid-emoji, as U+FFFD. StreamWriter's default UTF-8 throws on it instead, so the message isn't sent.
+    // Writes a lone surrogate (as in a string cut mid-emoji) as U+FFFD, as opposed to StreamWriter's default UTF-8, which throws on it, so the message isn't sent.
     static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
 
 #if !NET461
