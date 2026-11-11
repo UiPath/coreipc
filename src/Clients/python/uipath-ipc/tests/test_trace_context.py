@@ -15,6 +15,7 @@ from uipath_ipc.trace_context import (
     incoming_scope,
     outgoing_headers,
 )
+from uipath_ipc.wire import Request
 
 TP = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
 TP2 = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-00"
@@ -254,6 +255,40 @@ def test_from_headers_reads_the_exact_name_first_even_when_null() -> None:
     assert from_headers({"Traceparent": TP, "traceparent": None}) is None  # type: ignore[dict-item]
 
 
+@pytest.mark.parametrize(
+    ("headers", "received"),
+    [
+        (f'{{"traceparent":null,"TraceParent":"{TP}"}}', None),
+        (f'{{"TraceParent":"{TP}","traceparent":null}}', None),
+        (f'{{"traceparent":5,"TraceParent":"{TP}"}}', None),
+        (f'{{"TraceParent":null,"TRACEPARENT":"{TP}"}}', None),
+        (f'{{"TraceParent":5,"TRACEPARENT":"{TP}"}}', None),
+        (f'{{"traceparent":"{TP}","traceparent":5}}', None),
+        (f'{{"traceparent":"{TP}"}},"Headers":5', None),
+        (f'{{"traceparent":"{TP}"}},"Headers":null', None),
+        (f'{{}},"headers":{{"traceparent":"{TP}"}}', None),
+        (f'{{"traceparent":"{TP}"}},"headers":{{}}', TraceContext(TP)),
+        (f'{{"traceparent":"{TP}"}},"HEADERS":5', TraceContext(TP)),
+    ],
+    ids=[
+        "null-exact-name", "null-exact-name-last", "number-exact-name",
+        "null-first-spelling", "number-first-spelling", "repeated-name",
+        "repeated-headers-number", "repeated-headers-null", "lowercase-headers-not-read",
+        "lowercase-headers-not-overriding", "uppercase-headers-not-overriding",
+    ],
+)
+def test_from_headers_reads_a_request_like_dotnet_and_js(
+    headers: str, received: TraceContext | None
+) -> None:
+    # Parsed as a request arrives, so only "Headers" is read. The repeated name
+    # and the repeated Headers only pin json.loads, which keeps the last.
+    request = Request.from_json(
+        '{"Endpoint":"E","MethodName":"M","Parameters":[],"Id":"1","TimeoutInSeconds":0,'
+        f'"Headers":{headers}}}'
+    )
+    assert from_headers(request.headers) == received
+
+
 def test_from_headers_ignores_values_that_are_not_strings() -> None:
     assert from_headers({"traceparent": TP, "tracestate": 42, "baggage": ["k=v"]}) == TraceContext(TP)  # type: ignore[dict-item]
     assert from_headers(["traceparent", TP]) is None  # type: ignore[arg-type]
@@ -287,6 +322,10 @@ def test_baggage_encoding_sends_a_lone_surrogate_as_u_fffd_like_dotnet_and_js() 
 
 def test_baggage_encoding_skips_a_member_with_no_key_like_dotnet_and_js() -> None:
     assert _encode_baggage({None: "x", "k": "v"}) == "k=v"
+
+
+def test_baggage_encoding_sends_a_none_value_as_empty_like_dotnet_and_js() -> None:
+    assert _encode_baggage({"empty": None, "user id": "a,b=c;d"}) == "empty=,user%20id=a%2Cb%3Dc%3Bd"
 
 
 def test_baggage_with_encoded_separators_round_trips() -> None:
@@ -431,6 +470,45 @@ def test_opentelemetry_baggage_over_the_w3c_limits_is_cut(
     # OpenTelemetry's TraceState already refuses more than 32 members.
     with _otel_scope(TP, **entries):
         assert outgoing_headers() == sent
+
+
+class _Unprintable:
+    def __str__(self) -> str:
+        raise RuntimeError("no text")
+
+
+def test_an_unprintable_opentelemetry_value_is_dropped_rather_than_failing_the_call() -> None:
+    # set_baggage takes any object, and checks nothing. Only that member is lost.
+    with _otel_scope(TP, k=_Unprintable(), userId="bob"):  # type: ignore[arg-type]
+        assert outgoing_headers() == {"traceparent": TP, "baggage": "userId=bob"}
+        assert _sent(TraceContext(baggage="k=v")) == {"traceparent": TP, "baggage": "k=v"}
+
+
+def test_a_tracestate_that_writes_no_text_sends_nothing_rather_than_failing() -> None:
+    trace = pytest.importorskip("opentelemetry.trace")
+    from opentelemetry import baggage
+    from opentelemetry import context as otel_context
+
+    class _OddTraceState(trace.TraceState):
+        def to_header(self) -> str:
+            return 5  # type: ignore[return-value]
+
+    span_context = trace.SpanContext(
+        trace_id=int(TP[3:35], 16),
+        span_id=int(TP[36:52], 16),
+        is_remote=False,
+        trace_flags=trace.TraceFlags(1),
+        trace_state=_OddTraceState(),
+    )
+    ctx = baggage.set_baggage("k", "v", trace.set_span_in_context(trace.NonRecordingSpan(span_context)))
+    token = otel_context.attach(ctx)
+    try:
+        # A span context that can't be read gives nothing, its baggage included; a scope's own
+        # baggage still goes.
+        assert outgoing_headers() is None
+        assert _sent(TraceContext(baggage="userId=alice")) == {"baggage": "userId=alice"}
+    finally:
+        otel_context.detach(token)
 
 
 def test_incoming_scope_sets_the_remote_parent_and_baggage() -> None:

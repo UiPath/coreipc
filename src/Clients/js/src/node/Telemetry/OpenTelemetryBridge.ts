@@ -81,17 +81,29 @@ export class OpenTelemetryBridge implements TracingBridge {
             return undefined;
         }
 
-        const active = api.context.active();
-        const spanContext = api.trace.getSpanContext(active);
-        const baggage = api.propagation.getBaggage(active);
-        const encodedBaggage = baggage && TraceHeaders.encodeBaggage(baggage.getAllEntries().map(([key, entry]) => [key, entry.value]));
-        if (!spanContext || !api.trace.isSpanContextValid(spanContext)) {
-            return encodedBaggage ? TraceHeaders.normalize(undefined, undefined, encodedBaggage) : undefined;
-        }
+        // OpenTelemetry keeps what plain JS gives it unchecked. A baggage value String() can't convert is dropped (encodeBaggage).
+        // A span or baggage that can't be read at all, such as a span context without traceFlags, gives no trace context, as an
+        // API that fails to load does, rather than fail the call.
+        try {
+            const active = api.context.active();
+            const spanContext = api.trace.getSpanContext(active);
+            const baggage = api.propagation.getBaggage(active);
+            // A missing entry goes empty (k=), as a missing value does.
+            const encodedBaggage = baggage && TraceHeaders.encodeBaggage(baggage.getAllEntries().map(([key, entry]) => [key, entry?.value]));
+            if (!spanContext || !api.trace.isSpanContextValid(spanContext)) {
+                return encodedBaggage ? TraceHeaders.normalize(undefined, undefined, encodedBaggage) : undefined;
+            }
 
-        const flags = spanContext.traceFlags.toString(16).padStart(2, '0');
-        const tracestate = spanContext.traceState && (receivedTraceStates.get(spanContext.traceState) ?? spanContext.traceState.serialize());
-        return TraceHeaders.normalize(`00-${spanContext.traceId}-${spanContext.spanId}-${flags}`, tracestate, encodedBaggage);
+            const flags = spanContext.traceFlags.toString(16).padStart(2, '0');
+            const tracestate = spanContext.traceState && (receivedTraceStates.get(spanContext.traceState) ?? spanContext.traceState.serialize());
+            // A TraceState from plain JS may write something that isn't text.
+            if (tracestate && typeof tracestate !== 'string') {
+                return undefined;
+            }
+            return TraceHeaders.normalize(`00-${spanContext.traceId}-${spanContext.spanId}-${flags}`, tracestate, encodedBaggage);
+        } catch {
+            return undefined;
+        }
     }
 
     public runWithRemoteParent<R>(traceContext: TraceContext | undefined, callback: () => R): R {

@@ -15,6 +15,7 @@ import {
     IpcBaseImpl,
     IRpcChannel,
     IRpcChannelFactory,
+    JsonConvert,
     RequestHeaders,
     RpcCallContext,
     RpcMessage,
@@ -467,6 +468,31 @@ describe('trace context', () => {
             expect(seen).to.deep.equal({ traceparent });
         });
 
+        // Parsed as RpcMessage.Request.fromNetwork parses a request. The last three only pin JSON.parse, which keeps the last of
+        // a repeated name.
+        for (const headers of [
+            `{"traceparent":null,"TraceParent":"${traceparent}"}`,
+            `{"TraceParent":"${traceparent}","traceparent":null}`,
+            `{"traceparent":5,"TraceParent":"${traceparent}"}`,
+            `{"TraceParent":null,"TRACEPARENT":"${traceparent}"}`,
+            `{"TraceParent":5,"TRACEPARENT":"${traceparent}"}`,
+            `{"traceparent":"${traceparent}","traceparent":5}`,
+            `{"traceparent":"${traceparent}"},"Headers":5`,
+            `{"traceparent":"${traceparent}"},"Headers":null`,
+        ]) {
+            it(`should read "Headers":${headers} as .NET and Python do`, async () => {
+                const sut = createSut(TelemetryPropagationPolicy.Both);
+                const request = JsonConvert.deserializeObject(`{"Headers":${headers}}`, RpcMessage.Request);
+                let seen: TraceContext | undefined = { traceparent };
+                const response = await sut.receiveCallback(request.Headers, () => {
+                    seen = currentIncomingTraceContext();
+                });
+
+                expect(response.Error).to.equal(null);
+                expect(seen).to.equal(undefined);
+            });
+        }
+
         it('should trim in linear time, even around a long run of spaces inside a member', () => {
             const spaces = ' '.repeat(100_000);
             const started = Date.now();
@@ -641,6 +667,14 @@ describe('trace context', () => {
 
         it('should skip a member with no key, as .NET and Python do', () => {
             expect(TraceHeaders.encodeBaggage([[null as unknown as string, 'x'], ['k', 'v']])).to.equal('k=v');
+        });
+
+        it('should send a null or undefined value as empty, as .NET and Python do', () => {
+            for (const value of [null, undefined]) {
+                expect(TraceHeaders.encodeBaggage([['empty', value as unknown as string], ['user id', 'a,b=c;d']])).to.equal(
+                    'empty=,user%20id=a%2Cb%3Dc%3Bd',
+                );
+            }
         });
 
         it('should decode an encoded , = and ; back exactly', () => {

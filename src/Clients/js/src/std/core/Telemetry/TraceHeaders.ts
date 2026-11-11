@@ -97,8 +97,14 @@ export module TraceHeaders {
         const members = new Array<string>();
         for (const [key, value] of entries) {
             // A member with no key is dropped, as limitBaggage drops one with an empty key.
-            if (key != null) {
+            if (key == null) {
+                continue;
+            }
+            try {
                 members.push(`${escape(key)}=${escape(value)}`);
+            } catch {
+                // So is one String() can't write: OpenTelemetry keeps any value plain JS gives it.
+                continue;
             }
         }
         return members.length > 0 ? members.join(',') : undefined;
@@ -136,7 +142,9 @@ export module TraceHeaders {
             if (!splitBaggageMember(member)) {
                 continue;
             }
-            const memberBytes = utf8Length(member) + (kept.length === 0 ? 0 : 1);
+            // The Buffer that encodes every request: Node's, or the buffer package the web build bundles in. Both count UTF-8
+            // exactly here, as toWellFormed left no lone surrogate (the buffer package miscounts some).
+            const memberBytes = Buffer.byteLength(member, 'utf8') + (kept.length === 0 ? 0 : 1);
             if (bytes + memberBytes > maxBaggageBytes) {
                 continue;
             }
@@ -178,25 +186,6 @@ export module TraceHeaders {
         return code === 0x20 || code === 0x09;
     }
 
-    // Counted by hand, as some runtimes (Jest's jsdom) have no TextEncoder. toWellFormed left no lone surrogate.
-    function utf8Length(value: string): number {
-        let length = 0;
-        for (let index = 0; index < value.length; index++) {
-            const code = value.charCodeAt(index);
-            if (code < 0x80) {
-                length += 1;
-            } else if (code < 0x800) {
-                length += 2;
-            } else if (code >= 0xd800 && code < 0xdc00) {
-                length += 4;
-                index++;
-            } else {
-                length += 3;
-            }
-        }
-        return length;
-    }
-
     function joinOrUndefined(members: string[]): string | undefined {
         return members.length > 0 ? members.join(',') : undefined;
     }
@@ -219,10 +208,11 @@ export module TraceHeaders {
     }
 
     // Like .NET's Uri.EscapeDataString, so both sides produce the same bytes. toWellFormed, because encodeURIComponent throws on
-    // a lone surrogate; String(), because OpenTelemetry keeps any value plain JS puts in its baggage, such as a number, which goes
-    // as text, as with Python's str().
+    // a lone surrogate. OpenTelemetry keeps any value plain JS puts in its baggage: null and undefined go empty (k=), as on .NET
+    // and Python; anything else goes as String() writes it, which can differ from Python's str() (true and True, 1 and 1.0).
     function escape(value: string): string {
-        return encodeURIComponent(toWellFormed(String(value))).replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+        const text = value == null ? '' : String(value);
+        return encodeURIComponent(toWellFormed(text)).replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
     }
 
     const escapes = /(?:%[0-9a-f]{2})+/gi;
@@ -230,7 +220,9 @@ export module TraceHeaders {
     let utf8Decoder: TextDecoder | undefined;
 
     // W3C Baggage: a percent-escape that isn't valid UTF-8 decodes to U+FFFD. This needs a TextDecoder, which Node and
-    // browsers have, unlike Jest's jsdom; only handing a received baggage to OpenTelemetry decodes.
+    // browsers have, unlike Jest's jsdom; only handing a received baggage to OpenTelemetry decodes. It must stay a TextDecoder,
+    // not the Buffer limitBaggage counts with: the buffer package the web build bundles in decodes broken UTF-8 differently,
+    // such as two U+FFFD for E2 82 C3 A9, where TextDecoder, .NET and Python give one.
     function unescape(value: string): string {
         return value.replace(escapes, sequence => {
             const bytes = new Uint8Array(sequence.length / 3);

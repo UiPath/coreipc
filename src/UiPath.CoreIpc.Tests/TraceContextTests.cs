@@ -12,7 +12,8 @@ public sealed record TraceProbeResult(
     string? ActivityParentSpanId,
     string? ActivitySpanId,
     string[]? ActivityBaggage,
-    string? OverrideTraceParent)
+    string? OverrideTraceParent,
+    int SchedulerId)
 {
     public static TraceProbeResult Capture()
     {
@@ -26,7 +27,8 @@ public sealed record TraceProbeResult(
             activity?.ParentSpanId.ToHexString(),
             activity?.SpanId.ToHexString(),
             activity?.Baggage.Select(pair => $"{pair.Key}={pair.Value}").ToArray(),
-            IpcTraceContext.OutgoingTrace.Scope?.TraceParent);
+            IpcTraceContext.OutgoingTrace.Scope?.TraceParent,
+            TaskScheduler.Current.Id);
     }
 }
 
@@ -43,7 +45,8 @@ public sealed class Adder : IAdder
     public Task<int> Add(int x, int y) => Task.FromResult(x + y);
 }
 
-/// <summary>Makes a call with propagation off, from an AppDomain whose folder has no System.Diagnostics.DiagnosticSource.</summary>
+/// <summary>Makes a call with propagation off, inside an <see cref="IpcTraceContext.Use"/> scope, from an AppDomain whose folder
+/// has no System.Diagnostics.DiagnosticSource.</summary>
 public sealed class WithoutDiagnosticSource : MarshalByRefObject
 {
     public string Call()
@@ -79,11 +82,26 @@ public sealed class WithoutDiagnosticSource : MarshalByRefObject
         server.Start();
         try
         {
+            // Use checks the traceparent, so an invalid one must give its ArgumentException, not a failed load.
+            string invalid;
+            try
+            {
+                IpcTraceContext.Use(new("garbage")).Dispose();
+                invalid = "accepted";
+            }
+            catch (ArgumentException)
+            {
+                invalid = "rejected";
+            }
             var proxy = new IpcClient { Transport = new NamedPipeClientTransport { PipeName = pipeName } }.GetProxy<IAdder>();
-            var sum = await proxy.Add(1, 2);
+            int sum;
+            using (IpcTraceContext.Use(new("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", baggage: "k=v")))
+            {
+                sum = await proxy.Add(1, 2);
+            }
             (proxy as IpcProxy)?.Dispose();
             var loaded = AppDomain.CurrentDomain.GetAssemblies().Any(assembly => assembly.GetName().Name == "System.Diagnostics.DiagnosticSource");
-            return $"{sum}, DiagnosticSource {(loaded ? "loaded" : "not loaded")}, requested {requested} times";
+            return $"{sum}, invalid traceparent {invalid}, DiagnosticSource {(loaded ? "loaded" : "not loaded")}, requested {requested} times";
         }
         finally
         {
@@ -356,20 +374,41 @@ public sealed class TraceContextTests
         (header is "baggage" ? result.Baggage : result.TraceState).ShouldBe(value is "too-many" ? Members(header is "baggage" ? 64 : 32) : null);
     }
 
+    // Each row has a name: xUnit cuts the arguments it shows to 50 characters, so many rows would look the same.
     [Theory]
-    [InlineData("""{"traceparent":5,"tracestate":{"a":1},"baggage":["k=v"]}""")]
-    [InlineData("\"not an object\"")]
-    [InlineData("[1,2]")]
-    public async Task IncomingHeadersThatArentStrings_AreIgnored_AndTheConnectionStaysUp(string headers)
+    [InlineData("values-not-strings", """{"traceparent":5,"tracestate":{"a":1},"baggage":["k=v"]}""", null)]
+    [InlineData("string-not-object", "\"not an object\"", null)]
+    [InlineData("array-not-object", "[1,2]", null)]
+    // Skipped without reading its dates, which would overflow.
+    [InlineData("array-with-a-date", """["/Date(300000000000000)/"]""", null)]
+    // Only the value that isn't a string is lost.
+    [InlineData("tracestate-number", $$"""{"traceparent":"{{TraceParentA}}","tracestate":5}""", TraceParentA)]
+    // Yet it still counts: the exact name wins over another spelling, else the first spelling does, and of a repeated name the
+    // last one counts.
+    [InlineData("null-exact-name", $$"""{"traceparent":null,"TraceParent":"{{TraceParentA}}"}""", null)]
+    [InlineData("null-exact-name-last", $$"""{"TraceParent":"{{TraceParentA}}","traceparent":null}""", null)]
+    [InlineData("number-exact-name", $$"""{"traceparent":5,"TraceParent":"{{TraceParentA}}"}""", null)]
+    [InlineData("null-first-spelling", $$"""{"TraceParent":null,"TRACEPARENT":"{{TraceParentA}}"}""", null)]
+    [InlineData("number-first-spelling", $$"""{"TraceParent":5,"TRACEPARENT":"{{TraceParentA}}"}""", null)]
+    [InlineData("repeated-name", $$"""{"traceparent":"{{TraceParentA}}","traceparent":5}""", null)]
+    // A repeated Headers (the helper closes the request after it): the last one counts, even when it isn't an object.
+    [InlineData("repeated-headers-number", $$"""{"traceparent":"{{TraceParentA}}"},"Headers":5""", null)]
+    [InlineData("repeated-headers-null", $$"""{"traceparent":"{{TraceParentA}}"},"Headers":null""", null)]
+    // Another case of the name, which JS and Python ignore, neither reads nor overrides Headers, even with a date inside.
+    [InlineData("lowercase-headers-not-read", $$"""{},"headers":{"traceparent":"{{TraceParentA}}"}""", null)]
+    [InlineData("lowercase-headers-not-overriding", $$"""{"traceparent":"{{TraceParentA}}"},"headers":{}""", TraceParentA)]
+    [InlineData("uppercase-headers-not-overriding", $$"""{"traceparent":"{{TraceParentA}}"},"HEADERS":5""", TraceParentA)]
+    [InlineData("lowercase-headers-with-a-date", $$"""{"traceparent":"{{TraceParentA}}"},"headers":{"k":"/Date(300000000000000)/"}""", TraceParentA)]
+    public async Task IncomingHeadersThatBreakTheFormat_AreReadLikeJsAndPython_AndTheConnectionStaysUp(string row, string headers, string? traceParent)
     {
         await using var pair = await Pair.Create();
         using var raw = await RawConnection.Create(pair.PipeName);
 
-        var ignored = await raw.ProbeWithHeadersJson(headers);
+        var received = await raw.ProbeWithHeadersJson(headers);
         var next = await raw.Probe(new() { ["traceparent"] = TraceParentA });
 
-        ignored.TraceParent.ShouldBeNull();
-        next.TraceParent.ShouldBe(TraceParentA);
+        received.TraceParent.ShouldBe(traceParent, row);
+        next.TraceParent.ShouldBe(TraceParentA, row);
     }
 
     [Fact]
@@ -419,7 +458,7 @@ public sealed class TraceContextTests
             {
                 var probe = (WithoutDiagnosticSource)domain.CreateInstanceAndUnwrap(typeof(WithoutDiagnosticSource).Assembly.FullName, typeof(WithoutDiagnosticSource).FullName);
 
-                probe.Call().ShouldBe("3, DiagnosticSource not loaded, requested 0 times");
+                probe.Call().ShouldBe("3, invalid traceparent rejected, DiagnosticSource not loaded, requested 0 times");
             }
             finally
             {
@@ -510,15 +549,7 @@ public sealed class TraceContextTests
     [InlineData(true)]
     public async Task IncomingBaggageWithoutTraceParent_IsPassedOnUnderANewW3CTrace(bool listened)
     {
-        using var listener = new ActivityListener
-        {
-            ShouldListenTo = source => source.Name == "UiPath.Ipc",
-            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
-        };
-        if (listened)
-        {
-            ActivitySource.AddActivityListener(listener);
-        }
+        using var listener = listened ? ListenToIpcSpans(out _) : null;
         await using var sink = await Pair.Create();
         await using var pair = await Pair.Create();
         using var raw = await RawConnection.Create(pair.PipeName);
@@ -841,22 +872,14 @@ public sealed class TraceContextTests
     {
         var started = new List<Activity>();
         var baggageAtStart = new List<string>();
-        var stopped = new List<Activity>();
-        using var listener = new ActivityListener
+        using var listener = ListenToIpcSpans(out var stopped, activity =>
         {
-            ShouldListenTo = source => source.Name == "UiPath.Ipc",
-            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
-            ActivityStarted = activity =>
+            lock (started)
             {
-                lock (started)
-                {
-                    started.Add(activity);
-                    baggageAtStart.AddRange(activity.Baggage.Select(pair => $"{pair.Key}={pair.Value}"));
-                }
-            },
-            ActivityStopped = activity => { lock (stopped) stopped.Add(activity); },
-        };
-        ActivitySource.AddActivityListener(listener);
+                started.Add(activity);
+                baggageAtStart.AddRange(activity.Baggage.Select(pair => $"{pair.Key}={pair.Value}"));
+            }
+        });
         await using var pair = await Pair.Create();
 
         using (IpcTraceContext.Use(new(TraceParentA, TraceState, "k=v")))
@@ -877,16 +900,31 @@ public sealed class TraceContextTests
     }
 
     [Fact]
+    public async Task ServerActivity_WrapsAHandlerOnACustomScheduler()
+    {
+        using var listener = ListenToIpcSpans(out var stopped);
+        var scheduler = new ConcurrentExclusiveSchedulerPair().ExclusiveScheduler;
+        await using var pair = await Pair.Create(scheduler: scheduler);
+        using var caller = StartW3CActivity();
+
+        var result = await pair.Proxy.Probe();
+
+        // The handler ran on that scheduler, so the call took its path and not the default one.
+        result.SchedulerId.ShouldBe(scheduler.Id);
+        // The handler's Activity, not its TraceParent: IpcContext carries the traceparent even when no span wraps the handler.
+        var clientSpanId = result.TraceParent!.Substring(36, 16);
+        result.ActivityTraceId.ShouldBe(caller.TraceId.ToHexString());
+        result.ActivityParentSpanId.ShouldBe(clientSpanId);
+        lock (stopped)
+        {
+            stopped.ShouldContain(span => span.Kind == ActivityKind.Server && span.SpanId.ToHexString() == result.ActivitySpanId);
+        }
+    }
+
+    [Fact]
     public async Task ClientActivity_ComesFromTheIpcActivitySource_WhenListened()
     {
-        var stopped = new List<Activity>();
-        using var listener = new ActivityListener
-        {
-            ShouldListenTo = source => source.Name == "UiPath.Ipc",
-            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
-            ActivityStopped = activity => { lock (stopped) stopped.Add(activity); },
-        };
-        ActivitySource.AddActivityListener(listener);
+        using var listener = ListenToIpcSpans(out var stopped);
         await using var pair = await Pair.Create();
         using var caller = StartW3CActivity();
 
@@ -903,14 +941,7 @@ public sealed class TraceContextTests
     [Fact]
     public async Task ClientIncomingOnly_StartsNoClientActivity()
     {
-        var stopped = new List<Activity>();
-        using var listener = new ActivityListener
-        {
-            ShouldListenTo = source => source.Name == "UiPath.Ipc",
-            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
-            ActivityStopped = activity => { lock (stopped) stopped.Add(activity); },
-        };
-        ActivitySource.AddActivityListener(listener);
+        using var listener = ListenToIpcSpans(out var stopped);
         await using var pair = await Pair.Create(clientPropagation: TelemetryPropagationPolicy.Incoming);
         using var caller = StartW3CActivity();
 
@@ -1007,14 +1038,16 @@ public sealed class TraceContextTests
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(true, true)]
-    public void OutgoingTrace_DisposedWhereItsSpanIsNotCurrent_LeavesThatContextAsItFoundIt(bool stopped, bool suppressed)
+    public void OutgoingTrace_DisposedWhereItsSpanIsNotCurrent_StopsIt_AndLeavesThatContextAsItFoundIt(bool poolThreadStopped, bool suppressed)
     {
+        using var listener = ListenToIpcSpans(out var stopped);
         using var caller = StartW3CActivity();
         var trace = IpcTraceContext.OutgoingTrace.Start("ITraceProbe/Probe");
+        var span = Activity.Current!;
         // As on the pool thread that ends a call made under SuppressFlow, holding whatever other work left there.
         Activity.Current = null;
         using var poolThread = new Activity("pool thread").Start();
-        if (stopped)
+        if (poolThreadStopped)
         {
             // Stopped elsewhere, so it stays current here, and the Activity.Current setter would refuse it.
             ExecutionContext.Run(ExecutionContext.Capture()!, _ => poolThread.Stop(), null);
@@ -1034,6 +1067,7 @@ public sealed class TraceContextTests
         }
 
         Activity.Current.ShouldBeSameAs(poolThread);
+        stopped.ShouldContain(span);
     }
 
     [Fact]
@@ -1066,14 +1100,7 @@ public sealed class TraceContextTests
     [Fact]
     public async Task FailedCalls_SetTheErrorStatusOnTheClientAndServerSpans()
     {
-        var stopped = new List<Activity>();
-        using var listener = new ActivityListener
-        {
-            ShouldListenTo = source => source.Name == "UiPath.Ipc",
-            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
-            ActivityStopped = activity => { lock (stopped) stopped.Add(activity); },
-        };
-        ActivitySource.AddActivityListener(listener);
+        using var listener = ListenToIpcSpans(out var stopped);
         await using var pair = await Pair.Create();
         using var caller = StartW3CActivity();
 
@@ -1111,14 +1138,7 @@ public sealed class TraceContextTests
     [Fact]
     public async Task ClientTimeout_SetsTheCallersErrorOnTheClientSpan()
     {
-        var stopped = new List<Activity>();
-        using var listener = new ActivityListener
-        {
-            ShouldListenTo = source => source.Name == "UiPath.Ipc",
-            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
-            ActivityStopped = activity => { lock (stopped) stopped.Add(activity); },
-        };
-        ActivitySource.AddActivityListener(listener);
+        using var listener = ListenToIpcSpans(out var stopped);
         // The client's own timeout: a Message.RequestTimeout would also time the server out, with the same text.
         await using var pair = await Pair.Create(requestTimeout: TimeSpan.FromMilliseconds(200));
         using var caller = StartW3CActivity();
@@ -1204,6 +1224,11 @@ public sealed class TraceContextTests
         using (IpcTraceContext.Use(new(TraceParentA, baggage: "k=\uD800,pair=\uD83D\uDE00")))
         {
             (await pair.Proxy.Probe()).Baggage.ShouldBe("k=\uFFFD,pair=\uD83D\uDE00");
+        }
+        // A header whose only surrogate is a lone low one is repaired too.
+        using (IpcTraceContext.Use(new(TraceParentA, baggage: "k=\uDE00")))
+        {
+            (await pair.Proxy.Probe()).Baggage.ShouldBe("k=\uFFFD");
         }
     }
 
@@ -1293,6 +1318,23 @@ public sealed class TraceContextTests
 
     private static Activity StartW3CActivity() => new Activity("caller").SetIdFormat(ActivityIdFormat.W3C).Start();
 
+    // Samples every UiPath.Ipc span until disposed, and collects those that stop. A span can stop on another thread, so the list
+    // is filled under its lock.
+    private static ActivityListener ListenToIpcSpans(out List<Activity> stopped, Action<Activity>? started = null)
+    {
+        var spans = new List<Activity>();
+        var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "UiPath.Ipc",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStarted = started,
+            ActivityStopped = activity => { lock (spans) spans.Add(activity); },
+        };
+        ActivitySource.AddActivityListener(listener);
+        stopped = spans;
+        return listener;
+    }
+
     private static string Members(int count) => string.Join(",", Enumerable.Range(0, count).Select(i => $"k{i}=v"));
 
     private sealed class RawConnection : IDisposable
@@ -1371,7 +1413,8 @@ public sealed class TraceContextTests
             TelemetryPropagationPolicy clientPropagation = TelemetryPropagationPolicy.Both,
             TelemetryPropagationPolicy serverPropagation = TelemetryPropagationPolicy.Both,
             TimeSpan? requestTimeout = null,
-            BeforeCallHandler? beforeOutgoingCall = null)
+            BeforeCallHandler? beforeOutgoingCall = null,
+            TaskScheduler? scheduler = null)
         {
             var pipeName = $"ipctest_trace_{Guid.NewGuid():N}";
 
@@ -1380,6 +1423,7 @@ public sealed class TraceContextTests
                 Transport = new NamedPipeServerTransport { PipeName = pipeName },
                 Endpoints = new() { { typeof(ITraceProbe), new TraceProbe() } },
                 TelemetryPropagation = serverPropagation,
+                Scheduler = scheduler,
             };
 
             var client = new IpcClient

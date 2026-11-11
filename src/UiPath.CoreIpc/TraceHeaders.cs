@@ -24,15 +24,17 @@ internal static class TraceHeaders
 
     private static readonly char[] OptionalWhitespace = [' ', '\t'];
 
-    internal static bool IsValidTraceParent(string value) => TryParseTraceParent(value, null, out _);
+    /// <summary>Whether <paramref name="value"/> follows the rule above (a version 00 one has exactly 55 characters).</summary>
+    // Not through TryParseTraceParent, whose ActivityContext would load DiagnosticSource: Use calls this with propagation off.
+    internal static bool IsValidTraceParent(string value)
+    => TraceParent.Match(value) is { Success: true } match &&
+        !(value.StartsWith("00", StringComparison.Ordinal) && match.Groups["rest"].Success);
 
-    /// <summary>Whether <paramref name="value"/> follows the rule above (a version 00 traceparent has exactly 55 characters),
-    /// and if so its ids and flags, read at their offsets.</summary>
+    /// <summary>Whether <paramref name="value"/> is a valid traceparent (see <see cref="IsValidTraceParent"/>), and if so its
+    /// ids and flags, read at their offsets.</summary>
     internal static bool TryParseTraceParent(string? value, string? traceState, out ActivityContext context)
     {
-        if (value is null ||
-            TraceParent.Match(value) is not { Success: true } match ||
-            (value.StartsWith("00", StringComparison.Ordinal) && match.Groups["rest"].Success))
+        if (value is null || !IsValidTraceParent(value))
         {
             context = default;
             return false;
@@ -157,8 +159,19 @@ internal static class TraceHeaders
         static bool IsHex(char c) => c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F';
     }
 
-    // A lone surrogate becomes U+FFFD, as on JS and Python; a pair stays.
-    private static string WellFormed(string value) => Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(value));
+    // A lone surrogate becomes U+FFFD, as on JS and Python; a pair stays. This runs for each baggage key and value, so a string
+    // with no surrogate, the usual case, comes back as is, with nothing allocated.
+    private static string WellFormed(string value)
+    {
+        foreach (var c in value)
+        {
+            if (char.IsSurrogate(c))
+            {
+                return Encoding.UTF8.GetString(Encoding.UTF8.GetBytes(value));
+            }
+        }
+        return value;
+    }
 
     // .NET's Uri.EscapeDataString makes a lone surrogate U+FFFD itself, but .NET Framework's throws on some.
     private static string Escape(string value) => Uri.EscapeDataString(WellFormed(value));

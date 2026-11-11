@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { context, createTraceState, propagation, ROOT_CONTEXT, trace, INVALID_SPAN_CONTEXT, TraceFlags } from '@opentelemetry/api';
+import { Context, context, createTraceState, propagation, ROOT_CONTEXT, trace, INVALID_SPAN_CONTEXT, TraceFlags, TraceState } from '@opentelemetry/api';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 
 import {
@@ -119,6 +119,42 @@ describe('node:trace context', () => {
         ] as Array<[string, TraceContext, TraceContext]>) {
             it(`should cut ${name} from the tracing library to the W3C limits`, () => {
                 expect(outgoingHeadersFromFakeOtel(fromLibrary)).to.deep.equal(sent);
+            });
+        }
+
+        it('should send a baggage value that is null or missing as empty, as .NET and Python do', () => {
+            const baggage = propagation.createBaggage({
+                empty: { value: null as unknown as string },
+                noValue: {} as { value: string },
+                noEntry: null as unknown as { value: string },
+                'user id': { value: 'a,b=c;d' },
+            });
+            const actual = context.with(propagation.setBaggage(otelContext(), baggage), () => new OpenTelemetryBridge().current());
+
+            expect(actual).to.deep.equal({ traceparent, baggage: 'empty=,noValue=,noEntry=,user%20id=a%2Cb%3Dc%3Bd' });
+        });
+
+        // OpenTelemetry checks none of these, so plain JS can put them there.
+        const noTraceFlags = { traceId, spanId, traceFlags: undefined as unknown as TraceFlags };
+        const oddTraceState = { traceId, spanId, traceFlags: TraceFlags.SAMPLED, traceState: { serialize: () => 5 } as unknown as TraceState };
+        for (const [name, active, expected] of [
+            // A span context that can't be read gives nothing, as an API that fails to load does; a scope's own baggage still goes.
+            ['a span context without traceFlags', trace.setSpanContext(otelContext({ baggage: { k: 'v' } }), noTraceFlags), [undefined, { baggage: 'userId=alice' }]],
+            ['a TraceState that writes no text', trace.setSpanContext(otelContext({ baggage: { k: 'v' } }), oddTraceState), [undefined, { baggage: 'userId=alice' }]],
+            // Only the member that can't be written is lost.
+            [
+                'a baggage value that String() cannot convert',
+                otelContext({ baggage: { k: Object.create(null), userId: 'bob' } }),
+                [{ traceparent, baggage: 'userId=bob' }, { traceparent, baggage: 'userId=alice' }],
+            ],
+        ] as Array<[string, Context, Array<TraceContext | undefined>]>) {
+            it(`should not fail the call for ${name}`, () => {
+                const sent = context.with(active, () => [
+                    TraceContextRuntime.getOutgoingHeaders(),
+                    withTraceContext({ baggage: 'userId=alice' }, () => TraceContextRuntime.getOutgoingHeaders()),
+                ]);
+
+                expect(sent).to.deep.equal(expected);
             });
         }
 

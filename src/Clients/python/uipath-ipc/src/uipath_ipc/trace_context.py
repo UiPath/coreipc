@@ -254,17 +254,25 @@ def _get_header(headers: Mapping[str, str], name: str) -> str | None:
 
 
 def _encode_baggage(entries: Mapping[str, object]) -> str | None:
-    # A member with no key is dropped, as _limit_baggage drops one with an empty key.
-    encoded = ",".join(
-        f"{_escape(key)}={_escape(value)}" for key, value in entries.items() if key is not None
-    )
-    return encoded or None
+    members: list[str] = []
+    for key, value in entries.items():
+        # A member with no key is dropped, as _limit_baggage drops one with an
+        # empty key.
+        if key is None:
+            continue
+        try:
+            members.append(f"{_escape(key)}={_escape(value)}")
+        except Exception:
+            # So is one str() can't write: OpenTelemetry takes any value.
+            continue
+    return ",".join(members) or None
 
 
 def _escape(value: object) -> str:
     # quote(safe="") leaves exactly RFC 3986's unreserved set, like .NET's
-    # Uri.EscapeDataString, so both sides encode identically.
-    return quote(_well_formed(str(value)), safe="")
+    # Uri.EscapeDataString, so both sides encode identically. None goes empty
+    # (k=), as on .NET and JS.
+    return quote(_well_formed("" if value is None else str(value)), safe="")
 
 
 def _well_formed(text: str) -> str:
@@ -325,26 +333,36 @@ def _from_opentelemetry() -> TraceContext | None:
     otel = _opentelemetry()
     if otel is None:
         return None
-    span_context = otel.trace.get_current_span().get_span_context()
-    encoded_baggage = _encode_baggage(otel.baggage.get_all())
-    if not span_context.is_valid:
-        return TraceContext(baggage=encoded_baggage) if encoded_baggage else None
-    traceparent = (
-        f"00-{span_context.trace_id:032x}-{span_context.span_id:016x}-"
-        f"{span_context.trace_flags:02x}"
-    )
-    received = _incoming_tracestate.get()
-    if (
-        received is not None
-        and received[0] == span_context.trace_id
-        and received[1] == span_context.trace_state
-    ):
-        # Unchanged since receipt (child spans inherit it): forward it verbatim,
-        # like .NET, rather than OpenTelemetry's filtered re-serialization.
-        tracestate = received[2]
-    else:
-        tracestate = span_context.trace_state.to_header()
-    return TraceContext(traceparent, tracestate, encoded_baggage)
+    # OpenTelemetry keeps what it's given unchecked. A baggage value whose str()
+    # raises is dropped (_encode_baggage). A span or baggage that can't be read
+    # at all gives no trace context, as a failed import does, rather than
+    # failing the call.
+    try:
+        span_context = otel.trace.get_current_span().get_span_context()
+        encoded_baggage = _encode_baggage(otel.baggage.get_all())
+        if not span_context.is_valid:
+            return TraceContext(baggage=encoded_baggage) if encoded_baggage else None
+        traceparent = (
+            f"00-{span_context.trace_id:032x}-{span_context.span_id:016x}-"
+            f"{span_context.trace_flags:02x}"
+        )
+        received = _incoming_tracestate.get()
+        if (
+            received is not None
+            and received[0] == span_context.trace_id
+            and received[1] == span_context.trace_state
+        ):
+            # Unchanged since receipt (child spans inherit it): forward it verbatim,
+            # like .NET, rather than OpenTelemetry's filtered re-serialization.
+            tracestate = received[2]
+        else:
+            tracestate = span_context.trace_state.to_header()
+            # A TraceState subclass may write something that isn't text.
+            if tracestate and not isinstance(tracestate, str):
+                return None
+        return TraceContext(traceparent, tracestate, encoded_baggage)
+    except Exception:
+        return None
 
 
 def _attach_opentelemetry(trace_context: TraceContext | None) -> object | None:

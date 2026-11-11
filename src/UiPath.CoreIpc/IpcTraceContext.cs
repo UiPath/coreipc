@@ -9,7 +9,13 @@ public sealed class IpcTraceContext
     internal const string BaggageHeader = "baggage";
 
     private static readonly AsyncLocal<IpcTraceContext?> Override = new();
-    private static readonly ActivitySource Source = new("UiPath.Ipc");
+
+    // In its own class: Use reads Override, which runs this class's static initializer, and with propagation off nothing may
+    // load DiagnosticSource.
+    private static class Spans
+    {
+        public static readonly ActivitySource Source = new("UiPath.Ipc");
+    }
 
     /// <param name="traceParent">Optional: W3C Baggage doesn't depend on Trace Context, so a baggage can travel alone.
     /// The tracestate travels only with a traceparent.</param>
@@ -76,8 +82,8 @@ public sealed class IpcTraceContext
         ActivityContext? parent = TraceHeaders.TryParseTraceParent(TraceParent, TraceState, out var context) ? context : null;
         // W3C ids even where the default format is hierarchical (.NET Framework), so that a call with a baggage but no
         // traceparent still passes its baggage on from the new root activity.
-        var activity = Source.HasListeners()
-            ? Source.CreateActivity(name, ActivityKind.Server, parent ?? default, idFormat: ActivityIdFormat.W3C)
+        var activity = Spans.Source.HasListeners()
+            ? Spans.Source.CreateActivity(name, ActivityKind.Server, parent ?? default, idFormat: ActivityIdFormat.W3C)
             : null;
 
         if (activity is null)
@@ -167,13 +173,14 @@ public sealed class IpcTraceContext
         {
             var scope = Scope;
             var activity = scope?.TraceParent is null && Activity.Current is { IdFormat: ActivityIdFormat.W3C }
-                ? (Source.CreateActivity(name, ActivityKind.Client) ?? new Activity(name)).Start()
+                ? (Spans.Source.CreateActivity(name, ActivityKind.Client) ?? new Activity(name)).Start()
                 : null;
             return new(scope, activity);
         }
 
-        // The headers are written by hand, not through DistributedContextPropagator.Current, so they are the same on every runtime
-        // and are what JS and Python read (Current is LegacyPropagator on .NET 6, 8 and net461, W3CPropagator on .NET 10).
+        // The headers are written by hand, not through DistributedContextPropagator.Current, so they are the same whatever
+        // DiagnosticSource the host loads and are what JS and Python read (Current is LegacyPropagator before DiagnosticSource 10
+        // and W3CPropagator from 10, inbox on .NET 10; neither writes what JS and Python do).
         public Dictionary<string, string?>? Headers()
         {
             if (TraceContext() is not { } traceContext)

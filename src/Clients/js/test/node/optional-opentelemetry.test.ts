@@ -131,23 +131,31 @@ describe('node:packaged bundles where TextDecoder is missing', () => {
     ];
     const load = 'delete globalThis.TextDecoder; delete globalThis.TextEncoder; require(process.argv[1]); process.stdout.write("loaded");';
 
-    it(
-        'should send a baggage, and take one in, with the node bundle',
-        () => {
-            if (!existsSync(packagedBundle)) {
-                pending(`Run "npm run build" first: ${packagedBundle} is missing.`);
-            }
-            const run =
-                'delete globalThis.TextDecoder; delete globalThis.TextEncoder; const { TraceHeaders } = require(process.argv[1]); ' +
-                "process.stdout.write(JSON.stringify([TraceHeaders.fromHeaders({ baggage: 'k=v,x=%C3%A9' }), TraceHeaders.toHeaders({ baggage: 'k=é' })]));";
+    for (const [name, bundle] of bundles) {
+        it(
+            `should send a baggage, and take one in, with the ${name} bundle`,
+            () => {
+                if (!existsSync(bundle)) {
+                    pending(`Run "npm run build" first: ${bundle} is missing.`);
+                }
+                // A page has no Buffer either, so the web bundle counts the baggage's bytes with the one it brings. The node
+                // bundle needs Node's just to load, for the ws it bundles.
+                const noBuffer = name === 'web' ? 'delete globalThis.Buffer; ' : '';
+                const run =
+                    `${noBuffer}delete globalThis.TextDecoder; delete globalThis.TextEncoder; const { TraceHeaders } = require(process.argv[1]); ` +
+                    "process.stdout.write(JSON.stringify([TraceHeaders.fromHeaders({ baggage: 'k=v,x=%C3%A9' }), TraceHeaders.toHeaders({ baggage: 'k=é' }), " +
+                    "TraceHeaders.toHeaders({ baggage: 'a=1,k=' + 'é'.repeat(4095) })]));";
 
-            expect(JSON.parse(execFileSync(process.execPath, ['-e', run, packagedBundle], { encoding: 'utf8' }))).to.deep.equal([
-                { baggage: 'k=v,x=%C3%A9' },
-                { baggage: 'k=é' },
-            ]);
-        },
-        timeout,
-    );
+                expect(JSON.parse(execFileSync(process.execPath, ['-e', run, bundle], { encoding: 'utf8' }))).to.deep.equal([
+                    { baggage: 'k=v,x=%C3%A9' },
+                    { baggage: 'k=é' },
+                    // 'k=' and 4095 two-byte 'é' make 8192 UTF-8 bytes, too many after 'a=1,'.
+                    { baggage: 'a=1' },
+                ]);
+            },
+            timeout,
+        );
+    }
 
     for (const [name, bundle] of bundles) {
         it(
