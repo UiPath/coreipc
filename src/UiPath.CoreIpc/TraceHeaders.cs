@@ -99,14 +99,14 @@ internal static class TraceHeaders
     {
         var kept = new List<string>();
         var bytes = 0;
-        // The request's UTF-8 writer throws on a lone surrogate.
-        foreach (var raw in WellFormed(baggage).Split(','))
+        foreach (var raw in baggage.Split(','))
         {
             var member = raw.Trim(OptionalWhitespace);
             if (SplitBaggageMember(member) is null)
             {
                 continue;
             }
+            // A lone surrogate counts as the U+FFFD the request's writer sends for it.
             var memberBytes = Encoding.UTF8.GetByteCount(member) + (kept.Count is 0 ? 0 : 1);
             if (bytes + memberBytes > MaxBaggageBytes)
             {
