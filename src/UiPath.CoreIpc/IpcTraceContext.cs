@@ -77,7 +77,7 @@ public sealed class IpcTraceContext
         return traceParent is null && baggage is null ? null : new(traceParent, traceState, baggage);
     }
 
-    internal Activity StartActivity(string name)
+    private Activity StartActivity(string name)
     {
         ActivityContext? parent = TraceHeaders.TryParseTraceParent(TraceParent, TraceState, out var context) ? context : null;
         // W3C ids even where the default format is hierarchical (.NET Framework), so that a call with a baggage but no
@@ -119,7 +119,7 @@ public sealed class IpcTraceContext
     /// <summary>Runs <paramref name="call"/> under the server span <paramref name="name"/>, marked as an error when it throws.
     /// The span is only started here so that a server with propagation off never loads DiagnosticSource, which a .NET
     /// Framework host may lack, or ship in another version without a binding redirect.</summary>
-    internal async Task<T> RunInServerSpan<T>(string name, Func<Task<T>> call)
+    internal async Task<object?> RunInServerSpan(string name, Func<Task<object?>> call)
     {
         using var activity = StartActivity(name);
         try
@@ -218,14 +218,14 @@ public sealed class IpcTraceContext
                 _activity.Dispose();
                 return;
             }
-            // Stopping makes the span's parent current wherever it runs. A call made under SuppressFlow can end on a thread that
-            // never had the span as current: a pool thread, or code that finishes the call inline under SuppressFlow too. An
-            // async method gives that thread its context back when it returns, flow suppressed or not.
-            StopInItsOwnContext(_activity).GetAwaiter().GetResult();
+            // Stopping makes the span's parent current, and a call made under SuppressFlow can end on a thread that never had
+            // the span as current.
+            StopLeavingCurrentAsIs(_activity).GetAwaiter().GetResult();
         }
 
 #pragma warning disable CS1998 // Nothing to await: the method is async only for the context its builder restores.
-        private static async Task StopInItsOwnContext(Activity activity) => activity.Dispose();
+        // Stops the span in a copy of this thread's context, which the async builder throws away on return.
+        private static async Task StopLeavingCurrentAsIs(Activity activity) => activity.Dispose();
 #pragma warning restore CS1998
 
         /// <summary>The client span's traceparent and tracestate, with the scope's baggage when there is a scope, else the span's

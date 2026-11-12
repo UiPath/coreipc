@@ -24,6 +24,12 @@ steps:
     displayName: 'Python: install package + ${{ parameters.extras }} extras + build'
     workingDirectory: '$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc'
 
+  # pip only warns about an unknown extra, and the OpenTelemetry tests skip without it: fail here instead.
+  - ${{ if contains(parameters.extras, 'otel') }}:
+    - script: python -c "import opentelemetry.trace"
+      displayName: 'Python: check OpenTelemetry is installed'
+      workingDirectory: '$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc'
+
   - script: python -m pytest -v --junitxml=$(Build.SourcesDirectory)/python-test-results.xml
     displayName: 'Python: run tests (unit + integration)'
     workingDirectory: '$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc'

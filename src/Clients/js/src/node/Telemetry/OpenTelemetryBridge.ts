@@ -1,4 +1,4 @@
-import { TraceContext, TraceHeaders, TracingBridge } from '../../std';
+import { Trace, TraceContext, TraceHeaders, TracingBridge } from '../../std';
 
 // The slice of @opentelemetry/api used here, declared locally so its types never reach our public typings.
 interface OtelTraceState {
@@ -41,8 +41,16 @@ export interface OtelApi {
 export function loadOpenTelemetry(load?: () => unknown): OtelApi | undefined {
     try {
         // A literal require written inside this try, so a consumer's bundler treats the optional peer as optional.
-        const api: unknown = load ? load() : require(/* webpackIgnore: true */ '@opentelemetry/api');
-        return isOtelApi(api) ? api : undefined;
+        const api: any = load ? load() : require(/* webpackIgnore: true */ '@opentelemetry/api');
+        if (isOtelApi(api)) {
+            return api;
+        }
+        // An empty module is a bundler alias to false, which turns it off on purpose. One with parts of the API (a stub, or
+        // a version before 1.1) would otherwise turn propagation off without a word.
+        if (api?.context !== undefined || api?.trace !== undefined || api?.propagation !== undefined) {
+            Trace.log('@opentelemetry/api loaded but lacks what trace propagation needs (version 1.1 or later), so none is done.');
+        }
+        return undefined;
     } catch {
         return undefined;
     }

@@ -6,6 +6,7 @@ import {
     PromisePal,
     RemoteError,
     TelemetryPropagationPolicy,
+    Trace,
     TraceContext,
     TraceContextRuntime,
     TraceHeaders,
@@ -219,8 +220,19 @@ describe('node:trace context', () => {
             const withoutCreateTraceState = { ...require('@opentelemetry/api') };
             delete withoutCreateTraceState.createTraceState;
 
-            expect(loadOpenTelemetry(() => ({}))).to.equal(undefined);
-            expect(loadOpenTelemetry(() => withoutCreateTraceState)).to.equal(undefined);
+            const logged = new Array<unknown>();
+            const listener = Trace.addListener(entry => logged.push(entry));
+            try {
+                // An empty module is an alias to false, which turns it off on purpose: nothing is logged.
+                expect(loadOpenTelemetry(() => ({}))).to.equal(undefined);
+                expect(logged).to.deep.equal([]);
+                // A partial API turns propagation off too, but says so.
+                expect(loadOpenTelemetry(() => withoutCreateTraceState)).to.equal(undefined);
+                expect(logged).to.have.length(1);
+                expect(String(logged[0])).to.contain('@opentelemetry/api');
+            } finally {
+                listener.dispose();
+            }
         });
 
         it('should fall back to nothing when @opentelemetry/api is not installed', () => {
