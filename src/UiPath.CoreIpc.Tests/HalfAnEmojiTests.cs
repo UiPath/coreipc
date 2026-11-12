@@ -13,8 +13,7 @@ public sealed class HalfAnEmojiProbe : IHalfAnEmojiProbe
     // Static readonly, so it can't go in [InlineData]: the compiler stores attribute strings as UTF-8, where the halves would already be U+FFFD.
     public static readonly string Text = "whole \ud83d\ude00, lone low \ude00, lone high at the end \ud83d";
     public static readonly string Replaced = "whole \ud83d\ude00, lone low \ufffd, lone high at the end \ufffd";
-    // Sent by default, so the server needs no setting.
-    public const string DataKey = "UiPath.ErrorInfo.Error";
+    public const string KeySentByDefault = "UiPath.ErrorInfo.Error";
 
     public string? Received { get; private set; }
 
@@ -23,7 +22,7 @@ public sealed class HalfAnEmojiProbe : IHalfAnEmojiProbe
     public Task<bool> ThrowWithData()
     {
         var exception = new InvalidOperationException("data");
-        exception.Data[DataKey] = Text;
+        exception.Data[KeySentByDefault] = Text;
         throw exception;
     }
 
@@ -58,7 +57,7 @@ public sealed class HalfAnEmojiTests
     {
         await using var pair = await CreatePair();
         var ex = await pair.Proxy.ThrowWithData().ShouldThrowAsync<RemoteException>();
-        ex.Data[HalfAnEmojiProbe.DataKey].ShouldBe(HalfAnEmojiProbe.Replaced);
+        ex.Data[HalfAnEmojiProbe.KeySentByDefault].ShouldBe(HalfAnEmojiProbe.Replaced);
     }
 
     [Fact]
