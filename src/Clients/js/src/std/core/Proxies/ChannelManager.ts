@@ -1,4 +1,4 @@
-import { CancellationToken, IAsyncDisposable, PublicCtor, Timeout, TimeSpan } from '../..';
+import { CancellationToken, IAsyncDisposable, PublicCtor, Timeout, TimeSpan, Trace } from '../..';
 
 import {
     IServiceProvider,
@@ -9,11 +9,11 @@ import {
     IRpcChannelFactory,
     RpcCallContext,
     RpcMessage,
-    IpcError,
     IMessageStream,
 } from '..';
 
 import { RpcRequestFactory } from '.';
+import { TelemetryPropagationPolicy, TraceContextRuntime, TraceHeaders } from '../Telemetry';
 import { Observer } from 'rxjs';
 
 /* @internal */
@@ -81,6 +81,20 @@ export class ChannelManager implements IAsyncDisposable {
     private async invokeCallback(
         request: RpcMessage.Request,
     ): Promise<RpcMessage.Response> {
+        try {
+            const policy = this._sp.configStore.getTelemetryPropagation(this._address);
+            // Every callback runs isolated from whatever opened the connection, so its calls never carry that context.
+            const result = await TraceContextRuntime.runIncoming(
+                policy & TelemetryPropagationPolicy.Incoming ? TraceHeaders.fromHeaders(request.Headers) : undefined,
+                () => this.invokeCallbackCore(request),
+            );
+            return new RpcMessage.Response(request.Id, JSON.stringify(result), null);
+        } catch (err) {
+            return new RpcMessage.Response(request.Id, null, Converter.toRpcError(err));
+        }
+    }
+
+    private async invokeCallbackCore(request: RpcMessage.Request): Promise<unknown> {
         const callback = this._sp.callbackStore.get(
             request.Endpoint,
             this._address,
@@ -102,17 +116,7 @@ export class ChannelManager implements IAsyncDisposable {
         }
 
         const args = request.Parameters.map(jsonArg => JSON.parse(jsonArg));
-        let data: string | null = null;
-        let error: IpcError | null = null;
-
-        try {
-            const result = await method.apply(callback, args);
-            data = JSON.stringify(result);
-        } catch (err) {
-            error = Converter.toRpcError(err);
-        }
-
-        return new RpcMessage.Response(request.Id, data, error);
+        return await method.apply(callback, args);
     }
     private readonly _incommingCallObserver = new (class
         implements Observer<RpcCallContext.Incomming>
@@ -122,11 +126,9 @@ export class ChannelManager implements IAsyncDisposable {
         public closed?: boolean;
 
         public async next(incommingContext: RpcCallContext.Incomming): Promise<void> {
-            incommingContext.respond(
-                await this._channelManager.invokeCallback(
-                    incommingContext.request,
-                ),
-            );
+            const response = await this._channelManager.invokeCallback(incommingContext.request);
+            // The connection can close while the handler runs, and nothing else awaits this.
+            await Trace.traceErrorNoThrow(incommingContext.respond(response));
         }
         public error(err: any): void {}
         public complete(): void {}

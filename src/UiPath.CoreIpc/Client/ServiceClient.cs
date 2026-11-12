@@ -60,6 +60,9 @@ internal abstract class ServiceClient : IDisposable
             var serializedArguments = SerializeArguments();
 
             using var timeoutHelper = new TimeoutHelper(clientTimeout, cancellationToken);
+            var propagateOutgoing = (Config.TelemetryPropagation & TelemetryPropagationPolicy.Outgoing) != 0;
+            // Started before the first await, which can resume without the caller's ExecutionContext (SuppressFlow).
+            using var trace = propagateOutgoing ? IpcTraceContext.OutgoingTrace.Start($"{_interfaceType.Name}/{methodName}") : null;
             try
             {
                 var ct = timeoutHelper.Token;
@@ -71,7 +74,8 @@ internal abstract class ServiceClient : IDisposable
                 var requestId = connection.NewRequestId();
                 var request = new Request(_interfaceType.Name, requestId, methodName, serializedArguments, messageTimeout.TotalSeconds)
                 {
-                    UploadStream = uploadStream
+                    UploadStream = uploadStream,
+                    Headers = trace?.Headers(),
                 };
 
                 Config.Logger?.ServiceClient_Calling(methodName, requestId, Config.GetComputedDebugName());
@@ -93,7 +97,12 @@ internal abstract class ServiceClient : IDisposable
             }
             catch (Exception ex)
             {
-                timeoutHelper.ThrowTimeout(ex, methodName);
+                var error = timeoutHelper.CheckTimeout(ex, methodName);
+                trace?.SetError(error.Message);
+                if (error != ex)
+                {
+                    throw error;
+                }
                 throw;
             }
 

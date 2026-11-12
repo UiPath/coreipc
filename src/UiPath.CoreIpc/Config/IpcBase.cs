@@ -26,4 +26,10 @@ public abstract class IpcBase
         // Copied here, so a collection that can't be read fails where it's assigned, not on a connection.
         set => _propagatedExceptionDataKeys = value?.ToArray();
     }
+    /// <summary>
+    /// Opt-in W3C trace-context propagation (traceparent, tracestate, baggage) for this endpoint's calls and callbacks,
+    /// per direction (<see cref="TelemetryPropagationPolicy.Incoming"/>, <see cref="TelemetryPropagationPolicy.Outgoing"/>).
+    /// Defaults to <see cref="TelemetryPropagationPolicy.None"/>: nothing is sent or read.
+    /// </summary>
+    public TelemetryPropagationPolicy TelemetryPropagation { get; set; }
 }

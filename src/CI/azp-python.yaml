@@ -5,6 +5,10 @@ parameters:
   - name: pythonVersion
     type: string
     default: '3.12'
+  # The package extras to install: 'dev,otel' also runs the OpenTelemetry tests.
+  - name: extras
+    type: string
+    default: 'dev'
 
 steps:
   - task: UsePythonVersion@0
@@ -16,9 +20,15 @@ steps:
 
   - script: |
       python -m pip install --upgrade pip
-      python -m pip install -e ".[dev]" build
-    displayName: 'Python: install package + dev extras + build'
+      python -m pip install -e ".[${{ parameters.extras }}]" build
+    displayName: 'Python: install package + ${{ parameters.extras }} extras + build'
     workingDirectory: '$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc'
+
+  # pip only warns about an unknown extra, and the OpenTelemetry tests skip without it: fail here instead.
+  - ${{ if contains(parameters.extras, 'otel') }}:
+    - script: python -c "import opentelemetry.trace"
+      displayName: 'Python: check OpenTelemetry is installed'
+      workingDirectory: '$(Build.SourcesDirectory)/src/Clients/python/uipath-ipc'
 
   - script: python -m pytest -v --junitxml=$(Build.SourcesDirectory)/python-test-results.xml
     displayName: 'Python: run tests (unit + integration)'
@@ -31,4 +41,4 @@ steps:
       testResultsFormat: JUnit
       testResultsFiles: 'python-test-results.xml'
       searchFolder: '$(Build.SourcesDirectory)'
-      testRunTitle: 'Python ${{ parameters.pythonVersion }} tests ($(Agent.OS) $(Agent.OSArchitecture))'
+      testRunTitle: 'Python ${{ parameters.pythonVersion }} [${{ parameters.extras }}] tests ($(Agent.OS) $(Agent.OSArchitecture))'

@@ -114,6 +114,9 @@ stages:
     steps:
       - template: azp-initialization.yaml
       - template: azp-python.yaml
+        parameters:
+          # The OpenTelemetry tests run here; the Linux jobs test the package without it.
+          extras: 'dev,otel'
       - template: azp-python-dist.yaml
 
   - job: Python_Linux

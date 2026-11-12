@@ -165,6 +165,38 @@ var ipcServer = new IpcServer
 };
 ```
 
+### Trace context (telemetry)
+
+Set `TelemetryPropagation` on an `IpcClient` / `IpcServer` to carry the W3C `traceparent`, `tracestate` and `baggage` across its calls and callbacks (wire-compatible with the JS and Python clients). It is a `[Flags]` `TelemetryPropagationPolicy`: `Outgoing` covers the calls and callbacks the endpoint makes, `Incoming` the ones it receives, `Both` is both. `None` by default: nothing is sent or read.
+
+```csharp
+var client = new IpcClient
+{
+    Transport = new NamedPipeClientTransport { PipeName = "my-pipe" },
+    TelemetryPropagation = TelemetryPropagationPolicy.Both,
+};
+```
+
+- **Outgoing**: outside an `IpcTraceContext.Use(...)` scope, when `Activity.Current` has W3C ids, each call starts a client span `<Endpoint>/<MethodName>` (`ActivityKind.Client`, a child of `Activity.Current`, from connecting until the call returns) and sends its ids, `tracestate` and `baggage`, each baggage key once, with the value `GetBaggageItem` gives. Otherwise nothing is sent and no span is started: to send nothing for a call, make it with no scope and `Activity.Current = null`. Inside a `Use` scope:
+  - a scope with a `traceparent` wins outright: only its own `traceparent`, `tracestate` and `baggage` are sent, and no client span is started;
+  - a scope without one keeps the ambient trace: the call starts the client span as above and sends its `traceparent` and `tracestate` with the scope's `baggage`, or that `baggage` alone when `Activity.Current` has no W3C ids;
+  - scopes don't merge: an inner scope replaces the outer one until it's disposed.
+- **Incoming**: the handler runs under an `Activity` named `<Endpoint>/<MethodName>` whose parent is the received `traceparent` (the caller's client span, or its `Use` value), so nested calls continue the trace; `IpcContext.Current.TraceContext` gives the received values. Without `Incoming`, handlers run with no `Activity.Current`, so the spans they start are new traces.
+  - A call with a `baggage` but no `traceparent` runs under a new root `Activity` (a new trace id) that carries the baggage, as ASP.NET Core does. JS on Node with an OpenTelemetry context manager registered (as `NodeSDK.start()` does), and Python with `opentelemetry-api` installed, start no spans but pass it on alone; otherwise, and in the browser, it goes no further unless the handler forwards it.
+  - Incoming trusts the caller: it picks the trace id, the sampled flag and the baggage your handler runs under and passes on. Turn it on only for peers you trust.
+- **Rules**: the same on .NET, JS and Python. A `traceparent` must follow W3C Trace Context §3.2; a received one that doesn't is ignored, and so is its `tracestate`. `tracestate` members that break their grammar are dropped. On send and on receive, `tracestate` is cut to its first 32 members, and `baggage` to 64 members and 8192 UTF-8 bytes, by dropping whole members; baggage members with no key or no `=` are dropped too, and a lone surrogate in the baggage becomes U+FFFD. When a received baggage repeats a key, the last one wins. The `traceparent` is optional: a `baggage` can travel without it, but a `tracestate` can't. `IpcTraceContext.Use` throws `ArgumentException` for an invalid `traceparent`, and for a context with neither a `traceparent` nor a `baggage`.
+- A failed call sets `ActivityStatusCode.Error` on the client and server spans.
+- On .NET Framework the default `Activity` id format is hierarchical, so set `Activity.DefaultIdFormat = ActivityIdFormat.W3C; Activity.ForceDefaultIdFormat = true;` at startup (the OpenTelemetry SDK does this) or your activities are not propagated. There, CoreIpc depends on `System.Diagnostics.DiagnosticSource` 6.0.1, which it loads only with propagation on (neither an `IpcTraceContext` nor an `IpcTraceContext.Use` scope loads it): a host that ships another version then needs a binding redirect to it.
+- Subscribe to the `UiPath.Ipc` `ActivitySource` (OpenTelemetry: `.AddSource("UiPath.Ipc")`) in both the calling and the serving process. Otherwise the client and server spans are plain, unexported `Activity`s, and the spans under them point to a parent the backend never receives (as with `HttpClient`).
+- The ambient `baggage` is the `Activity`'s: a call sends `Activity.Current`'s, and the handler's `Activity` gets the received one. CoreIpc doesn't read or set OpenTelemetry's `Baggage`, which keeps its own.
+
+```csharp
+using (IpcTraceContext.Use(new IpcTraceContext("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", baggage: "userId=alice")))
+{
+    await proxy.AddFloats(1.5f, 2.5f);
+}
+```
+
 ## 🧩 Notable Types
 
 ### 1. The `IpcServer`, `IpcClient` and `IpcBase` classes.
@@ -189,6 +221,7 @@ var ipcServer = new IpcServer
 | Scheduler | TaskScheduler? |  **Optional**, defaults to the thread pool: Schedules incomming calls. |
 | RequestTimeout | TimeSpan? | **Optional**, defaults to infinity: Interval after which the honoring of requests will time out. |
 | PropagatedExceptionDataKeys | `IReadOnlyCollection<string>?` | **Optional**, defaults to `["UiPath.ErrorInfo.Error"]`: The `Exception.Data` keys whose string values are sent with the errors of the calls it handles, landing in the caller's `RemoteException.Data`. Assigning replaces the list, so list `UiPath.ErrorInfo.Error` too to keep it. `null` or empty sends none of its own; entries received from a further call still travel on. |
+| TelemetryPropagation | TelemetryPropagationPolicy | **Optional**, defaults to **None**: Directions (`Incoming`, `Outgoing`, `Both`) in which W3C trace context is propagated, see [Trace context](#trace-context-telemetry). |
 
 
 #### ii. `IpcServer`

@@ -181,6 +181,21 @@ async with IpcClient(transport, before_connect=launch_server, before_call=log_ca
 
 `before_connect` runs before each (re)connect; `before_call` runs before each outgoing call with a `CallInfo` (`endpoint`, `method_name`, `arguments`, and `new_connection` — `True` only on the call that opened the connection).
 
+### Trace context (telemetry)
+
+Opt in with `IpcClient(..., telemetry_propagation=TelemetryPropagationPolicy.BOTH)` / `IpcServer(..., telemetry_propagation=TelemetryPropagationPolicy.BOTH)` to carry the W3C `traceparent`, `tracestate` and `baggage` across calls and callbacks (wire-compatible with .NET's `TelemetryPropagation`). `OUTGOING` covers the calls an object makes (a client's calls, a server's callbacks), `INCOMING` the calls it handles (a server's calls, a client's callbacks); `NONE` (the default) sends and reads nothing.
+
+- **Outgoing**: a `use_trace_context(TraceContext(...))` scope with a `traceparent` wins outright: only its own values are sent. A scope without one sends its `baggage` with the current OpenTelemetry span's `traceparent` and `tracestate`, or alone when there is no span. Scopes don't merge: an inner scope replaces the outer one. With no scope, the current OpenTelemetry span + baggage is used when `opentelemetry-api` is installed (`pip install "uipath-ipc[otel]"`); otherwise nothing is sent. OpenTelemetry takes any value: a baggage value whose `str()` raises is dropped, and if the current span or baggage can't be read at all, the call goes on as if the context were empty. To send nothing for a call, make it with no `use_trace_context` scope and an empty OpenTelemetry context attached (`token = opentelemetry.context.attach(opentelemetry.context.Context())`, then `opentelemetry.context.detach(token)`).
+- **Incoming**: `incoming_trace_context()` returns the received values. With `opentelemetry-api` installed, the handler runs under an OpenTelemetry context whose (non-recording) remote parent is the caller's span, so nested calls continue the trace; without it, nested calls send nothing unless the handler forwards `incoming_trace_context()` with `use_trace_context`. Without `INCOMING`, handlers run in an empty OpenTelemetry context, so the spans they start are new traces, not children of whatever was current when the connection was opened (for an `IpcServer`, when it was started). An invalid `traceparent` gives no remote parent (a new trace), not an error. Incoming trusts the caller: it picks the trace id, the sampled flag and the baggage your handler runs under and passes on. Turn it on only for peers you trust.
+- **Rules**: the same on .NET, JS and Python. A `traceparent` must follow W3C Trace Context §3.2; a received one that doesn't is ignored, and so is its `tracestate`. `tracestate` members that break their grammar are dropped. On send and on receive, `tracestate` is cut to its first 32 members, and `baggage` to 64 members and 8192 UTF-8 bytes, by dropping whole members; baggage members with no key or no `=` are dropped too, and a lone surrogate in the baggage becomes U+FFFD. When a received baggage repeats a key, the last one wins. The `traceparent` is optional: a `baggage` can travel without it, but a `tracestate` can't. `use_trace_context(...)` raises `InvalidTraceContextError` (a `ValueError`) for an invalid `traceparent`, and for a `TraceContext` with neither a `traceparent` nor a `baggage`.
+
+```python
+from uipath_ipc import TraceContext, use_trace_context
+
+with use_trace_context(TraceContext("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", baggage="userId=alice")):
+    await svc.AddFloats(1.5, 2.5)
+```
+
 ### Custom serialization (advanced)
 
 The proxy materializes results into a contract's declared return type via reflection — `bytes`, `UUID`, `datetime`, `Decimal`, enums, and dataclasses all round-trip (see [Features](#features) above). If you need to (de)serialize values yourself, the same primitives are exported as `from_wire(value, hint)` / `to_wire(value)`. The contract vocabulary is intentionally narrow — plain JSON values and dataclasses — so the IPC layer stays decoupled from any modeling framework (pydantic, ORM entities, …); map IPC DTOs to your own validated/domain types at your boundary if you need them.

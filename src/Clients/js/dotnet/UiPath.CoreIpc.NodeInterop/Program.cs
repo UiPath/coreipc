@@ -83,6 +83,7 @@ class Program
             .AddSingleton<IBrittleService, BrittleService>()
             .AddSingleton<IEnvironmentVariableGetter, EnvironmentVariableGetter>()
             .AddSingleton<IDtoService, DtoService>()
+            .AddSingleton<ITraceProbe, TraceProbe>()
             .BuildServiceProvider();
 
         var thread = new AsyncContextThread();
@@ -167,11 +168,13 @@ class Program
                     typeof(ICalculus),
                     typeof(IBrittleService),
                     typeof(IEnvironmentVariableGetter),
-                    typeof(IDtoService)
+                    typeof(IDtoService),
+                    typeof(ITraceProbe),
                 },
                 Transport = transport,
                 ServiceProvider = sp,
-                Scheduler = scheduler
+                Scheduler = scheduler,
+                TelemetryPropagation = TelemetryPropagationPolicy.Both,
             };
             ipcServer.Start();
             return ipcServer;

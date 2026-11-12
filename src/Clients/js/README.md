@@ -315,6 +315,25 @@ ipc.config
 >   - the request timeout for pipe name "foo" and contract ISample is 3 seconds
 >   ```
 
+## Trace context (telemetry)
+
+`ipc.config.forAnyAddress().setTelemetryPropagation(policy)` carries the W3C `traceparent`, `tracestate` and `baggage` across this `ipc` instance's calls and callbacks (wire-compatible with the .NET and Python sides). `ipc.config.forAddress(...).setTelemetryPropagation(policy)` sets it for one address, and wins over `forAnyAddress()`. The `TelemetryPropagationPolicy` picks the directions: `None` (the default: nothing is sent or read), `Incoming`, `Outgoing` or `Both`.
+
+- **Outgoing** (the calls it makes): a `withTraceContext(...)` scope with a `traceparent` wins outright: only its own values are sent. A scope without a `traceparent` sends its `baggage` with the ambient trace: on Node, the `traceparent` and `tracestate` of the active span of the optional peer dependency `@opentelemetry/api`, or the `baggage` alone when there is no active span. A scope with neither a `traceparent` nor a `baggage` throws `ArgumentError`. Scopes don't merge: an inner scope replaces the outer one. With no scope, on Node, the active span and baggage of `@opentelemetry/api` are sent; otherwise nothing is sent. OpenTelemetry takes plain JS values unchecked: a baggage value `String()` can't convert is dropped, and if the active span or baggage can't be read at all (a span context without `traceFlags`, say), the call goes on as if the context were empty. To send nothing for a call, make it with no `withTraceContext` scope, in OpenTelemetry's `ROOT_CONTEXT`: `context.with(ROOT_CONTEXT, () => proxy.Foo())`. If `@opentelemetry/api` is missing, fails to load, or isn't the API (an empty module from a bundler alias, say), it is treated as not installed; one with only part of the API (a stub, or a version before 1.1) also says so once through `Trace`. Without it, webpack warns that it can't resolve `@opentelemetry/api`: that's expected, and an `IgnorePlugin`, `externals` or an alias to `false` silences it.
+- **Incoming** (the callbacks it receives): `currentIncomingTraceContext()` gives the received values. On Node, with an OpenTelemetry context manager registered (as `NodeSDK.start()` does), the callback also runs within an OpenTelemetry context whose parent is the remote span, so the spans it starts, and with `Outgoing` also its calls, continue the trace. With only `@opentelemetry/api` installed, its calls send nothing unless it forwards `currentIncomingTraceContext()` with `withTraceContext`. Without `Incoming`, callbacks ignore what they received; on Node they also run outside any span, so the spans they start are new traces, not children of whatever opened the connection. Incoming trusts the caller: it picks the trace id, the sampled flag and the baggage your handler runs under and passes on. Turn it on only for peers you trust.
+- **Rules**: the same on .NET, JS and Python. A `traceparent` must follow W3C Trace Context §3.2; a received one that doesn't is ignored, and so is its `tracestate`. `tracestate` members that break their grammar are dropped. On send and on receive, `tracestate` is cut to its first 32 members, and `baggage` to 64 members and 8192 UTF-8 bytes, by dropping whole members; baggage members with no key or no `=` are dropped too, and a lone surrogate in the baggage becomes U+FFFD. When a received baggage repeats a key, the last one wins. The `traceparent` is optional: a `baggage` can travel without it, but a `tracestate` can't. `withTraceContext` throws `ArgumentError` for an invalid `traceparent`, and for a context with neither a `traceparent` nor a `baggage`.
+- **Browser** (`@uipath/coreipc-web`): explicit-only for now. The OpenTelemetry context is not read or set; only `withTraceContext` and `currentIncomingTraceContext` apply, and only until the first `await`. A scope without a `traceparent` sends its `baggage` alone. Callbacks run in whatever OpenTelemetry context the page's context manager gives them.
+
+```typescript
+import { ipc, TelemetryPropagationPolicy, withTraceContext } from '@uipath/coreipc';
+
+ipc.config.forAnyAddress().setTelemetryPropagation(TelemetryPropagationPolicy.Both);
+// Or, for one address only:
+ipc.config.forAddress(options => options.isPipe('foo')).setTelemetryPropagation(TelemetryPropagationPolicy.Outgoing);
+
+await withTraceContext({ traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01' }, () => proxy.Foo());
+```
+
 ---
 ## Notes for Contributors
 

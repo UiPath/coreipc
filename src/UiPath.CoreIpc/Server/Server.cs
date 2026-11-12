@@ -26,6 +26,7 @@ internal class Server
 
     private readonly TimeSpan? _requestTimeout;
     private readonly IReadOnlyCollection<string>? _propagatedExceptionDataKeys;
+    private readonly bool _propagateIncoming;
 
     private ILogger? Logger => _connection.Logger;
     private bool LogEnabled => _connection.LogEnabled;
@@ -36,6 +37,7 @@ internal class Server
         _router = router;
         _requestTimeout = ipc.RequestTimeout;
         _propagatedExceptionDataKeys = ipc.PropagatedExceptionDataKeys is { Count: > 0 } keys ? keys : null;
+        _propagateIncoming = (ipc.TelemetryPropagation & TelemetryPropagationPolicy.Incoming) != 0;
         _connection = connection;
         _client = client;
         connection.RequestReceived += OnRequestReceived;
@@ -135,6 +137,7 @@ internal class Server
 #endif
     private async ValueTask<Response> HandleRequest(Method method, Route route, Request request, CancellationToken cancellationToken)
     {
+        var traceContext = _propagateIncoming ? IpcTraceContext.FromHeaders(request.Headers) : null;
         var arguments = GetArguments();
 
         object service;
@@ -166,11 +169,13 @@ internal class Server
             ScheduleMethodCall().LogException(Logger, method.MethodInfo);
             return Response.Success(request, "");
 
-            Task<object?> ScheduleMethodCall() => defaultScheduler ? MethodCall() : RunOnScheduler();
+            Task<object?> ScheduleMethodCall() => defaultScheduler ? TracedMethodCall() : RunOnScheduler();
+            // No span type appears here, so with propagation off nothing on this path loads DiagnosticSource.
+            Task<object?> TracedMethodCall() => traceContext is null ? MethodCall() : traceContext.RunInServerSpan($"{request.Endpoint}/{request.MethodName}", MethodCall);
             async Task<object?> MethodCall()
             {
                 // So a POCO contract can reach the peer without a Message parameter.
-                using (IpcContext.Push(new IpcContext(_client, cancellationToken)))
+                using (IpcContext.Push(new IpcContext(_client, cancellationToken, traceContext)))
                 {
                     await (route.BeforeCall?.Invoke(
                         new CallInfo(newConnection: false, method.MethodInfo, arguments),
@@ -188,7 +193,7 @@ internal class Server
                 }
             }
 
-            Task<object?> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler).Unwrap();
+            Task<object?> RunOnScheduler() => Task.Factory.StartNew(TracedMethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler).Unwrap();
         }
         object?[] GetArguments()
         {
