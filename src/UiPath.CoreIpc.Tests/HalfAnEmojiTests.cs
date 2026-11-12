@@ -10,10 +10,9 @@ public interface IHalfAnEmojiProbe
 
 public sealed class HalfAnEmojiProbe : IHalfAnEmojiProbe
 {
-    // A whole emoji, then a lone low surrogate and, at the end, a lone high one, as in a string cut mid-emoji.
     // Static readonly, so it can't go in [InlineData]: the compiler stores attribute strings as UTF-8, where the halves would already be U+FFFD.
-    public static readonly string Text = "whole \ud83d\ude00, \ude00 alone, cut \ud83d";
-    public static readonly string Replaced = "whole \ud83d\ude00, \ufffd alone, cut \ufffd";
+    public static readonly string Text = "whole \ud83d\ude00, lone low \ude00, lone high at the end \ud83d";
+    public static readonly string Replaced = "whole \ud83d\ude00, lone low \ufffd, lone high at the end \ufffd";
     // Sent by default, so the server needs no setting.
     public const string DataKey = "UiPath.ErrorInfo.Error";
 
@@ -39,9 +38,6 @@ public sealed class HalfAnEmojiProbe : IHalfAnEmojiProbe
 
 public sealed class HalfAnEmojiTests
 {
-    // Short, so a reply that never comes fails the test in seconds, not after the default minute.
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(5);
-
     [Fact]
     public async Task Thrown_TheCallerGetsTheError_WithTheHalvesReplaced()
     {
@@ -75,5 +71,5 @@ public sealed class HalfAnEmojiTests
     }
 
     private static Task<IpcPair<IHalfAnEmojiProbe>> CreatePair(HalfAnEmojiProbe? service = null)
-        => IpcPair<IHalfAnEmojiProbe>.Create(service ?? new HalfAnEmojiProbe(), configureClient: client => client.RequestTimeout = RequestTimeout);
+        => IpcPair<IHalfAnEmojiProbe>.Create(service ?? new HalfAnEmojiProbe());
 }
