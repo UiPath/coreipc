@@ -6,9 +6,12 @@
 # behind their approval-gated environments. Builds nothing itself.
 #
 # Parameters:
-#   - buildId      (required) the CI build/run id to publish from.
-#   - publishNuGet / publishNpm / publishPyPI  (default: all on) — which
-#     packages to publish. At least one must be selected.
+#   - buildId               (required) the CI build/run id to publish from.
+#   - publishNuGet / publishNpm / publishPython  (default: all on) — which
+#     packages to publish to the INTERNAL (UiPath-Internal) feeds.
+#   - publishToPublicPyPI   (default off) — ALSO publish Python to PUBLIC PyPI
+#     (master builds only; via the GitHub Action). Separate from publishPython
+#     so you can publish internally without touching public PyPI.
 #
 # The `ci` pipeline resource below is hardcoded to the CI pipeline (named
 # "CI", running azp-start.yaml). It resolves the CI definition id for the
@@ -36,10 +39,15 @@ parameters:
     type: boolean
     default: true
 
-  - name: publishPyPI
+  - name: publishPython
     displayName: 'Publish Python (wheel + sdist) → UiPath-Internal'
     type: boolean
     default: true
+
+  - name: publishToPublicPyPI
+    displayName: 'ALSO publish Python → PUBLIC PyPI (master builds only)'
+    type: boolean
+    default: false
 
 resources:
   pipelines:
@@ -73,7 +81,7 @@ stages:
           exit 1
         displayName: 'buildId is required'
 
-- ${{ if not(or(eq(parameters.publishNuGet, true), eq(parameters.publishNpm, true), eq(parameters.publishPyPI, true))) }}:
+- ${{ if not(or(eq(parameters.publishNuGet, true), eq(parameters.publishNpm, true), eq(parameters.publishPython, true), eq(parameters.publishToPublicPyPI, true))) }}:
   - stage: Nothing_Selected
     displayName: '❌ Nothing selected'
     jobs:
@@ -83,9 +91,9 @@ stages:
       steps:
       - checkout: none
       - script: |
-          echo "##vso[task.logissue type=error]Select at least one package to publish (NuGet, NPM, or PyPI)."
+          echo "##vso[task.logissue type=error]Select at least one target (NuGet, NPM, Python, or public PyPI)."
           exit 1
-        displayName: 'At least one package required'
+        displayName: 'At least one target required'
 
 # =====================================================================
 # Publish stages — only emitted when a real buildId was provided. Each runs
@@ -98,7 +106,7 @@ stages:
 # =====================================================================
 - ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishNuGet, true)) }}:
   - stage: Publish_NuGet
-    displayName: '🚚 Publish NuGet'
+    displayName: '🚚 Publish NuGet → UiPath-Internal'
     dependsOn: []
     jobs:
     - deployment: Publish_NuGet_Package
@@ -118,7 +126,7 @@ stages:
 
 - ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishNpm, true)) }}:
   - stage: Publish_NPM
-    displayName: '🚚 Publish NPM'
+    displayName: '🚚 Publish NPM → uipath-ipc-deps'
     dependsOn: []
     jobs:
     - deployment: Publish_NPM_Packages
@@ -136,12 +144,14 @@ stages:
                   reuseArtifactsFromBuildId: ${{ parameters.buildId }}
                   sourcePipelineId: $(resources.pipeline.ci.pipelineID)
 
-- ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishPyPI, true)) }}:
-  - stage: Publish_PyPI
-    displayName: '🚚 Publish PyPI'
+# Publish Python to the INTERNAL feed (UiPath-Internal). NOT public PyPI —
+# that is the separate publishToPublicPyPI lever + Publish_PublicPyPI stage below.
+- ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishPython, true)) }}:
+  - stage: Publish_Python
+    displayName: '🚚 Publish Python → UiPath-Internal'
     dependsOn: []
     jobs:
-    - deployment: Publish_PyPI_Package
+    - deployment: Publish_Python_Package
       displayName: '📦 Publish Python wheel + sdist to UiPath-Internal'
       environment: 'PyPI-Packages'
       pool:
@@ -156,21 +166,31 @@ stages:
                   reuseArtifactsFromBuildId: ${{ parameters.buildId }}
                   sourcePipelineId: $(resources.pipeline.ci.pipelineID)
 
-# Whisper to GitHub to publish the same release to public PyPI. dependsOn every
-# emitted publish stage with condition: succeeded(), so it fires only if all of them
-# succeeded — no PyPI publish on any ADO failure. It resolves the published buildId's
-# exact commit (ADO REST) and gates upstream — only a genuine NEW MASTER release
-# whispers (branch builds and already-published versions are skipped), so the GitHub
-# Action is never triggered just to refuse. Needs var group `github-dispatch`.
-- ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishPyPI, true)) }}:
-  - stage: Notify_GitHub
-    displayName: '📣 Notify GitHub → PyPI (master, new version only)'
+# =====================================================================
+# Publish Python to PUBLIC PyPI — via GitHub Actions (Trusted Publishing/OIDC).
+# =====================================================================
+# Only emitted when `publishToPublicPyPI` is set (separate lever from the
+# internal-feed publish above). It resolves the build's branch + commit (ADO
+# REST) and reads the EXACT version from the wheel CI built — so public PyPI
+# carries the same version as the internal feed (release, or .devN prerelease),
+# never a stripped-to-clean surprise. It then:
+#   - non-master build       -> skips (green): the GitHub Action is never fired
+#     just to refuse.
+#   - version already on PyPI -> ends YELLOW (SucceededWithIssues): the
+#     at-most-once semantic hit an existing version; no failure, no no-op run.
+#   - new master version     -> POSTs the repository_dispatch (sha + version).
+# dependsOn the emitted internal publish stages + condition: succeeded() =>
+# no public publish on ANY ADO failure. Needs var group `github-dispatch`.
+- ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishToPublicPyPI, true)) }}:
+  - stage: Publish_PublicPyPI
+    displayName: '📣 Publish Python → PUBLIC PyPI (master, new version only)'
     dependsOn:
       - ${{ if eq(parameters.publishNuGet, true) }}:
         - Publish_NuGet
       - ${{ if eq(parameters.publishNpm, true) }}:
         - Publish_NPM
-      - Publish_PyPI
+      - ${{ if eq(parameters.publishPython, true) }}:
+        - Publish_Python
     condition: succeeded()
     variables:
       - group: github-dispatch          # supplies secret GITHUB_DISPATCH_TOKEN
@@ -181,18 +201,29 @@ stages:
         vmImage: 'ubuntu-latest'
       steps:
         - checkout: none
+        # The published version = the EXACT version of the wheel CI built, so
+        # public PyPI matches the internal feed. Pull that artifact to read it.
+        - task: DownloadPipelineArtifact@2
+          displayName: 'Download Python package from build ${{ parameters.buildId }}'
+          inputs:
+            buildType: specific
+            project: $(System.TeamProject)
+            pipeline: $(resources.pipeline.ci.pipelineID)
+            buildVersionToDownload: specific
+            buildId: ${{ parameters.buildId }}
+            artifactName: 'Python package'
+            targetPath: '$(Pipeline.Workspace)/pypkg'
         - script: |
             set -euo pipefail
-            # 1. Resolve the published build's branch + commit (ADO REST).
+            # 1. Resolve the build's branch + commit (ADO REST).
             build=$(curl -sSf -H "Authorization: Bearer $SYSTEM_ACCESSTOKEN" \
               "${SYSTEM_COLLECTIONURI}${SYSTEM_TEAMPROJECT}/_apis/build/builds/${BUILD_ID}?api-version=7.1")
             SHA=$(printf '%s' "$build" | jq -r '.sourceVersion')
             BRANCH=$(printf '%s' "$build" | jq -r '.sourceBranch')
             echo "buildId ${BUILD_ID}: branch=${BRANCH} commit=${SHA}"
 
-            # 2. GATE — public PyPI gets MASTER releases only. For anything else,
-            #    skip the whisper entirely so the GitHub Action is never triggered
-            #    just to refuse (saves a wasted runner).
+            # 2. GATE — public PyPI gets MASTER builds only. Anything else: skip
+            #    (green) so the GitHub Action is never triggered just to refuse.
             if [ "$BRANCH" != "refs/heads/master" ]; then
               echo "Not a master build (${BRANCH}) — skipping public PyPI dispatch."
               exit 0
@@ -202,34 +233,43 @@ stages:
               exit 1
             fi
 
-            # 3. GATE — skip if this version is already on PyPI, so we never fire a
-            #    no-op run. Version = <Version> from the csproj AT that commit
-            #    (public repo → unauthenticated raw read).
-            VERSION=$(curl -sSf -H "Accept: application/vnd.github.raw" \
-              "https://api.github.com/repos/UiPath/coreipc/contents/src/UiPath.CoreIpc/UiPath.CoreIpc.csproj?ref=${SHA}" \
-              | grep -oPm1 '(?<=<Version>)[^<]+' | tr -d '[:space:]')
-            if [ -z "$VERSION" ]; then
-              echo "##vso[task.logissue type=error]Could not read <Version> from csproj at ${SHA}."
+            # 3. Read the EXACT version from the wheel CI built (from its
+            #    metadata, so it is un-escaped): release or .devN prerelease.
+            WHEEL=$(ls "$PYPKG_DIR"/*.whl 2>/dev/null | head -1 || true)
+            if [ -z "$WHEEL" ]; then
+              echo "##vso[task.logissue type=error]No wheel found in the Python artifact."
               exit 1
             fi
+            VERSION=$(unzip -p "$WHEEL" '*.dist-info/METADATA' | sed -n 's/^Version: //p' | head -1)
+            if [ -z "$VERSION" ]; then
+              echo "##vso[task.logissue type=error]Could not read Version from the wheel metadata."
+              exit 1
+            fi
+            echo "Wheel version: ${VERSION}"
+
+            # 4. GATE — at-most-once. If PyPI already has this version, end
+            #    YELLOW (SucceededWithIssues) to flag the collision; do NOT fail,
+            #    and do NOT fire a no-op GitHub Action run.
             code=$(curl -sS -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/uipath-ipc/${VERSION}/json")
             if [ "$code" = "200" ]; then
-              echo "uipath-ipc ${VERSION} already on PyPI — nothing to publish, skipping dispatch."
+              echo "##vso[task.logissue type=warning]uipath-ipc ${VERSION} is already on PyPI — at-most-once: skipping public publish."
+              echo "##vso[task.complete result=SucceededWithIssues;]already on PyPI"
               exit 0
             fi
 
-            # 4. New master release → whisper to GitHub to publish it.
+            # 5. New master version → whisper to GitHub to publish it.
             echo "Dispatching publish-pypi for uipath-ipc ${VERSION} (${SHA})"
             curl -sSf -X POST \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer $GITHUB_DISPATCH_TOKEN" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               https://api.github.com/repos/UiPath/coreipc/dispatches \
-              -d "{\"event_type\":\"publish-pypi\",\"client_payload\":{\"sha\":\"${SHA}\"}}"
-          displayName: 'Gate on master + unpublished version, then dispatch'
+              -d "{\"event_type\":\"publish-pypi\",\"client_payload\":{\"sha\":\"${SHA}\",\"version\":\"${VERSION}\"}}"
+          displayName: 'Gate on master + version, then dispatch'
           env:
             SYSTEM_ACCESSTOKEN: $(System.AccessToken)
             SYSTEM_COLLECTIONURI: $(System.CollectionUri)
             SYSTEM_TEAMPROJECT: $(System.TeamProject)
             BUILD_ID: ${{ parameters.buildId }}
             GITHUB_DISPATCH_TOKEN: $(GITHUB_DISPATCH_TOKEN)
+            PYPKG_DIR: $(Pipeline.Workspace)/pypkg
