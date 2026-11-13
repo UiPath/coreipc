@@ -1,14 +1,12 @@
-"""Shared bounded connect-retry for client transports.
+"""Shared connect-retry for client transports.
 
 A client often dials during the server's connect/accept warm-up window (the
 first call before the listener binds) or while it re-binds after a restart
-(auto-reconnect). The framework is meant to ride those races out with a brief
-backoff, retrying only the *transient* connect errors. .NET does this for TCP
-(`ConnectionRefused`, 10 ms backoff) and the named-pipe warm-up alike; this is
-the one helper both Python transports share so they behave the same.
-
-The overall call should still be bounded by the caller's deadline (the proxy
-wraps connect+send in `asyncio.wait_for`), so this ladder is finite and short.
+(auto-reconnect). Like .NET, the client rides those races out by retrying the
+*transient* connect errors until the caller gives up: a proxy call dials under
+its request timeout (the proxy wraps connect+send in `asyncio.wait_for`), the
+way .NET dials under the call's timeout token. With no deadline, it retries
+until cancelled, as .NET does with an infinite request timeout.
 """
 
 from __future__ import annotations
@@ -18,24 +16,23 @@ from typing import Awaitable, Callable, TypeVar
 
 _T = TypeVar("_T")
 
-#: Backoff ladder (seconds) across connect attempts; ~1.85s total.
-CONNECT_RETRY_DELAYS: tuple[float, ...] = (0.0, 0.05, 0.1, 0.2, 0.5, 1.0)
+#: Waits (seconds) before successive attempts; the last one repeats until the
+#: caller cancels.
+CONNECT_RETRY_DELAYS: tuple[float, ...] = (0.0, 0.01, 0.02, 0.05, 0.1)
 
 
 async def retry_connect(
     connect: Callable[[], Awaitable[_T]],
     transient: tuple[type[BaseException], ...],
 ) -> _T:
-    """Call `connect` over `CONNECT_RETRY_DELAYS`, retrying only `transient`
-    errors (the startup/reconnect races) and raising the last one if every
-    attempt fails."""
-    last: BaseException | None = None
-    for delay in CONNECT_RETRY_DELAYS:
+    """Call `connect` until it succeeds, retrying only `transient` errors (the
+    startup/reconnect races); any other error is raised at once."""
+    attempt = 0
+    while True:
+        delay = CONNECT_RETRY_DELAYS[min(attempt, len(CONNECT_RETRY_DELAYS) - 1)]
         if delay:
             await asyncio.sleep(delay)
         try:
             return await connect()
-        except transient as ex:
-            last = ex
-    assert last is not None  # the loop body ran at least once
-    raise last
+        except transient:
+            attempt += 1
