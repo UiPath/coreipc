@@ -29,6 +29,16 @@ export class OperationDescriptorImpl<TService> implements OperationDescriptor {
             parameterTypes[parameterTypes.length - 1] === (CancellationToken as any)
         );
     }
+    public get hasEndingAbortSignal(): boolean {
+        const parameterTypes = this.parameterTypes;
+
+        return (
+            typeof AbortSignal !== 'undefined' &&
+            parameterTypes &&
+            parameterTypes.length > 0 &&
+            parameterTypes[parameterTypes.length - 1] === (AbortSignal as any)
+        );
+    }
     public get returnType(): PublicCtor {
         return Reflect.getMetadata(
             'design:returntype',

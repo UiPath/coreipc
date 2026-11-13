@@ -45,6 +45,43 @@ internal static class ServiceImpls
         public Task<bool> Timeout() => Task.FromException<bool>(new TimeoutException());
 
         public Task<int> Echo(int x) => Task.FromResult(x);
+
+        private int _cancellationObservationCount;
+
+        public async Task<bool> WaitForCancellation(CancellationToken ct = default)
+        {
+            try
+            {
+                await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, ct);
+                return false; // unreachable: only completes by cancellation
+            }
+            catch (OperationCanceledException)
+            {
+                Interlocked.Increment(ref _cancellationObservationCount);
+                throw;
+            }
+        }
+
+        public Task<int> CancellationCount() =>
+            Task.FromResult(Volatile.Read(ref _cancellationObservationCount));
+
+        public async Task<bool> CancelCallback(Message message = default!)
+        {
+            var callback = message.Client.GetCallback<ICancellationCallback>();
+            using var cts = new CancellationTokenSource();
+            var callbackTask = callback.Wait(cts.Token);
+            cts.CancelAfter(TimeSpan.FromMilliseconds(200));
+            try
+            {
+                // The client handler resolves true once it observes the cancel.
+                return await callbackTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Or the handler propagated the cancellation — still observed.
+                return true;
+            }
+        }
     }
 
     public class Calculus : ICalculus

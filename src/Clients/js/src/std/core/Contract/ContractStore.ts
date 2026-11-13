@@ -12,6 +12,15 @@ export class ContractStore implements IContractStore {
         return this._map.get($class);
     }
 
+    maybeGetByEndpoint(endpoint: string): ServiceDescriptor<unknown> | undefined {
+        for (const descriptor of this._map.values()) {
+            if (descriptor.endpoint === endpoint) {
+                return descriptor;
+            }
+        }
+        return undefined;
+    }
+
     private add<TService>($class: PublicCtor<TService>): ServiceDescriptor<TService> {
         const descriptor = new ServiceDescriptorImpl($class);
         this._map.set($class, descriptor);
