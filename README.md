@@ -165,6 +165,16 @@ var ipcServer = new IpcServer
 };
 ```
 
+### Named Pipes on macOS
+
+On Windows and Linux a `PipeName` is handed to .NET as is, which maps it to a regular named pipe, respectively to the Unix domain socket `$TMPDIR/CoreFxPipe_<name>`. On macOS .NET's mapping overflows the 104-byte limit of a Unix domain socket path: `$TMPDIR` alone is 49 characters and `CoreFxPipe_` adds 11, so a name of about 44+ characters can neither bind nor connect, and .NET swallows the failed bind inside its accept loop. UiPath.Ipc therefore maps the name itself on macOS, for both `NamedPipeServerTransport` and `NamedPipeClientTransport`:
+
+1. A rooted name (starting with `/`) is used verbatim.
+2. Otherwise the socket is `<root>/<name>`, with no `CoreFxPipe_` prefix. The root is the `UIPATH_PIPE_ROOT_PATH` environment variable when set and non-empty, else the platform temp directory.
+3. The path is cut to at most 103 UTF-8 bytes without splitting a character.
+
+Set `UIPATH_PIPE_ROOT_PATH` to a short, existing directory (for example `/tmp/uipath`) when `$TMPDIR` is too long for your pipe names; both peers must see the same value. The Node.js and Python clients apply the same rule, so all three compute the same path for the same name. Nothing changes on Windows or Linux.
+
 ## 🧩 Notable Types
 
 ### 1. The `IpcServer`, `IpcClient` and `IpcBase` classes.
