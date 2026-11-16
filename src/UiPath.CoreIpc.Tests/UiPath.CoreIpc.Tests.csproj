@@ -55,6 +55,11 @@
     <Using Include="System.Diagnostics" />
   </ItemGroup>
   
+  <ItemGroup>
+    <!-- Shared with the TypeScript and Python suites: the macOS pipe-path rule must give byte-identical paths in all three. -->
+    <Content Include="..\MacPipePathVectors.json" Link="MacPipePathVectors.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(TargetFramework)' == '$(NetTfm)'">
     <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing">
       <Version>8.0.0</Version>

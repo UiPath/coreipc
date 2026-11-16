@@ -60,6 +60,11 @@ public sealed class IpcServerStartTests
         {
             Directory.GetFiles(@"\\.\pipe\").ShouldContain(path => path.EndsWith(pipeName, StringComparison.OrdinalIgnoreCase));
         }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            // macOS: UiPath.Ipc maps the name itself (see NamedPipePath), with no CoreFxPipe_ prefix.
+            File.Exists(NamedPipePath.Resolve(pipeName)).ShouldBeTrue();
+        }
         else
         {
             File.Exists(Path.Combine(Path.GetTempPath(), $"CoreFxPipe_{pipeName}")).ShouldBeTrue();

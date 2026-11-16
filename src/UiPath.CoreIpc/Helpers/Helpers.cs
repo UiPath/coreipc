@@ -5,6 +5,7 @@ using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using UiPath.Ipc.Transport.NamedPipe;
 
 namespace UiPath.Ipc;
 
@@ -199,7 +200,7 @@ public static class IOHelpers
         {
             try
             {
-                using (var client = new NamedPipeClientStream(pipeName))
+                using (var client = new NamedPipeClientStream(NamedPipePath.Resolve(pipeName)))
                 {
                     client.Connect(timeoutMilliseconds);
                 }

@@ -43,7 +43,7 @@ public sealed class NamedPipeServerTransport : ServerTransport
 
             NamedPipeServerStream CreateStream()
             => IOHelpers.NewNamedPipeServerStream(
-                serverState.Transport.PipeName,
+                NamedPipePath.Resolve(serverState.Transport.PipeName),
                 PipeDirection.InOut,
                 NamedPipeServerStream.MaxAllowedServerInstances,
                 PipeTransmissionMode.Byte,
