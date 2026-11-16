@@ -5,7 +5,8 @@ Cross-platform:
     `create_pipe_connection` (client) / `start_serving_pipe` (server).
   - Linux: a Unix Domain Socket at `$TMPDIR/CoreFxPipe_<name>` (fallback
     `/tmp`), matching .NET's `Path.Combine(Path.GetTempPath(), "CoreFxPipe_")`
-    — `GetTempPath()` honors `$TMPDIR`.
+    — `GetTempPath()` honors `$TMPDIR`. A rooted name (starting with `/`) is
+    used verbatim, as .NET and the TypeScript client do.
   - macOS: a Unix Domain Socket at `<root>/<name>` with no prefix, where root
     is `$UIPATH_PIPE_ROOT_PATH` when set and non-empty, else
     `default_mac_pipe_root()`. A rooted name (starting with `/`) is used
@@ -78,13 +79,17 @@ def _truncate_utf8(value: str, max_bytes: int) -> str:
 def _posix_pipe_path(pipe_name: str, platform: str | None = None) -> str:
     """The Unix socket path for ``pipe_name``; every POSIX connect and bind goes through here.
 
-    Linux keeps .NET's own mapping, ``$TMPDIR/CoreFxPipe_<name>``, unchanged.
+    Linux keeps .NET's own mapping, ``$TMPDIR/CoreFxPipe_<name>``, and, like
+    .NET and the TypeScript client, uses a rooted name verbatim.
     ``platform`` defaults to ``sys.platform`` and is injectable for tests.
     """
     if (platform or sys.platform) == "darwin":
         return resolve_mac_pipe_path(
             pipe_name, os.environ.get(PIPE_ROOT_ENV_VAR), default_mac_pipe_root()
         )
+    if pipe_name.startswith("/"):
+        # Caller is in full control of the file location.
+        return pipe_name
     return os.path.join(os.environ.get("TMPDIR") or "/tmp", f"CoreFxPipe_{pipe_name}")
 
 

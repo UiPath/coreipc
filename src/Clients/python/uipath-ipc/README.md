@@ -201,7 +201,7 @@ NamedPipeClientTransport(pipe_name="test", server_name="REMOTE")  # remote (Wind
 TcpClientTransport(host="127.0.0.1", port=5050)
 ```
 
-On Windows the pipe name is used as a regular named pipe; on Linux it becomes the Unix domain socket `$TMPDIR/CoreFxPipe_<name>`, as in .NET. On macOS that overflows the 104-byte limit of a Unix domain socket path (`$TMPDIR` alone is 49 characters), so both transports map the name themselves, exactly like the .NET library and the TypeScript client:
+On Windows the pipe name is used as a regular named pipe; on Linux it becomes the Unix domain socket `$TMPDIR/CoreFxPipe_<name>`, as in .NET, and a rooted name (starting with `/`) is used verbatim. On macOS that overflows the 104-byte limit of a Unix domain socket path (`$TMPDIR` alone is 49 characters), so both transports map the name themselves, exactly like the .NET library and the TypeScript client:
 
 1. A rooted name (starting with `/`) is used verbatim.
 2. Otherwise the socket is `<root>/<name>`, with no `CoreFxPipe_` prefix. The root is the `UIPATH_PIPE_ROOT_PATH` environment variable when set and non-empty, else `$TMPDIR` (fallback `/tmp`).

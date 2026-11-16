@@ -179,3 +179,12 @@ def test_off_mac_the_linux_mapping_is_unchanged(monkeypatch) -> None:
     assert _posix_pipe_path("robot", platform="linux") == os.path.join(
         "/var/tmp/xy", "CoreFxPipe_robot"
     )
+
+
+def test_off_mac_a_rooted_name_is_used_verbatim(monkeypatch) -> None:
+    """As in .NET and the TypeScript client: a rooted name is the socket path."""
+    monkeypatch.setenv("TMPDIR", "/var/tmp/xy")
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert _posix_pipe_path("/custom/robot.sock", platform="linux") == "/custom/robot.sock"
+    assert NamedPipeClientTransport(pipe_name="/custom/robot.sock")._posix_address == "/custom/robot.sock"
+    assert NamedPipeServerTransport(pipe_name="/custom/robot.sock")._posix_address == "/custom/robot.sock"
