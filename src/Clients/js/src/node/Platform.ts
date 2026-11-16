@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import path from 'path';
 import { NamedPipeSocket } from '.';
+import { NamedPipePath } from './NamedPipePath';
 import {
     CancellationToken,
     InvalidOperationError,
@@ -12,6 +13,7 @@ export module Platform {
     export enum Id {
         Windows,
         Linux,
+        MacOS,
     }
 
     class Windows implements IPlatform<Id> {
@@ -73,9 +75,32 @@ export module Platform {
         }
     }
 
+    /**
+     * Same Unix domain sockets as Linux, but .NET's `$TMPDIR/CoreFxPipe_<name>` mapping overflows
+     * macOS's 104-byte socket path, so the name is mapped by `NamedPipePath` instead (no prefix,
+     * `UIPATH_PIPE_ROOT_PATH` override, cut to 103 bytes). `pipeExists` is inherited: it connects
+     * through `NamedPipeSocket`, which calls back into `getFullPipeName`.
+     */
+    class MacOS extends Linux {
+        override get id(): Id {
+            return Id.MacOS;
+        }
+
+        override getFullPipeName(shortName: string): string {
+            return NamedPipePath.resolveMac(
+                shortName,
+                process.env[NamedPipePath.rootEnvironmentVariable],
+                NamedPipePath.defaultMacPipeRoot(),
+            );
+        }
+    }
+
     function detect(): Id {
         if (process.platform === 'win32') {
             return Id.Windows;
+        }
+        if (process.platform === 'darwin') {
+            return Id.MacOS;
         }
 
         return Id.Linux;
@@ -87,6 +112,8 @@ export module Platform {
                 return new Windows();
             case Id.Linux:
                 return new Linux();
+            case Id.MacOS:
+                return new MacOS();
             default:
                 throw new InvalidOperationError();
         }

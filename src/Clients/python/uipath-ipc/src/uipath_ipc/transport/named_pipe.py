@@ -3,9 +3,20 @@
 Cross-platform:
   - Windows: `\\\\<server>\\pipe\\<name>` via the ProactorEventLoop's
     `create_pipe_connection` (client) / `start_serving_pipe` (server).
-  - POSIX: a Unix Domain Socket at `$TMPDIR/CoreFxPipe_<name>` (fallback
+  - Linux: a Unix Domain Socket at `$TMPDIR/CoreFxPipe_<name>` (fallback
     `/tmp`), matching .NET's `Path.Combine(Path.GetTempPath(), "CoreFxPipe_")`
-    — `GetTempPath()` honors `$TMPDIR`, which macOS always sets.
+    — `GetTempPath()` honors `$TMPDIR`. A rooted name (starting with `/`) is
+    used verbatim, as .NET and the TypeScript client do.
+  - macOS: a Unix Domain Socket at `<root>/<name>` with no prefix, where root
+    is `$UIPATH_PIPE_ROOT_PATH` when set and non-empty, else
+    `default_mac_pipe_root()`. A rooted name (starting with `/`) is used
+    verbatim. The path is cut to at most 103 UTF-8 bytes without splitting a
+    character (`sun_path` is 104 bytes including the NUL). .NET's own mapping
+    does not fit on macOS: `$TMPDIR` is `/var/folders/XX/<30 chars>/T/`
+    (49 chars) and `CoreFxPipe_` adds 11, so any name of about 44+ chars can
+    neither bind nor connect. UiPath.Ipc applies this same rule in .NET and
+    in the TypeScript client, so all three compute byte-identical paths; the
+    shared test vectors live in `src/MacPipePathVectors.json`.
 """
 
 from __future__ import annotations
@@ -19,6 +30,67 @@ from dataclasses import dataclass
 
 from ._retry import retry_connect
 from .base import ClientTransport, ConnectionHandler, ServerHandle, ServerTransport
+
+PIPE_ROOT_ENV_VAR = "UIPATH_PIPE_ROOT_PATH"
+"""Environment variable that overrides the directory macOS pipes are created in."""
+
+MAC_MAX_PATH_BYTES = 103
+"""The longest socket path macOS accepts: ``sun_path`` is 104 bytes including the NUL."""
+
+
+def default_mac_pipe_root() -> str:
+    """The directory macOS pipes live in when ``UIPATH_PIPE_ROOT_PATH`` is not set.
+
+    For now this is the platform temp directory; a shorter root is being
+    researched separately, and swapping it in should touch only this function.
+    """
+    return os.environ.get("TMPDIR") or "/tmp"
+
+
+def resolve_mac_pipe_path(
+    pipe_name: str, root_override: str | None, default_root: str
+) -> str:
+    """The pure form of the macOS rule: environment and default root are
+    injected, so it is unit-tested on any OS.
+
+    Args:
+        pipe_name: The name the caller configured.
+        root_override: The value of ``UIPATH_PIPE_ROOT_PATH``, or ``None`` when unset.
+        default_root: The directory to use when ``root_override`` is unset or empty.
+    """
+    if pipe_name.startswith("/"):
+        return pipe_name
+    root = root_override or default_root
+    separator = "" if root.endswith("/") else "/"
+    return _truncate_utf8(root + separator + pipe_name, MAC_MAX_PATH_BYTES)
+
+
+def _truncate_utf8(value: str, max_bytes: int) -> str:
+    """Cut ``value`` to at most ``max_bytes`` UTF-8 bytes without splitting a character."""
+    data = value.encode("utf-8")
+    if len(data) <= max_bytes:
+        return value
+    cut = max_bytes
+    while cut > 0 and (data[cut] & 0xC0) == 0x80:  # step back off continuation bytes
+        cut -= 1
+    return data[:cut].decode("utf-8")
+
+
+def _posix_pipe_path(pipe_name: str, platform: str | None = None) -> str:
+    """The Unix socket path for ``pipe_name``; every POSIX connect and bind goes through here.
+
+    Linux keeps .NET's own mapping, ``$TMPDIR/CoreFxPipe_<name>``, and, like
+    .NET and the TypeScript client, uses a rooted name verbatim.
+    ``platform`` defaults to ``sys.platform`` and is injectable for tests.
+    """
+    if (platform or sys.platform) == "darwin":
+        return resolve_mac_pipe_path(
+            pipe_name, os.environ.get(PIPE_ROOT_ENV_VAR), default_mac_pipe_root()
+        )
+    if pipe_name.startswith("/"):
+        # Caller is in full control of the file location.
+        return pipe_name
+    return os.path.join(os.environ.get("TMPDIR") or "/tmp", f"CoreFxPipe_{pipe_name}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,9 +117,7 @@ class NamedPipeClientTransport(ClientTransport):
 
     @property
     def _posix_address(self) -> str:
-        return os.path.join(
-            os.environ.get("TMPDIR") or "/tmp", f"CoreFxPipe_{self.pipe_name}"
-        )
+        return _posix_pipe_path(self.pipe_name)
 
     async def _connect_windows(
         self,
@@ -144,9 +214,7 @@ class NamedPipeServerTransport(ServerTransport):
 
     @property
     def _posix_address(self) -> str:
-        return os.path.join(
-            os.environ.get("TMPDIR") or "/tmp", f"CoreFxPipe_{self.pipe_name}"
-        )
+        return _posix_pipe_path(self.pipe_name)
 
     async def serve(self, on_connection: ConnectionHandler) -> ServerHandle:
         if sys.platform == "win32":

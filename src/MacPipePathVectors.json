@@ -1,0 +1,82 @@
+{
+  "description": "Shared test vectors for the macOS named-pipe path rule. The C# (UiPath.CoreIpc.Tests/NamedPipePathTests.cs), TypeScript (Clients/js/test/node/NamedPipePath.test.ts) and Python (Clients/python/uipath-ipc/tests/transport/test_named_pipe.py) suites all load this file, so the three implementations are checked against the same inputs and must produce byte-identical paths. Every vector runs with the platform forced to macOS: pipeName is the name the caller passes, rootEnv is the value of UIPATH_PIPE_ROOT_PATH (null = unset), defaultRoot is what the language's default-root function would return, expected is the socket path. Expected paths never exceed 103 UTF-8 bytes (sun_path is 104 bytes including the NUL).",
+  "vectors": [
+    {
+      "name": "rooted name is used verbatim",
+      "pipeName": "/custom/dir/robot.sock",
+      "rootEnv": "/ignored/root",
+      "defaultRoot": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/",
+      "expected": "/custom/dir/robot.sock"
+    },
+    {
+      "name": "env override, no trailing slash",
+      "pipeName": "robot",
+      "rootEnv": "/var/run/uipath",
+      "defaultRoot": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/",
+      "expected": "/var/run/uipath/robot"
+    },
+    {
+      "name": "env override, trailing slash",
+      "pipeName": "robot",
+      "rootEnv": "/var/run/uipath/",
+      "defaultRoot": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/",
+      "expected": "/var/run/uipath/robot"
+    },
+    {
+      "name": "default root when env unset",
+      "pipeName": "robot",
+      "rootEnv": null,
+      "defaultRoot": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/",
+      "expected": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/robot"
+    },
+    {
+      "name": "default root when env empty",
+      "pipeName": "robot",
+      "rootEnv": "",
+      "defaultRoot": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/",
+      "expected": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/robot"
+    },
+    {
+      "name": "default root without trailing slash",
+      "pipeName": "robot",
+      "rootEnv": null,
+      "defaultRoot": "/tmp",
+      "expected": "/tmp/robot"
+    },
+    {
+      "name": "exactly 103 bytes is kept whole",
+      "pipeName": "uipath-robot-service-pipe-0123456789abcdef0123456789ab",
+      "rootEnv": null,
+      "defaultRoot": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/",
+      "expected": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/uipath-robot-service-pipe-0123456789abcdef0123456789ab"
+    },
+    {
+      "name": "ascii name is cut to 103 bytes",
+      "pipeName": "uipath-robot-service-pipe-0123456789abcdef0123456789abcdef01",
+      "rootEnv": null,
+      "defaultRoot": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/",
+      "expected": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/uipath-robot-service-pipe-0123456789abcdef0123456789ab"
+    },
+    {
+      "name": "2-byte char straddling byte 103 is dropped whole",
+      "pipeName": "aéééééééééééééééééééééééééééééé",
+      "rootEnv": null,
+      "defaultRoot": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/",
+      "expected": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/aéééééééééééééééééééééééééé"
+    },
+    {
+      "name": "4-byte char straddling byte 103 is dropped whole",
+      "pipeName": "pipe-🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀",
+      "rootEnv": null,
+      "defaultRoot": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/",
+      "expected": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/pipe-🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀"
+    },
+    {
+      "name": "env override is cut to 103 bytes too",
+      "pipeName": "service-host-pipe-0123456789",
+      "rootEnv": "/Users/robotuser/Library/Application Support/UiPath/Robot/Sockets/Runtime/Sessions",
+      "defaultRoot": "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/",
+      "expected": "/Users/robotuser/Library/Application Support/UiPath/Robot/Sockets/Runtime/Sessions/service-host-pipe-01"
+    }
+  ]
+}

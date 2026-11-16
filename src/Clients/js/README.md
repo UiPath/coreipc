@@ -131,6 +131,16 @@ async function main(): Promise<void> {
 const _ = main();
 ```
 
+### Named pipes on macOS
+
+On Linux a pipe name is mapped the way .NET does it, to the Unix domain socket `$TMPDIR/CoreFxPipe_<name>`. On macOS that overflows the 104-byte limit of a Unix domain socket path (`$TMPDIR` alone is 49 characters), so the client maps the name itself, exactly like the .NET library and the Python package:
+
+1. A rooted name (starting with `/`) is used verbatim.
+2. Otherwise the socket is `<root>/<name>`, with no `CoreFxPipe_` prefix. The root is the `UIPATH_PIPE_ROOT_PATH` environment variable when set and non-empty, else `$TMPDIR` (fallback `/tmp/`).
+3. The path is cut to at most 103 UTF-8 bytes without splitting a character.
+
+Set `UIPATH_PIPE_ROOT_PATH` to a short, existing directory when `$TMPDIR` is too long for your pipe names; the server must see the same value. Nothing changes on Windows or Linux.
+
 ## Canceling a call
 
 **CoreIpc client for JavaScript** exports `CancellationToken` and `CancellationTokenSource`. These types mirror their .NET counterparts and are employed in **CoreIpc** contracts.

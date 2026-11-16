@@ -39,7 +39,7 @@ internal class NamedPipeClientState : IClientState
 
         _pipe = new NamedPipeClientStream(
             transport.ServerName,
-            transport.PipeName,
+            NamedPipePath.Resolve(transport.PipeName),
             PipeDirection.InOut,
             PipeOptions.Asynchronous,
             transport.AllowImpersonation ? TokenImpersonationLevel.Impersonation : TokenImpersonationLevel.Identification);
