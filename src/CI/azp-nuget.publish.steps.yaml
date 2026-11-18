@@ -9,10 +9,6 @@ parameters:
   - name: sourcePipelineId
     type: string
     default: '$(System.DefinitionId)'
-  # '<project>/<feed>' of the Azure Artifacts feed the package is pushed to.
-  - name: feed
-    type: string
-    default: 'Public.Feeds/UiPath-Internal'
 
 steps:
 - checkout: none
@@ -36,8 +32,8 @@ steps:
       targetPath: '$(Pipeline.Workspace)/NuGet package'
 
 - task: DotNetCoreCLI@2
-  displayName: 'dotnet push to ${{ parameters.feed }}'
+  displayName: 'dotnet push to uipath-ipc-deps'
   inputs:
     command: push
     packagesToPush: '$(Pipeline.Workspace)/NuGet package/**/*.nupkg'
-    publishVstsFeed: '${{ parameters.feed }}'
+    publishVstsFeed: 'CoreIpc/uipath-ipc-deps'

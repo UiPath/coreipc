@@ -9,8 +9,6 @@
 #   - buildId      (required) the CI build/run id to publish from.
 #   - publishNuGet / publishNpm / publishPyPI  (default: all on) — which
 #     packages to publish. At least one must be selected.
-#   - nuGetFeed    (default: UiPath-Internal) where the NuGet package goes.
-#     Pick uipath-ipc-deps for a build that is still being tested.
 #
 # The `ci` pipeline resource below is hardcoded to the CI pipeline (named
 # "CI", running azp-start.yaml). It resolves the CI definition id for the
@@ -29,17 +27,9 @@ parameters:
     type: string
 
   - name: publishNuGet
-    displayName: 'Publish NuGet → the feed chosen below'
+    displayName: 'Publish NuGet → uipath-ipc-deps'
     type: boolean
     default: true
-
-  - name: nuGetFeed
-    displayName: 'NuGet feed: UiPath-Internal for releases, uipath-ipc-deps for a build that is still being tested'
-    type: string
-    default: 'Public.Feeds/UiPath-Internal'
-    values:
-      - 'Public.Feeds/UiPath-Internal'
-      - 'CoreIpc/uipath-ipc-deps'
 
   - name: publishNpm
     displayName: 'Publish NPM (Node + Web) → uipath-ipc-deps (+ GitHub Packages best-effort)'
@@ -112,7 +102,7 @@ stages:
     dependsOn: []
     jobs:
     - deployment: Publish_NuGet_Package
-      displayName: '📦 Publish NuGet to ${{ parameters.nuGetFeed }}'
+      displayName: '📦 Publish NuGet to uipath-ipc-deps'
       environment: 'NuGet-Packages'
       pool:
         vmImage: 'windows-2022'
@@ -125,7 +115,6 @@ stages:
                 parameters:
                   reuseArtifactsFromBuildId: ${{ parameters.buildId }}
                   sourcePipelineId: $(resources.pipeline.ci.pipelineID)
-                  feed: ${{ parameters.nuGetFeed }}
 
 - ${{ if and(not(in(parameters.buildId, '', '0')), eq(parameters.publishNpm, true)) }}:
   - stage: Publish_NPM
