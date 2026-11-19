@@ -25,6 +25,10 @@ public sealed class IpcContext
     /// <summary>The cancellation token of the in-flight call.</summary>
     public CancellationToken CancellationToken { get; }
 
+    /// <summary>The level the in-flight call is logged at if it fails. The service method lowers it before throwing an error
+    /// it expects; <see cref="LogLevel.None"/> logs nothing. The caller receives the error either way.</summary>
+    public LogLevel FailedCallLogLevel { get; set; } = LogLevel.Error;
+
     /// <summary>Equivalent to <c>Message.Client.GetCallback&lt;TCallback&gt;()</c>.</summary>
     /// <exception cref="InvalidOperationException"><see cref="Client"/> is null.</exception>
     public TCallback GetCallback<TCallback>() where TCallback : class

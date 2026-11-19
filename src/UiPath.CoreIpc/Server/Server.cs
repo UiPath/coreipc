@@ -95,20 +95,20 @@ internal class Server
             _requests[request.Id] = requestCancellation;
             var timeout = request.GetTimeout(_requestTimeout);
             var timeoutHelper = new TimeoutHelper(timeout, requestCancellation.Token);
+            var context = new IpcContext(_client, timeoutHelper.Token);
             try
             {
-                var token = timeoutHelper.Token;
-                response = await HandleRequest(method, route, request, token);
+                response = await HandleRequest(method, route, request, context);
 
                 if (LogEnabled)
                 {
                     Log($"{DebugName} sending response for {request}");
                 }
-                await SendResponse(response, token);
+                await SendResponse(response, context.CancellationToken);
             }
             catch (Exception ex) when (response is null)
             {
-                await OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName));
+                await OnError(request, timeoutHelper.CheckTimeout(ex, request.MethodName), context.FailedCallLogLevel);
             }
             finally
             {
@@ -124,17 +124,18 @@ internal class Server
             cancellation.Return();
         }
     }
-    ValueTask OnError(Request request, Exception ex)
+    ValueTask OnError(Request request, Exception ex, LogLevel logLevel = LogLevel.Error)
     {
-        Logger.LogException(ex, $"{DebugName} {request}");
+        Logger.LogException(ex, $"{DebugName} {request}", logLevel);
         return SendResponse(Response.Fail(request, ex, _propagatedExceptionDataKeys), default);
     }
 
 #if !NET461
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
-    private async ValueTask<Response> HandleRequest(Method method, Route route, Request request, CancellationToken cancellationToken)
+    private async ValueTask<Response> HandleRequest(Method method, Route route, Request request, IpcContext context)
     {
+        var cancellationToken = context.CancellationToken;
         var arguments = GetArguments();
 
         object service;
@@ -170,7 +171,7 @@ internal class Server
             async Task<object?> MethodCall()
             {
                 // So a POCO contract can reach the peer without a Message parameter.
-                using (IpcContext.Push(new IpcContext(_client, cancellationToken)))
+                using (IpcContext.Push(context))
                 {
                     await (route.BeforeCall?.Invoke(
                         new CallInfo(newConnection: false, method.MethodInfo, arguments),

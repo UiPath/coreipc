@@ -54,17 +54,33 @@ internal static class Helpers
         _ => parameter.DefaultValue
     };
     internal static ReadOnlyDictionary<TKey, TValue> ToReadOnlyDictionary<TKey, TValue>(this IDictionary<TKey, TValue> dictionary) where TKey : notnull => new(dictionary);
-    internal static void LogException(this ILogger? logger, Exception ex, object tag)
+    internal static void LogException(this ILogger? logger, Exception ex, object tag, LogLevel logLevel = LogLevel.Error)
     {
+        // A logger factory lets None through to its providers, and not all of them drop it.
+        if (logLevel is LogLevel.None)
+        {
+            return;
+        }
         var message = $"{tag} # {ex}";
 
         if (logger is not null)
         {
-            logger.LogError(message);
+            logger.Log(logLevel, message);
             return;
         }
 
-        Trace.TraceError(message);
+        switch (logLevel)
+        {
+            case LogLevel.Error or LogLevel.Critical:
+                Trace.TraceError(message);
+                break;
+            case LogLevel.Warning:
+                Trace.TraceWarning(message);
+                break;
+            default:
+                Trace.TraceInformation(message);
+                break;
+        }
     }
 
     internal static void TraceError(this Task task)
