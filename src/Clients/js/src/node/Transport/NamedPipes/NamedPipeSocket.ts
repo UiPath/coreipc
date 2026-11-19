@@ -14,6 +14,7 @@ import {
     Socket,
     ConnectHelper,
     UnknownError,
+    PromisePal,
 } from '../../../std';
 
 import { Platform } from '../..';
@@ -44,7 +45,7 @@ export class NamedPipeSocket extends Socket {
                 }
 
                 try {
-                    socket = await NamedPipeSocket.connect(pipeName, timeout, ct, socketLikeCtor);
+                    socket = await NamedPipeSocket.connectRetrying(pipeName, timeout, ct, socketLikeCtor);
                     return true;
                 } catch (error) {
                     errors.push(UnknownError.ensureError(error));
@@ -74,6 +75,49 @@ export class NamedPipeSocket extends Socket {
         }
 
         throw new InvalidOperationError();
+    }
+
+    // Waits (ms) after each failed attempt; the last repeats until the timeout or cancellation.
+    private static readonly connectRetryDelays = [10, 20, 50, 100];
+
+    // Like .NET, a pipe the server has not created yet (or a stale socket file) is retried
+    // within the call's timeout instead of failing the first attempt.
+    public static async connectRetrying(
+        pipeName: string,
+        timeout: TimeSpan,
+        ct: CancellationToken,
+        socketLikeCtor?: NamedPipeSocketLikeCtor,
+    ): Promise<NamedPipeSocket> {
+        const deadline = timeout.isNegative
+            ? Number.POSITIVE_INFINITY
+            : Date.now() + timeout.totalMilliseconds;
+
+        for (let attempt = 0; ; attempt++) {
+            const remaining = deadline - Date.now();
+            const attemptTimeout = Number.isFinite(remaining)
+                ? TimeSpan.fromMilliseconds(Math.max(remaining, 0))
+                : timeout;
+
+            try {
+                return await NamedPipeSocket.connect(pipeName, attemptTimeout, ct, socketLikeCtor);
+            } catch (error) {
+                const delays = NamedPipeSocket.connectRetryDelays;
+                const delay = delays[Math.min(attempt, delays.length - 1)];
+                if (
+                    !NamedPipeSocket.isTransientConnectError(error) ||
+                    ct.isCancellationRequested ||
+                    Date.now() + delay >= deadline
+                ) {
+                    throw error;
+                }
+                await PromisePal.delay(delay, ct);
+            }
+        }
+    }
+
+    private static isTransientConnectError(error: unknown): boolean {
+        const code = (error as { code?: unknown } | undefined)?.code;
+        return code === 'ENOENT' || code === 'ECONNREFUSED';
     }
 
     public static async connect(
