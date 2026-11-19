@@ -97,6 +97,34 @@ public sealed class FailedCallLogLevelTests
         _serverLogs.LevelsOf(FailingCallback.Message).ShouldBeEmpty();
     }
 
+    [Theory]
+    [InlineData(LogLevel.Critical, TraceEventType.Error)]
+    [InlineData(LogLevel.Error, TraceEventType.Error)]
+    [InlineData(LogLevel.Warning, TraceEventType.Warning)]
+    [InlineData(LogLevel.Information, TraceEventType.Information)]
+    [InlineData(LogLevel.Debug, TraceEventType.Information)]
+    [InlineData(LogLevel.Trace, TraceEventType.Information)]
+    public void WithoutALogger_TheFailureIsTraced_BelowWarningAsInformation(LogLevel logLevel, TraceEventType expectedTraceEventType)
+    {
+        using var traces = new TraceCapture();
+        var failure = new InvalidOperationException(Guid.NewGuid().ToString());
+
+        default(ILogger).LogException(failure, nameof(FailedCallLogLevelTests), logLevel);
+
+        traces.EventTypesOf(failure.Message).ShouldBe([expectedTraceEventType]);
+    }
+
+    [Fact]
+    public void WithoutALogger_None_IsNotTraced()
+    {
+        using var traces = new TraceCapture();
+        var failure = new InvalidOperationException(Guid.NewGuid().ToString());
+
+        default(ILogger).LogException(failure, nameof(FailedCallLogLevelTests), LogLevel.None);
+
+        traces.EventTypesOf(failure.Message).ShouldBeEmpty();
+    }
+
     private Task<IpcPair<IFailingCalls>> CreatePair(Action<IpcClient>? configureClient = null)
     {
         IFailingCalls service = new FailingCalls();
@@ -106,6 +134,45 @@ public sealed class FailedCallLogLevelTests
                 .AddSingleton(service)
                 .BuildServiceProvider(),
             configureClient);
+    }
+
+    // Trace listeners are process-wide, so a test picks its own events out by content.
+    private sealed class TraceCapture : TraceListener
+    {
+        private readonly List<(TraceEventType EventType, string Message)> _events = new();
+
+        public TraceCapture() => Trace.Listeners.Add(this);
+
+        public TraceEventType[] EventTypesOf(string messagePart)
+        {
+            lock (_events)
+            {
+                return _events.Where(traced => traced.Message.Contains(messagePart)).Select(traced => traced.EventType).ToArray();
+            }
+        }
+
+        public override void TraceEvent(TraceEventCache? eventCache, string source, TraceEventType eventType, int id, string? message)
+        {
+            if (message is not null)
+            {
+                lock (_events)
+                {
+                    _events.Add((eventType, message));
+                }
+            }
+        }
+
+        public override void Write(string? message) { }
+        public override void WriteLine(string? message) { }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Trace.Listeners.Remove(this);
+            }
+            base.Dispose(disposing);
+        }
     }
 
     private sealed class LogCapture : ILoggerProvider

@@ -32,8 +32,8 @@ steps:
       targetPath: '$(Pipeline.Workspace)/NuGet package'
 
 - task: DotNetCoreCLI@2
-  displayName: 'dotnet push to uipath-ipc-deps'
+  displayName: 'dotnet push to UiPath-Internal'
   inputs:
     command: push
     packagesToPush: '$(Pipeline.Workspace)/NuGet package/**/*.nupkg'
-    publishVstsFeed: 'CoreIpc/uipath-ipc-deps'
+    publishVstsFeed: 'Public.Feeds/UiPath-Internal'

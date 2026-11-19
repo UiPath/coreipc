@@ -165,6 +165,24 @@ var ipcServer = new IpcServer
 };
 ```
 
+### Log Level of a Failed Call
+
+The server logs a failed call as an error. A service method that expects a failure can lower the level before it throws; the caller still receives the error.
+
+```csharp
+public async Task<string> GetResourceUrl(string name)
+{
+    if (!HasUserSession)
+    {
+        IpcContext.Current!.FailedCallLogLevel = LogLevel.Debug; // LogLevel.None logs nothing
+        throw new InvalidOperationException("No user session.");
+    }
+    // ...
+}
+```
+
+The level covers only what the service method throws. If the call is cancelled or times out and the method returns anyway (it ignores its `CancellationToken`, or has already finished its work), the failure comes from the server after the method and is logged as an error whatever level was set.
+
 ## 🧩 Notable Types
 
 ### 1. The `IpcServer`, `IpcClient` and `IpcBase` classes.

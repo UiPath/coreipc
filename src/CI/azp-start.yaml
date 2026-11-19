@@ -15,8 +15,7 @@
 # NuGet-signs the .nupkg, through the shared Signing/signing.yml template
 # (ROBO-6151). Skipped on PR builds and when `signPackages` is off.
 #
-# Pushes to no feed unless `pushNuGetToTestFeed` is on, which pushes the .nupkg
-# to uipath-ipc-deps. Publishing is the separate, manual Publish pipeline
+# Pushes to NO feed. Publishing is the separate, manual Publish pipeline
 # (azp-publish.yaml): it takes a CI build id and pushes that build's artifacts
 # to the feeds behind approval-gated environments.
 #
@@ -31,11 +30,6 @@ parameters:
     displayName: 'Sign UiPath.Ipc.dll and the .nupkg (skipped on PR builds regardless)'
     type: boolean
     default: true
-
-  - name: pushNuGetToTestFeed
-    displayName: 'Push the .nupkg to the uipath-ipc-deps feed, for a build that another repo''s CI has to consume before it is released'
-    type: boolean
-    default: false
 
 resources:
   repositories:
@@ -87,8 +81,6 @@ stages:
         parameters:
           sign: ${{ and(eq(parameters.signPackages, true), ne(variables['Build.Reason'], 'PullRequest')) }}
       - template: azp-dotnet-dist.yaml
-        parameters:
-          pushNuGetToTestFeed: ${{ parameters.pushNuGetToTestFeed }}
 
 - stage: Build_NPM
   displayName: '🏭 Build NPM'

@@ -57,7 +57,7 @@ internal static class Helpers
     internal static void LogException(this ILogger? logger, Exception ex, object tag, LogLevel logLevel = LogLevel.Error)
     {
         // A logger factory lets None through to its providers, and not all of them drop it.
-        if (logLevel == LogLevel.None)
+        if (logLevel is LogLevel.None)
         {
             return;
         }
@@ -77,7 +77,7 @@ internal static class Helpers
             case LogLevel.Warning:
                 Trace.TraceWarning(message);
                 break;
-            case LogLevel.Information:
+            default:
                 Trace.TraceInformation(message);
                 break;
         }

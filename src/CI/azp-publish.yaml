@@ -27,7 +27,7 @@ parameters:
     type: string
 
   - name: publishNuGet
-    displayName: 'Publish NuGet → uipath-ipc-deps'
+    displayName: 'Publish NuGet → UiPath-Internal'
     type: boolean
     default: true
 
@@ -102,7 +102,7 @@ stages:
     dependsOn: []
     jobs:
     - deployment: Publish_NuGet_Package
-      displayName: '📦 Publish NuGet to uipath-ipc-deps'
+      displayName: '📦 Publish NuGet to UiPath-Internal'
       environment: 'NuGet-Packages'
       pool:
         vmImage: 'windows-2022'
