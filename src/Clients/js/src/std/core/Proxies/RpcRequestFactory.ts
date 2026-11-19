@@ -6,7 +6,7 @@ import {
     TimeSpan,
 } from '../..';
 import { Address, Converter, Message, RpcMessage, ServiceId } from '..';
-import { IServiceProvider } from '.';
+import { AmbientCallOptions, IServiceProvider } from '.';
 
 /* @internal */
 export class RpcRequestFactory {
@@ -55,6 +55,7 @@ export class RpcRequestFactory {
 
         const timeout =
             message?.RequestTimeout ??
+            AmbientCallOptions.current()?.requestTimeout ??
             params.sp.configStore.getRequestTimeout(
                 params.address,
                 params.service,

@@ -4,5 +4,6 @@ export * from '../IServiceProvider';
 export * from './DispatchProxy';
 export * from './Wire';
 export * from './ChannelManager';
+export * from './AmbientCallOptions';
 export * from './RpcRequestFactory';
 export * from './CallbackStoreImpl';
