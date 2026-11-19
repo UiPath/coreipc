@@ -42,7 +42,7 @@ public sealed class TcpServerTransport : ServerTransport
         async ValueTask<Stream> IServerConnectionSlot.AwaitConnection(CancellationToken ct)
         {
             TcpClient tcpClient;
-#if NET461
+#if NETFRAMEWORK
             using var ctreg = ct.Register(ServerState.TcpListener.Stop);
             tcpClient = await ServerState.TcpListener.AcceptTcpClientAsync();
 #else

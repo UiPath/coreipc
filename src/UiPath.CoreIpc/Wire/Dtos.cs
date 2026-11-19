@@ -23,12 +23,95 @@ internal record Request(string Endpoint, string Id, string MethodName, string[] 
     [JsonIgnore]
     public Stream? UploadStream { get; set; }
 
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    [JsonConverter(typeof(RequestHeadersConverter))]
+    public Dictionary<string, string>? Headers { get; set; }
+
     public override string ToString() => $"{Endpoint} {MethodName} {Id}.";
 
     public  TimeSpan GetTimeout(TimeSpan? defaultTimeout) => TimeoutInSeconds == 0 
         ? defaultTimeout.OrInfinite() 
         : TimeSpan.FromSeconds(TimeoutInSeconds);
 }
+// Reads the headers as JS and Python do. Of a repeated name, and of a repeated Headers, the last one counts.
+internal sealed class RequestHeadersConverter : JsonConverter<Dictionary<string, string>>
+{
+    public override bool CanWrite => false;
+
+    public override Dictionary<string, string>? ReadJson(JsonReader reader, Type objectType, Dictionary<string, string>? existingValue, bool hasExistingValue, JsonSerializer serializer)
+    {
+        // Newtonsoft also matches the name in another case, such as "headers", which JS and Python ignore: skipped, it leaves an
+        // earlier Headers as it is. A Request is a whole message, so the path is the name as sent.
+        if (reader.Path != "Headers")
+        {
+            reader.Skip();
+            return null;
+        }
+        // Empty rather than null for a Headers that isn't an object: NullValueHandling.Ignore would keep an earlier one.
+        return StringValuesReader.Read(reader) ?? new();
+    }
+
+    public override void WriteJson(JsonWriter writer, Dictionary<string, string>? value, JsonSerializer serializer) => throw new NotSupportedException();
+}
+
+// Reads an object's string values, for Headers and Error.Data. Any other value, and anything but an object, is skipped without
+// being loaded, so a peer that sends richer ones costs nothing and doesn't fail the read, which would close the connection. A
+// comment does fail it: no peer we stay compatible with writes one.
+internal static class StringValuesReader
+{
+    // Of a repeated key the last counts, so a key whose last value isn't a string goes.
+    public static Dictionary<string, string>? Read(JsonReader reader)
+    {
+        // Off while reading, as the reader of parameters and results has it on: a string that looks like a date would be read as
+        // one, and lost, or fail the call if it overflows.
+        var dateParseHandling = reader.DateParseHandling;
+        reader.DateParseHandling = DateParseHandling.None;
+        try
+        {
+            return ReadObject(reader);
+        }
+        finally
+        {
+            reader.DateParseHandling = dateParseHandling;
+        }
+    }
+
+    private static Dictionary<string, string>? ReadObject(JsonReader reader)
+    {
+        // The path names what is read, such as Headers or Error.InnerError.Data.
+        var path = reader.Path;
+        if (reader.TokenType is JsonToken.Comment)
+        {
+            throw new JsonSerializationException($"A comment isn't allowed in {path}.");
+        }
+        if (reader.TokenType is not JsonToken.StartObject)
+        {
+            reader.Skip();
+            return null;
+        }
+        var values = new Dictionary<string, string>();
+        while (reader.Read() && reader.TokenType is JsonToken.PropertyName)
+        {
+            var key = (string)reader.Value!;
+            reader.Read();
+            if (reader.TokenType is JsonToken.String)
+            {
+                values[key] = (string)reader.Value!;
+            }
+            else
+            {
+                reader.Skip();
+                values.Remove(key);
+            }
+        }
+        if (reader.TokenType is not JsonToken.EndObject)
+        {
+            throw new JsonSerializationException($"Unexpected {reader.TokenType} in {path}.");
+        }
+        return values;
+    }
+}
+
 record CancellationRequest(string RequestId);
 
 internal record Response(string RequestId, string? Data = null, Error? Error = null)
@@ -136,54 +219,13 @@ public record Error(string Message, string StackTrace, string Type, Error? Inner
         return data.Count > 0 ? data : null;
     }
 
-    // Keeps the string values and skips any other without loading it, so a peer that sends richer ones costs nothing and doesn't fail the read,
-    // which would close the connection. A comment does fail it: no peer we stay compatible with writes one.
+    // An entry whose value isn't a string goes, so Data holds only strings.
     private sealed class DataConverter : JsonConverter<IReadOnlyDictionary<string, string>>
     {
         public override bool CanWrite => false;
 
         public override IReadOnlyDictionary<string, string>? ReadJson(JsonReader reader, Type objectType, IReadOnlyDictionary<string, string>? existingValue, bool hasExistingValue, JsonSerializer serializer)
-        {
-            var dateParseHandling = reader.DateParseHandling;
-            // Otherwise a string that looks like a date is read as a date, and skipped.
-            reader.DateParseHandling = DateParseHandling.None;
-            try
-            {
-                if (reader.TokenType is JsonToken.Comment)
-                {
-                    throw new JsonSerializationException("A comment isn't allowed in Error.Data.");
-                }
-                if (reader.TokenType is not JsonToken.StartObject)
-                {
-                    reader.Skip();
-                    return null;
-                }
-                var data = new Dictionary<string, string>();
-                while (reader.Read() && reader.TokenType is JsonToken.PropertyName)
-                {
-                    var key = (string)reader.Value!;
-                    reader.Read();
-                    if (reader.TokenType is JsonToken.String)
-                    {
-                        data[key] = (string)reader.Value!;
-                    }
-                    else
-                    {
-                        data.Remove(key);
-                        reader.Skip();
-                    }
-                }
-                if (reader.TokenType is not JsonToken.EndObject)
-                {
-                    throw new JsonSerializationException($"Unexpected {reader.TokenType} in Error.Data.");
-                }
-                return data;
-            }
-            finally
-            {
-                reader.DateParseHandling = dateParseHandling;
-            }
-        }
+            => StringValuesReader.Read(reader);
 
         public override void WriteJson(JsonWriter writer, IReadOnlyDictionary<string, string>? value, JsonSerializer serializer) => throw new NotSupportedException();
     }

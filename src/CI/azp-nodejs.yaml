@@ -1,7 +1,7 @@
 ﻿steps:
   - task: UseDotNet@2
     inputs:
-      version: 6.0.x
+      version: 8.0.x
 
   - task: NodeTool@0 
     displayName: 'Use Node.js 20.20.2'
@@ -12,13 +12,13 @@
     displayName: 'Build "UiPath.CoreIpc.csproj"'
     inputs:
       projects: '$(DotNet_MainProjectPath)'
-      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net6.0 -p:Version="$(FullVersion)"'
+      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net8.0 -p:Version="$(FullVersion)"'
 
   - task: DotNetCoreCLI@2
     displayName: 'Build "UiPath.CoreIpc.NodeInterop.csproj"'
     inputs:
       projects: '$(NodeJS_DotNetNodeInteropProject)'
-      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net6.0 -p:Version="$(FullVersion)"'
+      arguments: '--configuration $(NodeJS_DotNet_BuildConfiguration) --framework net8.0 -p:Version="$(FullVersion)"'
 
   - task: CmdLine@2
     displayName: 'Set $[FullVersion] in package.json'

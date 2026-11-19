@@ -258,14 +258,19 @@ public sealed class ExceptionDataTests
         error.InnerError!.Data!["k2"].ShouldBe("v2");
     }
 
-    [Fact]
-    public void NewerPeer_DataValuesThatAreNotStrings_AreSkipped()
+    // As a message, and as a parameter or result, whose reader parses dates.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void NewerPeer_DataValuesThatAreNotStrings_AreSkipped(bool asMessage)
     {
-        var error = Deserialize("""{"Data":{"s":"first","s":"v","d":"2026-11-05T10:00:00Z","o":{"Code":1},"a":["v"],"n":1,"b":true,"z":null,"dup":"v","dup":{}},"Message":"m","StackTrace":"s","Type":"t","InnerError":{"Message":"i","StackTrace":"s","Type":"t","InnerError":null,"Data":{"o":{"Code":2},"k2":"v2"}}}""");
+        const string Json = """{"Data":{"s":"first","s":"v","d":"2026-11-05T10:00:00Z","big":"/Date(300000000000000)/","o":{"Code":1},"a":["v"],"n":1,"b":true,"z":null,"dup":"v","dup":{}},"Message":"m","StackTrace":"s","Type":"t","InnerError":{"Message":"i","StackTrace":"s","Type":"t","InnerError":null,"Data":{"o":{"Code":2},"k2":"v2"}}}""";
+        var error = asMessage ? DeserializeMessage(Json) : Deserialize(Json);
         error.Message.ShouldBe("m");
-        error.Data!.Keys.ShouldBe(new[] { "s", "d" }, ignoreOrder: true);
+        error.Data!.Keys.ShouldBe(new[] { "s", "d", "big" }, ignoreOrder: true);
         error.Data["s"].ShouldBe("v");
         error.Data["d"].ShouldBe("2026-11-05T10:00:00Z");
+        error.Data["big"].ShouldBe("/Date(300000000000000)/");
         error.InnerError!.Data!.Keys.ShouldBe(new[] { "k2" });
     }
 
@@ -282,9 +287,9 @@ public sealed class ExceptionDataTests
     [InlineData("""{"k":"v",/*c*/"k2":"v2"}""")]
     [InlineData("""{"k":"v"/*c*/}""")]
     public void Wire_CommentInData_FailsTheRead(string data)
-        => Should.Throw<Newtonsoft.Json.JsonSerializationException>(() => Deserialize($$"""{"Data":{{data}},"Message":"m","StackTrace":"s","Type":"t","InnerError":null}""")).Message.ShouldContain("in Error.Data");
+        => Should.Throw<Newtonsoft.Json.JsonSerializationException>(() => Deserialize($$"""{"Data":{{data}},"Message":"m","StackTrace":"s","Type":"t","InnerError":null}""")).Message.ShouldContain("in Data");
 
-#if !NET461
+#if !NETFRAMEWORK
     [Theory]
     [InlineData("""{"k":[%]}""")]
     [InlineData("[%]")]
@@ -303,9 +308,11 @@ public sealed class ExceptionDataTests
     [InlineData("\"v\"")]
     [InlineData("1")]
     [InlineData("null")]
+    // A whole value that looks like a date, too big for one: read as text, like any string.
+    [InlineData("\"/Date(300000000000000)/\"")]
     public void NewerPeer_DataThatIsNotAnObject_IsSkipped(string data)
     {
-        var error = Deserialize($$"""{"Message":"m","StackTrace":"s","Type":"t","Data":{{data}},"InnerError":null}""");
+        var error = DeserializeMessage($$"""{"Message":"m","StackTrace":"s","Type":"t","Data":{{data}},"InnerError":null}""");
         error.Message.ShouldBe("m");
         error.Data.ShouldBeNull();
     }
@@ -600,6 +607,10 @@ public sealed class ExceptionDataTests
         => (JObject)JObject.Parse(IpcJsonSerializer.Instance.Serialize(response))["Error"]!;
 
     private static Error Deserialize(string json) => (Error)IpcJsonSerializer.Instance.Deserialize(json, typeof(Error))!;
+
+    // Read as a message is, with date parsing off.
+    private static Error DeserializeMessage(string json)
+        => IpcJsonSerializer.Instance.DeserializeAsync<Error>(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json)), logger: null).AsTask().GetAwaiter().GetResult()!;
 
     private static Task<IpcPair<IErrorDataProbe>> CreatePair(IReadOnlyCollection<string>? serverKeys = null, IReadOnlyCollection<string>? clientKeys = null, TimeSpan? serverTimeout = null)
         => IpcPair<IErrorDataProbe>.Create(

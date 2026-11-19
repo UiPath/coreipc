@@ -8,6 +8,7 @@ import warnings
 from typing import TypeVar, cast
 
 from ..hooks import BeforeCallHandler, BeforeConnectHandler
+from ..trace_context import TelemetryPropagationPolicy
 from ..transport.base import ClientTransport
 from ..wire import MAX_PAYLOAD_BYTES
 from .connection import IpcConnection
@@ -37,6 +38,9 @@ class IpcClient:
         before_connect: BeforeConnectHandler | None = None,
         before_call: BeforeCallHandler | None = None,
         max_message_size: int = MAX_PAYLOAD_BYTES,
+        telemetry_propagation: TelemetryPropagationPolicy = (
+            TelemetryPropagationPolicy.NONE
+        ),
     ) -> None:
         """Create a new client.
 
@@ -72,6 +76,10 @@ class IpcClient:
                 larger frame is rejected before allocation, failing the
                 connection rather than letting a corrupt/hostile header demand a
                 huge buffer. Defaults to 2 MB.
+            telemetry_propagation: Opt in to W3C trace-context propagation
+                (see `uipath_ipc.trace_context`): ``OUTGOING`` for outgoing
+                calls, ``INCOMING`` for incoming callbacks, ``BOTH`` for both.
+                ``NONE`` by default: nothing is sent or read.
         """
         self._transport = transport
         self._connection: IpcConnection | None = None
@@ -86,6 +94,9 @@ class IpcClient:
         #: Read by `_IpcProxy._invoke` before sending each outgoing request.
         self.before_call = before_call
         self._max_message_size = max_message_size
+        #: Read by `_IpcProxy._invoke` per outgoing call; incoming callbacks use
+        #: the value at connect time.
+        self.telemetry_propagation = telemetry_propagation
         # Translate contract-type keys to endpoint-name keys once at
         # construction; the connection stores by name but keeps the contract
         # type so dispatch can resolve incoming methods against it.
@@ -139,6 +150,7 @@ class IpcClient:
                     callbacks=self._callbacks,
                     request_timeout=self.request_timeout,
                     max_message_size=self._max_message_size,
+                    telemetry_propagation=self.telemetry_propagation,
                 )
             finally:
                 self._connecting_task = None

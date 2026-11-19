@@ -7,5 +7,6 @@ internal interface IClientConfig
     BeforeConnectHandler? BeforeConnect { get; }
     BeforeCallHandler? BeforeOutgoingCall { get; }
     ILogger? Logger { get; }
+    TelemetryPropagationPolicy TelemetryPropagation { get; }
     string GetComputedDebugName();
 }

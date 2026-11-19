@@ -144,8 +144,16 @@ function createConfig(params) {
         delete package.scripts;
         delete package.dependencies;
         delete package.devDependencies;
+        if (params.target !== 'node') {
+            // Only the Node bridge loads @opentelemetry/api.
+            delete package.peerDependencies;
+            delete package.peerDependenciesMeta;
+        }
 
-        const generatePackageJson = new GeneratePackageJsonPlugin(package);
+        // The plugin would list every external as a hard dependency; this one is an optional peer.
+        const generatePackageJson = new GeneratePackageJsonPlugin(package, {
+            excludeDependencies: ['@opentelemetry/api'],
+        });
         // Everything is bundled and package.json declares no dependencies, so the
         // package carries its own ingredients list (agreed with API-Workflow, which reads it).
         const sbom = new CycloneDxWebpackPlugin({
@@ -176,6 +184,8 @@ function createConfig(params) {
     }
 
     const module = {
+        // Lets `require(/* webpackIgnore: true */ ...)` keep the optional peer a plain runtime require.
+        parser: { javascript: { commonjsMagicComments: true } },
         rules: [
             {
                 test: /\.tsx?$/,
