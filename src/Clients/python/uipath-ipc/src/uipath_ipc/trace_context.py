@@ -108,7 +108,7 @@ def use_trace_context(trace_context: TraceContext | None) -> Iterator[TraceConte
 
     As for a received header, a value that isn't text is left out, and so is
     a ``traceparent`` that breaks W3C Trace Context §3.2, with its
-    ``tracestate``. When neither a ``traceparent`` nor a ``baggage`` is left,
+    ``tracestate``, and a ``baggage`` with no member that can be sent. When neither a ``traceparent`` nor a ``baggage`` is left,
     the scope changes nothing, and so does ``None`` (what
     `incoming_trace_context` returns when nothing arrived). The first time it leaves something out, a
     warning on the ``uipath_ipc.trace_context`` logger says why."""
@@ -131,7 +131,14 @@ def use_trace_context(trace_context: TraceContext | None) -> Iterator[TraceConte
         left_out.append(f"the {TRACEPARENT} isn't a W3C traceparent")
         traceparent = None
     baggage = text(BAGGAGE)
+    # The baggage is encoded once, here, as W3CPropagator would write what it reads.
+    encoded_baggage = baggage and _encode_baggage(_decode_baggage(baggage))
+    if baggage and not encoded_baggage:
+        left_out.append(f"the {BAGGAGE} has no member it can send")
+    baggage = encoded_baggage
     tracestate = text(TRACESTATE)
+    if tracestate and traceparent is None:
+        left_out.append(f"the {TRACESTATE} goes only with a {TRACEPARENT}")
     global _left_out_logged
     if left_out and not _left_out_logged:
         _left_out_logged = True
@@ -139,8 +146,6 @@ def use_trace_context(trace_context: TraceContext | None) -> Iterator[TraceConte
             "A use_trace_context scope left out what it couldn't use: %s.",
             ", ".join(left_out),
         )
-    # The baggage is encoded once, here, as W3CPropagator would write what it reads.
-    baggage = baggage and _encode_baggage(_decode_baggage(baggage))
     if traceparent is None and not baggage:
         yield trace_context
         return

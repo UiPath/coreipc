@@ -40,7 +40,8 @@ export module TraceHeaders {
 
     /**
      * The scope's trace context, with its baggage encoded once, here, as .NET writes it. As for a received header, a value that
-     * isn't text is left out, and so is a traceparent that breaks W3C Trace Context §3.2, with its tracestate. Undefined when
+     * isn't text is left out, and so is a traceparent that breaks W3C Trace Context §3.2, with its tracestate, and a baggage
+     * with no member that can be sent. Undefined when
      * neither a traceparent nor a baggage is left. The first time it leaves something out, it says why through Trace.
      */
     export function validated(value: TraceContext): TraceContext | undefined {
@@ -60,7 +61,13 @@ export module TraceHeaders {
         }
         const baggageValue = text(baggage);
         const encodedBaggage = baggageValue ? encodeBaggage(decodeBaggage(baggageValue)) : undefined;
+        if (baggageValue && !encodedBaggage) {
+            leftOut.push(`the ${baggage} has no member it can send`);
+        }
         const traceStateValue = text(tracestate);
+        if (traceStateValue && !validTraceParent) {
+            leftOut.push(`the ${tracestate} goes only with a ${traceparent}`);
+        }
         if (leftOut.length > 0 && !leftOutLogged) {
             leftOutLogged = true;
             Trace.log(`A withTraceContext scope left out what it couldn't use: ${leftOut.join(', ')}.`);

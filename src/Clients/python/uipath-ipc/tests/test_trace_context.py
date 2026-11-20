@@ -99,6 +99,21 @@ def test_use_says_once_what_it_leaves_out(
     with caplog.at_level("WARNING", logger="uipath_ipc.trace_context"):
         _sent(TraceContext(TP))
         assert caplog.messages == []
+        _sent(TraceContext(baggage="garbage"))
+        _sent(TraceContext(baggage="garbage"))
+        assert caplog.messages == [
+            "A use_trace_context scope left out what it couldn't use: "
+            "the baggage has no member it can send."
+        ]
+        caplog.clear()
+        monkeypatch.setattr(module, "_left_out_logged", False)
+        _sent(TraceContext(tracestate="a=b"))
+        assert caplog.messages == [
+            "A use_trace_context scope left out what it couldn't use: "
+            "the tracestate goes only with a traceparent."
+        ]
+        caplog.clear()
+        monkeypatch.setattr(module, "_left_out_logged", False)
         _sent(TraceContext("garbage", baggage=5))  # type: ignore[arg-type]
         _sent(TraceContext("garbage"))
     assert caplog.messages == [

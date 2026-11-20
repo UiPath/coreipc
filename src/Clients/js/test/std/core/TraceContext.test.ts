@@ -210,6 +210,15 @@ describe('trace context', () => {
                 TraceHeaders.resetLeftOutLogged();
                 outgoing({ traceparent });
                 expect(logged).to.deep.equal([]);
+                outgoing({ baggage: 'garbage' });
+                outgoing({ baggage: 'garbage' });
+                expect(logged).to.deep.equal(["A withTraceContext scope left out what it couldn't use: the baggage has no member it can send."]);
+                logged.length = 0;
+                TraceHeaders.resetLeftOutLogged();
+                outgoing({ tracestate: 'a=b' });
+                expect(logged).to.deep.equal(["A withTraceContext scope left out what it couldn't use: the tracestate goes only with a traceparent."]);
+                logged.length = 0;
+                TraceHeaders.resetLeftOutLogged();
                 outgoing({ traceparent: 'garbage', baggage: 5 } as unknown as TraceContext);
                 outgoing({ traceparent: 'garbage' });
                 expect(logged).to.deep.equal([
