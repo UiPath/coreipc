@@ -80,6 +80,23 @@ def test_use_leaves_out_an_invalid_traceparent_and_its_tracestate(traceparent: s
     assert _sent(TraceContext(traceparent, "a=b", "k=v")) == {"baggage": "k = v"}
 
 
+def test_use_says_once_what_it_leaves_out(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import uipath_ipc.trace_context as module
+
+    monkeypatch.setattr(module, "_left_out_logged", False)
+    with caplog.at_level("WARNING", logger="uipath_ipc.trace_context"):
+        _sent(TraceContext(TP))
+        assert caplog.messages == []
+        _sent(TraceContext("garbage", baggage=5))  # type: ignore[arg-type]
+        _sent(TraceContext("garbage"))
+    assert caplog.messages == [
+        "A use_trace_context scope left out what it couldn't use: "
+        "the traceparent isn't a W3C traceparent, the baggage isn't text."
+    ]
+
+
 def test_use_leaves_out_a_value_that_is_not_text() -> None:
     assert _sent(TraceContext(baggage=5)) is None  # type: ignore[arg-type]
     assert _sent(TraceContext(TP, 7)) == {"traceparent": TP}  # type: ignore[arg-type]

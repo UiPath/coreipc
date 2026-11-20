@@ -1,3 +1,4 @@
+import { Trace } from '../../bcl';
 import type { TraceContext } from './TraceContext';
 
 /* @internal */
@@ -40,17 +41,38 @@ export module TraceHeaders {
     /**
      * The scope's trace context, with its baggage encoded once, here, as .NET writes it. As for a received header, a value that
      * isn't text is left out, and so is a traceparent that breaks W3C Trace Context §3.2, with its tracestate. Undefined when
-     * neither a traceparent nor a baggage is left.
+     * neither a traceparent nor a baggage is left. The first time it leaves something out, it says why through Trace.
      */
     export function validated(value: TraceContext): TraceContext | undefined {
-        const text = (name: Header) => (typeof value[name] === 'string' ? (value[name] as string) : undefined);
+        const leftOut: string[] = [];
+        const text = (name: Header) => {
+            const raw: unknown = value[name];
+            if (raw != null && typeof raw !== 'string') {
+                leftOut.push(`the ${name} isn't text`);
+                return undefined;
+            }
+            return raw as string | undefined;
+        };
         const traceParentValue = text(traceparent);
         const validTraceParent = traceParentValue && isValidTraceParent(traceParentValue) ? traceParentValue : undefined;
+        if (traceParentValue && !validTraceParent) {
+            leftOut.push(`the ${traceparent} isn't a W3C traceparent`);
+        }
         const baggageValue = text(baggage);
         const encodedBaggage = baggageValue ? encodeBaggage(decodeBaggage(baggageValue)) : undefined;
-        return validTraceParent || encodedBaggage
-            ? normalize(validTraceParent, validTraceParent && text(tracestate), encodedBaggage)
-            : undefined;
+        const traceStateValue = text(tracestate);
+        if (leftOut.length > 0 && !leftOutLogged) {
+            leftOutLogged = true;
+            Trace.log(`A withTraceContext scope left out what it couldn't use: ${leftOut.join(', ')}.`);
+        }
+        return validTraceParent || encodedBaggage ? normalize(validTraceParent, validTraceParent && traceStateValue, encodedBaggage) : undefined;
+    }
+
+    let leftOutLogged = false;
+
+    /** For tests: the next scope that leaves something out says why again. */
+    export function resetLeftOutLogged(): void {
+        leftOutLogged = false;
     }
 
     /**

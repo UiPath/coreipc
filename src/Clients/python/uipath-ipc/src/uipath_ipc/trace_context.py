@@ -109,29 +109,44 @@ def use_trace_context(trace_context: TraceContext) -> Iterator[TraceContext]:
     As for a received header, a value that isn't text is left out, and so is
     a ``traceparent`` that breaks W3C Trace Context §3.2, with its
     ``tracestate``. When neither a ``traceparent`` nor a ``baggage`` is left,
-    the scope changes nothing."""
+    the scope changes nothing. The first time it leaves something out, a
+    warning on the ``uipath_ipc.trace_context`` logger says why."""
     if not isinstance(trace_context, TraceContext):
         raise TypeError("trace_context must be a TraceContext")
-    traceparent = _text(trace_context.traceparent)
+    left_out: list[str] = []
+
+    def text(name: str) -> str | None:
+        value = getattr(trace_context, name)
+        if value is not None and not isinstance(value, str):
+            left_out.append(f"the {name} isn't text")
+            return None
+        return value
+
+    traceparent = text(TRACEPARENT)
     if traceparent is not None and not _is_valid_traceparent(traceparent):
+        left_out.append(f"the {TRACEPARENT} isn't a W3C traceparent")
         traceparent = None
-    baggage = _text(trace_context.baggage)
+    baggage = text(BAGGAGE)
+    tracestate = text(TRACESTATE)
+    global _left_out_logged
+    if left_out and not _left_out_logged:
+        _left_out_logged = True
+        _logger.warning(
+            "A use_trace_context scope left out what it couldn't use: %s.",
+            ", ".join(left_out),
+        )
     # The baggage is encoded once, here, as W3CPropagator would write what it reads.
     baggage = baggage and _encode_baggage(_decode_baggage(baggage))
     if traceparent is None and not baggage:
         yield trace_context
         return
     token = _override.set(
-        TraceContext(traceparent, traceparent and _text(trace_context.tracestate), baggage)
+        TraceContext(traceparent, traceparent and tracestate, baggage)
     )
     try:
         yield trace_context
     finally:
         _override.reset(token)
-
-
-def _text(value: object) -> str | None:
-    return value if isinstance(value, str) else None
 
 
 def incoming_trace_context() -> TraceContext | None:
@@ -333,6 +348,7 @@ def _opentelemetry() -> Any:
 
 _logger = logging.getLogger(__name__)
 _read_failure_logged = False
+_left_out_logged = False
 
 
 def _from_opentelemetry() -> TraceContext | None:

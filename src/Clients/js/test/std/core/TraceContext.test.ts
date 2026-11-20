@@ -21,6 +21,7 @@ import {
     Socket,
     TelemetryPropagationPolicy,
     TimeSpan,
+    Trace,
     TraceContext,
     TraceContextRuntime,
     TraceHeaders,
@@ -191,6 +192,23 @@ describe('trace context', () => {
 
         it('should reject a missing trace context', () => {
             expect(() => withTraceContext(null!, () => 1)).to.throw();
+        });
+
+        it('should say once, through Trace, what a scope leaves out', () => {
+            const logged: unknown[] = [];
+            const listener = Trace.addListener(entry => logged.push(entry));
+            try {
+                TraceHeaders.resetLeftOutLogged();
+                outgoing({ traceparent });
+                expect(logged).to.deep.equal([]);
+                outgoing({ traceparent: 'garbage', baggage: 5 } as unknown as TraceContext);
+                outgoing({ traceparent: 'garbage' });
+                expect(logged).to.deep.equal([
+                    "A withTraceContext scope left out what it couldn't use: the traceparent isn't a W3C traceparent, the baggage isn't text.",
+                ]);
+            } finally {
+                listener.dispose();
+            }
         });
 
         it("should leave out a value that isn't text, without throwing", () => {
