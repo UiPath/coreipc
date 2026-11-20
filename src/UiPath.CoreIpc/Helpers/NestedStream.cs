@@ -67,7 +67,7 @@ internal class NestedStream : Stream
         _remainingBytes -= bytesRead;
         return bytesRead;
     }
-#if !NET461
+#if !NETFRAMEWORK
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     public async override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {

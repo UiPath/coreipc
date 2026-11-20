@@ -15,7 +15,7 @@
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == '$(NetFrameworkTfm)'">
     <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
-    <PackageReference Include="System.Net.Http" Version="4.3.4" />
+    <Reference Include="System.Net.Http" />
   </ItemGroup>
 
   <ItemGroup>

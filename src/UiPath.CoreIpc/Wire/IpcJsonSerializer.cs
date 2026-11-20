@@ -14,7 +14,7 @@ internal class IpcJsonSerializer : IArrayPool<char>
     // Writes a lone surrogate (as in a string cut mid-emoji) as U+FFFD, as opposed to StreamWriter's default UTF-8, which throws on it, so the message isn't sent.
     static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
 
-#if !NET461
+#if !NETFRAMEWORK
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
     public async ValueTask<T?> DeserializeAsync<T>(Stream json, ILogger? logger)
@@ -23,6 +23,9 @@ internal class IpcJsonSerializer : IArrayPool<char>
         await json.CopyToAsync(stream);
         stream.Position = 0;
         using var reader = CreateReader(new StreamReader(stream));
+        // A message has no dates, and a string that looks like one would be read as one, or fail the read if it overflows, which
+        // would close the connection. Not in CreateReader, which also reads the call's parameters and results.
+        reader.DateParseHandling = DateParseHandling.None;
         var result = StringArgsSerializer.Deserialize<T>(reader);
         if (stream.Position != json.Length)
         {

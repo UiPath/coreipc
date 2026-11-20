@@ -72,7 +72,7 @@ public sealed class NamedPipeServerTransport : ServerTransport
 
         ValueTask IAsyncDisposable.DisposeAsync()
         {
-#if NET461
+#if NETFRAMEWORK
             Stream.Dispose();
             return default;
 #else

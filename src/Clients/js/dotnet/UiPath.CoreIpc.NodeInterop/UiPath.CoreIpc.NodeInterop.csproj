@@ -1,10 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>$(NetFrameworkTfm);$(NetTfm)</TargetFrameworks>
+        <TargetFrameworks>$(NetTfm)</TargetFrameworks>
         <OutputType>Exe</OutputType>
         <LangVersion>preview</LangVersion>
-        <EnablePreviewFeatures>true</EnablePreviewFeatures>
         <Nullable>enable</Nullable>
         <NoWarn>1998</NoWarn>
     </PropertyGroup>

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import logging
+import sys
 import struct
 
 import pytest
@@ -601,3 +603,20 @@ async def test_ipc_client_and_server_accept_max_message_size() -> None:
     assert client._max_message_size == 123
     server = IpcServer(transport=object(), services={}, max_message_size=456)  # type: ignore[arg-type]
     assert server._max_message_size == 456
+
+
+# --- receive loop context -------------------------------------------------
+
+_opener_value: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "opener_value", default=None
+)
+
+
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="Task.get_context is 3.12+")
+async def test_receive_loop_does_not_keep_the_openers_context() -> None:
+    _opener_value.set("opener")
+    conn, _reader, _writer = await _make_connection()
+    try:
+        assert _opener_value not in conn._receive_task.get_context()
+    finally:
+        await conn.aclose()

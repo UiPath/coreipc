@@ -49,7 +49,7 @@ internal sealed class Connection : IDisposable
     public event Func<Request, ValueTask>? RequestReceived;
     public event Action<string>? CancellationReceived;
     public event EventHandler<EventArgs>? Closed;
-#if !NET461
+#if !NETFRAMEWORK
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
     public async ValueTask<Response> RemoteCall(Request request, CancellationToken token)
@@ -124,7 +124,7 @@ internal sealed class Connection : IDisposable
             SendMessage(MessageType.Response, responseBytes, cancellationToken) :
             SendDownloadStream(responseBytes, response.DownloadStream, cancellationToken);
     }
-#if !NET461
+#if !NETFRAMEWORK
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
     private async ValueTask SendDownloadStream(MemoryStream responseBytes, Stream downloadStream, CancellationToken cancellationToken)
@@ -134,7 +134,7 @@ internal sealed class Connection : IDisposable
             await SendStream(MessageType.DownloadResponse, responseBytes, downloadStream, cancellationToken);
         }
     }
-#if !NET461
+#if !NETFRAMEWORK
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
     private async ValueTask SendStream(MessageType messageType, Stream data, Stream userStream, CancellationToken cancellationToken)
@@ -155,7 +155,7 @@ internal sealed class Connection : IDisposable
             tokenRegistration.Dispose();
         }
     }
-#if !NET461
+#if !NETFRAMEWORK
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
     private async ValueTask SendMessage(MessageType messageType, MemoryStream data, CancellationToken cancellationToken)
@@ -204,7 +204,7 @@ internal sealed class Connection : IDisposable
             }
         }
     }
-#if !NET461
+#if !NETFRAMEWORK
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
     private async ValueTask<bool> ReadBuffer(int length)
@@ -218,7 +218,7 @@ internal sealed class Connection : IDisposable
             try
             {
                 read = await Network.ReadAsync(
-#if NET461
+#if NETFRAMEWORK
                     _buffer, offset, toRead);
 #else
                     _buffer.AsMemory(offset, toRead));
@@ -247,7 +247,15 @@ internal sealed class Connection : IDisposable
         while (toRead > 0);
         return true;
     }
-    private async Task ReceiveLoop()
+    private Task ReceiveLoop()
+    {
+        // Upload handlers run on the loop, so it must not carry whatever was ambient when the connection opened.
+        using (Helpers.EnsureFlowSuppressed())
+        {
+            return Task.Run(ReceiveLoopCore);
+        }
+    }
+    private async Task ReceiveLoopCore()
     {
         try
         {
@@ -273,7 +281,7 @@ internal sealed class Connection : IDisposable
         Dispose();
         return;
 
-#if !NET461
+#if !NETFRAMEWORK
         [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
         async ValueTask HandleMessage()

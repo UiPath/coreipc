@@ -9,7 +9,7 @@ export class Paths {
                 Paths.UiPath_CoreIpc_NodeInterop,
                 Paths.Bin,
                 Paths.Debug,
-                Paths.Net60
+                Paths.Net80
             );
 
         const absoluteTargetDir = path.join(process.cwd(), relativeTargetDir);
@@ -30,6 +30,6 @@ export class Paths {
     private static readonly DotNet = 'dotnet';
     private static readonly Bin = 'bin';
     private static readonly Debug = 'Debug';
-    private static readonly Net60 = 'net6.0';
+    private static readonly Net80 = 'net8.0';
 }
 

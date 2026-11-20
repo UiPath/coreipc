@@ -14,12 +14,13 @@ internal static class Helpers
 {
     internal const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly;
     internal static bool Enabled(this ILogger? logger, LogLevel logLevel = LogLevel.Information) => logger is not null && logger.IsEnabled(logLevel);
+    internal static AsyncFlowControl? EnsureFlowSuppressed() => ExecutionContext.IsFlowSuppressed() ? null : ExecutionContext.SuppressFlow();
     [Conditional("DEBUG")]
     internal static void AssertDisposed(this SemaphoreSlim semaphore) => semaphore.AssertFieldNull("m_waitHandle");
     [Conditional("DEBUG")]
     internal static void AssertDisposed(this CancellationTokenSource cts)
     {
-#if NET461
+#if NETFRAMEWORK
         cts.AssertFieldNull("m_kernelEvent");
         cts.AssertFieldNull("m_timer");
 #else
@@ -115,7 +116,7 @@ public static class IOHelpers
     internal const int HeaderLength = sizeof(int) + 1;
     internal static NamedPipeServerStream NewNamedPipeServerStream(string pipeName, PipeDirection direction, int maxNumberOfServerInstances, PipeTransmissionMode transmissionMode, PipeOptions options, Func<PipeSecurity?> pipeSecurity)
     {
-#if NET461
+#if NETFRAMEWORK
         return new(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options, inBufferSize: 0, outBufferSize: 0, pipeSecurity());
 #elif WINDOWS
         return NamedPipeServerStreamAcl.Create(pipeName, direction, maxNumberOfServerInstances, transmissionMode, options, inBufferSize: 0, outBufferSize: 0, pipeSecurity());
@@ -174,7 +175,7 @@ public static class IOHelpers
         Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer.Slice(1)), payloadLength);
         return stream.WriteMessageCore(recyclableStream, cancellationToken);
     }
-#if !NET461
+#if !NETFRAMEWORK
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
     private static async ValueTask WriteMessageCore(this Stream stream, RecyclableMemoryStream recyclableStream, CancellationToken cancellationToken)
@@ -352,14 +353,6 @@ internal readonly struct TimeoutHelper : IDisposable
             }
         }
         return exception;
-    }
-    public void ThrowTimeout(Exception exception, string message)
-    {
-        var newException = CheckTimeout(exception, message);
-        if (newException != exception)
-        {
-            throw newException;
-        }
     }
     public void Dispose()
     {

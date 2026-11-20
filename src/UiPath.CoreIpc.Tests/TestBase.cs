@@ -32,7 +32,7 @@ public abstract class TestBase : IAsyncLifetime
         _xUnitMethod = CustomTestFramework.Context?.Method ?? throw new InvalidOperationException();
 
         string runtime =
-#if NET461
+#if NETFRAMEWORK
     RuntimeInformation.FrameworkDescription
 #else
     $"{RuntimeInformation.FrameworkDescription}, {RuntimeInformation.RuntimeIdentifier}"
