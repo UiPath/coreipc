@@ -39,9 +39,10 @@ export module TraceHeaders {
     }
 
     /**
-     * The scope's trace context, with its baggage encoded once, here, as .NET writes it. As for a received header, a value that
-     * isn't text is left out, and so is a traceparent that breaks W3C Trace Context §3.2, with its tracestate, and a baggage
-     * with no member that can be sent. Undefined when
+     * The scope's trace context, with its tracestate cut and its baggage encoded once, here, as they are sent. As for a received
+     * header, a value that isn't text is left out, and so is a traceparent that breaks W3C Trace Context §3.2, with its
+     * tracestate. The baggage is read as a received one and written again, and the tracestate is cut as it is sent, so either
+     * one with no member that can be sent is left out too. Undefined when
      * neither a traceparent nor a baggage is left. The first time it leaves something out, it says why through Trace.
      */
     export function validated(value: TraceContext): TraceContext | undefined {
@@ -65,14 +66,17 @@ export module TraceHeaders {
             leftOut.push(`the ${baggage} has no member it can send`);
         }
         const traceStateValue = text(tracestate);
+        const validTraceState = validTraceParent && traceStateValue ? validateTraceState(traceStateValue) : undefined;
         if (traceStateValue && !validTraceParent) {
             leftOut.push(`the ${tracestate} goes only with a ${traceparent}`);
+        } else if (traceStateValue && !validTraceState) {
+            leftOut.push(`the ${tracestate} has no member it can send`);
         }
         if (leftOut.length > 0 && !leftOutLogged) {
             leftOutLogged = true;
             Trace.log(`A withTraceContext scope left out what it couldn't use: ${leftOut.join(', ')}.`);
         }
-        return validTraceParent || encodedBaggage ? normalize(validTraceParent, validTraceParent && traceStateValue, encodedBaggage) : undefined;
+        return validTraceParent || encodedBaggage ? normalize(validTraceParent, validTraceState, encodedBaggage) : undefined;
     }
 
     let leftOutLogged = false;

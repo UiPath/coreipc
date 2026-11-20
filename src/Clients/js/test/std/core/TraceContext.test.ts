@@ -165,7 +165,7 @@ describe('trace context', () => {
             expect(run({ traceparent, tracestate: members(33), baggage: members(65) })).to.equal(1);
         });
 
-        const outgoing = (traceContext: TraceContext) => withTraceContext(traceContext, () => TraceContextRuntime.getOutgoingHeaders());
+        const outgoing = (traceContext: TraceContext | undefined) => withTraceContext(traceContext, () => TraceContextRuntime.getOutgoingHeaders());
 
         for (const [name, value] of invalidTraceparents) {
             it(`should leave out a traceparent with ${name}, and its tracestate, without throwing`, () => {
@@ -183,21 +183,14 @@ describe('trace context', () => {
             ['empty values', { traceparent: '', tracestate: '', baggage: '' }],
             ['a tracestate alone', { tracestate: 'a=b' }],
             ['a baggage with no valid member', { baggage: 'garbage' }],
-        ] as Array<[string, TraceContext]>) {
+            ['a missing context (undefined)', undefined],
+            ['a missing context (null)', null],
+        ] as Array<[string, TraceContext | undefined]>) {
             it(`should run ${name}, which leaves neither a traceparent nor a baggage, as without this scope`, () => {
                 expect(withTraceContext({ traceparent }, () => outgoing(value))).to.deep.equal({ traceparent });
                 expect(outgoing(value)).to.equal(undefined);
             });
         }
-
-        it('should run a missing trace context, as currentIncomingTraceContext() gives when none arrived, as without this scope', () => {
-            for (const missing of [undefined, null!]) {
-                expect(withTraceContext({ traceparent }, () => withTraceContext(missing, () => TraceContextRuntime.getOutgoingHeaders()))).to.deep.equal({
-                    traceparent,
-                });
-                expect(withTraceContext(missing, () => 1)).to.equal(1);
-            }
-        });
 
         it('should reject a trace context that is not an object', () => {
             expect(() => withTraceContext('x' as unknown as TraceContext, () => 1)).to.throw();
@@ -217,6 +210,10 @@ describe('trace context', () => {
                 TraceHeaders.resetLeftOutLogged();
                 outgoing({ tracestate: 'a=b' });
                 expect(logged).to.deep.equal(["A withTraceContext scope left out what it couldn't use: the tracestate goes only with a traceparent."]);
+                logged.length = 0;
+                TraceHeaders.resetLeftOutLogged();
+                expect(outgoing({ traceparent, tracestate: 'Bad=1,a=1' })).to.deep.equal({ traceparent });
+                expect(logged).to.deep.equal(["A withTraceContext scope left out what it couldn't use: the tracestate has no member it can send."]);
                 logged.length = 0;
                 TraceHeaders.resetLeftOutLogged();
                 outgoing({ traceparent: 'garbage', baggage: 5 } as unknown as TraceContext);
@@ -390,6 +387,25 @@ describe('trace context', () => {
     });
 
     describe('incoming callbacks', () => {
+        it('should send on what it received through withTraceContext(currentIncomingTraceContext(), ...), and change nothing when none arrived', async () => {
+            await withAmbientTraceContext(async () => {
+                const sut = createSut(TelemetryPropagationPolicy.Both);
+                const forward = () => withTraceContext(currentIncomingTraceContext(), () => TraceContextRuntime.getOutgoingHeaders());
+                const sent: Array<RequestHeaders | undefined> = [];
+                await sut.receiveCallback(undefined, () => {
+                    sent.push(forward());
+                });
+                await sut.receiveCallback({ traceparent, tracestate: 'a=b', baggage: 'x=a%20b' }, () => {
+                    sent.push(forward());
+                });
+
+                expect(sent).to.deep.equal([
+                    TraceHeaders.toHeaders(ambientTraceContext),
+                    { traceparent, tracestate: 'a=b', baggage: 'x = a%20b' },
+                ]);
+            });
+        });
+
         it('should expose the received values to the handler', async () => {
             const sut = createSut(TelemetryPropagationPolicy.Both);
             let seen: TraceContext | undefined;

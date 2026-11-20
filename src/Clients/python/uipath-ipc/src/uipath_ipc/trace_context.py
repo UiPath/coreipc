@@ -108,7 +108,9 @@ def use_trace_context(trace_context: TraceContext | None) -> Iterator[TraceConte
 
     As for a received header, a value that isn't text is left out, and so is
     a ``traceparent`` that breaks W3C Trace Context §3.2, with its
-    ``tracestate``, and a ``baggage`` with no member that can be sent. When neither a ``traceparent`` nor a ``baggage`` is left,
+    ``tracestate``. The ``baggage`` is read as a received one and written
+    again, and the ``tracestate`` is cut as it is sent, so either one with no
+    member that can be sent is left out too. When neither a ``traceparent`` nor a ``baggage`` is left,
     the scope changes nothing, and so does ``None`` (what
     `incoming_trace_context` returns when nothing arrived). The first time it leaves something out, a
     warning on the ``uipath_ipc.trace_context`` logger says why."""
@@ -139,6 +141,13 @@ def use_trace_context(trace_context: TraceContext | None) -> Iterator[TraceConte
     tracestate = text(TRACESTATE)
     if tracestate and traceparent is None:
         left_out.append(f"the {TRACESTATE} goes only with a {TRACEPARENT}")
+        tracestate = None
+    elif tracestate:
+        # Cut once, here, as it is sent.
+        cut = _validate_tracestate(tracestate)
+        if not cut:
+            left_out.append(f"the {TRACESTATE} has no member it can send")
+        tracestate = cut
     global _left_out_logged
     if left_out and not _left_out_logged:
         _left_out_logged = True
@@ -150,7 +159,7 @@ def use_trace_context(trace_context: TraceContext | None) -> Iterator[TraceConte
         yield trace_context
         return
     token = _override.set(
-        TraceContext(traceparent, traceparent and tracestate, baggage)
+        TraceContext(traceparent, tracestate, baggage)
     )
     try:
         yield trace_context

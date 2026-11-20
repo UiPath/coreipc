@@ -64,14 +64,18 @@ def _use(tc: TraceContext) -> None:
         pass
 
 
-def test_use_with_none_changes_nothing() -> None:
-    # What incoming_trace_context() returns when nothing arrived.
-    with use_trace_context(TraceContext(TP)):
-        with use_trace_context(None) as tc:
-            assert tc is None
-            assert outgoing_headers() == {"traceparent": TP}
-    with use_trace_context(None):
-        assert outgoing_headers() is None
+def test_forwarding_incoming_trace_context_sends_it_on_and_changes_nothing_when_none_arrived() -> None:
+    def forwarded(received: TraceContext | None) -> dict[str, str] | None:
+        with incoming_scope(received, enabled=True):
+            with use_trace_context(incoming_trace_context()):
+                return outgoing_headers()
+
+    assert forwarded(None) is None
+    assert forwarded(from_headers({"traceparent": TP, "tracestate": "a=b", "baggage": "x=a%20b"})) == {
+        "traceparent": TP,
+        "tracestate": "a=b",
+        "baggage": "x = a%20b",
+    }
 
 
 def test_use_rejects_what_is_not_a_trace_context() -> None:
@@ -79,7 +83,7 @@ def test_use_rejects_what_is_not_a_trace_context() -> None:
         _use("x")  # type: ignore[arg-type]
 
 
-def _sent(tc: TraceContext) -> dict[str, str] | None:
+def _sent(tc: TraceContext | None) -> dict[str, str] | None:
     with use_trace_context(tc):
         return outgoing_headers()
 
@@ -114,6 +118,13 @@ def test_use_says_once_what_it_leaves_out(
         ]
         caplog.clear()
         monkeypatch.setattr(module, "_left_out_logged", False)
+        assert _sent(TraceContext(TP, "Bad=1,a=1")) == {"traceparent": TP}
+        assert caplog.messages == [
+            "A use_trace_context scope left out what it couldn't use: "
+            "the tracestate has no member it can send."
+        ]
+        caplog.clear()
+        monkeypatch.setattr(module, "_left_out_logged", False)
         _sent(TraceContext("garbage", baggage=5))  # type: ignore[arg-type]
         _sent(TraceContext("garbage"))
     assert caplog.messages == [
@@ -130,9 +141,9 @@ def test_use_leaves_out_a_value_that_is_not_text() -> None:
 
 @pytest.mark.parametrize(
     "tc",
-    [TraceContext(), TraceContext("", ""), TraceContext(tracestate="a=b"), TraceContext(baggage="garbage")],
+    [TraceContext(), TraceContext("", ""), TraceContext(tracestate="a=b"), TraceContext(baggage="garbage"), None],
 )
-def test_use_with_neither_a_traceparent_nor_a_baggage_left_changes_nothing(tc: TraceContext) -> None:
+def test_use_with_neither_a_traceparent_nor_a_baggage_left_changes_nothing(tc: TraceContext | None) -> None:
     with use_trace_context(TraceContext(TP)):
         assert _sent(tc) == {"traceparent": TP}
     assert _sent(tc) is None
