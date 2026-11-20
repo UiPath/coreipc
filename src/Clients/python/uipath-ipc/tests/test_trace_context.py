@@ -64,9 +64,19 @@ def _use(tc: TraceContext) -> None:
         pass
 
 
-def test_use_requires_a_trace_context() -> None:
+def test_use_with_none_changes_nothing() -> None:
+    # What incoming_trace_context() returns when nothing arrived.
+    with use_trace_context(TraceContext(TP)):
+        with use_trace_context(None) as tc:
+            assert tc is None
+            assert outgoing_headers() == {"traceparent": TP}
+    with use_trace_context(None):
+        assert outgoing_headers() is None
+
+
+def test_use_rejects_what_is_not_a_trace_context() -> None:
     with pytest.raises(TypeError):
-        _use(None)  # type: ignore[arg-type]
+        _use("x")  # type: ignore[arg-type]
 
 
 def _sent(tc: TraceContext) -> dict[str, str] | None:

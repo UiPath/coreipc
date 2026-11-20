@@ -190,8 +190,17 @@ describe('trace context', () => {
             });
         }
 
-        it('should reject a missing trace context', () => {
-            expect(() => withTraceContext(null!, () => 1)).to.throw();
+        it('should run a missing trace context, as currentIncomingTraceContext() gives when none arrived, as without this scope', () => {
+            for (const missing of [undefined, null!]) {
+                expect(withTraceContext({ traceparent }, () => withTraceContext(missing, () => TraceContextRuntime.getOutgoingHeaders()))).to.deep.equal({
+                    traceparent,
+                });
+                expect(withTraceContext(missing, () => 1)).to.equal(1);
+            }
+        });
+
+        it('should reject a trace context that is not an object', () => {
+            expect(() => withTraceContext('x' as unknown as TraceContext, () => 1)).to.throw();
         });
 
         it('should say once, through Trace, what a scope leaves out', () => {

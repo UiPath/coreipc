@@ -97,7 +97,7 @@ _incoming_tracestate: contextvars.ContextVar[tuple[int, object, str] | None] = (
 
 
 @contextlib.contextmanager
-def use_trace_context(trace_context: TraceContext) -> Iterator[TraceContext]:
+def use_trace_context(trace_context: TraceContext | None) -> Iterator[TraceContext | None]:
     """Make `trace_context` the trace context of every outgoing call (forward
     calls and callbacks) made within this scope — including from tasks created
     inside it — winning over OpenTelemetry. Without a ``traceparent``, its
@@ -109,10 +109,14 @@ def use_trace_context(trace_context: TraceContext) -> Iterator[TraceContext]:
     As for a received header, a value that isn't text is left out, and so is
     a ``traceparent`` that breaks W3C Trace Context §3.2, with its
     ``tracestate``. When neither a ``traceparent`` nor a ``baggage`` is left,
-    the scope changes nothing. The first time it leaves something out, a
+    the scope changes nothing, and so does ``None`` (what
+    `incoming_trace_context` returns when nothing arrived). The first time it leaves something out, a
     warning on the ``uipath_ipc.trace_context`` logger says why."""
+    if trace_context is None:
+        yield None
+        return
     if not isinstance(trace_context, TraceContext):
-        raise TypeError("trace_context must be a TraceContext")
+        raise TypeError("trace_context must be a TraceContext or None")
     left_out: list[str] = []
 
     def text(name: str) -> str | None:

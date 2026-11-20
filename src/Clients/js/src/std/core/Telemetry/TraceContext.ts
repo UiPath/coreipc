@@ -39,12 +39,13 @@ export interface TraceContext {
  * `withTraceContext(tc, () => proxy.Method())` is covered).
  *
  * As for a received header, a value that isn't text is left out, and so is a `traceparent` that breaks W3C Trace Context §3.2,
- * with its `tracestate`. When neither a `traceparent` nor a `baggage` is left, `callback` runs as it would without this scope.
+ * with its `tracestate`. When neither a `traceparent` nor a `baggage` is left, or `traceContext` is missing (as
+ * `currentIncomingTraceContext()` is when a callback brought none), `callback` runs as it would without this scope.
  */
-export function withTraceContext<T>(traceContext: TraceContext, callback: () => T): T {
-    assertArgument({ traceContext }, 'object');
+export function withTraceContext<T>(traceContext: TraceContext | undefined, callback: () => T): T {
+    assertArgument({ traceContext }, 'object', 'undefined');
 
-    const validated = TraceHeaders.validated(traceContext);
+    const validated = traceContext == null ? undefined : TraceHeaders.validated(traceContext);
     return validated ? TraceContextRuntime.overrides.run(validated, callback) : callback();
 }
 
