@@ -746,7 +746,7 @@ class IpcConnection:
         try:
             incoming = TelemetryPropagationPolicy.INCOMING in self.telemetry_propagation
             trace_context = from_headers(req.headers) if incoming else None
-            with incoming_scope(trace_context, incoming):
+            with incoming_scope(trace_context):
                 await self._invoke_callback(req)
         except Exception as ex:
             await self._try_send_response(

@@ -221,18 +221,19 @@ def from_headers(headers: Mapping[str, str] | None) -> TraceContext | None:
 
 
 @contextlib.contextmanager
-def incoming_scope(trace_context: TraceContext | None, enabled: bool) -> Iterator[None]:
-    """Run an incoming handler under `trace_context`.
+def incoming_scope(trace_context: TraceContext | None) -> Iterator[None]:
+    """Run an incoming handler under `trace_context`: ``None`` when none
+    arrived or the policy lacks ``INCOMING``.
 
     The receive loop starts with an empty context, and this resets the
     override and incoming values anyway, so none seen by whoever opened the
     connection can leak into the handler. The OpenTelemetry context is replaced too: the
-    remote parent when `enabled` (``INCOMING``), else empty (also when none
-    arrived or OpenTelemetry rejects the traceparent)."""
+    remote parent, else empty (also when OpenTelemetry rejects the
+    traceparent)."""
     override_token = _override.set(None)
     incoming_token = _incoming.set(trace_context)
     tracestate_token = _incoming_tracestate.set(None)
-    otel_token = _attach_opentelemetry(trace_context if enabled else None)
+    otel_token = _attach_opentelemetry(trace_context)
     try:
         yield
     finally:

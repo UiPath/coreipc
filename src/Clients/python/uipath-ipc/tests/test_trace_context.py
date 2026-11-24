@@ -75,7 +75,7 @@ def test_forwarding_incoming_trace_context_sends_it_on_and_changes_nothing_when_
     monkeypatch.setattr(trace_context_module, "_from_opentelemetry", lambda: ambient)
 
     def forwarded(received: TraceContext | None) -> dict[str, str] | None:
-        with incoming_scope(received, enabled=True):
+        with incoming_scope(received):
             with use_trace_context(incoming_trace_context()):
                 return outgoing_headers()
 
@@ -383,10 +383,16 @@ def test_from_headers_ignores_values_that_are_not_strings() -> None:
     assert from_headers(["traceparent", TP]) is None  # type: ignore[arg-type]
 
 
-def test_incoming_scope_exposes_the_values_and_hides_the_override() -> None:
+def test_incoming_scope_exposes_the_values_and_hides_the_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import uipath_ipc.trace_context as trace_context_module
+
+    # No ambient trace, so with OpenTelemetry the remote parent isn't sent either.
+    monkeypatch.setattr(trace_context_module, "_from_opentelemetry", lambda: None)
     received = TraceContext(TP2)
     with use_trace_context(TraceContext(TP)):
-        with incoming_scope(received, enabled=False):
+        with incoming_scope(received):
             assert incoming_trace_context() is received
             # Received values never become the outgoing override.
             assert outgoing_headers() is None
@@ -523,7 +529,7 @@ def test_opentelemetry_failing_to_import_counts_as_not_installed_and_is_tried_on
     monkeypatch.setattr(builtins, "__import__", failing_import)
     received = TraceContext(TP)
     for _ in range(3):
-        with incoming_scope(received, enabled=True):
+        with incoming_scope(received):
             assert incoming_trace_context() is received
             assert outgoing_headers() is None
     # Python doesn't remember a failed import: retrying it would cost every call.
@@ -661,7 +667,7 @@ def test_incoming_scope_sets_the_remote_parent_and_baggage() -> None:
 
     received = TraceContext(TP, "congo=t61rcWkgMzE", "userId = alice, x = a%20b")
     with _otel_scope(TP2, leaked="yes"):
-        with incoming_scope(received, enabled=True):
+        with incoming_scope(received):
             sc = trace.get_current_span().get_span_context()
             assert (sc.trace_id, sc.span_id) == (int(TP[3:35], 16), int(TP[36:52], 16))
             assert sc.is_remote
@@ -670,7 +676,7 @@ def test_incoming_scope_sets_the_remote_parent_and_baggage() -> None:
             assert dict(baggage.get_all()) == {"userId": "alice", "x": "a b"}
             # A nested call propagates the same trace.
             assert outgoing_headers()["traceparent"] == TP  # type: ignore[index]
-        with incoming_scope(None, enabled=True):
+        with incoming_scope(None):
             assert not trace.get_current_span().get_span_context().is_valid
             assert dict(baggage.get_all()) == {}
         assert dict(baggage.get_all()) == {"leaked": "yes"}
@@ -680,7 +686,7 @@ def test_incoming_scope_hands_opentelemetry_the_first_of_a_repeated_key() -> Non
     pytest.importorskip("opentelemetry.trace")
     from opentelemetry import baggage
 
-    with incoming_scope(TraceContext(baggage="k=1,j=2,k=3,=x,z=4"), enabled=True):
+    with incoming_scope(TraceContext(baggage="k=1,j=2,k=3,=x,z=4")):
         assert list(baggage.get_all().items()) == [("k", "1"), ("j", "2")]
         assert outgoing_headers() == {"baggage": "k = 1, j = 2"}
 
@@ -704,7 +710,7 @@ def test_incoming_scope_gives_no_remote_parent_for_a_traceparent_opentelemetry_r
 
     received = TraceContext(traceparent, "congo=t61rcWkgMzE", "k=v")
     with _otel_scope(TP2, leaked="yes"):
-        with incoming_scope(received, enabled=True):
+        with incoming_scope(received):
             assert incoming_trace_context() is received
             assert not trace.get_current_span().get_span_context().is_valid
             assert dict(baggage.get_all()) == {"k": "v"}
@@ -737,7 +743,7 @@ def test_received_tracestate_is_forwarded_as_received(
         finally:
             otel_context.detach(token)
 
-    with incoming_scope(from_headers({"traceparent": TP, "tracestate": tracestate}), enabled=True):
+    with incoming_scope(from_headers({"traceparent": TP, "tracestate": tracestate})):
         parent = trace.get_current_span().get_span_context()
         assert parent.trace_state.to_header() == parsed
         assert outgoing_headers()["tracestate"] == forwarded  # type: ignore[index]
