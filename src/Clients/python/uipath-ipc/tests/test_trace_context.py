@@ -64,13 +64,22 @@ def _use(tc: TraceContext) -> None:
         pass
 
 
-def test_forwarding_incoming_trace_context_sends_it_on_and_changes_nothing_when_none_arrived() -> None:
+def test_forwarding_incoming_trace_context_sends_it_on_and_changes_nothing_when_none_arrived(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Another ambient trace, faked so this runs without OpenTelemetry too: a
+    # forward that did nothing would send it instead of the received one.
+    import uipath_ipc.trace_context as trace_context_module
+
+    ambient = TraceContext(TP2, "congo=t61rcWkgMzE", "ambient = 1")
+    monkeypatch.setattr(trace_context_module, "_from_opentelemetry", lambda: ambient)
+
     def forwarded(received: TraceContext | None) -> dict[str, str] | None:
         with incoming_scope(received, enabled=True):
             with use_trace_context(incoming_trace_context()):
                 return outgoing_headers()
 
-    assert forwarded(None) is None
+    assert forwarded(None) == {"traceparent": TP2, "tracestate": "congo=t61rcWkgMzE", "baggage": "ambient = 1"}
     assert forwarded(from_headers({"traceparent": TP, "tracestate": "a=b", "baggage": "x=a%20b"})) == {
         "traceparent": TP,
         "tracestate": "a=b",
