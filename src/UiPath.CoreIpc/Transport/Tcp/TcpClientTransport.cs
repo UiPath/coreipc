@@ -36,7 +36,7 @@ internal sealed class TcpClientState : IClientState
         var transport = client.Transport as TcpClientTransport ?? throw new InvalidOperationException();
 
         _tcpClient = new();
-#if NET461
+#if NETFRAMEWORK
         using var ctreg = ct.Register(_tcpClient.Dispose);
         try
         {

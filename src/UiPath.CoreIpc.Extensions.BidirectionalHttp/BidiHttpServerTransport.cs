@@ -228,7 +228,7 @@ public sealed partial class BidiHttpServerTransport : ServerTransportBase
             }
 
             public
-#if !NET461
+#if !NETFRAMEWORK
             override
 #endif
             ValueTask DisposeAsync() => _slot.DisposeAsync();
@@ -259,7 +259,7 @@ public sealed partial class BidiHttpServerTransport : ServerTransportBase
                 }
 
                 HttpContent content =
-#if NET461
+#if NETFRAMEWORK
         new ByteArrayContent(memory.ToArray());
 #else
                 new ReadOnlyMemoryContent(memory);

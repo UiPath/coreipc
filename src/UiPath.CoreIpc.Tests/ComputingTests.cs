@@ -171,7 +171,7 @@ public abstract class ComputingTests : SpyTestBase
         => client().WithBeforeConnect(ct => ValueStorage.Value.ShouldNotBeNull().Invoke(ct));
     }
 
-#if !NET461 && !CI
+#if !NETFRAMEWORK && !CI
     [SkippableFact]
 #endif
     [OverrideConfig(typeof(DisableInProcClientServer))]

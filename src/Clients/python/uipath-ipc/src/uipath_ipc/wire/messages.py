@@ -11,7 +11,7 @@ mapping is explicit in `to_dict` / `from_dict`.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any
 
@@ -73,13 +73,16 @@ class Request:
     parameters: list[str]
     id: str = "0"
     timeout_in_seconds: float | None = None
+    #: Per-call headers (today only the W3C trace-context keys). Kept out of
+    #: the repr so baggage never reaches a log.
+    headers: dict[str, str] | None = field(default=None, repr=False)
 
     def to_dict(self) -> dict[str, Any]:
         # .NET's Request.TimeoutInSeconds is a non-nullable `double`, with 0
         # as the "no timeout, use server default" sentinel. Sending JSON null
         # makes Newtonsoft.Json throw on Request deserialization (it cannot
         # convert null → double) and the server drops the connection.
-        return {
+        d: dict[str, Any] = {
             "Endpoint": self.endpoint,
             "MethodName": self.method_name,
             "Parameters": list(self.parameters),
@@ -88,6 +91,11 @@ class Request:
             if self.timeout_in_seconds is not None
             else 0.0,
         }
+        # Omitted when None so a request without headers stays byte-identical
+        # to what older peers expect.
+        if self.headers is not None:
+            d["Headers"] = self.headers
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Request:
@@ -99,6 +107,7 @@ class Request:
             id=d.get("Id", "0"),
             # 0 / 0.0 from the wire decodes to None — both mean "no timeout".
             timeout_in_seconds=None if timeout in (None, 0, 0.0) else timeout,
+            headers=d.get("Headers"),
         )
 
     def to_json(self) -> str:

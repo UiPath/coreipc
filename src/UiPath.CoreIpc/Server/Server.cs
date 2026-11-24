@@ -26,6 +26,7 @@ internal class Server
 
     private readonly TimeSpan? _requestTimeout;
     private readonly IReadOnlyCollection<string>? _propagatedExceptionDataKeys;
+    private readonly bool _propagateIncoming;
 
     private ILogger? Logger => _connection.Logger;
     private bool LogEnabled => _connection.LogEnabled;
@@ -36,6 +37,7 @@ internal class Server
         _router = router;
         _requestTimeout = ipc.RequestTimeout;
         _propagatedExceptionDataKeys = ipc.PropagatedExceptionDataKeys is { Count: > 0 } keys ? keys : null;
+        _propagateIncoming = (ipc.TelemetryPropagation & TelemetryPropagationPolicy.Incoming) != 0;
         _connection = connection;
         _client = client;
         connection.RequestReceived += OnRequestReceived;
@@ -69,7 +71,7 @@ internal class Server
         }
     }
 
-#if !NET461
+#if !NETFRAMEWORK
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
 #endif
     private async ValueTask OnRequestReceived(Request request)
@@ -130,7 +132,7 @@ internal class Server
         return SendResponse(Response.Fail(request, ex, _propagatedExceptionDataKeys), default);
     }
 
-#if !NET461
+#if !NETFRAMEWORK
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
     private async ValueTask<Response> HandleRequest(Method method, Route route, Request request, IpcContext context)
@@ -143,7 +145,7 @@ internal class Server
         {
             return await InvokeMethod();
         }
-#if !NET461
+#if !NETFRAMEWORK
         [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
 #endif
         async ValueTask<Response> InvokeMethod()
@@ -167,7 +169,10 @@ internal class Server
             ScheduleMethodCall().LogException(Logger, method.MethodInfo);
             return Response.Success(request, "");
 
-            Task<object?> ScheduleMethodCall() => defaultScheduler ? MethodCall() : RunOnScheduler();
+            Task<object?> ScheduleMethodCall() => defaultScheduler ? TracedMethodCall() : RunOnScheduler();
+            Task<object?> TracedMethodCall() => _propagateIncoming && request.Headers is { } headers
+                ? Telemetry.RunInServerSpan(headers, $"{request.Endpoint}/{request.MethodName}", MethodCall)
+                : MethodCall();
             async Task<object?> MethodCall()
             {
                 // So a POCO contract can reach the peer without a Message parameter.
@@ -189,7 +194,7 @@ internal class Server
                 }
             }
 
-            Task<object?> RunOnScheduler() => Task.Factory.StartNew(MethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler).Unwrap();
+            Task<object?> RunOnScheduler() => Task.Factory.StartNew(TracedMethodCall, cancellationToken, TaskCreationOptions.DenyChildAttach, scheduler).Unwrap();
         }
         object?[] GetArguments()
         {

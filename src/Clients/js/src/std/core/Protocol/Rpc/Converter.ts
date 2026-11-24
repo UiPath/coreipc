@@ -1,6 +1,5 @@
 import {
     TimeSpan,
-    assertArgument,
     TimeoutError,
     InvalidOperationError,
     Trace,
@@ -98,13 +97,22 @@ export class Converter {
         }
     }
 
-    public static toRpcError(err: any): IpcError {
-        assertArgument({ err }, 'string', Object);
-
-        if (err instanceof Error) {
-            return new IpcError(err.message, err.stack ?? '', err.name, null);
-        } else {
-            return new IpcError(`${err}`, '', '', null);
+    /** A callback can throw anything, even a value whose properties or conversion throw: the caller still gets an error. */
+    public static toRpcError(err: unknown): IpcError {
+        try {
+            if (err instanceof Error) {
+                // String(): an Error's message or name can be anything, and the response must still be written.
+                return new IpcError(String(err.message), String(err.stack ?? ''), String(err.name), null);
+            }
+            return new IpcError(String(err), '', '', null);
+        } catch {
+            let message: string;
+            try {
+                message = Object.prototype.toString.call(err);
+            } catch {
+                message = typeof err;
+            }
+            return new IpcError(message, '', '', null);
         }
     }
 }

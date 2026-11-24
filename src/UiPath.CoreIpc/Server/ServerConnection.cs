@@ -75,6 +75,7 @@ internal sealed class ServerConnection : IClient, IDisposable, IClientConfig
     BeforeConnectHandler? IClientConfig.BeforeConnect => null;
     BeforeCallHandler? IClientConfig.BeforeOutgoingCall => null;
     ILogger? IClientConfig.Logger => _logger;
+    TelemetryPropagationPolicy IClientConfig.TelemetryPropagation => _ipcServer.TelemetryPropagation;
     string IClientConfig.GetComputedDebugName() => _debugName;
     #endregion
 }

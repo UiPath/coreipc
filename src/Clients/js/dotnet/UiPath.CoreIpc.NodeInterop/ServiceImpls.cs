@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -76,6 +77,33 @@ internal static class ServiceImpls
     public sealed class EnvironmentVariableGetter : IEnvironmentVariableGetter
     {
         public Task<string?> Get(string variable) => Task.FromResult<string?>(Environment.GetEnvironmentVariable(variable));
+    }
+
+    public sealed class TraceProbe : ITraceProbe
+    {
+        public Task<TraceProbeResult> Probe()
+        {
+            var activity = Activity.Current;
+            return Task.FromResult(new TraceProbeResult
+            {
+                ActivityTraceId = activity?.TraceId.ToHexString(),
+                ActivityParentSpanId = activity?.ParentSpanId.ToHexString(),
+                ActivitySpanId = activity?.SpanId.ToHexString(),
+                ActivityTraceState = activity?.TraceStateString,
+                ActivityBaggage = activity?.Baggage.Select(pair => $"{pair.Key}={pair.Value}").ToArray(),
+            });
+        }
+
+        public async Task<TraceProbeCallbackResult> ProbeViaCallback()
+        {
+            var activity = Activity.Current;
+            return new TraceProbeCallbackResult
+            {
+                Callback = await IpcContext.Current!.GetCallback<ITraceProbeCallback>().Probe(),
+                ServerActivityTraceId = activity?.TraceId.ToHexString(),
+                ServerActivitySpanId = activity?.SpanId.ToHexString(),
+            };
+        }
     }
 
     public sealed class DtoService : IDtoService
