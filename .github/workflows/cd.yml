@@ -2,7 +2,9 @@ name: Publish uipath-ipc to PyPI
 
 # Publishes uipath-ipc to public PyPI via Trusted Publishing (OIDC) — no tokens.
 # ADO stays primary; on a green publish it POSTs a repository_dispatch (publish-pypi)
-# with the released commit SHA, and this builds & publishes that commit. Only master
+# with the released commit SHA and the exact version CI built (release or .devN
+# prerelease), and this builds that commit at that version and publishes it — so
+# public PyPI matches the internal feed (no stripped-to-clean surprise). Only master
 # publishes (dispatch runs the default-branch file; the build refuses non-master
 # commits) and there is no workflow_dispatch, so it can't fire by accident. Prereqs:
 # a PyPI Trusted Publisher (UiPath/coreipc, workflow cd.yml, env pypi) + protected `pypi` env.
@@ -21,7 +23,6 @@ concurrency:
 
 env:
   PACKAGE_DIR: src/Clients/python/uipath-ipc
-  CSPROJ: src/UiPath.CoreIpc/UiPath.CoreIpc.csproj
 
 jobs:
   build:
@@ -30,9 +31,8 @@ jobs:
     outputs:
       version: ${{ steps.resolve.outputs.version }}
     steps:
-      # Untrusted input (client_payload.sha) is read via env, never inlined into
-      # a run: script, and validated as a 40-char hex commit — script-injection
-      # hardening + rejects tags/branch-names (we require an exact commit).
+      # Untrusted inputs (client_payload.*) are read via env, never inlined into
+      # a run: script (script-injection hardening).
       - name: Resolve & validate commit SHA
         id: ref
         env:
@@ -73,44 +73,40 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Version comes from the SAME commit we build (single source of truth) and
-      # is validated as a clean PEP 440 RELEASE version. A CI/dev build (local
-      # +segment) or a non-PEP-440 string (e.g. .NET-style '2.5.2-rc1') is
-      # REJECTED rather than silently mangled into the wrong release.
-      - name: Resolve & validate version (PEP 440, no local segment)
+      # The version to publish is decided by ADO (the exact version CI built and
+      # pushed to the internal feed) and passed in the dispatch. We accept PEP 440
+      # RELEASES and PRE-RELEASES (e.g. 2.5.3, 2.5.3.dev123, 2.5.3rc1); we reject
+      # only local (+...) segments, which PyPI forbids.
+      - name: Resolve & validate version (PEP 440)
         id: resolve
+        env:
+          DISPATCH_VERSION: ${{ github.event.client_payload.version }}
         run: |
           set -euo pipefail
           python -m pip install --quiet --upgrade packaging
-          python - "$CSPROJ" <<'PY'
-          import os, sys, xml.etree.ElementTree as ET
+          RAW="$DISPATCH_VERSION" python - <<'PY'
+          import os, sys
           from packaging.version import Version, InvalidVersion
 
-          root = ET.parse(sys.argv[1]).getroot()
-          vals = [e.text.strip() for e in root.iter()
-                  if e.tag.split('}')[-1] == 'Version' and (e.text or '').strip()]
-          if not vals:
-              sys.exit(f"::error::No <Version> found in {sys.argv[1]}")
-          raw = vals[0]
-
+          raw = os.environ.get("RAW", "").strip()
+          if not raw:
+              sys.exit("::error::No client_payload.version provided.")
           if "+" in raw:
-              sys.exit(f"::error::Version '{raw}' has a PEP 440 local segment (+...); "
-                       "that is a CI/dev build, not a release — refusing to publish.")
+              sys.exit(f"::error::Version '{raw}' has a PEP 440 local segment (+...); PyPI forbids it — refusing.")
           try:
-              v = Version(raw)          # rejects .NET-style '2.5.2-rc1'
+              v = Version(raw)
           except InvalidVersion:
-              sys.exit(f"::error::Version '{raw}' is not a valid PEP 440 release version. "
-                       "Set a clean version (e.g. 2.5.2 or 2.5.2rc1) before publishing.")
+              sys.exit(f"::error::Version '{raw}' is not a valid PEP 440 version.")
           if v.local:
               sys.exit(f"::error::Version '{raw}' has a local segment — refusing.")
           with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
               fh.write(f"version={raw}\n")
-          print(f"Publishing version: {raw}")
+          print(f"Publishing version: {raw}" + (" (pre-release)" if v.is_prerelease else ""))
           PY
 
       - name: Stamp version into pyproject.toml
-        # Reuse the repo's own stamper (single source of truth). With a clean
-        # dash-free version its to_pep440() is the identity.
+        # The version is already PEP 440 (no dash), so stamp-python-version.py's
+        # to_pep440() writes it verbatim.
         run: |
           set -euo pipefail
           python src/CI/stamp-python-version.py \
