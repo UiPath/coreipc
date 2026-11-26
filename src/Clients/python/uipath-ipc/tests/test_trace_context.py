@@ -220,27 +220,27 @@ def test_baggage_over_the_limits_like_w3c_propagator() -> None:
     [
         ("userId=alice,x=a%20b", "userId = alice, x = a%20b"),
         (" k = v ", "k = v"),
-        ("a=1,foo,b=2", "a = 1"),
-        ("foo,a=1", None),
-        ("a=1,b=,c=3", "a = 1"),
+        ("a=1,foo,b=2", "a = 1, b = 2"),
+        ("foo,a=1", "a = 1"),
+        ("a=1,b=,c=3", "a = 1, c = 3"),
         ("a=1,b= ,c=3", "a = 1, b = , c = 3"),
         ("a=1,Bad Key=2,b=2", "a = 1, b = 2"),
         ("a=50%,b=2", "b = 2"),
         ("a=café,b=2", "b = 2"),
-        ("k=v;p=1", "k = v%3Bp=1"),
+        ("k=v ;p=1", "k = v"),
         ("k%41=1", "k%41 = 1"),
-        ("a=1,a=2", "a = 1"),
+        ("a=1,b=2,a=3", "a = 3, b = 2"),
         ("k=%C3%A9", "k = %C3%A9"),
         ("k=%c3%a9", "k = %C3%A9"),
     ],
     ids=[
-        "format", "trimmed", "stops-at-no-equal", "nothing-before-no-equal",
-        "stops-at-equal-last", "equal-last-before-trim", "skips-a-non-token-key",
-        "skips-a-broken-escape", "skips-raw-non-ascii", "properties-in-the-value",
-        "key-not-decoded", "first-wins", "escape-kept", "escape-uppercased",
+        "format", "trimmed", "skips-no-equal", "skips-a-first-no-equal",
+        "skips-equal-last", "equal-last-before-trim", "skips-a-non-token-key",
+        "skips-a-broken-escape", "skips-raw-non-ascii", "properties-dropped",
+        "key-not-decoded", "last-wins", "escape-kept", "escape-uppercased",
     ],
 )
-def test_an_override_baggage_is_sent_as_w3c_propagator_writes_what_it_reads(
+def test_an_override_baggage_is_read_as_a_received_one_and_sent_as_w3c_propagator_writes(
     baggage: str, sent: str | None
 ) -> None:
     expected = {"traceparent": TP, "baggage": sent} if sent else {"traceparent": TP}
@@ -472,13 +472,13 @@ def test_baggage_decoding_skips_a_broken_escape_or_a_raw_non_ascii_value(value: 
     assert _decode_baggage(f"a=1,k={value},b=2") == {"a": "1", "b": "2"}
 
 
-def test_baggage_decoding_follows_w3c_propagator() -> None:
-    assert _decode_baggage(" a = 1 ,b= ,c=3;ttl=30,Bad Key=4,k%41=5,a=6,d=7,") == {
-        "a": "1", "b": "", "c": "3;ttl=30", "k%41": "5", "d": "7",
-    }
-    # It stops for good at a member with no '=', or with it first or last.
-    for stop in ("foo", "", "=x", "k=", " k="):
-        assert _decode_baggage(f"a=1,{stop},b=2") == {"a": "1"}
+def test_baggage_decoding_follows_opentelemetry() -> None:
+    assert list(_decode_baggage(" a = 1 ,b= ,c=3 ;ttl=30,Bad Key=4,k%41=5,a=6,d=7,").items()) == [
+        ("a", "6"), ("b", ""), ("c", "3"), ("k%41", "5"), ("d", "7"),
+    ]
+    # A member with no '=', or with it first or last, is skipped, not the rest with it.
+    for skipped in ("foo", "", "=x", "k=", " k="):
+        assert _decode_baggage(f"a=1,{skipped},b=2") == {"a": "1", "b": "2"}
 
 
 # --- OpenTelemetry precedence -------------------------------------------------------
@@ -682,13 +682,13 @@ def test_incoming_scope_sets_the_remote_parent_and_baggage() -> None:
         assert dict(baggage.get_all()) == {"leaked": "yes"}
 
 
-def test_incoming_scope_hands_opentelemetry_the_first_of_a_repeated_key() -> None:
+def test_incoming_scope_hands_opentelemetry_the_last_of_a_repeated_key() -> None:
     pytest.importorskip("opentelemetry.trace")
     from opentelemetry import baggage
 
-    with incoming_scope(TraceContext(baggage="k=1,j=2,k=3,=x,z=4")):
-        assert list(baggage.get_all().items()) == [("k", "1"), ("j", "2")]
-        assert outgoing_headers() == {"baggage": "k = 1, j = 2"}
+    with incoming_scope(TraceContext(baggage="k=1,j=2,k=3,=x,z=4;p=1")):
+        assert list(baggage.get_all().items()) == [("k", "3"), ("j", "2"), ("z", "4")]
+        assert outgoing_headers() == {"baggage": "k = 3, j = 2, z = 4"}
 
 
 @pytest.mark.parametrize(

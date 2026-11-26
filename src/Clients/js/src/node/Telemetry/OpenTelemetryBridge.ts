@@ -154,7 +154,7 @@ export class OpenTelemetryBridge implements TracingBridge {
         }
 
         if (traceContext.baggage) {
-            // A null prototype keeps an untrusted "__proto__" key an ordinary entry. decodeBaggage keeps the first of a repeated key.
+            // A null prototype keeps an untrusted "__proto__" key an ordinary entry. decodeBaggage keeps the last of a repeated key.
             const entries: { [key: string]: { value: string } } = Object.create(null);
             for (const [key, value] of TraceHeaders.decodeBaggage(traceContext.baggage)) {
                 entries[key] = { value };

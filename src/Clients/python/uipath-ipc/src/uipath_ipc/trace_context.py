@@ -11,7 +11,8 @@ values, and with OpenTelemetry installed the handler's current span is the
 (non-recording) remote parent.
 
 The headers are read and written as .NET's DiagnosticSource 10 W3CPropagator
-does, so the .NET, JS and Python clients send the same bytes.
+does, so the .NET, JS and Python clients send the same bytes; only a received
+baggage is read like the OpenTelemetry propagators read it.
 """
 
 from __future__ import annotations
@@ -317,21 +318,23 @@ def _well_formed(text: str) -> str:
 
 
 def _decode_baggage(baggage: str) -> dict[str, str]:
-    """Stops at a member whose raw text has no '=', or has it first or last;
-    skips one whose trimmed key isn't a token, or whose value has a non-ASCII
-    character or a '%' without two hex digits. Keys aren't decoded, properties
-    (after ';') stay in the value, and the first of a repeated key wins."""
+    """Like the OpenTelemetry propagators, skips a member it can't read,
+    drops the properties (from the first ';') and keeps the last of a
+    repeated key, in the first one's place. A member can't be read when its
+    raw text has no '=', or has it first or last, its trimmed key isn't a
+    token, or its value has a non-ASCII character or a '%' without two hex
+    digits. Keys aren't decoded; values are trimmed and decoded."""
     entries: dict[str, str] = {}
     for member in baggage.split(","):
         equal = member.find("=")
         if equal <= 0 or equal == len(member) - 1:
-            break
+            continue
         key = member[:equal].strip(" \t")
-        value = member[equal + 1 :].strip(" \t")
+        value = member[equal + 1 :].split(";", 1)[0].strip(" \t")
         if not _BAGGAGE_KEY.fullmatch(key) or not value.isascii() or _BAD_ESCAPE.search(value):
             continue
         # A percent-escape that isn't valid UTF-8 decodes to U+FFFD.
-        entries.setdefault(key, unquote(value, errors="replace"))
+        entries[key] = unquote(value, errors="replace")
     return entries
 
 

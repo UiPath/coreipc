@@ -238,22 +238,23 @@ describe('node:trace context', () => {
             }
         });
 
-        it('should keep the first of a repeated baggage key, as .NET and Python do', () => {
+        it('should keep the last of a repeated baggage key, as the OpenTelemetry propagators and Python do', () => {
             const value = new OpenTelemetryBridge().runWithRemoteParent({ traceparent, baggage: 'k=1,k=2' }, () =>
                 propagation.getBaggage(context.active())?.getEntry('k')?.value,
             );
 
-            expect(value).to.equal('1');
+            expect(value).to.equal('2');
         });
 
-        it("should hand OpenTelemetry the baggage .NET would read: properties kept in the value, and nothing after a member with no '='", () => {
+        it("should hand OpenTelemetry the received baggage with properties dropped and a member with no '=' skipped", () => {
             const entries = new OpenTelemetryBridge().runWithRemoteParent({ traceparent, baggage: 'a=1;p=2, b = x%20y ,bad key=3,c=50%,foo,d=4' }, () =>
                 propagation.getBaggage(context.active())?.getAllEntries().map(([key, entry]) => [key, entry.value]),
             );
 
             expect(entries).to.deep.equal([
-                ['a', '1;p=2'],
+                ['a', '1'],
                 ['b', 'x y'],
+                ['d', '4'],
             ]);
         });
 
