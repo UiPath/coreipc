@@ -6,8 +6,9 @@ export type RequestHeaders = { [name: string]: string };
 
 /**
  * The three headers as DiagnosticSource 10's W3C propagator (W3CPropagator.cs) writes and reads them, so .NET, JS and Python
- * send the same bytes. Where a map can't follow it, each baggage key goes once, in map order; broken UTF-8 in a received
- * baggage decodes as TextDecoder does.
+ * send the same bytes; only a received baggage is read like the OpenTelemetry propagators read it (see decodeBaggage). Where
+ * a map can't follow it, each baggage key goes once, in map order; broken UTF-8 in a received baggage decodes as TextDecoder
+ * does.
  */
 /* @internal */
 export module TraceHeaders {
@@ -198,20 +199,22 @@ export module TraceHeaders {
     }
 
     /**
-     * Stops at a member whose raw text has no '=', or has it first or last. Skips a member whose key isn't a token or whose
-     * value can't be decoded. Keys aren't decoded; values are trimmed and decoded, ';' properties included. The first of a
-     * repeated key wins.
+     * Like the OpenTelemetry propagators, skips a member it can't read, drops the properties (from the first ';') and keeps
+     * the last of a repeated key, in the first one's place. A member can't be read when its raw text has no '=', or has it
+     * first or last, its key isn't a token, or its value can't be decoded. Keys aren't decoded; values are trimmed and
+     * decoded.
      */
     export function decodeBaggage(value: string): Array<[string, string]> {
         const entries = new Map<string, string>();
         for (const member of value.split(',')) {
             const separator = member.indexOf('=');
             if (separator <= 0 || separator >= member.length - 1) {
-                break;
+                continue;
             }
             const key = trimOptionalWhitespace(member.substring(0, separator));
-            const escaped = trimOptionalWhitespace(member.substring(separator + 1));
-            if (baggageKeyPattern.test(key) && !invalidBaggageValuePattern.test(escaped) && !entries.has(key)) {
+            const properties = member.indexOf(';', separator + 1);
+            const escaped = trimOptionalWhitespace(member.substring(separator + 1, properties < 0 ? member.length : properties));
+            if (baggageKeyPattern.test(key) && !invalidBaggageValuePattern.test(escaped)) {
                 entries.set(key, unescape(escaped));
             }
         }

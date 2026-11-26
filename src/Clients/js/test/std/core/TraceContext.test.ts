@@ -328,9 +328,9 @@ describe('trace context', () => {
             const sut = createSut(TelemetryPropagationPolicy.Both);
             const send = async (value: string) => (await withTraceContext({ traceparent, baggage: value }, () => sut.call())).Headers!.baggage;
 
-            expect(await send(' a=1 ,bad key=2,b=50%,c=é,d=x%20y;p=1,a=3,e=%F0%9F%98%80')).to.equal('a = 1, d = x%20y%3Bp=1, e = %F0%9F%98%80');
-            expect(await send('a=1,foo,b=2')).to.equal('a = 1');
-            expect(await send('foo,a=1')).to.equal(undefined);
+            expect(await send(' a=1 ,bad key=2,b=50%,c=é,d=x%20y;p=1,a=3,e=%F0%9F%98%80')).to.equal('a = 3, d = x%20y, e = %F0%9F%98%80');
+            expect(await send('a=1,foo,b=2')).to.equal('a = 1, b = 2');
+            expect(await send('foo,a=1')).to.equal('a = 1');
         });
 
         it('should send the baggage alone, without the tracestate, when there is no traceparent', async () => {
@@ -757,18 +757,21 @@ describe('trace context', () => {
             expect(TraceHeaders.decodeBaggage(TraceHeaders.encodeBaggage(entries)!)).to.deep.equal(entries);
         });
 
-        it('should skip a member with a bad key or value, trim, keep properties in the value and the first of a repeated key', () => {
-            expect(TraceHeaders.decodeBaggage('a=1, b = 2 ,c=3;ttl=30,bad key=4,d=50%,e=é,f=%zz%41,a=9,g=x')).to.deep.equal([
-                ['a', '1'],
+        it("should skip a member with a bad key or value, trim, drop properties and keep the last of a repeated key in the first one's place", () => {
+            expect(TraceHeaders.decodeBaggage('a=1, b = 2 ,c=3 ;ttl=30,bad key=4,d=50%,e=é,f=%zz%41,a=9,g=x')).to.deep.equal([
+                ['a', '9'],
                 ['b', '2'],
-                ['c', '3;ttl=30'],
+                ['c', '3'],
                 ['g', 'x'],
             ]);
         });
 
-        for (const baggage of ['a=1,foo,b=2', 'a=1,k=,b=2', 'a=1,=x,b=2', 'a=1,,b=2', 'a=1,']) {
-            it(`should stop reading ${baggage} at a member with no =, or with it first or last`, () => {
-                expect(TraceHeaders.decodeBaggage(baggage)).to.deep.equal([['a', '1']]);
+        for (const skipped of ['foo', 'k=', ' k=', '=x', '']) {
+            it(`should skip '${skipped}', a member with no = or with it first or last, and read on`, () => {
+                expect(TraceHeaders.decodeBaggage(`a=1,${skipped},b=2`)).to.deep.equal([
+                    ['a', '1'],
+                    ['b', '2'],
+                ]);
             });
         }
 
