@@ -227,9 +227,9 @@ def incoming_scope(trace_context: TraceContext | None) -> Iterator[None]:
 
     The receive loop starts with an empty context, and this resets the
     override and incoming values anyway, so none seen by whoever opened the
-    connection can leak into the handler. The OpenTelemetry context is replaced too: the
-    remote parent, else empty (also when OpenTelemetry rejects the
-    traceparent)."""
+    connection can leak into the handler. The OpenTelemetry context is
+    replaced too, by one holding only the received baggage and, when
+    OpenTelemetry accepts the traceparent, the remote parent."""
     override_token = _override.set(None)
     incoming_token = _incoming.set(trace_context)
     tracestate_token = _incoming_tracestate.set(None)
